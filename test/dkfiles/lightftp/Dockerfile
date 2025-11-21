@@ -21,10 +21,12 @@ RUN apt-get -y update && \
     gdb \
     netcat \
     strace \
-    wget
+    wget 
 
 # Install uv
-RUN wget -qO- https://astral.sh/uv/install.sh | sh
+RUN wget -qO- https://astral.sh/uv/install.sh | sh 
+
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Add a new user ubuntu, pass: ubuntu
 RUN groupadd ubuntu && \
@@ -51,18 +53,25 @@ RUN git clone https://github.com/profuzzbench/aflnet.git
 #     make clean all $MAKE_OPT && \
 #     cd llvm_mode && make $MAKE_OPT
 
-RUN git clone https://github.com/Ch1ps-dot/Voltron.git && \
-    cd Voltron && \
-    uv pip install requirements
+# ONLY WORKED WITHIN LAB NETWORK 
+ARG GITLAB_USERNAME
+ARG GITLAB_TOKEN
+RUN git clone http://${GITLAB_USERNAME}:${GITLAB_TOKEN}@121.248.48.129:8001/pfqiu/voltron.git
+
+USER root
+RUN cd voltron && \
+    uv sync
+USER ubuntu
+
 
 # Set up environment variables for AFLNet
 ENV WORKDIR="/home/ubuntu/experiments"
-# ENV AFLNET="/home/ubuntu/aflnet"
-# ENV PATH="${PATH}:${AFLNET}:/home/ubuntu/.local/bin:${WORKDIR}"
-# ENV AFL_PATH="${AFLNET}"
-# ENV AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
-#     AFL_SKIP_CPUFREQ=1 \
-#     AFL_NO_AFFINITY=1
+ENV AFLNET="/home/ubuntu/aflnet"
+ENV PATH="${PATH}:${AFLNET}:/home/ubuntu/.local/bin:${WORKDIR}"
+ENV AFL_PATH="${AFLNET}"
+ENV AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
+    AFL_SKIP_CPUFREQ=1 \
+    AFL_NO_AFFINITY=1
 
 
 RUN mkdir $WORKDIR

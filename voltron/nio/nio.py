@@ -34,7 +34,7 @@ class Nio:
         except Exception as e:
             print('Network Send Failure')
     
-    def net_recv(self, skt:socket.socket):
+    def net_recv(self):
         try:
             if (self.stype == 'tcp'):
                 response = self.skt.recv(1024)

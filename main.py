@@ -2,8 +2,8 @@ from voltron import fuzz
 import sys
 
 def main():
-    ans = fuzz.fuzz_one()
-    print(f"answer: {ans}")
+    
+    pass
 
 
 if __name__ == "__main__":
