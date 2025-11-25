@@ -1,0 +1,65 @@
+Table of Contents
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   4
+   2.  Conventions Used in This Document . . . . . . . . . . . . . .   5
+     2.1.  Requirements Language . . . . . . . . . . . . . . . . . .   5
+     2.2.  Printing Terminology  . . . . . . . . . . . . . . . . . .   5
+     2.3.  Abbreviations . . . . . . . . . . . . . . . . . . . . . .   6
+   3.  Encoding of the Operation Layer . . . . . . . . . . . . . . .   6
+     3.1.  Picture of the Encoding . . . . . . . . . . . . . . . . .   8
+       3.1.1.  Request and Response  . . . . . . . . . . . . . . . .   8
+       3.1.2.  Attribute Group . . . . . . . . . . . . . . . . . . .   9
+       3.1.3.  Attribute . . . . . . . . . . . . . . . . . . . . . .   9
+       3.1.4.  Attribute-with-one-value  . . . . . . . . . . . . . .  10
+       3.1.5.  Additional-value  . . . . . . . . . . . . . . . . . .  11
+       3.1.6.  Collection Attribute  . . . . . . . . . . . . . . . .  12
+       3.1.7.  Member Attributes . . . . . . . . . . . . . . . . . .  13
+       3.1.8.  Alternative Picture of the Encoding of a Request or a
+               Response  . . . . . . . . . . . . . . . . . . . . . .  14
+     3.2.  Syntax of Encoding  . . . . . . . . . . . . . . . . . . .  15
+     3.3.  Attribute-group . . . . . . . . . . . . . . . . . . . . .  16
+     3.4.  Required Parameters . . . . . . . . . . . . . . . . . . .  18
+       3.4.1.  "version-number"  . . . . . . . . . . . . . . . . . .  18
+       3.4.2.  "operation-id"  . . . . . . . . . . . . . . . . . . .  18
+       3.4.3.  "status-code" . . . . . . . . . . . . . . . . . . . .  19
+       3.4.4.  "request-id"  . . . . . . . . . . . . . . . . . . . .  19
+     3.5.  Tags  . . . . . . . . . . . . . . . . . . . . . . . . . .  19
+       3.5.1.  "delimiter-tag" Values  . . . . . . . . . . . . . . .  19
+       3.5.2.  "value-tag" Values  . . . . . . . . . . . . . . . . .  20
+     3.6.  "name-length" . . . . . . . . . . . . . . . . . . . . . .  23
+     3.7.  (Attribute) "name"  . . . . . . . . . . . . . . . . . . .  23
+     3.8.  "value-length"  . . . . . . . . . . . . . . . . . . . . .  23
+     3.9.  (Attribute) "value" . . . . . . . . . . . . . . . . . . .  24
+     3.10. Data  . . . . . . . . . . . . . . . . . . . . . . . . . .  25
+Sweet & McDonald             Standards Track                    [Page 2]
+RFC 8010             IPP/1.1: Encoding and Transport        January 2017
+   4.  Encoding of Transport Layer . . . . . . . . . . . . . . . . .  26
+     4.1.  Printer URI, Job URI, and Job ID  . . . . . . . . . . . .  26
+   5.  IPP URI Schemes . . . . . . . . . . . . . . . . . . . . . . .  28
+   6.  IANA Considerations . . . . . . . . . . . . . . . . . . . . .  29
+   7.  Internationalization Considerations . . . . . . . . . . . . .  31
+   8.  Security Considerations . . . . . . . . . . . . . . . . . . .  31
+     8.1.  Security Conformance Requirements . . . . . . . . . . . .  31
+       8.1.1.  Digest Authentication . . . . . . . . . . . . . . . .  32
+       8.1.2.  Transport Layer Security (TLS)  . . . . . . . . . . .  32
+     8.2.  Using IPP with TLS  . . . . . . . . . . . . . . . . . . .  33
+   9.  Interoperability with Other IPP Versions  . . . . . . . . . .  33
+     9.1.  The "version-number" Parameter  . . . . . . . . . . . . .  34
+     9.2.  Security and URI Schemes  . . . . . . . . . . . . . . . .  34
+   10. Changes since RFC 2910  . . . . . . . . . . . . . . . . . . .  35
+   11. References  . . . . . . . . . . . . . . . . . . . . . . . . .  36
+     11.1.  Normative References . . . . . . . . . . . . . . . . . .  36
+     11.2.  Informative References . . . . . . . . . . . . . . . . .  38
+   Appendix A.  Protocol Examples  . . . . . . . . . . . . . . . . .  40
+     A.1.  Print-Job Request . . . . . . . . . . . . . . . . . . . .  40
+     A.2.  Print-Job Response (Successful) . . . . . . . . . . . . .  41
+     A.3.  Print-Job Response (Failure)  . . . . . . . . . . . . . .  42
+     A.4.  Print-Job Response (Success with Attributes Ignored)  . .  43
+     A.5.  Print-URI Request . . . . . . . . . . . . . . . . . . . .  45
+     A.6.  Create-Job Request  . . . . . . . . . . . . . . . . . . .  46
+     A.7.  Create-Job Request with Collection Attributes . . . . . .  46
+     A.8.  Get-Jobs Request  . . . . . . . . . . . . . . . . . . . .  48
+     A.9.  Get-Jobs Response . . . . . . . . . . . . . . . . . . . .  49
+   Acknowledgements  . . . . . . . . . . . . . . . . . . . . . . . .  51
+   Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .  51
+Sweet & McDonald             Standards Track                    [Page 3]
+RFC 8010             IPP/1.1: Encoding and Transport        January 2017
