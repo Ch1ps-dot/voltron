@@ -182,21 +182,28 @@ class RFCAgent:
         reg = r'^(?<!\S)' + r'\d+\.'*level + r'\s+.*'
         pattern = re.compile(reg, re.MULTILINE)
         
+        # debug
+        print(level)
 
-        # early return for not matching
+        # early return if not match
         if pattern.findall(content[start:end]) == []: return None
+        print(pattern.findall(content[start:end]))
 
-        section_start = 0
+        # initialize the index by scope of current section
+        section_start = start
         name = ''
-        section_end = 0
+        section_end = end
 
         for s in pattern.finditer(content[start:end]):
             section_end = s.start()
 
             # skip first round because we dont know the end of section
-            if start == 0:
+            if section_start == 0:
                 name = s.group() 
                 continue
+
+            # debug
+            print(f'{start}-{end}: {name}')
 
             node = SectionNode(name, level, section_start, section_end)
 
