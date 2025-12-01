@@ -41,8 +41,9 @@ def test_re():
 def test_section():
     agent = RFCAgent(Path('test/docs/rfc8010.txt').resolve())
     st = agent.section_split(agent.doc_content)
-    if st != None:
-        st.output_tree()
+    # if st != None:
+    #     st.output_tree()
+        # pprint(st.tree)
 
 if __name__ == "__main__":
     # test_db_query()

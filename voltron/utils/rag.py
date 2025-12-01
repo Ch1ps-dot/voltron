@@ -17,7 +17,7 @@ class SectionNode:
     def __init__(
             self, 
             name: str, 
-            depth: int, 
+            level: int, 
             start: int,
             end: int
     ) -> None:
@@ -25,7 +25,9 @@ class SectionNode:
         self.subsection = []
         self.start = start
         self.end = end
-        self.depth = depth
+        self.level = level
+
+        print(f'{name}: {start}-{end}')
 
     def add_subsection(
             self, 
@@ -52,32 +54,37 @@ class SectionTree:
     Attributes:
         id: identification of documents
         height: the height of tree
-        tree: a list of dict which store the Name and SectionNode, the index of dict is also the depth of section.
+        tree: a double list of SectionNode. The index of second level list stands for the level of belonging SectionNode.
     """
     def __init__(
             self, 
             id: str = ''
     ) -> None:
-        self.tree: list[dict[str, SectionNode]] = [{'root' : SectionNode('root', 0, 0, 0)}]
+        self.tree: list[list[SectionNode]] = [[SectionNode('root', 0, 0, 0)]]
         self.height = 0
         self.toc = 0
         self.id = id
 
     def add_section(self, node: SectionNode):
-        if(node.depth > self.height): 
+        if(node.level > self.height): 
             self.height += 1
-            self.tree.append({})
-        self.tree[node.depth][node.name] = node
+            self.tree.append([])
+        self.tree[node.level].append(node)
 
     def fetch_node(
             self, 
             level: int, 
             name: str
-    ) -> SectionNode:
-        return self.tree[level][name]
+    ) -> SectionNode | None:
+        """fetch the node with section name
+        """
+        for s in self.tree[level]:
+            if s.name == name:
+                return s
+        return None
 
-    def fetch_layer(self, depth):
-        return self.tree[depth]
+    def fetch_layer(self, level):
+        return self.tree[level]
     
 
     def output_node(
@@ -85,14 +92,14 @@ class SectionTree:
             node: SectionNode | None
     ) -> None:
         if (node == None): return
-        print(node.name)
+        print('-'*node.level + node.name)
         if(node.subsection != []):
             for n in node.subsection:
                 self.output_node(n)
 
     def output_tree(self):
         if self.height == 0: return 
-        self.output_node(self.tree[0]['root'])
+        self.output_node(self.tree[0][0])
 
 class RFCAgent:
     """reslove document and contruct RAG database
@@ -173,72 +180,83 @@ class RFCAgent:
             end: int,
             content: str,
             sections: SectionTree,
-            upper: str = ''
+            upper: str = 'root'
     ):
         """Help function to construct section tree
 
         use regrex to find the different level of sections.
+        Recursively construct section tree from upper to lower section.
+
+        Args:
+            level: level of current section
+            start: start point of current section
+            end: end point of current section
+            content: the original txt
+            sections: section tree
+            upper: name of upper level section
+
         """
-        reg = r'^(?<!\S)' + r'\d+\.'*level + r'\s+.*'
+        reg = r'^(?<!\S)' + r'\d+\.' * level + r'\s+.*'
         pattern = re.compile(reg, re.MULTILINE)
-        
-        # debug
-        print(level)
 
         # early return if not match
         if pattern.findall(content[start:end]) == []: return None
-        print(pattern.findall(content[start:end]))
 
         # initialize the index by scope of current section
-        section_start = start
-        name = ''
-        section_end = end
-
+        pre_section_start = start
+        cur_section_start = start
+        pre_name = ''
+        skip_first = True
+    
         for s in pattern.finditer(content[start:end]):
-            section_end = s.start()
-
+            
             # skip first round because we dont know the end of section
-            if section_start == 0:
-                name = s.group() 
+            # we must change relative index which find by regrex to real index
+            if skip_first:
+                pre_section_start = s.start() + start
+                pre_name = s.group() 
+                skip_first = False
                 continue
 
-            # debug
-            print(f'{start}-{end}: {name}')
+            cur_section_start = s.start() + start
 
-            node = SectionNode(name, level, section_start, section_end)
-
-            # add section to SectionTree and upper SectionNode
+            # add previous section to SectionTree and upper SectionNode
+            node = SectionNode(pre_name, level, pre_section_start, cur_section_start)          
             sections.add_section(node)
             if upper:
                 upper_node = sections.fetch_node(level - 1, upper)
-                upper_node.add_subsection(node)
+                if upper_node != None:
+                    upper_node.add_subsection(node)
             
             # recursively resolve subsection
             self._section_helper(
                 level+1, 
-                section_start, 
-                section_end,
+                pre_section_start, 
+                cur_section_start,
                 content,
                 sections,
-                name
+                pre_name
             )
-            # iterate the index and section name
-            name = s.group()
-            section_start = section_end
+
+            # iterate the index and name of current section
+            pre_name = s.group()
+            pre_section_start = cur_section_start
+            
 
         # store the last one node
-        node = SectionNode(name, level, section_start, end)
+        node = SectionNode(pre_name, level, pre_section_start, end)
         sections.add_section(node)
         if upper:
             upper_node = sections.fetch_node(level - 1, upper)
-            upper_node.add_subsection(node)
+            if upper_node != None:
+                upper_node.add_subsection(node)
         self._section_helper(
                 level+1, 
-                section_start, 
-                section_end,
+                pre_section_start, 
+                end,
                 content,
                 sections,
-                name
+                pre_name
             )
 
     def section_split(
