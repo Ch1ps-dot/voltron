@@ -64,7 +64,7 @@ class SectionTree:
             id: str = '',
             content: str = ''
     ) -> None:
-        self.tree: list[list[SectionNode]] = [[SectionNode(0, 0, len(content) - 1, 'root')]]
+        self.tree: list[list[SectionNode]] = [[SectionNode(0, 0, len(content) - 1, '0.')]]
         self.height: int = 0
         self.doc_toc: str = ''
         self.id: str = id
@@ -137,13 +137,25 @@ class SectionTree:
             return {"toc": doc_toc, "rest": doc_content[:toc_start] + doc_content[content_start:]}
         else:
             return None
+
+    def _check_section(
+            self,
+            pre: str,
+            cur: str
+    ) -> bool:
+        """TODO: precise check for section name
+        """
+        reg = r'(\d+\.)+'
+        pattern = re.compile(reg, re.MULTILINE)
+        pre_numbers = pattern.search(pre)
+        return False
         
     def _section_helper(
             self, 
             level: int, 
             start: int,
             end: int,
-            upper: str = 'root'
+            upper: str = '0.'
     ):
         """Help function to construct section tree
 
@@ -157,7 +169,8 @@ class SectionTree:
             upper: name of upper level section
 
         """
-        reg = r'^(?<!\S)' + r'\d+\.' * level + r'\s+.*'
+        # reg = r'^(?<!\S)' + r'\d+\.' * level + r'\s+.*'
+        reg = r'^[ ]*' + r'\d+\.' * level + r'[ ]{2,}' + r'[^,.\n]*' + r'$(?=\r?\n^\s*$)'
         pattern = re.compile(reg, re.MULTILINE)
 
         # early return if not match
@@ -170,12 +183,12 @@ class SectionTree:
         skip_first = True
     
         for s in pattern.finditer(self.doc_content[start:end]):
-            
+
             # skip first round because we dont know the end of section
             # we must change relative index which find by regrex to real index
             if skip_first:
                 pre_section_start = s.start() + start
-                pre_name = s.group() 
+                pre_name =  re.sub(r'\n', '', s.group()) 
                 skip_first = False
                 continue
 
@@ -198,7 +211,7 @@ class SectionTree:
             )
 
             # iterate the index and name of current section
-            pre_name = s.group()
+            pre_name = re.sub(r'\n', '', s.group())
             pre_section_start = cur_section_start
             
 
@@ -221,7 +234,7 @@ class SectionTree:
     ) -> None:
         """Construct the section tree
         """
-        self._section_helper(1, 0, len(self.doc_content) - 1, 'root') 
+        self._section_helper(1, 0, len(self.doc_content) - 1, '0.') 
 
     def add_section(
             self, 

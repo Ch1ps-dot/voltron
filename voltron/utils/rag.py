@@ -15,7 +15,7 @@ class RFCAgent:
     ) -> None:
         self.doc_path: Path = doc_path
         self.doc_file = doc_path.open('r+', encoding='utf-8')
-        self.doc_content: str = ''.join([line for line in self.doc_file.readlines() if not line.isspace()])
+        self.doc_content: str = self.doc_file.read()
 
         # initialize the sectiontree which stands for the section structure of documents
         start = time.perf_counter()    

@@ -41,7 +41,7 @@ def save_to_file(str):
 #             print(s.group())
 
 def test_section():
-    agent = RFCAgent(Path('test/docs/rfc8010.txt').resolve())
+    agent = RFCAgent(Path('test/docs/rfc9110.txt').resolve())
     st = agent.st
     if st != None:
         print(st.fetch_toc())
