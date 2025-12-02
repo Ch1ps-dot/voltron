@@ -3,8 +3,11 @@ class prompter:
 
     def __init__(self) -> None:
         pass
-
-    def msg_query(self, pro_name:str):
+    
+    def rfc_query(
+            self, 
+            pro_name:str
+    ) -> str:
         msg = f'''You are a protocol analysis expert, and you are currently analyzing the [Protocol Name] protocol. Please complete the following tasks:
         1. Query which documents are related to the packet format of this protocol.
         2. If the specification document of this protocol is an RFC document, check these RFC documents. Ignore documents that have been obsoleted by other documents and return the RFC numbers of the other eligible documents.
@@ -14,5 +17,13 @@ class prompter:
         ```json
         ["959","3659","2389","2428","4217"]
         ```
+        '''
+        return msg
+    
+    def msg_type_query(
+            self, 
+            pro_name: str
+    ) -> str:
+        msg = f'''You are anaylzing
         '''
         return msg

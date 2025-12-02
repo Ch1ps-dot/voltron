@@ -1,8 +1,12 @@
-from voltron.utils.rag import RFCAgent, SectionNode, SectionTree
+from voltron.utils.rag import RFCAgent
+from voltron.utils.setciontree import SectionNode, SectionTree
 import os
+import re
+import time
 from pathlib import Path
 from pprint import pprint
-import re
+import cProfile
+
 
 def save_to_file(str):
     f = open( 'test.txt', 'w+')
@@ -14,38 +18,35 @@ def save_to_file(str):
 #     ans = agent.db_query('QUIT')
 #     pprint(ans)
 
-def test_toc():
-    # agent = RAGRfc(Path('test/docs/rfc9112.txt').resolve())
-    agent = RFCAgent(Path('test/docs/rfc8010.txt').resolve())
-    ans = agent.toc_extract(agent.doc_content)
-    if ans is not None:
-        toc = ans['toc']
-        rest = ans['rest']
-    save_to_file(toc)
+# def test_toc():
+#     # agent = RAGRfc(Path('test/docs/rfc9112.txt').resolve())
+#     agent = RFCAgent(Path('test/docs/rfc8010.txt').resolve())
+#     ans = agent.doc_toc
+#     if ans is not None:
+#         save_to_file(ans)
 
-def test_re():
-    reg = r'^(?<!\S)' + r'\d+\.'+ r'\s+.*'
-    reg1 = r'^(?<!\S)' + r'\d+\.'*2 + r'\s+.*'
-    pattern = re.compile(reg1, re.MULTILINE)
-    agent = RFCAgent(Path('test/docs/rfc8010.txt').resolve())
-    ans = agent.toc_extract(agent.doc_content)
+# def test_re():
+#     reg = r'^(?<!\S)' + r'\d+\.'+ r'\s+.*'
+#     reg1 = r'^(?<!\S)' + r'\d+\.'*2 + r'\s+.*'
+#     pattern = re.compile(reg1, re.MULTILINE)
+#     agent = RFCAgent(Path('test/docs/rfc8010.txt').resolve())
+#     ans = agent._toc_extract(agent.doc_content)
 
-    if ans is not None:
-        toc = ans['toc']
-        rest = ans['rest']
-    section = pattern.finditer(rest)
-    if section != None:
-        for s in section:
-            print(s.group())
+#     if ans is not None:
+#         toc = ans['toc']
+#         rest = ans['rest']
+#     section = pattern.finditer(rest)
+#     if section != None:
+#         for s in section:
+#             print(s.group())
 
 def test_section():
     agent = RFCAgent(Path('test/docs/rfc8010.txt').resolve())
-    st = agent.section_split(agent.doc_content)
-    # if st != None:
-    #     st.output_tree()
+    st = agent.st
+    if st != None:
+        print(st.fetch_toc())
         # pprint(st.tree)
 
 if __name__ == "__main__":
-    # test_db_query()
-    # test_re()
+    # cProfile.run("test_section()", sort=1)
     test_section()

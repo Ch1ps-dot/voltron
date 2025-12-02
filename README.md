@@ -27,3 +27,9 @@ Install package depencies with uv
 ```
 uv pip install requirements
 ```
+
+## Project Log
+
+### 2025-12-01
+
+utils/rag.py: be able to resolve documents to data structure.

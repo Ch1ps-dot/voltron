@@ -18,7 +18,7 @@ class LLM:
         completion = self.clt.chat.completions.create(
           model=settings.model,
           messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "system", "content": "You are a protocol fuzzer developer."},
             {"role": "user", "content": msg}
           ]
         )
