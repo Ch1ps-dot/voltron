@@ -1,7 +1,13 @@
 from openai import OpenAI
 from ..configs import settings
+from ..utils.logger import logger
 
 class Chater:
+    """chat with llm through api.
+
+    Attributes:
+        clt: client for chat
+    """
     def __init__(
             self
     ) -> None:
@@ -14,16 +20,24 @@ class Chater:
             print("Connection Error")
         self.clt = client
 
-    def chatllm(
+    def chat_llm(
             self, 
-            msg: str = ""
-        ) -> str | None:
+            prompt: str = ""
+    ) -> str | None:
+        """Chat to llm with the prompt
+
+        Args:
+            prompt: prompt for llm
+
+        Returns:
+            response of llm
+        """
         try:
             completion = self.clt.chat.completions.create(
                 model=settings.model,
                 messages=[
                     {"role": "system", "content": "You are a protocol fuzzer developer."},
-                    {"role": "user", "content": msg}
+                    {"role": "user", "content": prompt}
                 ]
         )
         except Exception as e:
@@ -32,3 +46,16 @@ class Chater:
         response: str | None = completion.choices[0].message.content
 
         return response
+
+    def gen_input(
+            self,
+            dir: str = '../input'
+    ) -> str | None:
+        """Generate input generator and save to target directory
+
+        Args:
+
+        Returns:
+            path of generated results
+        """
+        pass

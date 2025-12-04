@@ -6,7 +6,7 @@ from typing import Self
 from .setciontree import SectionTree
 from .logger import logger
 
-class RFCAgent:
+class RFCRag:
     """Reslove document and contruct RAG database
     """
     def __init__(
@@ -21,7 +21,7 @@ class RFCAgent:
         start = time.perf_counter()    
         self.st = SectionTree(id='', content=self.doc_content)
         end = time.perf_counter()
-        logger.info(f"[ST init]: {end - start}")
+        logger.debug(f"\n[ST init]: \n cost time:{end - start}")
 
         # initialize the vectordatabase
         # self.chroma_client = chromadb.Client()

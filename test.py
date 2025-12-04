@@ -1,4 +1,4 @@
-from voltron.utils.rag import RFCAgent
+from voltron.utils.rag import RFCRag
 from voltron.utils.setciontree import SectionNode, SectionTree
 import os
 import re
@@ -41,10 +41,10 @@ def save_to_file(str):
 #             print(s.group())
 
 def test_section():
-    agent = RFCAgent(Path('test/docs/rfc9110.txt').resolve())
+    agent = RFCRag(Path('test/docs/rfc9110.txt').resolve())
     st = agent.st
-    if st != None:
-        print(st.fetch_toc())
+    # if st != None:
+    #     print(st.fetch_toc())
         # pprint(st.tree)
 
 if __name__ == "__main__":

@@ -2,13 +2,40 @@ import socket
 from typing import Optional
 
 class Nio:
-    def __init__(self, stype:str, host:str, port:int) -> None:
+    """ Network sender and receiver
+
+    Attributte:
+        stype: socket type. tcp or udp.
+        host: host name 
+        port port number
+    """
+    def __init__(
+            self, 
+            stype:str, 
+            host:str, 
+            port:int
+    ) -> None:
         self.stype:str = stype
         self.host:str = host
         self.port:int = port
         self.skt:socket.socket = self.setup_socket(stype, host, port)
 
-    def setup_socket(self, stype:str, host:str, port:int) -> socket.socket:
+    def setup_socket(
+            self, 
+            stype:str, 
+            host:str, 
+            port:int
+    ) -> socket.socket:
+            """Setup the socket for network communication
+
+            Args:
+                stype: socket type is tcp or udp.
+                host: host name.
+                port: port number.
+            
+            Returns:
+                socket for sending and receiving
+            """
             skt: socket.socket
             try:
                 if (stype == 'tcp'):
@@ -23,7 +50,10 @@ class Nio:
             
             return skt
 
-    def net_send(self, msg):
+    def net_send(
+            self, 
+            msg
+    ):
         try:
             if (self.stype == 'tcp'):
                 self.skt.sendall(msg)
@@ -34,7 +64,9 @@ class Nio:
         except Exception as e:
             print('Network Send Failure')
     
-    def net_recv(self):
+    def net_recv(
+            self
+    ):
         try:
             if (self.stype == 'tcp'):
                 response = self.skt.recv(1024)
@@ -44,3 +76,5 @@ class Nio:
                 raise ValueError("Unsupport protocol")
         except Exception as e:
             print('Network Recv Failure')
+        
+        return response
