@@ -43,10 +43,21 @@ def save_to_file(str):
 def test_section():
     agent = RFCRag(Path('test/docs/rfc9110.txt').resolve())
     st = agent.st
-    # if st != None:
-    #     print(st.fetch_toc())
+    if st != None:
+        print(st.fetch_toc())
         # pprint(st.tree)
+
+def test_promt():
+    from voltron.llm.prompt import Prompter
+    pt = Prompter(Path('./prompts').resolve())
+    print(pt.msg_input_gen("ftp", "GET", "test")) 
+
+def test_gen():
+    from  voltron.llm.chat import Chater
+    ct = Chater(Path('./prompts').resolve())
+    print(ct.gen_input("ftp", "CWD", "test"))
 
 if __name__ == "__main__":
     # cProfile.run("test_section()", sort=1)
-    test_section()
+    # test_promt()
+    test_gen()

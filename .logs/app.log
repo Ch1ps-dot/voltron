@@ -42,3 +42,27 @@
 2025-12-04 21:44:39,358 - voltron - DEBUG - rag:24 - 
 [ST init]: 
  cost time:0.02906721702311188
+2025-12-05 16:17:42,686 - voltron - DEBUG - rag:24 - 
+[ST init]: 
+ cost time:0.04222746600134997
+2025-12-05 16:17:54,810 - voltron - DEBUG - rag:24 - 
+[ST init]: 
+ cost time:0.0494854190001206
+2025-12-05 17:28:03,432 - voltron - DEBUG - rag:24 - 
+[ST init]: 
+ cost time:0.04750448599952506
+2025-12-07 23:52:37,020 - voltron - INFO - chat:56 - [Chat]
+	cost time: 3.6586536910008363
+2025-12-07 23:53:03,600 - voltron - INFO - chat:56 - [Chat]
+	cost time: 7.228714800000489
+2025-12-07 23:54:02,377 - voltron - INFO - chat:56 - [Chat]
+	cost time: 2.881611140000132
+2025-12-07 23:56:09,262 - voltron - INFO - chat:56 - 
+[Chat]
+	cost time: 3.7163667759996315
+2025-12-07 23:56:36,617 - voltron - INFO - chat:56 - 
+[Chat]
+cost_time:2.448085965000246
+2025-12-07 23:57:00,909 - voltron - INFO - chat:56 - 
+[Chat]
+cost_time:2.6843863779995445
