@@ -1,8 +1,12 @@
 import logging
 from logging.handlers import RotatingFileHandler
+from logging import Logger
 import os
 
-def get_logger(name="voltron"):
+def get_logger(
+        mode, 
+        name = ""
+):
     """ Create logger
 
     Args: 
@@ -20,9 +24,15 @@ def get_logger(name="voltron"):
 
     # create logs file
     log_dir = ".logs"
+    log_file = None
+    mode = 'a'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    log_file = os.path.join(log_dir, "app.log")
+    if name == 'debug':
+        mode = 'w'
+        log_file = os.path.join(log_dir, "debug.log")
+    else:
+        log_file = os.path.join(log_dir, "app.log")
 
     # console logger
     console_handler = logging.StreamHandler()
@@ -38,7 +48,8 @@ def get_logger(name="voltron"):
         log_file,
         maxBytes=5*1024*1024,
         backupCount=10,
-        encoding="utf-8"
+        encoding="utf-8",
+        mode = mode
     )
     file_handler.setLevel(logging.DEBUG)
     file_fmt = logging.Formatter(
@@ -52,5 +63,4 @@ def get_logger(name="voltron"):
 
     return logger
 
-# create global logger that the other module can directly import 
-logger = get_logger()
+logger = get_logger(mode = 'w', name= 'debug')

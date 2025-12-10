@@ -3,6 +3,7 @@ import chromadb
 from pprint import pprint
 from pathlib import Path
 from typing import Self
+from voltron.utils.logger import logger
 
 class SectionNode:
     """Structure of Section Node
@@ -65,17 +66,25 @@ class SectionTree:
             content: str = ''
     ) -> None:
         self.tree: list[list[SectionNode]] = [[SectionNode(0, 0, len(content) - 1, '0.')]]
+        self.leafs: list[SectionNode]
         self.height: int = 0
         self.doc_toc: str = ''
+        self.doc_apx: str = ''
         self.id: str = id
 
         ans = self._toc_extract(content)
         if ans != None:
-            # self.doc_toc: str = ans['toc']
             self.doc_content = ans['rest']
         else:
             self.doc_content = content
+
+        ans = self._apx_extract(self.doc_content)
+        if ans != None:
+            self.doc_apx = ans['apx']
+            self.doc_content = ans['rest']
+
         self.construct_tree()
+        self.identify_leaf()
 
     def construct_toc(
             self,
@@ -137,13 +146,37 @@ class SectionTree:
             return {"toc": doc_toc, "rest": doc_content[:toc_start] + doc_content[content_start:]}
         else:
             return None
+        
+    def _apx_extract(
+            self, 
+            doc_content: str
+    ) -> dict[str, str] | None:
+        """extact table of cantent from documents
+        Args:
+            doc_content: content of documents
+        Returns:
+            A dict contains table of content and rest part of the document
+        """
+        reg = r'^\s*' + \
+                r'appendix' + \
+                r'[^,\n]*' + \
+                r'$(?=\r?\n^\s*$)'
+        pattern_apx = re.compile(reg, re.MULTILINE | re.IGNORECASE)
+        apx = pattern_apx.search(doc_content)
+        
+        if apx:
+            apx_start = apx.start()
+            doc_apx = doc_content[apx_start:]
+            return {"apx": doc_apx, "rest": doc_content[:apx_start]}
+        else:
+            return None
 
     def _check_section(
             self,
             pre: str,
             cur: str
     ) -> bool:
-        """Check the string whether it is section name
+        """Check the string whether it is section name by indent space
 
         Args:
             pre: previous section name
@@ -189,7 +222,7 @@ class SectionTree:
         """
         reg = r'^[ ]*' + \
                 r'\d+\.' * level + \
-                r'[ ]{2,}' + \
+                r'[ ]*' + \
                 r'[^,.\n]*' + \
                 r'$(?=\r?\n^\s*$)'
         pattern = re.compile(reg, re.MULTILINE)
@@ -240,7 +273,6 @@ class SectionTree:
             pre_name = cur_name
             pre_section_start = cur_section_start
             
-
         # store the last one node
         cur_name = re.sub(r'\n', '', s.group())
         if (self._check_section(pre_name, cur_name)): 
@@ -274,6 +306,13 @@ class SectionTree:
             self.height += 1
             self.tree.append([])
         self.tree[node.level].append(node)
+
+    def identify_leaf(
+            self
+    ):
+        """TODO: Identify leaf nodes in section tree
+        """
+        pass
 
     def fetch_node(
             self, 
@@ -381,22 +420,3 @@ class SectionTree:
         self.construct_toc(self.tree[0][0])
         return self.doc_toc
     
-    # def output_readable(self):
-    #     """helper function: output human readable content
-    #     """
-    #     if self.doc_content is None: return
-    #     pprint(self.doc_content)
-
-    # def output_raw(self):
-    #     """helper function: output raw content of file
-    #     """
-    #     pprint(self.doc_file.read())
-
-    # def output_pages(self):
-    #     """helper function: output pages of file
-    #     """
-    #     if self.doc_pages is None: return
-    #     print(len(self.doc_pages))
-    #     for i in range(len(self.doc_pages)):
-    #         print(f'===============NUMBER: {i}================')
-    #         pprint(self.doc_pages[i])

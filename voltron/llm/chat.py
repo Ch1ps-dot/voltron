@@ -1,72 +1,156 @@
-from openai import OpenAI
-from ..configs import settings
-from ..utils.logger import logger
-from .prompt import Prompter
 from pathlib import Path
-import re
+from openai import OpenAI
+import time, re
 from re import Match
-import time
+
+from ..configs import settings
+from .prompt import Prompter
+from ..utils.logger import logger
 
 class Chater:
-    """chat with llm through api.
+    """Chat with llm through api and manage the context.
 
     Attributes:
-        clt: client for chat
+        dir: prompt directory path
     """
     def __init__(
             self,
             dir: Path
     ) -> None:
-        try:
-            client = OpenAI(
-                base_url=settings.base_url,
-                api_key=settings.api_key
-            )
-        except Exception as e:
-            print("Connection Error")
+        """Initialize the chater with prompt directory path
+        Args: 
+            dir: prompt directory path
+
+        """
+
+        client = OpenAI(
+            base_url=settings.base_url,
+            api_key=settings.api_key
+        )
+
         self.clt = client
         self.pmp = Prompter(dir)
 
     def chat_llm(
             self, 
-            prompt: str = ""
+            prompt: str = "",
+            usage: str = ""
     ) -> str | None:
         """Chat to llm with the prompt
 
         Args:
             prompt: prompt for llm
+            usage: usage of this chat
 
         Returns:
             response of llm
         """
         start = time.perf_counter()
-        try:
-            completion = self.clt.chat.completions.create(
-                model=settings.model,
-                messages=[
-                    {"role": "system", "content": "You are a protocol fuzzer developer."},
-                    {"role": "user", "content": prompt}
-                ]
+        completion = self.clt.chat.completions.create(
+            model=settings.model,
+            messages=[
+                {"role": "system", "content": "You are a protocol analyzer."},
+                {"role": "user", "content": prompt}
+            ]
         )
-        except Exception as e:
-            print("Chat Error")
+        if completion == None:
+            logger.debug("Chat Error")
         end = time.perf_counter()
         
         response: str | None = completion.choices[0].message.content
-        logger.info(f"\n[Chat]\ncost_time:{end - start}")
+        logger.info(f"[Chat] usage:{usage} cost_time:{end - start}")
         return response
 
-    def gen_input(
+    def llm_query_rfc(
+            self
+    ) -> str | None:
+        pass
+
+    def llm_query_type(
+            self,
+            rfc_doc: str = '',
+            rfc_num: str = '',
+            pro_name: str = ''
+    ) -> str | None:
+        """Parse rfc and query message type related thing.
+
+        Args:
+            rfc_doc: RFC content
+            rfc_num: rfc number
+            rfc_name: name of rfc
+
+        """
+        ans = self.chat_llm(
+            prompt=self.pmp.msg_type_query(
+                rfc_doc = rfc_doc,
+                rfc_num = rfc_num,
+                pro_name = pro_name
+            ),
+            usage = "query_type"
+        )
+        
+        pattern = re.compile(
+            r'```(?:json)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: failed to parse rfc')
+        return ""
+
+    def llm_rfc_summary(
+            self,
+            rfc_toc: str,
+            rfc_doc: str,
+            rfc_num: str,
+            pro_name: str
+    ) -> str | None:
+        """Summary rfc by chapter.
+
+        Args:
+            rfc_toc: table of content of RFC
+            rfc_num: rfc number
+            rfc_name: name of rfc
+
+        """
+        ans = self.chat_llm(
+            prompt=self.pmp.msg_rfc_summary(
+                rfc_toc = rfc_toc,
+                rfc_num = rfc_num,
+                pro_name = pro_name
+            ),
+            usage = "rfc_summary"
+        )
+        
+        pattern = re.compile(
+            r'```(?:json)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: failed to summary rfc')
+        return ""
+    
+
+    def llm_gen_input(
             self,
             pro_name: str = '',
             msg_type: str = '',
-            pending: str = '',
-            dir: str = ''
+            pending: str = ''
     ) -> str | None:
-        """Generate input generator and save to target directory
+        """Generate python code as fuzzer input
 
         Args:
-            saving directory of input 
+            pro_name: name of protocol
+            msg_type: required protocol message type
 
         Returns:
             generated input
@@ -76,14 +160,21 @@ class Chater:
                 pro_name=pro_name, 
                 msg_type=msg_type, 
                 pending=pending
-            )
+            ),
+            usage = "gen_input"
         )
-        print(ans)
-        reg = r'```p(?:y|ython).*```'
-        pattern = re.compile(reg, re.MULTILINE)
+        # print(ans)
+
+        pattern = re.compile(
+            r'```(?:python|py)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
         if ans != None:
             match: Match | None = pattern.search(ans)
-        if match:
-            return match.group()
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: didn\'t match valid python code')
         return ""
         

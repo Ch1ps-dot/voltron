@@ -6,8 +6,8 @@ from typing import Self
 from .setciontree import SectionTree
 from .logger import logger
 
-class RFCRag:
-    """Reslove document and contruct RAG database
+class RFCAgent:
+    """Read protocol specification and parse it to section tree.
     """
     def __init__(
             self, 
