@@ -21,18 +21,18 @@ def test_gen():
 
 def test_rfc_summary():
     from voltron.llm.chat import Chater
-    from voltron.utils.rag import RFCAgent
+    from voltron.utils.rfcparser import RFCParser
 
-    ra= RFCAgent(Path('/docs/rfc959.txt').resolve())
+    ra= RFCParser(Path('/docs/rfc959.txt').resolve())
     ct = Chater(Path('../prompts').resolve())
 
     logger.debug(ct.llm_rfc_summary(rfc_toc= ra.st.doc_toc, rfc_doc = ra.st.doc_content, rfc_num='959', pro_name='ftp'))
 
 def test_message_type():
     from voltron.llm.chat import Chater
-    from voltron.utils.rag import RFCAgent
+    from voltron.utils.rfcparser import RFCParser
 
-    ra= RFCAgent(Path('/docs/rfc7826.txt').resolve())
+    ra= RFCParser(Path('/docs/rfc7826.txt').resolve())
     ct = Chater(Path('../prompts').resolve())
     summary = ct.llm_rfc_summary(rfc_toc= ra.st.doc_toc, rfc_doc = ra.st.doc_content, rfc_num='7826', pro_name='rtsp')
     logger.debug(summary)

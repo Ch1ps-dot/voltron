@@ -18,11 +18,15 @@ class Prompter:
         self._path_gen_input = dir / "gen_input.md"
         self._path_msg_type = dir / "msg_type.md"
         self._path_rfc_summary = dir / "rfc_summary.md"
+        self._path_req_query = dir / "request_query.md"
+        self._path_res_query = dir / "response_query.md"
 
         self._tem_rfc_query = ''
         self._tem_gen_input = ''
         self._tem_msg_type = ''
         self._tem_rfc_summary = ''
+        self._tem_res_query = ''
+        self._tem_req_query = ''
 
 
         if dir.is_dir():
@@ -34,6 +38,10 @@ class Prompter:
                 self._tem_msg_type = f.read()
             with self._path_rfc_summary.open('r+') as f:
                 self._tem_rfc_summary = f.read()
+            with self._path_res_query.open('r+') as f:
+                self._tem_res_query = f.read()
+            with self._path_req_query.open('r+') as f:
+                self._tem_req_query = f.read()
         else:
             logger.info("[prompter]: template directory error")
 
@@ -80,3 +88,20 @@ class Prompter:
             return msg.substitute(msg_type = msg_type, pro_name = pro_name, pending=f'{pro_name}_{msg_type}')
         else:
             return msg.substitute(msg_type = msg_type, pro_name = pro_name, pending=pending)
+        
+    def msg_req_query(
+            self,
+            rfc_num:str = '',
+            pro_name:str = ''
+    ) -> str:
+        msg = Template(self._tem_req_query)
+        return msg.substitute(rfc_num = rfc_num, pro_name = pro_name)
+    
+    def msg_res_query(
+            self,
+            rfc_num:str = '',
+            pro_name:str = ''
+    ) -> str:
+        msg = Template(self._tem_res_query)
+        return msg.substitute(rfc_num = rfc_num, pro_name = pro_name)
+

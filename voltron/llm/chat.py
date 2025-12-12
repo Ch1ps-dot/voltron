@@ -177,4 +177,30 @@ class Chater:
             else:
                 logger.debug(f'[Chat]: didn\'t match valid python code')
         return ""
-        
+
+    def llm_req_query(
+            self,
+            rfc_num:str = '',
+            pro_name: str = '',
+            msg_type: str = ''
+    ) -> str | None:
+        ans = self.chat_llm(
+            prompt=self.pmp.msg_req_query(
+                rfc_num=rfc_num,
+                pro_name=pro_name
+            ),
+            usage = "req_query"
+        )
+
+        pattern = re.compile(
+            r'```(?:json)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: didn\'t match valid python code')
+        return ""
