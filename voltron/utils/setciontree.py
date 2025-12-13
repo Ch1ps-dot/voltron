@@ -27,6 +27,8 @@ class SectionNode:
         self.start: int = start
         self.end: int = end
         self.level: int = level
+        self.isLeaf: bool = False
+        self.upper = ''
 
         # debug
         # print(f'{name}: [{start}-{end}]')
@@ -66,7 +68,7 @@ class SectionTree:
             content: str = ''
     ) -> None:
         self.tree: list[list[SectionNode]] = [[SectionNode(0, 0, len(content) - 1, '0.')]]
-        self.leafs: list[SectionNode]
+        self.leafs: list[SectionNode] = []
         self.height: int = 0
         self.doc_toc: str = ''
         self.doc_apx: str = ''
@@ -84,7 +86,7 @@ class SectionTree:
             self.doc_content = ans['rest']
 
         self.construct_tree()
-        self.identify_leaf()
+        self.identify_leaf(self.tree[0][0])
 
     def construct_toc(
             self,
@@ -157,7 +159,7 @@ class SectionTree:
         Returns:
             A dict contains table of content and rest part of the document
         """
-        reg = r'^\s*' + \
+        reg = r'$(?=\r?\n^\s*$)' + r'^\s*' + \
                 r'appendix' + \
                 r'[^,\n]*' + \
                 r'$(?=\r?\n^\s*$)'
@@ -185,6 +187,34 @@ class SectionTree:
         Return:
             true or false
         """
+
+        # pre_seg = pre.strip().split('.')
+        # cur_seg = cur.strip().split('.')
+
+        # if(len(pre_seg) == len(cur_seg)): 
+        #     reg = r'^\s*'
+        #     pattern = re.compile(reg)
+        #     pos_pre = -1
+        #     pos_cur = -1
+        #     m_pre: re.Match | None = pattern.match(pre)
+        #     m_cur: re.Match | None = pattern.match(cur)
+
+        #     if m_pre and m_cur:
+        #         pos_pre = m_pre.end()
+        #         pos_cur = m_cur.end()
+            
+        #     if pos_cur == pos_pre:
+        #         return True
+        #     else:
+        #         return False
+            
+        # return True
+
+        cnt = 0
+        for c in cur.strip():
+            if c == '.': cnt = cnt + 1
+            if cnt != 0: return True
+    
         reg = r'^\s*'
         pattern = re.compile(reg)
         pos_pre = -1
@@ -196,10 +226,10 @@ class SectionTree:
             pos_pre = m_pre.end()
             pos_cur = m_cur.end()
         
-        if pos_cur == pos_pre:
-            return True
-        else:
+        if pos_cur <= pos_pre:
             return False
+        else:
+            return True
         
     def _section_helper(
             self, 
@@ -249,7 +279,10 @@ class SectionTree:
 
             # validate the section name
             cur_name = re.sub(r'\n', '', s.group())
-            if (not self._check_section(pre_name, cur_name)): continue
+            
+            if self._check_section(pre_name, cur_name) == False:
+                logger.debug(f'{pre_name} {cur_name}') 
+                continue
 
             cur_section_start = s.start() + start
 
@@ -260,6 +293,7 @@ class SectionTree:
                 upper_node = self.fetch_node(level - 1, upper)
                 if upper_node != None:
                     upper_node.add_subsection(node)
+                    node.upper = upper
             
             # recursively resolve subsection
             self._section_helper(
@@ -274,20 +308,21 @@ class SectionTree:
             pre_section_start = cur_section_start
             
         # store the last one node
-        cur_name = re.sub(r'\n', '', s.group())
-        if (self._check_section(pre_name, cur_name)): 
-            node = SectionNode(level, pre_section_start, end, pre_name)
-            self.add_section(node)
-            if upper:
-                upper_node = self.fetch_node(level - 1, upper)
-                if upper_node != None:
-                    upper_node.add_subsection(node)
-            self._section_helper(
-                    level+1, 
-                    pre_section_start, 
-                    end,
-                    pre_name
-                )
+        # if (self._check_section(pre_name, cur_name)): 
+        node = SectionNode(level, pre_section_start, end, pre_name)
+        self.add_section(node)
+        logger.debug(pre_name)
+        if upper:
+            upper_node = self.fetch_node(level - 1, upper)
+            if upper_node != None:
+                upper_node.add_subsection(node)
+                node.upper = upper
+        self._section_helper(
+                level+1, 
+                pre_section_start, 
+                end,
+                pre_name
+            )
         
     def construct_tree(
             self
@@ -308,11 +343,17 @@ class SectionTree:
         self.tree[node.level].append(node)
 
     def identify_leaf(
-            self
+            self,
+            node: SectionNode
     ):
-        """TODO: Identify leaf nodes in section tree
+        """Scan the section tree and identify leaf nodes, then set the isLeaf flag
         """
-        pass
+        if node.subsection == []:
+            node.isLeaf = True 
+            self.leafs.append(node)
+        else:
+            for n in node.subsection:
+                self.identify_leaf(n)
 
     def fetch_node(
             self, 
@@ -374,7 +415,13 @@ class SectionTree:
     def fetch_layer(self, level):
         return self.tree[level]
     
-    def fetch_content(
+    def fetch_node_content(
+            self,
+            node: SectionNode
+    ) -> str | None:
+        return self.doc_content[node.start:node.end]
+    
+    def fetch_id_content(
             self,
             id: str = '', 
             name: str = ''
@@ -419,4 +466,10 @@ class SectionTree:
 
         self.construct_toc(self.tree[0][0])
         return self.doc_toc
+    
+    def debug_tree(
+            self
+    ):
+        for node in self.leafs:
+            logger.debug(self.fetch_node_content(node))
     

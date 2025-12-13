@@ -36,12 +36,13 @@ class RFCParser:
     def save_parser(
             self,
             st: SectionTree, 
-            save_path: str = './'
+            save_path: str
     ):
         """Use pickle to store section tree instance
         """
-        with open("section_tree.pkl", "wb") as f:
-            pickle.dump(st, f)  # dump(对象, 文件对象)
+        cwd = Path.cwd()
+        with open(cwd / "section_tree.pkl", "wb") as f:
+            pickle.dump(st, f)  
 
 
 
