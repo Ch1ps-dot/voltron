@@ -5,23 +5,28 @@ from pathlib import Path
 from typing import Self
 from .setciontree import SectionTree
 from .logger import logger
+from ..llm.chat import Chater
 
 class RFCParser:
     """Read protocol specification and parse it to section tree.
     """
     def __init__(
             self, 
-            doc_path: Path
+            doc_path: Path,
+            pro_name: str,
+            rfc_id: str
     ) -> None:
         self.doc_path: Path = doc_path
         self.doc_file = doc_path.open('r+', encoding='utf-8')
         self.doc_content: str = self.doc_file.read()
+        self.pro_name = pro_name
+        self.rfc_id = rfc_id
 
         # initialize the sectiontree which stands for the section structure of documents
         start = time.perf_counter()    
         self.st = SectionTree(id='', content=self.doc_content)
         end = time.perf_counter()
-        logger.debug(f"\n[ST init]: \n cost time:{end - start}")
+        logger.debug(f"[ST init]: cost time:{end - start}")
 
         # initialize the vectordatabase
         # self.chroma_client = chromadb.Client()
@@ -33,16 +38,9 @@ class RFCParser:
     ):
         pass
 
-    def save_parser(
-            self,
-            st: SectionTree, 
-            save_path: str
-    ):
-        """Use pickle to store section tree instance
-        """
-        cwd = Path.cwd()
-        with open(cwd / "section_tree.pkl", "wb") as f:
-            pickle.dump(st, f)  
+    
+
+
 
 
 

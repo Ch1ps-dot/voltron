@@ -58,7 +58,7 @@ class Chater:
         end = time.perf_counter()
         
         response: str | None = completion.choices[0].message.content
-        logger.info(f"[Chat] usage:{usage} cost_time:{end - start}")
+        logger.info(f"[Chat]:{usage} cost_time:{end - start}")
         return response
 
     def llm_query_rfc(
@@ -66,78 +66,94 @@ class Chater:
     ) -> str | None:
         pass
 
-    def llm_query_type(
+    def llm_doc_parse(
             self,
-            rfc_doc: str = '',
             rfc_num: str = '',
-            pro_name: str = ''
+            pro_name: str = '',
+            rfc_doc: str = ''
     ) -> str | None:
-        """Parse rfc and query message type related thing.
-
-        Args:
-            rfc_doc: RFC content
-            rfc_num: rfc number
-            rfc_name: name of rfc
-
-        """
         ans = self.chat_llm(
-            prompt=self.pmp.msg_type_query(
-                rfc_doc = rfc_doc,
-                rfc_num = rfc_num,
-                pro_name = pro_name
+            prompt=self.pmp.doc_analyze(
+                pro_name=pro_name, 
+                rfc_num=rfc_num, 
+                rfc_doc=rfc_doc
             ),
-            usage = "query_type"
+            usage = "doc_parse"
         )
+        return ans
+
+    # def llm_query_type(
+    #         self,
+    #         rfc_doc: str = '',
+    #         rfc_num: str = '',
+    #         pro_name: str = ''
+    # ) -> str | None:
+    #     """Parse rfc and query message type related thing.
+
+    #     Args:
+    #         rfc_doc: RFC content
+    #         rfc_num: rfc number
+    #         rfc_name: name of rfc
+
+    #     """
+    #     ans = self.chat_llm(
+    #         prompt=self.pmp.msg_type_query(
+    #             rfc_doc = rfc_doc,
+    #             rfc_num = rfc_num,
+    #             pro_name = pro_name
+    #         ),
+    #         usage = "query_type"
+    #     )
         
-        pattern = re.compile(
-            r'```(?:json)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
+    #     pattern = re.compile(
+    #         r'```(?:json)\s*\n(.*?)\n\s*```',
+    #         re.DOTALL | re.IGNORECASE
+    #     )
 
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: failed to parse rfc')
-        return ""
+    #     if ans != None:
+    #         match: Match | None = pattern.search(ans)
+    #         if match:
+    #             return match.group()
+    #         else:
+    #             logger.debug(f'[Chat]: failed to parse rfc')
+    #     return ""
 
-    def llm_rfc_summary(
-            self,
-            rfc_toc: str,
-            rfc_doc: str,
-            rfc_num: str,
-            pro_name: str
-    ) -> str | None:
-        """Summary rfc by chapter.
+    # def llm_rfc_summary(
+    #         self,
+    #         rfc_toc: str,
+    #         rfc_doc: str,
+    #         rfc_num: str,
+    #         pro_name: str
+    # ) -> str | None:
+    #     """Abandon Summary rfc by chapter.
 
-        Args:
-            rfc_toc: table of content of RFC
-            rfc_num: rfc number
-            rfc_name: name of rfc
+    #     Args:
+    #         rfc_toc: table of content of RFC
+    #         rfc_num: rfc number
+    #         rfc_name: name of rfc
 
-        """
-        ans = self.chat_llm(
-            prompt=self.pmp.msg_rfc_summary(
-                rfc_toc = rfc_toc,
-                rfc_num = rfc_num,
-                pro_name = pro_name
-            ),
-            usage = "rfc_summary"
-        )
+    #     """
+    #     ans = self.chat_llm(
+    #         prompt=self.pmp.msg_rfc_summary(
+    #             rfc_toc = rfc_toc,
+    #             rfc_num = rfc_num,
+    #             pro_name = pro_name
+    #         ),
+    #         usage = "rfc_summary"
+    #     )
         
-        pattern = re.compile(
-            r'```(?:json)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
+    #     pattern = re.compile(
+    #         r'```(?:json)\s*\n(.*?)\n\s*```',
+    #         re.DOTALL | re.IGNORECASE
+    #     )
 
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: failed to summary rfc')
-        return ""
+    #     if ans != None:
+    #         match: Match | None = pattern.search(ans)
+    #         if match:
+    #             return match.group()
+    #         else:
+    #             logger.debug(f'[Chat]: failed to summary rfc')
+    #     return ""
     
 
     def llm_gen_input(
@@ -145,7 +161,7 @@ class Chater:
             pro_name: str = '',
             msg_type: str = '',
             pending: str = ''
-    ) -> str | None:
+    ) -> str:
         """Generate python code as fuzzer input
 
         Args:
@@ -156,7 +172,7 @@ class Chater:
             generated input
         """
         ans = self.chat_llm(
-            prompt=self.pmp.msg_input_gen(
+            prompt=self.pmp.input_gen(
                 pro_name=pro_name, 
                 msg_type=msg_type, 
                 pending=pending
@@ -185,7 +201,7 @@ class Chater:
             msg_type: str = ''
     ) -> str | None:
         ans = self.chat_llm(
-            prompt=self.pmp.msg_req_query(
+            prompt=self.pmp.req_query(
                 rfc_num=rfc_num,
                 pro_name=pro_name
             ),

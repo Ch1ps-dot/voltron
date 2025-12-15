@@ -1,62 +1,178 @@
-2025-12-12 18:36:31,577 - debug - DEBUG - setciontree:314 -    2.3.  THE FTP MODEL
-2025-12-12 18:36:31,580 - debug - DEBUG - setciontree:314 -          3.1.1.5.  FORMAT CONTROL
-2025-12-12 18:36:31,580 - debug - DEBUG - setciontree:314 -             3.1.1.5.2.  CARRIAGE CONTROL (ASA)
-2025-12-12 18:36:31,580 - debug - DEBUG - setciontree:314 -       3.1.2.  DATA STRUCTURES
-2025-12-12 18:36:31,581 - debug - DEBUG - setciontree:314 -          3.1.2.3.  PAGE STRUCTURE
-2025-12-12 18:36:31,581 - debug - DEBUG - setciontree:314 -       3.4.3.  COMPRESSED MODE
-2025-12-12 18:36:31,581 - debug - DEBUG - setciontree:314 -    3.5.  ERROR RECOVERY AND RESTART
-2025-12-12 18:36:31,583 - debug - DEBUG - setciontree:314 -       4.1.3.  FTP SERVICE COMMANDS
-2025-12-12 18:36:31,584 - debug - DEBUG - setciontree:314 -       4.2.2 Numeric  Order List of Reply Codes
-2025-12-12 18:36:31,585 - debug - DEBUG - setciontree:314 -       5.3.2.  FTP COMMAND ARGUMENTS
-2025-12-12 18:36:31,585 - debug - DEBUG - setciontree:314 -    5.4.  SEQUENCING OF COMMANDS AND REPLIES
-2025-12-12 18:36:31,586 - debug - DEBUG - setciontree:314 - 8.  CONNECTION ESTABLISHMENT
-2025-12-12 18:36:31,586 - debug - DEBUG - rfcparser:24 - 
-[ST init]: 
- cost time:0.013735010999880615
-2025-12-12 18:36:31,586 - debug - DEBUG - test_st:11 - 
-0.
-1.  INTRODUCTION
-2.  OVERVIEW
-   2.1.  HISTORY
-   2.2.  TERMINOLOGY
-   2.3.  THE FTP MODEL
-3.  DATA TRANSFER FUNCTIONS
-   3.1.  DATA REPRESENTATION AND STORAGE
-      3.1.1.  DATA TYPES
-         3.1.1.1.  ASCII TYPE
-         3.1.1.2.  EBCDIC TYPE
-         3.1.1.3.  IMAGE TYPE
-         3.1.1.4.  LOCAL TYPE
-         3.1.1.5.  FORMAT CONTROL
-            3.1.1.5.1.  NON PRINT
-            3.1.1.5.2.  TELNET FORMAT CONTROLS
-            3.1.1.5.2.  CARRIAGE CONTROL (ASA)
-      3.1.2.  DATA STRUCTURES
-         3.1.2.1.  FILE STRUCTURE
-         3.1.2.2.  RECORD STRUCTURE
-         3.1.2.3.  PAGE STRUCTURE
-   3.2.  ESTABLISHING DATA CONNECTIONS
-   3.3.  DATA CONNECTION MANAGEMENT
-   3.4.  TRANSMISSION MODES
-      3.4.1.  STREAM MODE
-      3.4.2.  BLOCK MODE
-      3.4.3.  COMPRESSED MODE
-   3.5.  ERROR RECOVERY AND RESTART
-4.  FILE TRANSFER FUNCTIONS
-   4.1.  FTP COMMANDS
-      4.1.1.  ACCESS CONTROL COMMANDS
-      4.1.2.  TRANSFER PARAMETER COMMANDS
-      4.1.3.  FTP SERVICE COMMANDS
-   4.2.  FTP REPLIES
-      4.2.1  Reply Codes by Function Groups
-      4.2.2 Numeric  Order List of Reply Codes
-5.  DECLARATIVE SPECIFICATIONS
-   5.1.  MINIMUM IMPLEMENTATION
-   5.2.  CONNECTIONS
-   5.3.  COMMANDS
-      5.3.1.  FTP COMMANDS
-      5.3.2.  FTP COMMAND ARGUMENTS
-   5.4.  SEQUENCING OF COMMANDS AND REPLIES
-6.  STATE DIAGRAMS
-7.  TYPICAL FTP SCENARIO
-8.  CONNECTION ESTABLISHMENT
+2025-12-15 16:42:49,848 - debug - DEBUG - rfcparser:29 - [ST init]: cost time:0.012058785996487131
+2025-12-15 16:42:51,449 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.6002334510012588
+2025-12-15 16:42:51,449 - debug - INFO - fuzz:89 - []	0.[PADDING]
+2025-12-15 16:42:52,498 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.0484748740018404
+2025-12-15 16:42:52,498 - debug - INFO - fuzz:89 - []1.  INTRODUCTION
+2025-12-15 16:42:53,229 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7309826640012034
+2025-12-15 16:42:53,229 - debug - INFO - fuzz:89 - []	2.  OVERVIEW[PADDING]
+2025-12-15 16:42:53,895 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6657487259981281
+2025-12-15 16:42:53,895 - debug - INFO - fuzz:89 - []   2.1.  HISTORY
+2025-12-15 16:42:54,650 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7543183219968341
+2025-12-15 16:42:54,650 - debug - INFO - fuzz:89 - []   2.2.  TERMINOLOGY
+2025-12-15 16:42:55,297 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6464548539988755
+2025-12-15 16:42:55,297 - debug - INFO - fuzz:89 - []   2.3.  THE FTP MODEL
+2025-12-15 16:42:55,938 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6406036530024721
+2025-12-15 16:42:55,938 - debug - INFO - fuzz:89 - []	3.  DATA TRANSFER FUNCTIONS[PADDING]
+2025-12-15 16:42:56,737 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7987379890000739
+2025-12-15 16:42:56,737 - debug - INFO - fuzz:89 - []	   3.1.  DATA REPRESENTATION AND STORAGE[PADDING]
+2025-12-15 16:42:57,631 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8943624659987108
+2025-12-15 16:42:57,632 - debug - INFO - fuzz:89 - []	      3.1.1.  DATA TYPES[PADDING]
+2025-12-15 16:42:58,556 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.9240997790002439
+2025-12-15 16:42:58,556 - debug - INFO - fuzz:89 - []         3.1.1.1.  ASCII TYPE
+2025-12-15 16:42:59,486 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.929846772000019
+2025-12-15 16:42:59,486 - debug - INFO - fuzz:89 - []         3.1.1.2.  EBCDIC TYPE
+2025-12-15 16:43:00,167 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6806807510001818
+2025-12-15 16:43:00,167 - debug - INFO - fuzz:89 - []         3.1.1.3.  IMAGE TYPE
+2025-12-15 16:43:00,780 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.612352367999847
+2025-12-15 16:43:00,780 - debug - INFO - fuzz:89 - []         3.1.1.4.  LOCAL TYPE
+2025-12-15 16:43:01,799 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.0191484169990872
+2025-12-15 16:43:01,800 - debug - INFO - fuzz:89 - []	         3.1.1.5.  FORMAT CONTROL[PADDING]
+2025-12-15 16:43:02,599 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7992617109994171
+2025-12-15 16:43:02,599 - debug - INFO - fuzz:89 - []            3.1.1.5.1.  NON PRINT
+2025-12-15 16:43:03,195 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.5961464130014065
+2025-12-15 16:43:03,195 - debug - INFO - fuzz:89 - []            3.1.1.5.2.  TELNET FORMAT CONTROLS
+2025-12-15 16:43:03,853 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6573439310013782
+2025-12-15 16:43:03,853 - debug - INFO - fuzz:89 - []            3.1.1.5.2.  CARRIAGE CONTROL (ASA)
+2025-12-15 16:43:04,663 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8100096869966364
+2025-12-15 16:43:04,663 - debug - INFO - fuzz:89 - []	      3.1.2.  DATA STRUCTURES[PADDING]
+2025-12-15 16:43:05,520 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8564234080004098
+2025-12-15 16:43:05,520 - debug - INFO - fuzz:89 - []         3.1.2.1.  FILE STRUCTURE
+2025-12-15 16:43:06,426 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.9060120549984276
+2025-12-15 16:43:06,426 - debug - INFO - fuzz:89 - []         3.1.2.2.  RECORD STRUCTURE
+2025-12-15 16:43:07,194 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7677788479995797
+2025-12-15 16:43:07,194 - debug - INFO - fuzz:89 - []         3.1.2.3.  PAGE STRUCTURE
+2025-12-15 16:43:07,947 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7521266260009725
+2025-12-15 16:43:07,947 - debug - INFO - fuzz:89 - []   3.2.  ESTABLISHING DATA CONNECTIONS
+2025-12-15 16:43:09,333 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.3859297070011962
+2025-12-15 16:43:09,333 - debug - INFO - fuzz:89 - []   3.3.  DATA CONNECTION MANAGEMENT
+2025-12-15 16:43:10,136 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.802304324999568
+2025-12-15 16:43:10,136 - debug - INFO - fuzz:89 - []	   3.4.  TRANSMISSION MODES[PADDING]
+2025-12-15 16:43:10,980 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8441244970017578
+2025-12-15 16:43:10,980 - debug - INFO - fuzz:89 - []      3.4.1.  STREAM MODE
+2025-12-15 16:43:11,757 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7764005249991897
+2025-12-15 16:43:11,757 - debug - INFO - fuzz:89 - []      3.4.2.  BLOCK MODE
+2025-12-15 16:43:12,591 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8334262919997855
+2025-12-15 16:43:12,591 - debug - INFO - fuzz:89 - []      3.4.3.  COMPRESSED MODE
+2025-12-15 16:43:13,264 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6731110930013529
+2025-12-15 16:43:13,264 - debug - INFO - fuzz:89 - []   3.5.  ERROR RECOVERY AND RESTART
+2025-12-15 16:43:14,573 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.3087844680012495
+2025-12-15 16:43:14,574 - debug - INFO - fuzz:89 - []	4.  FILE TRANSFER FUNCTIONS[PADDING]
+2025-12-15 16:43:15,285 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7113613080000505
+2025-12-15 16:43:15,285 - debug - INFO - fuzz:89 - []      4.1.1.  ACCESS CONTROL COMMANDS
+2025-12-15 16:43:16,669 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.3836195370022324
+2025-12-15 16:43:16,669 - debug - INFO - fuzz:89 - []      4.1.2.  TRANSFER PARAMETER COMMANDS
+2025-12-15 16:43:18,714 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:2.0447621810017154
+2025-12-15 16:43:18,714 - debug - INFO - fuzz:89 - []      4.1.3.  FTP SERVICE COMMANDS
+2025-12-15 16:43:19,414 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.700138504998904
+2025-12-15 16:43:19,415 - debug - INFO - fuzz:89 - []   4.2.  FTP REPLIES
+2025-12-15 16:43:20,103 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6887788389976777
+2025-12-15 16:43:20,104 - debug - INFO - fuzz:89 - []      4.2.1  Reply Codes by Function Groups
+2025-12-15 16:43:20,815 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7109977459986112
+2025-12-15 16:43:20,815 - debug - INFO - fuzz:89 - []      4.2.2 Numeric  Order List of Reply Codes
+2025-12-15 16:43:21,551 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7357297439993999
+2025-12-15 16:43:21,551 - debug - INFO - fuzz:89 - []   5.1.  MINIMUM IMPLEMENTATION
+2025-12-15 16:43:22,513 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.9620009530008247
+2025-12-15 16:43:22,513 - debug - INFO - fuzz:89 - []   5.2.  CONNECTIONS
+2025-12-15 16:43:23,258 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7450976910004101
+2025-12-15 16:43:23,258 - debug - INFO - fuzz:89 - []	   5.3.  COMMANDS[PADDING]
+2025-12-15 16:43:23,834 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.5758590989971708
+2025-12-15 16:43:23,835 - debug - INFO - fuzz:89 - []      5.3.1.  FTP COMMANDS
+2025-12-15 16:43:24,693 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8587126530001115
+2025-12-15 16:43:24,694 - debug - INFO - fuzz:89 - []      5.3.2.  FTP COMMAND ARGUMENTS
+2025-12-15 16:43:25,528 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8344337690032262
+2025-12-15 16:43:25,528 - debug - INFO - fuzz:89 - []   5.4.  SEQUENCING OF COMMANDS AND REPLIES
+2025-12-15 16:43:26,562 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.0339964049999253
+2025-12-15 16:43:26,562 - debug - INFO - fuzz:89 - []6.  STATE DIAGRAMS
+2025-12-15 16:43:27,170 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6072557799998322
+2025-12-15 16:43:27,170 - debug - INFO - fuzz:89 - []7.  TYPICAL FTP SCENARIO
+2025-12-15 16:43:27,865 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6944832549997955
+2025-12-15 16:43:27,865 - debug - INFO - fuzz:89 - []8.  CONNECTION ESTABLISHMENT
+2025-12-15 16:45:46,548 - debug - DEBUG - rfcparser:29 - [ST init]: cost time:0.011899850000190781
+2025-12-15 16:45:47,890 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.3418232269978034
+2025-12-15 16:45:47,890 - debug - INFO - fuzz:90 - [no]	0.[PADDING]
+2025-12-15 16:45:48,623 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7332687449998048
+2025-12-15 16:45:48,624 - debug - INFO - fuzz:90 - [no]1.  INTRODUCTION
+2025-12-15 16:45:49,268 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6438231899992388
+2025-12-15 16:45:49,268 - debug - INFO - fuzz:90 - [no]	2.  OVERVIEW[PADDING]
+2025-12-15 16:45:49,859 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.5904665399975784
+2025-12-15 16:45:49,859 - debug - INFO - fuzz:90 - [no]   2.1.  HISTORY
+2025-12-15 16:45:50,556 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6968249540004763
+2025-12-15 16:45:50,556 - debug - INFO - fuzz:90 - [no]   2.2.  TERMINOLOGY
+2025-12-15 16:45:51,560 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.0034537219980848
+2025-12-15 16:45:51,560 - debug - INFO - fuzz:90 - [no]   2.3.  THE FTP MODEL
+2025-12-15 16:45:52,313 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.753186469002685
+2025-12-15 16:45:52,313 - debug - INFO - fuzz:90 - [no]	3.  DATA TRANSFER FUNCTIONS[PADDING]
+2025-12-15 16:45:53,084 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7708877740005846
+2025-12-15 16:45:53,085 - debug - INFO - fuzz:90 - [no]	   3.1.  DATA REPRESENTATION AND STORAGE[PADDING]
+2025-12-15 16:45:53,686 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6009906959989166
+2025-12-15 16:45:53,687 - debug - INFO - fuzz:90 - [no]	      3.1.1.  DATA TYPES[PADDING]
+2025-12-15 16:45:54,353 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6664134669990744
+2025-12-15 16:45:54,354 - debug - INFO - fuzz:90 - [no]         3.1.1.1.  ASCII TYPE
+2025-12-15 16:45:55,493 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.1388655739974638
+2025-12-15 16:45:55,493 - debug - INFO - fuzz:90 - [no]         3.1.1.2.  EBCDIC TYPE
+2025-12-15 16:45:56,195 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7020991860008508
+2025-12-15 16:45:56,195 - debug - INFO - fuzz:90 - [no]         3.1.1.3.  IMAGE TYPE
+2025-12-15 16:45:56,787 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.5916177280014381
+2025-12-15 16:45:56,787 - debug - INFO - fuzz:90 - [no]         3.1.1.4.  LOCAL TYPE
+2025-12-15 16:45:57,371 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.5840521220015944
+2025-12-15 16:45:57,371 - debug - INFO - fuzz:90 - [no]	         3.1.1.5.  FORMAT CONTROL[PADDING]
+2025-12-15 16:45:58,177 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8051675119968422
+2025-12-15 16:45:58,177 - debug - INFO - fuzz:90 - [no]            3.1.1.5.1.  NON PRINT
+2025-12-15 16:45:58,811 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6343278450003709
+2025-12-15 16:45:58,812 - debug - INFO - fuzz:90 - [no]            3.1.1.5.2.  TELNET FORMAT CONTROLS
+2025-12-15 16:46:00,165 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.3526006100000814
+2025-12-15 16:46:00,165 - debug - INFO - fuzz:90 - [no]            3.1.1.5.2.  CARRIAGE CONTROL (ASA)
+2025-12-15 16:46:00,776 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6110988000000361
+2025-12-15 16:46:00,777 - debug - INFO - fuzz:90 - [no]	      3.1.2.  DATA STRUCTURES[PADDING]
+2025-12-15 16:46:01,548 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7717517879973457
+2025-12-15 16:46:01,549 - debug - INFO - fuzz:90 - [no]         3.1.2.1.  FILE STRUCTURE
+2025-12-15 16:46:02,300 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7516443970016553
+2025-12-15 16:46:02,300 - debug - INFO - fuzz:90 - [no]         3.1.2.2.  RECORD STRUCTURE
+2025-12-15 16:46:02,999 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6989520659990376
+2025-12-15 16:46:03,000 - debug - INFO - fuzz:90 - [no]         3.1.2.3.  PAGE STRUCTURE
+2025-12-15 16:46:03,715 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7146932400028163
+2025-12-15 16:46:03,715 - debug - INFO - fuzz:90 - [no]   3.2.  ESTABLISHING DATA CONNECTIONS
+2025-12-15 16:46:04,469 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7541874410017044
+2025-12-15 16:46:04,469 - debug - INFO - fuzz:90 - [no]   3.3.  DATA CONNECTION MANAGEMENT
+2025-12-15 16:46:05,082 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6120686479989672
+2025-12-15 16:46:05,082 - debug - INFO - fuzz:90 - [no]	   3.4.  TRANSMISSION MODES[PADDING]
+2025-12-15 16:46:06,184 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:1.1016569299972616
+2025-12-15 16:46:06,184 - debug - INFO - fuzz:90 - [no]      3.4.1.  STREAM MODE
+2025-12-15 16:46:06,976 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7923805780010298
+2025-12-15 16:46:06,976 - debug - INFO - fuzz:90 - [no]      3.4.2.  BLOCK MODE
+2025-12-15 16:46:07,851 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8749612899991916
+2025-12-15 16:46:07,852 - debug - INFO - fuzz:90 - [no]      3.4.3.  COMPRESSED MODE
+2025-12-15 16:46:08,679 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8269380409983569
+2025-12-15 16:46:08,679 - debug - INFO - fuzz:90 - [no]   3.5.  ERROR RECOVERY AND RESTART
+2025-12-15 16:46:09,465 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.785684215999936
+2025-12-15 16:46:09,465 - debug - INFO - fuzz:90 - [no]	4.  FILE TRANSFER FUNCTIONS[PADDING]
+2025-12-15 16:46:10,464 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.9983757920017524
+2025-12-15 16:46:10,464 - debug - INFO - fuzz:90 - [no]      4.1.1.  ACCESS CONTROL COMMANDS
+2025-12-15 16:46:11,155 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6912906830002612
+2025-12-15 16:46:11,156 - debug - INFO - fuzz:90 - [request]      4.1.2.  TRANSFER PARAMETER COMMANDS
+2025-12-15 16:46:12,111 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.9555454479996115
+2025-12-15 16:46:12,111 - debug - INFO - fuzz:90 - [no]      4.1.3.  FTP SERVICE COMMANDS
+2025-12-15 16:46:12,863 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7519351609989826
+2025-12-15 16:46:12,864 - debug - INFO - fuzz:90 - [response]   4.2.  FTP REPLIES
+2025-12-15 16:46:13,546 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6818653679983981
+2025-12-15 16:46:13,546 - debug - INFO - fuzz:90 - [response]      4.2.1  Reply Codes by Function Groups
+2025-12-15 16:46:14,472 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.9257541129991296
+2025-12-15 16:46:14,472 - debug - INFO - fuzz:90 - [response]      4.2.2 Numeric  Order List of Reply Codes
+2025-12-15 16:46:15,254 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7816475750005338
+2025-12-15 16:46:15,254 - debug - INFO - fuzz:90 - [no]   5.1.  MINIMUM IMPLEMENTATION
+2025-12-15 16:46:16,242 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.987245749001886
+2025-12-15 16:46:16,242 - debug - INFO - fuzz:90 - [no]   5.2.  CONNECTIONS
+2025-12-15 16:46:16,941 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6985601439992024
+2025-12-15 16:46:16,941 - debug - INFO - fuzz:90 - [request]	   5.3.  COMMANDS[PADDING]
+2025-12-15 16:46:17,567 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6261096920025011
+2025-12-15 16:46:17,567 - debug - INFO - fuzz:90 - [request]      5.3.1.  FTP COMMANDS
+2025-12-15 16:46:18,248 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.6803605739987688
+2025-12-15 16:46:18,248 - debug - INFO - fuzz:90 - [request]      5.3.2.  FTP COMMAND ARGUMENTS
+2025-12-15 16:46:19,064 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.8161266679999244
+2025-12-15 16:46:19,064 - debug - INFO - fuzz:90 - [response]   5.4.  SEQUENCING OF COMMANDS AND REPLIES
+2025-12-15 16:46:19,812 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.747312965002493
+2025-12-15 16:46:19,812 - debug - INFO - fuzz:90 - [no]6.  STATE DIAGRAMS
+2025-12-15 16:46:20,406 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.5935038019997592
+2025-12-15 16:46:20,406 - debug - INFO - fuzz:90 - [no]7.  TYPICAL FTP SCENARIO
+2025-12-15 16:46:21,156 - debug - INFO - chat:61 - [Chat]:doc_parse cost_time:0.7497949150019849
+2025-12-15 16:46:21,156 - debug - INFO - fuzz:90 - [no]8.  CONNECTION ESTABLISHMENT

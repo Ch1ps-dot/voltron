@@ -1,31 +1,39 @@
 You are an expert in networking protocols and RFC analysis.
 
 Your task:
-Analyzing the $rfc_number document of the $pro_name protocol, identify and summarize all categories of response-type protocol messages defined in the RFC.
-A “response message type” is any protocol message whose purpose is to reply to a request, acknowledge an action, return data, confirm state, provide a status report, or otherwise serve as the *response* side of a request/response interaction.
+Analyzing the $rfc_number document of the $pro_name protocol, extract the fields from the **response message** that can be used to distinguish or identify the message type or function. Briefly explain how each field is used for this purpose. Focus only on fields that directly determine the type of the response message, and do not include fields related to content, parameters, or other functionalities.
 
-You MUST follow these rules:
-
-1. For each message provide:
-   - name: Exact message name as written in the RFC
-   - section_number: Exact RFC section number where the message type is defined (e.g., “3.1.2”)
-
-2. If the RFC contains no response messages, return an empty array.
-
-3. Output MUST be a single JSON object and nothing else.
-
-JSON output schema:
+**Output the result in the following JSON format:**
 
 ```json
-{
-  "doc_name": "<RFC number or document name>",
-  "response_message_types": [
-     {
-       "name": "string",
-       "section_number": "string"
-     }
-  ]
-}
+[
+  {
+    "field_name": "",
+    "position": "",
+    "explanation": "",
+    "value": []
+  }
+]
 ```
 
-Now analyze the RFC document and output the result strictly in JSON.
+**Sample output:**
+
+```json
+[
+  {
+    "field_name": "Status-Code",
+    "position": "First element of the response line",
+    "explanation": "Used to distinguish the result and type of HTTP response messages, such as 200, 404, 500, etc."
+    "values": [200, 201, 204, 400, 401, 403, 404, 500, 501, 502, ...]
+  },
+  {
+    "field_name": "Reply Code",
+    "position": "First three digits of the FTP response message",
+    "explanation": "Used to distinguish the type and result of FTP response messages, such as 220, 331, 550, etc.",
+    "values": [110, 120, 125, 150, 200, 220, 221, 226, 230, 331, 332, 421, 425, 426, 530, 550, ...]
+  }
+]
+```
+
+Please extract and explain only the fields related to **response messages**, strictly according to the format and requirements above.
+Only respond with the analysis result in JSON format.

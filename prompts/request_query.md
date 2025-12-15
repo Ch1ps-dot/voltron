@@ -1,42 +1,33 @@
 You are an expert in networking protocols and RFC analysis.
 
 Your task:
-Analyze the provided RFC document and extract all *request-type* protocol messages.
+Analyzing the $rfc_number document of the $pro_name protocol, extract the fields from the **request message** that can be used to distinguish or identify the message type or function. Briefly explain how each field is used for this purpose. Focus only on fields that directly determine the type of the request message, and do not include fields related to content, parameters, or other functionalities.
 
-A “request message type” is any protocol message whose purpose is to:
-- initiate an operation
-- query state or request data
-- begin negotiation or connection setup
-- solicit information (e.g., Solicit, Discover, Query)
-- send capability or configuration requests
-- trigger a request–response interaction
+**Output the result in the following JSON format:**
 
-These include any messages named or described as:
-"Request", "Query", "Solicit", "Discover", "Open", "Init", "Capability-Request",
-"Hello-Request", or any subtype/TLV that behaves as a request.
+```json
+[
+  {
+    "field_name": "",
+    "position": "",
+    "explanation": "",
+    "value": []
+  }
+]
+```
 
-You MUST follow these rules:
+**Sample output:**
 
-1. Extract ONLY request-type messages.
-2. For each request-type message, provide:
-   - name: exact name as written in the RFC
-   - section_number: exact RFC section where the message is normatively defined
-   - purpose: brief description of what operation or information is being requested
-3. If a message has multiple request subtypes (e.g., TLV-based), list each separately.
-4. If no request-type messages exist, return an empty array.
-5. Output MUST be a single JSON object, and NOTHING else.
+```json
+[
+  {
+    "field_name": "Method",
+    "position": "First element of the request line",
+    "explanation": "Used to distinguish the operation type of HTTP requests, such as GET, POST, PUT, etc.",
+    "values": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", ...]
+  }
+]
+```
 
-Output schema:
-{
-  "doc_name": "<RFC number or document name>",
-  "request_message_types": [
-    {
-      "name": "string",
-      "section_number": "string",
-      "purpose": "string"
-    }
-  ]
-}
-
-Now analyze the RFC text below and output the result strictly in JSON.
-<RFC_TEXT>
+Please extract and explain only the fields related to **request messages**, strictly according to the format and requirements above.
+Only respond with the analysis result in JSON format.

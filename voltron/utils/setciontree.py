@@ -20,7 +20,7 @@ class SectionNode:
             level: int, 
             start: int,
             end: int,
-            name: str
+            name: str,
     ) -> None:
         self.name: str = name
         self.subsection: list[SectionNode] = []
@@ -28,7 +28,8 @@ class SectionNode:
         self.end: int = end
         self.level: int = level
         self.isLeaf: bool = False
-        self.upper = ''
+        self.upper: SectionNode | None
+        self.content_type: str
 
         # debug
         # print(f'{name}: [{start}-{end}]')
@@ -42,13 +43,25 @@ class SectionNode:
         Args:
             name: name of subsection
         """
+
+        # add the content between first subsection and start point of upper section.
+        if self.subsection == [] and node.start - self.start > len(self.name) + 5:
+            ov_node = SectionNode(
+                level = node.level,
+                start = self.start,
+                end = node.start,
+                name = f'\t{self.name}[PADDING]'
+            )
+            ov_node.upper = self
+            self.subsection.append(ov_node)
         self.subsection.append(node)
 
-    # TODO
     def is_sub(
             self,
             name: str
     ) -> bool:
+        """TODO
+        """
         return name in self.subsection
         
 
@@ -293,7 +306,7 @@ class SectionTree:
                 upper_node = self.fetch_node(level - 1, upper)
                 if upper_node != None:
                     upper_node.add_subsection(node)
-                    node.upper = upper
+                    node.upper = upper_node
             
             # recursively resolve subsection
             self._section_helper(
@@ -311,12 +324,12 @@ class SectionTree:
         # if (self._check_section(pre_name, cur_name)): 
         node = SectionNode(level, pre_section_start, end, pre_name)
         self.add_section(node)
-        logger.debug(pre_name)
+
         if upper:
             upper_node = self.fetch_node(level - 1, upper)
             if upper_node != None:
                 upper_node.add_subsection(node)
-                node.upper = upper
+                node.upper = upper_node
         self._section_helper(
                 level+1, 
                 pre_section_start, 
@@ -471,5 +484,5 @@ class SectionTree:
             self
     ):
         for node in self.leafs:
-            logger.debug(self.fetch_node_content(node))
+            logger.debug(node.name)
     
