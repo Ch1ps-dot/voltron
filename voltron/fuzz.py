@@ -15,6 +15,7 @@ class Fuzzer:
             host:str, 
             port:int, 
             pro_name:str,
+            rparser_path:Path | None = None,
             sut_path:Path = Path(''),
             pmp_dir:Path = Path('./prompts').resolve(),
             doc_path:Path = Path('./tests/docs').resolve(),
@@ -30,6 +31,7 @@ class Fuzzer:
         self.sut_path = sut_path
         self.script_path = script_path
         self.doc_path = doc_path
+        self.rparser_path = rparser_path
 
         self.st: SectionTree
         self.rfcparser: RFCParser
@@ -46,7 +48,10 @@ class Fuzzer:
         self.chater = Chater(Path(pmp_dir).resolve())
 
         # specification parse
-        self.spe_parse()
+        if(rparser_path):
+            self.load_parser()
+        else:
+            self.spe_parse()
 
         # ir generation
         self.ir_generation()
@@ -102,6 +107,16 @@ class Fuzzer:
         # section tree decoration
 
         # ir generation
+
+    def load_parser(
+            self
+    ):
+        """Load rfc parser 
+        """
+        if self.rparser_path == None: return
+        with self.rparser_path.open('rb') as f:
+            self.rfcparser = pickle.load(f)  
+        
 
     def save_parser(
             self,
