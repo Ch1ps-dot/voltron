@@ -1,10 +1,8 @@
 from string import Template
 import textwrap
 from pathlib import Path
-import logging
+from ..utils.logger import logger
 import re
-
-logger = logging.getLogger(__name__)
 
 class Prompter:
     """Construct prompt for client
@@ -21,6 +19,7 @@ class Prompter:
         self._path_req_query = dir / "request_query.md"
         self._path_res_query = dir / "response_query.md"
         self._path_doc_analyze = dir / "doc_analyze.md"
+        self._path_ir_generation = dir / "ir_generation.md"
 
         self._tem_rfc_query = ''
         self._tem_gen_input = ''
@@ -29,6 +28,7 @@ class Prompter:
         self._tem_res_query = ''
         self._tem_req_query = ''
         self._tem_doc_analyze = ''
+        self._tem_ir_generation = ''
 
 
         if dir.is_dir():
@@ -46,6 +46,8 @@ class Prompter:
                 self._tem_req_query = f.read()
             with self._path_doc_analyze.open('r+') as f:
                 self._tem_doc_analyze = f.read()
+            with self._path_ir_generation.open('r+') as f:
+                self._tem_ir_generation = f.read()
         else:
             logger.info("[prompter]: template directory error")
     
@@ -115,4 +117,13 @@ class Prompter:
     ) -> str:
         msg = Template(self._tem_doc_analyze)
         return msg.substitute(rfc_num = rfc_num, pro_name = pro_name, rfc_doc = rfc_doc)
+    
+    def ir_generation(
+            self,
+            pro_name: str = '',
+            message_name: str = '',
+            rfc_doc: str = ''
+    ) -> str:
+        msg = Template(self._tem_ir_generation)
+        return msg.substitute(pro_name = pro_name, message_name = message_name, rfc_doc = rfc_doc)
 

@@ -81,6 +81,22 @@ class Chater:
             usage = "doc_parse"
         )
         return ans
+    
+    def llm_ir_generation(
+            self,
+            pro_name: str = '',
+            message_name: str = '',
+            rfc_doc: str = ''
+    ):
+        ans = self.chat_llm(
+            prompt=self.pmp.ir_generation(
+                pro_name=pro_name, 
+                message_name=message_name, 
+                rfc_doc=rfc_doc
+            ),
+            usage = "ir_generation"
+        )
+        return ans
 
     # def llm_query_type(
     #         self,
@@ -181,18 +197,21 @@ class Chater:
         )
         # print(ans)
 
-        pattern = re.compile(
-            r'```(?:python|py)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
+        # pattern = re.compile(
+        #     r'```(?:python|py)\s*\n(.*?)\n\s*```',
+        #     re.DOTALL | re.IGNORECASE
+        # )
 
+        # if ans != None:
+        #     match: Match | None = pattern.search(ans)
+        #     if match:
+        #         return match.group()
+        #     else:
+        #         logger.debug(f'[Chat]: didn\'t match valid python code')
         if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: didn\'t match valid python code')
-        return ""
+            return ans
+        else:
+            return ''
 
     def llm_req_query(
             self,
