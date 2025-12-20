@@ -4,9 +4,10 @@ from .utils.setciontree import SectionTree
 from .utils.logger import logger
 from .nio.nio import Nio
 from .executor.executor import Executor
+from .sheduler.alphabet import Alphabet, Symbol
 
 from pathlib import Path
-import os, pickle
+import os, pickle, json
 
 class Fuzzer:
     def __init__(
@@ -15,26 +16,33 @@ class Fuzzer:
             host:str, 
             port:int, 
             pro_name:str,
-            rparser_path:Path | None = None,
+            rfc_name:str,
             sut_path:Path = Path(''),
             pmp_dir:Path = Path('./prompts').resolve(),
             doc_path:Path = Path('./tests/docs').resolve(),
             script_path:Path = Path('')
         ) -> None:
 
-        # init some key parameter
+        # key parameter of fuzzer
         self.host = host
         self.stype = stype
         self.port = port
         self.pro_name = pro_name
+        self.rfc_name = rfc_name
 
         self.sut_path = sut_path
         self.script_path = script_path
         self.doc_path = doc_path
-        self.rparser_path = rparser_path
+        self.ir_path = Path.cwd() / 'ir'
 
+        # key parameter of ir generation
         self.st: SectionTree
         self.rfcparser: RFCParser
+        self.req: list
+        self.res: list
+        self.alphabet: Alphabet
+        self.req_doc: list
+        self.res_doc: list
 
 
         # network I/O init
@@ -47,85 +55,25 @@ class Fuzzer:
         # llm init
         self.chater = Chater(Path(pmp_dir).resolve())
 
-        # specification parse
-        if(rparser_path):
-            self.load_parser()
-        else:
-            self.spe_parse()
-
         # ir generation
-        self.ir_generation()
+        self.rfcparser = RFCParser(
+            Path(self.doc_path).resolve(),
+            pro_name=self.pro_name,
+            chater=self.chater,
+            rfc_name = self.rfc_name
+        )
+        self.st = self.rfcparser.st
 
     def fuzz_one(
             self
     ):
-        """Fuzz the target one time
+        """Fuzz the target one
         """
         pass
     
     def fuzz_loop(self):
         pass
-
-    def spe_parse(
-            self
-    ):
-        """Workflow of specification parse
-        """
-        # section tree construct
-        self.rfcparser = RFCParser(
-            Path(self.doc_path).resolve(),
-            pro_name=self.pro_name,
-            rfc_id=''
-        )
-        self.st = self.rfcparser.st
-
-        # section tree parse
-        for node in self.st.leafs:
-            
-            doc = self.st.fetch_node_content(node)
-            ans = ''
-            if doc != None:
-                ans = self.chater.llm_doc_parse(
-                    rfc_num = self.rfcparser.rfc_id,
-                    pro_name = self.rfcparser.pro_name,
-                    rfc_doc = doc
-                )
-                if ans != None:
-                    node.content_type = ans
-                    logger.debug(f'[SPE_PARSE]:{ans} {node.name}')           
-    
-    def ir_generation(
-            self
-    ):
-        """Workflow of IR generation
-        """
-        
-        # key field query
-
-        # type query
-
-        # section tree decoration
-
-        # ir generation
-
-    def load_parser(
-            self
-    ):
-        """Load rfc parser 
-        """
-        if self.rparser_path == None: return
-        with self.rparser_path.open('rb') as f:
-            self.rfcparser = pickle.load(f)  
-        
-
-    def save_parser(
-            self,
-            save_path: Path = Path.cwd()
-    ):
-        """Use pickle to store section tree instance
-        """
-        with open("section_tree.pkl", "wb") as f:
-            pickle.dump(self.st, f)  
+  
 
 
         

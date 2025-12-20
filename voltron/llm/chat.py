@@ -58,7 +58,7 @@ class Chater:
         end = time.perf_counter()
         
         response: str | None = completion.choices[0].message.content
-        logger.info(f"[Chat]:{usage} cost_time:{end - start}")
+        logger.debug(f"[Chat]:{usage} cost_time:{end - start}")
         return response
 
     def llm_query_rfc(
@@ -213,18 +213,47 @@ class Chater:
         else:
             return ''
 
-    def llm_req_query(
+    def llm_request_query(
             self,
-            rfc_num:str = '',
-            pro_name: str = '',
-            msg_type: str = ''
-    ) -> str | None:
+            rfc_num:str,
+            pro_name: str,
+            rfc_doc: str
+    ) -> str:
         ans = self.chat_llm(
             prompt=self.pmp.req_query(
                 rfc_num=rfc_num,
-                pro_name=pro_name
+                pro_name=pro_name,
+                rfc_doc=rfc_doc
             ),
             usage = "req_query"
+        )
+
+        pattern = re.compile(
+            r'```(?:json)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: didn\'t match valid json')
+        return ""
+    
+    def llm_response_query(
+            self,
+            rfc_num:str,
+            pro_name: str,
+            rfc_doc: str
+    ) -> str:
+        ans = self.chat_llm(
+            prompt=self.pmp.res_query(
+                rfc_num=rfc_num,
+                pro_name=pro_name,
+                rfc_doc=rfc_doc
+            ),
+            usage = "res_query"
         )
 
         pattern = re.compile(

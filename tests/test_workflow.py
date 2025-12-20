@@ -10,6 +10,7 @@ def test_anno():
         port=80,
         host='127.0.0.1',
         pro_name='ftp',
+        rfc_name='rfc959',
         doc_path=Path('./tests/docs/rfc959.txt').resolve()
     )
 
@@ -19,5 +20,6 @@ def test_ir():
         port=80,
         host='127.0.0.1',
         pro_name='ftp',
+        rfc_name='rfc959',
         doc_path=Path('./tests/docs/rfc959.txt').resolve()
     )

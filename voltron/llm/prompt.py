@@ -95,19 +95,21 @@ class Prompter:
         
     def req_query(
             self,
-            rfc_num:str = '',
-            pro_name:str = ''
+            rfc_num:str,
+            pro_name:str,
+            rfc_doc:str
     ) -> str:
         msg = Template(self._tem_req_query)
-        return msg.substitute(rfc_num = rfc_num, pro_name = pro_name)
+        return msg.substitute(rfc_num = rfc_num, pro_name = pro_name, rfc_doc = rfc_doc)
     
     def res_query(
             self,
-            rfc_num:str = '',
-            pro_name:str = ''
+            rfc_num:str,
+            pro_name:str,
+            rfc_doc:str
     ) -> str:
         msg = Template(self._tem_res_query)
-        return msg.substitute(rfc_num = rfc_num, pro_name = pro_name)
+        return msg.substitute(rfc_num = rfc_num, pro_name = pro_name, rfc_doc = rfc_doc)
     
     def doc_analyze(
             self,
