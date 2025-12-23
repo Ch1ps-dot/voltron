@@ -1,0 +1,345 @@
+import chromadb
+import time, pickle, json, re
+from pprint import pprint
+from pathlib import Path
+from typing import Self
+from lxml import html, etree # type: ignore
+import html as html_escape
+from tqdm import tqdm
+
+from .setciontree import SectionTree
+from ..utils.logger import logger
+from ..llm.chat import Chater
+from ..sheduler.alphabet import Alphabet, Symbol 
+
+class RFCParser:
+    """Read protocol specification and parse it to section tree.
+    """
+    def __init__(
+            self, 
+            doc_path: Path,
+            pro_name: str,
+            rfc_name: str,
+            chater: Chater,
+            ir_path: Path = Path.cwd() / 'ir'
+    ) -> None:
+        self.chater =chater
+
+        # doc related value
+        self.doc_path: Path = doc_path
+        self.doc_file = doc_path.open('r+', encoding='utf-8')
+        self.doc_content: str = self.doc_file.read()
+        self.pro_name = pro_name
+        self.rfc_name = rfc_name
+
+        # initialize the sectiontree which stands for the section structure of documents 
+        self.st = SectionTree(id='', content=self.doc_content)
+
+        # ir related value
+        self.req: list
+        self.res: list[dict]
+        self.alphabet: Alphabet
+        self.req_doc: list = []
+        self.res_doc: list = []
+        self.ir_path = ir_path
+
+        self.req_ir = None
+        self.res_ir = None
+
+        # sectiontree parse pass
+        fn = self.ir_path / "section_tree.pkl"
+        if(fn.is_file()):
+            self.load_st()
+            logger.info('[RFC Parse]: load parser')
+            self._query_prepare()
+        else:
+            self.spe_parse()
+            logger.info('[RFC Parse]: parse document')
+            self._query_prepare()
+        logger.info('[RFC Parse]: finish parse')
+
+        # ir generation
+        self.ir_generation()
+
+        
+
+    def _query_prepare(
+            self
+    ):
+        """Prepare content for ir generation
+        """
+        for node in self.st.leafs:
+            match node.content_type:
+                case "request":
+                    self.req_doc.append(self.st.fetch_node_content(node))
+                case "response":
+                    self.res_doc.append(self.st.fetch_node_content(node))
+                case "all":
+                    self.req_doc.append(self.st.fetch_node_content(node))
+                    self.res_doc.append(self.st.fetch_node_content(node))
+                case "none":
+                    pass
+                case _:
+                    logger.debug("[Section type]: unexpected type {_}")
+        logger.info('[RFCParser]: query prepare')
+
+    def spe_parse(
+            self
+    ):
+        """Workflow of specification parse
+        """
+
+        # determine the content type of each section
+        """Return four different types
+        1. request
+        2. response
+        3. all
+        4. none
+        """
+        with tqdm(total=len(self.st.leafs), desc='[Spec Parse]', unit='section') as pbar:
+            for node in self.st.leafs:
+                doc = self.st.fetch_node_content(node)
+                ans = ''
+                if doc != None:
+                    ans = self.chater.llm_doc_parse(
+                        rfc_num = self.rfc_name,
+                        pro_name = self.pro_name,
+                        rfc_doc = doc
+                    )
+                    if ans != None:
+                        node.content_type = ans
+            pbar.update(1)
+                    
+        self.save_st()           
+    
+    def ir_generation(
+            self
+    ):
+        """Workflow of IR generation
+
+        1. field extraction for request and response message individually.
+        2. ir generation for both individually.
+
+        """
+        """
+            format of key field description
+            [
+                {
+                    "field_name": "",
+                    "position": "",
+                    "explanation": "",
+                    "value": []
+                }
+                ...
+            ]
+        """
+        
+        """===Key field parse==="""
+        req_path = self.ir_path / 'req.json'
+        res_path = self.ir_path / 'res.json'
+
+        # request field extraction
+        if(req_path.is_file()):
+            with open(req_path, 'r', encoding='utf-8') as f:
+                self.req = json.load(f)
+            logger.info('[IR Generation]: request description load')
+        else:
+            req_json = self.chater.llm_request_query(
+                rfc_num = self.rfc_name,
+                pro_name = self.pro_name,
+                rfc_doc = ''.join([s for s in self.req_doc])
+            )
+
+            if (req_json != None):
+                self.req = json.loads(req_json[7:-4])
+                with open(req_path, 'w', encoding="utf-8") as f:
+                    json.dump(self.req, f)
+            logger.info('[IR Generation]: request description generation')
+
+        # response field extraction
+        if(res_path.is_file()):
+            with open(res_path, 'r', encoding='utf-8') as f:
+                self.res = json.load(f)
+            logger.info('[IR Generation]: response description load')
+        else:
+            res_json = self.chater.llm_response_query(
+                rfc_num = self.rfc_name,
+                pro_name = self.pro_name,
+                rfc_doc = ''.join([s for s in self.res_doc])
+            )
+
+            if (res_json != None):
+                self.res = json.loads(res_json[7:-4])
+                with open(res_path, 'w', encoding="utf-8") as f:
+                    json.dump(self.res, f)
+            logger.info('[IR Generation]: response description generation')
+
+        if(self._field_check(self.req[0]) and self._field_check(self.res[0])):
+            logger.debug('[bad field format]')
+
+
+        """===IR Generation==="""
+
+        # request message IR generation
+        req_ir_path =  self.ir_path / 'req_ir.xml'
+        if (req_ir_path.is_file()):
+            self.req_ir = etree.parse(req_ir_path)
+        else:
+            root = etree.Element('ir')
+
+            # generate ir for every message type
+            with tqdm(total=len(self.req[0]['value']), desc='[REQ IR]', unit='type') as pbar:
+                for msg_type in self.req[0]['value']:
+
+                    msg_ir = self.chater.llm_ir_generation(
+                        pro_name=self.pro_name,
+                        message_name=msg_type,
+                        rfc_doc=''.join([s for s in self.req_doc])
+                    )
+
+                    if msg_ir == None:
+                        raise Exception
+                    
+                    try_times = 0
+                    while(True):
+                        fix_ir = self.chater.llm_ir_repair(
+                            pro_name=self.pro_name,
+                            message_name=msg_type,
+                            ir=msg_ir
+                        )
+
+                        try:
+                            if fix_ir != None:
+                                ir = re.sub(r'"([^"]*)"', self._fix_attr, fix_ir[6:-4]) # fix xml
+
+                                ir_xml = etree.fromstring(ir)
+                                root.append(ir_xml)
+                                break
+                        except Exception as e:
+                            try_times += 1
+                            logger.debug(fix_ir)
+                            logger.debug(f'[bad xml format] {msg_type}: {try_times} err: {e}')
+                            if (fix_ir != None):
+                                msg_ir = fix_ir
+                    pbar.update(1)
+
+            tree = etree.ElementTree(root)
+            tree.write( 
+                req_ir_path,
+                encoding="UTF-8",
+                xml_declaration=True,
+                pretty_print=True,
+                standalone="yes"
+            )
+            self.req_ir = etree.parse(req_ir_path)
+
+        # response message IR generation, just like above.
+        res_ir_path = self.ir_path / 'res_ir.xml'
+        if (res_ir_path.is_file()):
+            self.res_ir = etree.parse(res_ir_path)
+        else:
+            root = etree.Element('ir')
+
+            # generation for every response type
+            with tqdm(total=len(self.req[0]['value']), desc='[RES IR]', unit='type') as pbar:
+                for msg_type in self.res[0]['value']:
+
+                    msg_ir = self.chater.llm_ir_generation(
+                        pro_name=self.pro_name,
+                        message_name=msg_type,
+                        rfc_doc=''.join([s for s in self.res_doc])
+                    )
+
+                    if msg_ir == None:
+                        raise Exception
+                    
+                    while(True):
+                        fix_ir = self.chater.llm_ir_repair(
+                            pro_name=self.pro_name,
+                            message_name=msg_type,
+                            ir=msg_ir
+                        )
+
+                        try:
+                            if fix_ir != None:
+                                ir = re.sub(r'"([^"]*)"', self._fix_attr, fix_ir[6:-4]) # fix xml
+                                logger.debug(ir)
+
+                                ir_xml = etree.fromstring(ir)
+                                root.append(ir_xml)
+                                break
+                        except Exception as e:
+                            try_times += 1
+                            logger.debug(fix_ir)
+                            logger.debug(f'{msg_type}: {try_times} err: {e}')
+                            if (fix_ir != None):
+                                msg_ir = fix_ir
+                    pbar.update(1)
+
+            tree = etree.ElementTree(root)
+            tree.write( 
+                res_ir_path,
+                encoding="UTF-8",
+                xml_declaration=True,
+                pretty_print=True,
+                standalone="yes"
+            )
+            self.res_ir = etree.parse(res_ir_path)
+
+        logger.info('[IR Generation]: finish ir generation')
+
+    def _field_check(
+            self,
+            data: dict
+    ) -> bool:
+        for key in data:
+            if key not in ['field', 'position', 'explanation', 'value']:
+                return False
+        return True
+    
+    def _escape_xml_attr(
+            self,
+            s: str
+    ) -> str:
+        s = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;)', '&amp;', s)
+        s = s.replace('<', '&lt;')
+        s = s.replace('>', '&gt;')
+        return s
+    
+    def _fix_attr(
+            self,
+            match
+    ) -> str:
+        return '"' + self._escape_xml_attr(match.group(1)) + '"'
+
+
+    def load_st(
+            self
+    ):
+        """Load rfc parser 
+        """
+        with open(self.ir_path / "section_tree.pkl", "rb") as f:
+            self.st = pickle.load(f)
+        
+    def save_st(
+            self
+    ):
+        """Use pickle to store section tree instance
+        """
+        with open(self.ir_path / "section_tree.pkl", "wb") as f:
+            pickle.dump(self.st, f)
+            logger.debug("[Save Sectiontree]")   
+
+    def db_create(
+            self
+    ):
+        pass
+
+    
+
+
+
+
+
+
+    

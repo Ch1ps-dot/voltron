@@ -10,7 +10,7 @@ Your task is to generate a **protocol message syntax description** using the **p
 You will be given:
 
 * **Protocol name**: $pro_name
-* **Message name** (if applicable): $message_name
+* **Message name or Message type** (if applicable): $message_name
 * **Protocol description or RFC excerpt**:
 $rfc_doc
 
@@ -35,8 +35,10 @@ $rfc_doc
      * `length`: use `B` for bytes, `b` for bits (e.g., `1B`, `16b`)
      * `value`:
 
-       * Constant fields → exact value (decimal / hex / binary)
+       * Constant fields → exact value (decimal / hex / binary / character)
        * Variable fields → valid range or symbolic range
+         * If the content of the Variable field is uncertain, provide the legal character set for it in the "value" field.
+         * If the length of the field is uncertain, set it to 'undefined' in the 'length' field.
 
 3. **Semantic Comments**
 
@@ -48,7 +50,7 @@ $rfc_doc
 4. **Modeling Rules**
 
    * Prefer **explicit constant fields** for magic numbers, version fields, and fixed flags.
-   * Use **variable fields** for lengths, identifiers, payload sizes, and status codes.
+   * Use **variable fields** for lengths, identifiers, payload sizes.
    * If a field’s length depends on another field, note this dependency in a comment.
    * Do NOT invent fields not implied by the protocol description.
    * If information is missing, make a **reasonable inference** and document it in a comment.
@@ -64,20 +66,20 @@ $rfc_doc
 ### **Expected Output Structure Example**
 
 ```xml
-<message name="ExampleProtocolMessage">
-    <!-- Used for data exchange between client and server -->
+<message name="CWD">
+    <!-- Command to change the working directory on the FTP server -->
 
-    <field name="Header" type="constant" length="3B" value="0x404"/>
-    <!-- Magic number identifying the protocol -->
+    <field name="CommandCode" type="constant" length="3B" value="CWD"/>
+    <!-- Command code indicating a change of working directory -->
 
-    <field name="Flag" type="constant" length="3b" value="0b101"/>
-    <!-- Control flags indicating message type -->
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating command code and argument -->
 
-    <field name="DataLength" type="variable" length="2B" value="0x0000-0xFFFF"/>
-    <!-- Length of the following payload in bytes -->
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Directory path to set as the current working directory on the server -->
 
-    <field name="Status" type="variable" length="3b" value="0b001-0b111"/>
-    <!-- Status code representing processing result -->
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating end of the command -->
 </message>
 ```
 
@@ -91,5 +93,3 @@ Before finalizing the output, ensure:
 * Bit/byte units are used consistently
 * XML is well-formed
 * Comments clearly explain protocol semantics
-
-

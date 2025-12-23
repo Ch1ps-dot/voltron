@@ -3,7 +3,7 @@ import chromadb
 from pprint import pprint
 from pathlib import Path
 from typing import Self
-from .logger import logger
+from ..utils.logger import logger
 
 class SectionNode:
     """Structure of Section Node

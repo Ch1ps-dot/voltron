@@ -27,13 +27,13 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
     "field_name": "Status-Code",
     "position": "First element of the response line",
     "explanation": "Used to distinguish the result and type of HTTP response messages, such as 200, 404, 500, etc."
-    "values": [200, 201, 204, 400, 401, 403, 404, 500, 501, 502, ...]
+    "value": [200, 201, 204, 400, 401, 403, 404, 500, 501, 502, ...]
   },
   {
     "field_name": "Reply Code",
     "position": "First three digits of the FTP response message",
     "explanation": "Used to distinguish the type and result of FTP response messages, such as 220, 331, 550, etc.",
-    "values": [110, 120, 125, 150, 200, 220, 221, 226, 230, 331, 332, 421, 425, 426, 530, 550, ...]
+    "value": [110, 120, 125, 150, 200, 220, 221, 226, 230, 331, 332, 421, 425, 426, 530, 550, ...]
   }
 ]
 ```

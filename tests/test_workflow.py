@@ -1,4 +1,4 @@
-from voltron.utils.rfcparser import RFCParser
+from voltron.rfcparser.rfcparser import RFCParser
 from voltron.utils.logger import logger
 from pathlib import Path
 from voltron.fuzz import Fuzzer

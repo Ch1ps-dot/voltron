@@ -27,7 +27,7 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
     "field_name": "Method",
     "position": "First element of the request line",
     "explanation": "Used to distinguish the operation type of HTTP requests, such as GET, POST, PUT, etc.",
-    "values": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", ...]
+    "value": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", ...]
   }
 ]
 ```

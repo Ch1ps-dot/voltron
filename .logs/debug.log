@@ -1,0 +1,982 @@
+2025-12-23 20:53:36,170 - debug - INFO - rfcparser:53 - [RFC Parse]: load parser
+2025-12-23 20:53:36,170 - debug - INFO - rfcparser:84 - [RFCParser]: query prepare
+2025-12-23 20:53:36,171 - debug - INFO - rfcparser:59 - [RFC Parse]: finish parse
+2025-12-23 20:53:36,171 - debug - INFO - rfcparser:145 - [IR Generation]: request description load
+2025-12-23 20:53:36,171 - debug - INFO - rfcparser:163 - [IR Generation]: response description load
+2025-12-23 20:53:36,172 - debug - INFO - rfcparser:289 - [IR Generation]: finish ir generation
+2025-12-23 20:53:39,696 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.5212257870007306
+2025-12-23 20:53:39,696 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Field 'CommandCode': constant value 'USER', 4 bytes
+    message += b'USER'
+    
+    # Field 'Whitespace': constant value 0x20, 1 byte
+    message += b'\x20'
+    
+    # Field 'Username': variable length string, must be ASCII excluding CR, LF
+    username_length = random.randint(5, 10)  # Choose a reasonable length for username
+    username_chars = string.ascii_letters + string.digits
+    username = ''.join(random.choices(username_chars, k=username_length))
+    message += username.encode('ascii')
+    
+    # Field 'EndOfLine': constant value 0x0D0A, 2 bytes
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:53:43,137 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.4408187340013683
+2025-12-23 20:53:43,138 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode: constant field with value "PASS", length 4 bytes
+    message += b'PASS'
+    
+    # Whitespace: constant field with value 0x20 (space character), length 1 byte
+    message += b'\x20'
+    
+    # Password: variable field, ASCII excluding CR (0x0D) and LF (0x0A)
+    # Arbitrarily choosing a length of 8 characters for demonstration
+    allowed_chars = ''.join(c for c in string.ascii_letters + string.digits if c not in '\x0D\x0A')
+    password = ''.join(random.choices(allowed_chars, k=8))
+    message += password.encode('ascii')
+    
+    # EndOfLine: constant field with value 0x0D0A, length 2 bytes
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:53:45,802 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.6639345930307172
+2025-12-23 20:53:45,802 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    import random
+    import string
+    
+    message = b''
+    
+    # Constant field: CommandCode
+    message += b'ACCT'
+    
+    # Constant field: Whitespace
+    message += b'\x20'
+    
+    # Variable field: AccountInformation
+    # Generate a random ASCII string excluding CR and LF
+    account_info_length = random.randint(1, 20)  # Choose a reasonable length
+    valid_chars = string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', ' ').strip()
+    account_information = ''.join(random.choices(valid_chars, k=account_info_length))
+    message += account_information.encode('ascii')
+    
+    # Constant field: EndOfLine
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:53:47,940 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.1378744620014913
+2025-12-23 20:53:47,940 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Append the constant CommandCode "CWD"
+    message += b'CWD'
+    
+    # Append the constant Whitespace 0x20 (space character)
+    message += bytes([0x20])
+    
+    # Pathname: ASCII characters excluding CR and LF
+    # Let's choose a valid directory name, e.g., "/home/user"
+    pathname = "/home/user".encode('ascii')
+    message += pathname
+    
+    # Append the constant EndOfLine 0x0D0A (CRLF)
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:53:49,985 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.0446609670179896
+2025-12-23 20:53:49,985 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Construct the message according to the protoIR specification
+    
+    # Field: CommandCode
+    command_code = b'CDUP'
+    message += command_code
+    
+    # Field: EndOfLine
+    end_of_line = b'\x0D\x0A'
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:53:52,840 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.8545641399687156
+2025-12-23 20:53:52,840 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    import random
+    import string
+    
+    message = b''
+    
+    # CommandCode: Constant field with value "SMNT"
+    command_code = b'SMNT'
+    
+    # Whitespace: Constant field with value 0x20 (space)
+    whitespace = b'\x20'
+    
+    # Pathname: Variable field; generate a random ASCII string excluding CR, LF
+    pathname_length = random.randint(5, 10)  # Choose a reasonable length between 5 and 10 characters
+    pathname_characters = string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', '')
+    pathname = ''.join(random.choices(pathname_characters, k=pathname_length)).encode('ascii')
+    
+    # EndOfLine: Constant field with value 0x0D0A
+    end_of_line = b'\x0D\x0A'
+    
+    # Constructing the message
+    message = command_code + whitespace + pathname + end_of_line
+    
+    return message
+```
+2025-12-23 20:53:54,385 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:1.5440933710196987
+2025-12-23 20:53:54,385 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Constructing the message based on protoIR specification
+    command_code = b'QUIT'
+    end_of_line = b'\r\n'
+    
+    message += command_code
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:53:56,706 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.320783573028166
+2025-12-23 20:53:56,706 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode field
+    command_code = b'REIN'  # 4 bytes constant as defined in the IR
+    
+    # EndOfLine field
+    end_of_line = bytes.fromhex('0D0A')  # 2 bytes constant for carriage return and line feed
+    
+    # Construct the message
+    message += command_code
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:53:59,852 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.1454244049964473
+2025-12-23 20:53:59,852 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    import random
+
+    message = b''
+    
+    # Constant fields
+    command_code = b'PORT'
+    whitespace = b'\x20'
+    comma_delimiter = b'\x2C'
+    end_of_line = b'\x0D\x0A'
+    
+    # Variable fields
+    host_number = ','.join(str(random.randint(0, 255)) for _ in range(4)).encode('ascii')
+    port_number = ','.join(str(random.randint(0, 255)) for _ in range(2)).encode('ascii')
+    
+    # Construct the message
+    message += command_code
+    message += whitespace
+    message += host_number
+    message += comma_delimiter  # CommaDelimiter1
+    message += comma_delimiter  # CommaDelimiter2
+    message += comma_delimiter  # CommaDelimiter3
+    message += port_number
+    message += comma_delimiter  # CommaDelimiter4
+    message += comma_delimiter  # CommaDelimiter5
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:54:01,819 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:1.9665248609962873
+2025-12-23 20:54:01,819 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode field (constant value "PASV" as bytes)
+    command_code = b'PASV'
+    
+    # EndOfLine field (constant value 0x0D0A as bytes)
+    end_of_line = b'\x0D\x0A'
+    
+    # Concatenate fields to form the complete message
+    message = command_code + end_of_line
+    
+    return message
+```
+2025-12-23 20:54:05,540 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.7204365680227056
+2025-12-23 20:54:05,541 - debug - DEBUG - handler:40 - ```python
+import random
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Constant field: CommandCode
+    message += b'TYPE'
+    
+    # Constant field: Whitespace
+    message += b'\x20'
+    
+    # Variable field: TypeCode
+    type_code = random.choice([b'A', b'E', b'I', b'L'])
+    message += type_code
+    
+    # Variable field: FormatOrByteSize
+    if type_code in [b'A', b'E']:
+        format_code = random.choice([b'N', b'T', b'C'])
+        message += format_code
+    elif type_code == b'L':
+        byte_size = str(random.randint(1, 255)).encode('ascii')
+        message += byte_size
+    # No additional data for type_code 'I'
+    
+    # Constant field: EndOfLine
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:54:08,689 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.1476782799581997
+2025-12-23 20:54:08,689 - debug - DEBUG - handler:40 - ```python
+import random
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode: Fixed command code for the STRU command
+    message += b'STRU'
+    
+    # Whitespace: Fixed space character separating command code and argument
+    message += b'\x20'
+    
+    # StructureCode: One of 'F', 'R', 'P'
+    structure_code_choice = random.choice([b'F', b'R', b'P'])
+    message += structure_code_choice
+    
+    # EndOfLine: Carriage Return followed by Line Feed
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:54:11,525 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.8358998520416208
+2025-12-23 20:54:11,525 - debug - DEBUG - handler:40 - ```python
+import random
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Constant field: CommandCode
+    command_code = b'MODE'
+    message += command_code
+    
+    # Constant field: Whitespace
+    whitespace = bytes.fromhex('20')
+    message += whitespace
+    
+    # Variable field: ModeCode (restricted to options: S, B, C)
+    mode_code_options = ['S', 'B', 'C']
+    mode_code = random.choice(mode_code_options).encode('ascii')
+    message += mode_code
+    
+    # Constant field: EndOfLine
+    end_of_line = bytes.fromhex('0D0A')
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:54:17,325 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:5.799086596001871
+2025-12-23 20:54:17,325 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode: 4 bytes constant "RETR"
+    message += b'RETR'
+    
+    # Whitespace: 1 byte constant representing space " "
+    message += b'\x20'
+    
+    # Pathname: variable length, ASCII excluding CR, LF
+    pathname_length = random.randint(1, 100)  # Choose a reasonable length
+    pathname_chars = string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', '').replace('\x0D', '').replace('\x0A', '')
+    pathname = ''.join(random.choices(pathname_chars, k=pathname_length))
+    message += pathname.encode('ascii')
+    
+    # EndOfLine: 2 bytes constant 0x0D0A
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:54:20,365 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.039638490008656
+2025-12-23 20:54:20,365 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    import random
+    import string
+    
+    # Construct the STOR message
+    
+    # Constant CommandCode field
+    command_code = b'STOR'
+    
+    # Constant Whitespace field
+    whitespace = b'\x20'
+    
+    # Variable Pathname field (e.g., a sample reasonable path without CR or LF)
+    pathname_length = random.randint(1, 50)  # Choosing a reasonable length
+    pathname_characters = string.ascii_letters + string.digits + "/.-_"
+    pathname = ''.join(random.choices(pathname_characters, k=pathname_length)).encode('ascii')
+    
+    # Constant EndOfLine field
+    end_of_line = b'\x0D\x0A'
+    
+    # Concatenate all parts to form the final message
+    message = command_code + whitespace + pathname + end_of_line
+    
+    return message
+```
+2025-12-23 20:54:22,759 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.393502912018448
+2025-12-23 20:54:22,759 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Add CommandCode field
+    message += b'STOU'
+    
+    # Add Whitespace field
+    message += b'\x20'
+    
+    # Add UniqueFilename field
+    # We will generate a filename with a reasonable length, for example, 8 to 12 characters
+    filename_length = random.randint(8, 12)
+    unique_filename = ''.join(random.choices(string.ascii_letters + string.digits, k=filename_length)).encode('ascii')
+    message += unique_filename
+    
+    # Add EndOfLine field
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:54:25,661 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.9018712699762546
+2025-12-23 20:54:25,661 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Add the CommandCode
+    message += b"APPE"
+    
+    # Add the Whitespace
+    message += b"\x20"
+    
+    # Generate the Pathname
+    # Pathname should be ASCII excluding CR, LF. We will generate a random path.
+    # Example path might be: "dir1/file.txt" (does not include CR or LF)
+    pathname = ''.join(random.choices(string.ascii_letters + string.digits + "/._-", k=random.randint(5, 15)))
+    message += pathname.encode('ascii')
+    
+    # Add the EndOfLine
+    message += b"\x0D\x0A"
+    
+    return message
+```
+2025-12-23 20:54:30,095 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:4.433698903012555
+2025-12-23 20:54:30,096 - debug - DEBUG - handler:40 - ```python
+import random
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+
+    # CommandCode
+    command_code = b'ALLO'
+
+    # Whitespace1
+    whitespace1 = b'\x20'
+
+    # PrimaryParameter (choose a random decimal integer as a string)
+    primary_parameter_value = str(random.randint(1000, 9999))
+    primary_parameter = primary_parameter_value.encode('ascii')
+
+    # OptionalWhitespace and OptionalRCharacter
+    if random.choice([True, False]):
+        optional_whitespace = b'\x20'
+        optional_r_character = b'R'
+        
+        # OptionalSecondaryWhitespace
+        optional_secondary_whitespace = b'\x20'
+        
+        # SecondaryParameter (choose a random decimal integer as a string)
+        secondary_parameter_value = str(random.randint(100, 999))
+        secondary_parameter = secondary_parameter_value.encode('ascii')
+    else:
+        optional_whitespace = b''
+        optional_r_character = b''
+        optional_secondary_whitespace = b''
+        secondary_parameter = b''
+
+    # EndOfLine
+    end_of_line = b'\x0D\x0A'
+
+    # Build the complete message
+    message = (command_code + whitespace1 + 
+               primary_parameter +
+               optional_whitespace +
+               optional_r_character +
+               optional_secondary_whitespace +
+               secondary_parameter +
+               end_of_line)
+
+    return message
+```
+2025-12-23 20:54:33,894 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.7979560460080393
+2025-12-23 20:54:33,894 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode: constant value "REST" (4B)
+    command_code = b'REST'
+    
+    # Whitespace: constant space (0x20) (1B)
+    whitespace = b'\x20'
+    
+    # Offset: variable length ASCII digits (undefined length)
+    # Synthesize a valid offset value using ASCII digits (48-57)
+    offset_length = random.randint(1, 10)  # Choose a reasonable length for the offset
+    offset_value = ''.join(random.choices(string.digits, k=offset_length)).encode('ascii')
+    
+    # EndOfLine: constant value 0x0D0A (2B)
+    end_of_line = b'\x0D\x0A'
+    
+    # Construct the message by concatenating all fields in order
+    message = command_code + whitespace + offset_value + end_of_line
+    
+    return message
+```
+2025-12-23 20:54:36,870 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.9757346679689363
+2025-12-23 20:54:36,870 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode field: constant value "RNFR" (4 bytes)
+    command_code = b'RNFR'
+    
+    # Whitespace field: constant value 0x20 (1 byte)
+    whitespace = b'\x20'
+    
+    # Pathname field: variable length, consisting of ASCII characters excluding CR and LF
+    # We'll choose a reasonable length (e.g., 10 characters) for demonstration
+    valid_ascii = [ch for ch in string.ascii_letters + string.digits + string.punctuation if ch not in '\r\n']
+    pathname_length = 10  # Example length
+    pathname = ''.join(random.choices(valid_ascii, k=pathname_length)).encode('ascii')
+    
+    # EndOfLine field: constant value 0x0D0A (2 bytes)
+    end_of_line = b'\x0D\x0A'
+    
+    # Concatenate all fields to form the complete message
+    message = command_code + whitespace + pathname + end_of_line
+    
+    return message
+```
+2025-12-23 20:54:39,800 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.929930559010245
+2025-12-23 20:54:39,801 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode: constant value "RNTO", 4 bytes
+    message += b'RNTO'
+    
+    # Whitespace: constant value 0x20 (space), 1 byte
+    message += b'\x20'
+    
+    # Pathname: variable length ASCII excluding CR, LF
+    pathname_length = random.randint(5, 15)  # Reasonable dynamic length
+    pathname_chars = string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', '')
+    pathname = ''.join(random.choices(pathname_chars, k=pathname_length)).encode('ascii')
+    message += pathname
+    
+    # EndOfLine: constant value 0x0D0A (CRLF), 2 bytes
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:54:41,928 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.1270173779921606
+2025-12-23 20:54:41,928 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Command code which is a constant "ABOR" as ASCII bytes
+    command_code = b'ABOR'
+    
+    # End of line which is a constant sequence of Carriage Return (0x0D) 
+    # and Line Feed (0x0A) as bytes
+    end_of_line = b'\x0D\x0A'
+    
+    # Construct the message by concatenating the fields
+    message = command_code + end_of_line
+    
+    return message
+```
+2025-12-23 20:54:45,504 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.5757300190161914
+2025-12-23 20:54:45,505 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    import random
+    import string
+
+    message = b''
+
+    # Constant field: CommandCode
+    command_code = b'DELE'
+    message += command_code
+
+    # Constant field: Whitespace
+    whitespace = b'\x20'
+    message += whitespace
+
+    # Variable field: Pathname
+    # ASCII excluding CR and LF; let's pick a reasonable length
+    # Using random ASCII characters excluding CR (0x0D) and LF (0x0A)
+    pathname_length = random.randint(5, 15)  # Reasonable length assumption
+    pathname_chars = string.ascii_letters + string.digits + string.punctuation
+    pathname_valid_chars = pathname_chars.replace('\r', '').replace('\n', '')
+    pathname = ''.join(random.choices(pathname_valid_chars, k=pathname_length)).encode('ascii')
+    message += pathname
+
+    # Constant field: EndOfLine
+    end_of_line = b'\x0D\x0A'
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:54:48,138 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.6329097869456746
+2025-12-23 20:54:48,138 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Constant field: CommandCode (3B) - "RMD"
+    command_code = b'RMD'
+    
+    # Constant field: Whitespace (1B) - 0x20 (space character)
+    whitespace = b'\x20'
+    
+    # Variable field: Pathname (undefined) - any ASCII excluding CR and LF
+    pathname_length = random.randint(5, 15)  # Choosing a reasonable length for the pathname
+    valid_characters = string.ascii_letters + string.digits + ' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+    pathname = ''.join(random.choices(valid_characters, k=pathname_length)).encode('ascii')
+    
+    # Constant field: EndOfLine (2B) - CRLF (0x0D0A)
+    end_of_line = b'\x0D\x0A'
+    
+    # Constructing the message by concatenating the fields
+    message = command_code + whitespace + pathname + end_of_line
+    
+    return message
+```
+2025-12-23 20:54:51,134 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.9954981630435213
+2025-12-23 20:54:51,134 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode field: constant value "MKD", length 3 bytes
+    message += b'MKD'
+    
+    # Whitespace field: constant value 0x20 (space), length 1 byte
+    message += b'\x20'
+    
+    # Pathname field: variable, ASCII excluding CR and LF
+    # Generate a reasonable directory path for demonstration
+    valid_chars = string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', '')
+    pathname_length = random.randint(5, 15)  # Arbitrary length between 5 and 15 characters
+    pathname = ''.join(random.choices(valid_chars, k=pathname_length))
+    message += pathname.encode('ascii')
+    
+    # EndOfLine field: constant value 0x0D0A, length 2 bytes
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:54:53,121 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:1.9870456909993663
+2025-12-23 20:54:53,121 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode field: constant value "PWD", length 3B
+    command_code = b'PWD'
+
+    # EndOfLine field: constant value 0x0D0A, length 2B
+    end_of_line = bytes.fromhex('0D0A')
+
+    # Concatenate all fields into a single bytes object
+    message += command_code + end_of_line
+    
+    return message
+```
+2025-12-23 20:54:56,037 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.9151651940192096
+2025-12-23 20:54:56,037 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    import random
+    import string
+    
+    message = b''
+    
+    # Constant field: CommandCode (LIST)
+    message += b'LIST'
+    
+    # Constant field: Whitespace (Space)
+    message += b'\x20'
+    
+    # Variable field: Pathname (ASCII excluding CR, LF)
+    # Using a reasonable example value since length is undefined
+    # Example: simple directory name
+    pathname = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+    message += pathname.encode('ascii')
+    
+    # Constant field: EndOfLine (CRLF)
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:54:59,357 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.319337152992375
+2025-12-23 20:54:59,357 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    import random
+    import string
+
+    message = b''
+
+    # Constant field: CommandCode "NLST"
+    command_code = b'NLST'
+    message += command_code
+
+    # Optional field: Whitespace "0x20" only if Pathname is provided
+    pathname = ''.join(random.choices(string.ascii_letters, k=random.randint(1, 10)))
+    if pathname:
+        whitespace = b'\x20'  # Space character
+        message += whitespace
+        message += pathname.encode('ascii')
+    
+    # Constant field: EndOfLine "0x0D0A"
+    end_of_line = b'\x0D\x0A'
+    message += end_of_line
+
+    return message
+```
+2025-12-23 20:55:02,437 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:3.079542876977939
+2025-12-23 20:55:02,438 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    import random
+    import string
+    
+    message = b''
+    
+    # Command code for indicating the SITE command
+    command_code = b'SITE'
+    message += command_code
+    
+    # Whitespace - Space character separating command code and argument
+    whitespace = b'\x20'
+    message += whitespace
+    
+    # SiteParameter - Site-specific parameter, ASCII excluding CR, LF
+    # Let's choose a reasonable length (e.g., 10 characters) for demonstration
+    site_parameter_length = 10
+    site_parameter = ''.join(random.choices(
+        string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', ''), 
+        k=site_parameter_length
+    )).encode('ascii')
+    message += site_parameter
+    
+    # EndOfLine - Carriage Return and Line Feed
+    end_of_line = b'\x0D\x0A'
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:55:04,743 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.304890453000553
+2025-12-23 20:55:04,743 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Protocol fields
+    command_code = b'SYST'
+    end_of_line = struct.pack('!BB', 0x0D, 0x0A)
+    
+    message += command_code
+    message += end_of_line
+    
+    return message
+```
+2025-12-23 20:55:09,909 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:5.164656332985032
+2025-12-23 20:55:09,909 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Command code for the status request
+    message += b'STAT'
+    
+    # Optional whitespace, needed if Pathname is provided
+    # For this example, we'll include a Pathname
+    message += b'\x20'
+    
+    # Pathname: A reasonable example that excludes CR and LF
+    pathname_chars = string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', '').replace(' ', '')
+    pathname_length = random.randint(5, 15)  # Example length
+    pathname = ''.join(random.choices(pathname_chars, k=pathname_length))
+    message += pathname.encode('ascii')
+    
+    # End of line CRLF
+    message += b'\x0D\x0A'
+    
+    return message
+```
+2025-12-23 20:55:16,457 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:6.54759379097959
+2025-12-23 20:55:16,457 - debug - DEBUG - handler:40 - ```python
+import random
+import string
+
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # CommandCode: constant value "HELP" must be encoded as bytes
+    command_code = b'HELP'
+    
+    # Whitespace: constant value "0x20" must be encoded as a byte
+    whitespace = bytes([0x20])
+    
+    # Argument: variable, ASCII excluding CR and LF, reasonable length
+    # Generate a random argument with a reasonable length
+    argument_length = random.randint(1, 10)
+    argument_chars = string.ascii_letters + string.digits + string.punctuation.replace('\r', '').replace('\n', '')
+    argument = ''.join(random.choices(argument_chars, k=argument_length)).encode('ascii')
+    
+    # EndOfLine: constant value "0x0D0A" must be encoded as bytes
+    end_of_line = bytes([0x0D, 0x0A])
+    
+    # Concatenate all fields to form the final message
+    message = command_code + whitespace + argument + end_of_line
+    
+    return message
+```
+2025-12-23 20:55:18,522 - debug - DEBUG - chat:61 - [Chat]:input_gen cost_time:2.0644398679723963
+2025-12-23 20:55:18,522 - debug - DEBUG - handler:40 - ```python
+def input_message():
+    """Generate one message message for the ftp protocol.
+    - Input: none
+    - Output: bytes
+    """
+    
+    message = b''
+    
+    # Constants as per the protoIR specification
+    command_code = b'NOOP'  # CommandCode field of 4 bytes
+    end_of_line = b'\r\n'   # EndOfLine field of 2 bytes
+
+    # Construct the message
+    message = command_code + end_of_line
+    
+    return message
+```
+2025-12-23 20:55:18,523 - debug - DEBUG - handler:26 - [Handler]: finish input generation

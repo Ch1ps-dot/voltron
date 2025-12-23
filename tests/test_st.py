@@ -4,7 +4,7 @@ from pprint import pprint
 from voltron.utils.logger import logger
 
 def test_section():
-    from voltron.utils.rfcparser import RFCParser
+    from voltron.rfcparser.rfcparser import RFCParser
     agent = RFCParser(
         Path('./tests/docs/rfc9110.txt').resolve(), 
         pro_name='', 
@@ -16,7 +16,7 @@ def test_section():
         # pprint(st.tree)
 
 def test_leaf():
-    from voltron.utils.rfcparser import RFCParser
+    from voltron.rfcparser.rfcparser import RFCParser
     agent = RFCParser(
         Path('./tests/docs/rfc9110.txt').resolve(), 
         pro_name='', 
@@ -27,11 +27,11 @@ def test_leaf():
         st.debug_tree()
 
 def test_apx():
-    from voltron.utils.rfcparser import RFCParser
+    from voltron.rfcparser.rfcparser import RFCParser
     agent = RFCParser(
         Path('./tests/docs/rfc9110.txt').resolve(), 
         pro_name='', 
-        rfc_id=''
+        rfc_id='',
     )
     st = agent.st
     logger.debug(st.doc_apx)

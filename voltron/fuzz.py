@@ -1,10 +1,11 @@
 from .llm.chat import Chater
-from .utils.rfcparser import RFCParser
-from .utils.setciontree import SectionTree
+from .rfcparser.rfcparser import RFCParser
+from .rfcparser.setciontree import SectionTree
 from .utils.logger import logger
 from .nio.nio import Nio
 from .executor.executor import Executor
 from .sheduler.alphabet import Alphabet, Symbol
+from .handler.handler import Handler
 
 from pathlib import Path
 import os, pickle, json
@@ -63,6 +64,15 @@ class Fuzzer:
             rfc_name = self.rfc_name
         )
         self.st = self.rfcparser.st
+
+        self.res_ir = self.rfcparser.res_ir
+        self.req_ir = self.rfcparser.req_ir
+
+        # handler generation
+        self.handler = Handler(
+            chater=self.chater,
+            rfcp=self.rfcparser
+        )
 
     def fuzz_one(
             self

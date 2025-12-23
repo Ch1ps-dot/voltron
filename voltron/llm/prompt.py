@@ -13,22 +13,20 @@ class Prompter:
     ) -> None:
         
         self._path_rfc_query = dir / "rfc_query.md"
-        self._path_gen_input = dir / "gen_input.md"
-        # self._path_msg_type = dir / "msg_type.md"
-        # self._path_rfc_summary = dir / "rfc_summary.md"
+        self._path_gen_input = dir / "input_generation.md"
         self._path_req_query = dir / "request_query.md"
         self._path_res_query = dir / "response_query.md"
         self._path_doc_analyze = dir / "doc_analyze.md"
         self._path_ir_generation = dir / "ir_generation.md"
+        self._path_ir_repair = dir / "ir_repair.md"
 
         self._tem_rfc_query = ''
         self._tem_gen_input = ''
-        # self._tem_msg_type = ''
-        # self._tem_rfc_summary = ''
         self._tem_res_query = ''
         self._tem_req_query = ''
         self._tem_doc_analyze = ''
         self._tem_ir_generation = ''
+        self._tem_ir_repair = ''
 
 
         if dir.is_dir():
@@ -48,6 +46,8 @@ class Prompter:
                 self._tem_doc_analyze = f.read()
             with self._path_ir_generation.open('r+') as f:
                 self._tem_ir_generation = f.read()
+            with self._path_ir_repair.open('r+') as f:
+                self._tem_ir_repair = f.read()
         else:
             logger.info("[prompter]: template directory error")
     
@@ -84,14 +84,10 @@ class Prompter:
             self,
             pro_name: str = '',
             msg_type: str = '',
-            pending: str = ''
+            msg_ir: str = ''
     ) -> str:
         msg = Template(self._tem_gen_input)
-
-        if pending == '':
-            return msg.substitute(msg_type = msg_type, pro_name = pro_name, pending=f'{pro_name}_{msg_type}')
-        else:
-            return msg.substitute(msg_type = msg_type, pro_name = pro_name, pending=pending)
+        return msg.substitute(msg_type = msg_type, pro_name = pro_name, msg_ir=msg_ir)
         
     def req_query(
             self,
@@ -129,3 +125,11 @@ class Prompter:
         msg = Template(self._tem_ir_generation)
         return msg.substitute(pro_name = pro_name, message_name = message_name, rfc_doc = rfc_doc)
 
+    def ir_repair(
+            self,
+            pro_name: str = '',
+            message_name: str = '',
+            ir: str = ''
+    ) -> str:
+        msg = Template(self._tem_ir_repair)
+        return msg.substitute(pro_name = pro_name, message_name = message_name, ir = ir)
