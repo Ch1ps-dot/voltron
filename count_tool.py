@@ -28,7 +28,7 @@ COMMENT_CONFIG = {
     '.yml': (['#'], None, None),
     '.yaml': (['#'], None, None),
     '.json': ([], None, None),  # JSON无注释
-    '.xml': (['<!--'], '<!--', '-->'),
+    # '.xml': (['<!--'], '<!--', '-->'),
     '.md': ([], None, None)
 }
 

@@ -13,7 +13,15 @@ from ..llm.chat import Chater
 from ..sheduler.alphabet import Alphabet, Symbol 
 
 class RFCParser:
-    """Read protocol specification and parse it to section tree.
+    """Read protocol specification and parse it to section tree, then use these information to generate IR.
+
+    Attributes:
+        pro_name: name of protocol
+        req: discription of request status field
+        res: discription of response status field
+        req_ir: message format information for request message
+        res_ir: message format information for response message 
+        st: tree-like data structure of specification document
     """
     def __init__(
             self, 
@@ -21,7 +29,6 @@ class RFCParser:
             pro_name: str,
             rfc_name: str,
             chater: Chater,
-            ir_path: Path = Path.cwd() / 'ir'
     ) -> None:
         self.chater =chater
 
@@ -36,12 +43,12 @@ class RFCParser:
         self.st = SectionTree(id='', content=self.doc_content)
 
         # ir related value
-        self.req: list
+        self.req: list[dict]
         self.res: list[dict]
         self.alphabet: Alphabet
         self.req_doc: list = []
         self.res_doc: list = []
-        self.ir_path = ir_path
+        self.ir_path = Path.cwd() / 'ir' / pro_name
 
         self.req_ir = None
         self.res_ir = None
@@ -61,12 +68,12 @@ class RFCParser:
         # ir generation
         self.ir_generation()
 
-        
-
     def _query_prepare(
             self
     ):
         """Prepare content for ir generation
+
+        concatenate the sections of document with the same type as one augmentation info
         """
         for node in self.st.leafs:
             match node.content_type:
@@ -86,11 +93,9 @@ class RFCParser:
     def spe_parse(
             self
     ):
-        """Workflow of specification parse
-        """
+        """parse specification documents and annotate the section tree.
 
-        # determine the content type of each section
-        """Return four different types
+        LLM returns four different types
         1. request
         2. response
         3. all
@@ -118,7 +123,7 @@ class RFCParser:
         """Workflow of IR generation
 
         1. field extraction for request and response message individually.
-        2. ir generation for both individually.
+        2. ir generation for request and response.
 
         """
         """
@@ -184,6 +189,7 @@ class RFCParser:
         req_ir_path =  self.ir_path / 'req_ir.xml'
         if (req_ir_path.is_file()):
             self.req_ir = etree.parse(req_ir_path)
+            logger.info('[IR Generation]: req ir load')
         else:
             root = etree.Element('ir')
 
@@ -237,6 +243,7 @@ class RFCParser:
         res_ir_path = self.ir_path / 'res_ir.xml'
         if (res_ir_path.is_file()):
             self.res_ir = etree.parse(res_ir_path)
+            logger.info('[IR Generation]: res ir load')
         else:
             root = etree.Element('ir')
 
@@ -292,6 +299,14 @@ class RFCParser:
             self,
             data: dict
     ) -> bool:
+        """Check the json content of message field information
+
+        Args:
+            data: json file of message format
+
+        Return:
+            True or False
+        """
         for key in data:
             if key not in ['field', 'position', 'explanation', 'value']:
                 return False
@@ -301,6 +316,14 @@ class RFCParser:
             self,
             s: str
     ) -> str:
+        """Fix xml file, transfer some special character to avoid xml parsing failure
+
+        Args:
+            s: xml file as string
+
+        Return:
+            fixed xml file
+        """
         s = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;)', '&amp;', s)
         s = s.replace('<', '&lt;')
         s = s.replace('>', '&gt;')
@@ -310,6 +333,8 @@ class RFCParser:
             self,
             match
     ) -> str:
+        """Callback function for xml fixing
+        """
         return '"' + self._escape_xml_attr(match.group(1)) + '"'
 
 

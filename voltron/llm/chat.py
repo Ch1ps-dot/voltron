@@ -9,20 +9,11 @@ from ..utils.logger import logger
 
 class Chater:
     """Chat with llm through api and manage the context.
-
-    Attributes:
-        dir: prompt directory path
     """
     def __init__(
             self,
             dir: Path
     ) -> None:
-        """Initialize the chater with prompt directory path
-        Args: 
-            dir: prompt directory path
-
-        """
-
         client = OpenAI(
             base_url=settings.base_url,
             api_key=settings.api_key
@@ -134,6 +125,44 @@ class Chater:
                 pro_name=pro_name, 
                 msg_type=msg_type, 
                 msg_ir=msg_ir
+            ),
+            usage = "input_gen"
+        )
+
+        pattern = re.compile(
+            r'```(?:python|py)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: didn\'t match valid python code')
+        if ans != None:
+            return ans
+        else:
+            return ''
+        
+    def llm_parser_gen(
+            self,
+            pro_name: str,
+            res_info: str
+    ) -> str:
+        """Generate python code as fuzzer input
+
+        Args:
+            pro_name: name of protocol
+            msg_type: required protocol message type
+
+        Returns:
+            generated input
+        """
+        ans = self.chat_llm(
+            prompt=self.pmp.parser_gen(
+                pro_name=pro_name, 
+                res_info=res_info
             ),
             usage = "input_gen"
         )
