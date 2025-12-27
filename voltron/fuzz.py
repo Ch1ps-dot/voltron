@@ -53,7 +53,7 @@ class Fuzzer:
         # llm init
         self.chater = Chater(self.pmp_path)
 
-        # ir generation
+        # rfcparser init
         self.rfcparser = RFCParser(
             doc_path=self.doc_path,
             pro_name=self.pro_name,
@@ -61,7 +61,7 @@ class Fuzzer:
             rfc_name = self.rfc_name
         )
 
-        # handler generation
+        # handler init
         self.handler = Handler(
             chater=self.chater,
             rfcp=self.rfcparser

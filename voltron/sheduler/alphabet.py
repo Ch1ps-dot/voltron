@@ -1,26 +1,41 @@
-"""Symbol stands for unique action in protocol statemachine.
-"""
+from collections.abc import Callable
+from ..handler import handler
+
 class Symbol:
-    def __init__(
-            self
-    ) -> None:
-        pass
+    """Symbol stands for unique action in protocol statemachine.
 
-"""Alhpabet stands for all actions in protocol statemachine.
-"""
+    Attributes
+        name: name of symbol
+    """
+    def __init__(
+            self,
+            name: str,
+            func: Callable[[], str]
+    ) -> None:
+        self.name: str = name
+        self.func: Callable[[], str] = func
+
+    def instance(
+            self
+    ):
+        return self.func()
+
 class Alphabet:
+    """Alhpabet stands for all actions in protocol statemachine.
+"""
     def __init__(
             self
     ) -> None:
-        self.send_symbols: dict
-        self.recv_symbols: dict
+        self.input_symbols: list[Symbol]
+        self.output_symbols: list[Symbol]
 
-    def set_send_symbols(
-            self
+    def set_input_symbols(
+            self,
+            inputs
     ) -> None:
         pass
 
-    def set_recv_symbols(
+    def set_ouput_symbols(
             self
     ) -> None:
         pass
