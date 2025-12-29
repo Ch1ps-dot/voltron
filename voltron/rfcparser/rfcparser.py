@@ -3,14 +3,12 @@ import time, pickle, json, re
 from pprint import pprint
 from pathlib import Path
 from typing import Self
-from lxml import html, etree # type: ignore
-import html as html_escape
+from lxml import etree # type: ignore
 from tqdm import tqdm
 
 from .setciontree import SectionTree
 from ..utils.logger import logger
 from ..llm.chat import Chater
-from ..sheduler.alphabet import Alphabet, Symbol 
 
 class RFCParser:
     """Read protocol specification and parse it to section tree, then use these information to generate IR.
@@ -43,9 +41,8 @@ class RFCParser:
         self.st = SectionTree(id='', content=self.doc_content)
 
         # ir related value
-        self.req: list[dict]
-        self.res: list[dict]
-        self.alphabet: Alphabet
+        self.req: list[dict] # json data of request field
+        self.res: list[dict] # json data of response field
         self.req_doc: list = []
         self.res_doc: list = []
         self.ir_path = Path.cwd() / 'ir' / pro_name

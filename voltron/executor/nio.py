@@ -5,31 +5,31 @@ class Nio:
     """ Network sender and receiver
 
     Attributte:
-        stype: socket type. tcp or udp.
+        trans: socket type. tcp or udp.
         host: host name 
         port port number
     """
     def __init__(
             self, 
-            stype:str, 
+            trans:str, 
             host:str, 
             port:int
     ) -> None:
-        self.stype:str = stype
+        self.trans:str = trans
         self.host:str = host
         self.port:int = port
-        self.skt:socket.socket = self.setup_socket(stype, host, port)
+        self.skt:socket.socket = self.setup_socket(trans, host, port)
 
     def setup_socket(
             self, 
-            stype:str, 
+            trans:str, 
             host:str, 
             port:int
     ) -> socket.socket:
             """Setup the socket for network communication
 
             Args:
-                stype: socket type is tcp or udp.
+                trans: socket type is tcp or udp.
                 host: host name.
                 port: port number.
             
@@ -38,10 +38,10 @@ class Nio:
             """
             skt: socket.socket
             try:
-                if (stype == 'tcp'):
+                if (trans == 'tcp'):
                     skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     skt.connect((host, port))
-                elif (stype == 'udp'):
+                elif (trans == 'udp'):
                     skt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 else:
                     raise ValueError("Unsupport protocol")
@@ -55,9 +55,9 @@ class Nio:
             msg
     ):
         try:
-            if (self.stype == 'tcp'):
+            if (self.trans == 'tcp'):
                 self.skt.sendall(msg)
-            elif (self.stype == 'udp'):
+            elif (self.trans == 'udp'):
                 self.skt.sendto(msg, (self.host, self.port))
             else:
                 raise ValueError("Unsupport protocol")
@@ -68,9 +68,9 @@ class Nio:
             self
     ):
         try:
-            if (self.stype == 'tcp'):
+            if (self.trans == 'tcp'):
                 response = self.skt.recv(1024)
-            elif (self.stype == 'udp'):
+            elif (self.trans == 'udp'):
                 response = self.skt.recvfrom(1024)
             else:
                 raise ValueError("Unsupport protocol")

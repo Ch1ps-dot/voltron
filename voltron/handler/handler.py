@@ -8,13 +8,12 @@ from ..rfcparser.rfcparser import RFCParser
 from ..utils.logger import logger
 from ..llm.chat import Chater
 
-
 class Handler:
     """Prepare message handler (input generator and packet parser).
 
     Attributes:
-        inputs: dict of {msg_type : code of generator}
-        pkt_parser: code of packet parser
+        inputs: dict of {msg_type : function of generator}
+        pkt_parser: function of packet parser
     """
 
     def __init__(
@@ -34,12 +33,32 @@ class Handler:
         self.inputs_code: dict[str, str] = {}
         self.pkt_parser_code: str
 
-        self.inputs: dict[str, Callable] = {}
-        self.pkt_parser: Callable | None = None
+        # function instance
+        # self.inputs: dict[str, Callable] = {}
+        # self.pkt_parser: Callable
+
+        # types of symbols
+        self.input_types: list[str] = []
+        self.output_types: list[str] = []
 
         # generate handler
         self.input_gen()
         self.parser_gen()
+
+        # symbol prepare
+        self.symbols_extract()
+
+    def symbols_extract(
+            self
+    ) -> None:
+        """Collect input and output symbols from message types
+        """
+
+        for msg in self.req_ir.findall("message"):
+            self.input_types.append(msg.get('name'))
+        for msg in self.res_ir.findall('message'):
+            self.output_types.append(msg.get('name'))
+
     
     def input_gen(
             self
@@ -50,7 +69,7 @@ class Handler:
         inputs_path = self.handler_path / 'inputs.json'
         if(inputs_path.is_file()):
             with open(inputs_path, 'r', encoding='utf-8') as f:
-                self.inputs = json.load(f)
+                self.inputs_code = json.load(f)
             logger.info("[Handler]: load inputs")
 
         else:
@@ -81,7 +100,7 @@ class Handler:
             logger.info("[Handler]: finish inputs generation")
 
             with open(inputs_path, 'w', encoding='utf-8') as f:
-                json.dump(self.inputs, f)
+                json.dump(self.inputs_code, f)
 
     def parser_gen(
             self
@@ -115,31 +134,31 @@ class Handler:
                 logger.debug(self.pkt_parser_code)
                 logger.debug("[Handler]: finish parser generation")
 
-    def input_instance(
-            self,
-            msg_type: str
-    ) -> Callable:
-        """Execute message input generator
+    # def input_instance(
+    #         self,
+    #         msg_type: str
+    # ) -> Callable:
+    #     """Execute message input generator
 
-        Args:
-            msg_type: name of message type
+    #     Args:
+    #         msg_type: name of message type
         
-        Return:
-            generated message
-        """
-        if(msg_type not in self.inputs):
-            name_space = {}
-            code = self.inputs_code[msg_type]
-            exec(code, name_space)
-            self.inputs[msg_type] = name_space[f'input_{msg_type}']
-        return self.inputs[msg_type]
+    #     Return:
+    #         generated message
+    #     """
+    #     if(msg_type not in self.inputs):
+    #         name_space = {}
+    #         code = self.inputs_code[msg_type]
+    #         exec(code, name_space)
+    #         self.inputs[msg_type] = name_space[f'input_{msg_type}']
+    #     return self.inputs[msg_type]
 
-    def parser_instance(
-            self
-    ) -> Callable | None:
-        if(self.pkt_parser == None):
-            name_space = {}
-            exec(self.pkt_parser_code, name_space)
-            self.pkt_parser = name_space['packet_parser']
-        return self.pkt_parser
+    # def parser_instance(
+    #         self
+    # ) -> Callable | None:
+    #     if(self.pkt_parser == None):
+    #         name_space = {}
+    #         exec(self.pkt_parser_code, name_space)
+    #         self.pkt_parser = name_space['packet_parser']
+    #     return self.pkt_parser
 
