@@ -21,14 +21,14 @@ class Symbol:
     def inst(
             self,
             msg = ''
-    ) -> str:
+    ) -> bytes | None:
         match self.type:
             case 'in':
                 return self.func()
             case 'out':
                 return self.func(msg)
             case _:
-                return ''
+                return None
 
 class Alphabet:
     """Alhpabet stands for all actions in protocol statemachine.

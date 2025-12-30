@@ -35,7 +35,7 @@ class Handler:
 
         # function instance
         # self.inputs: dict[str, Callable] = {}
-        # self.pkt_parser: Callable
+        self.pkt_parser: Callable | None = None
 
         # types of symbols
         self.input_types: list[str] = []
@@ -153,12 +153,14 @@ class Handler:
     #         self.inputs[msg_type] = name_space[f'input_{msg_type}']
     #     return self.inputs[msg_type]
 
-    # def parser_instance(
-    #         self
-    # ) -> Callable | None:
-    #     if(self.pkt_parser == None):
-    #         name_space = {}
-    #         exec(self.pkt_parser_code, name_space)
-    #         self.pkt_parser = name_space['packet_parser']
-    #     return self.pkt_parser
+    def parser_instance(
+            self
+    ) -> Callable | None:
+        if(self.pkt_parser):
+            return self.pkt_parser
+        else:
+            name_space = {}
+            exec(self.pkt_parser_code, name_space)
+            self.pkt_parser = name_space['packet_parser']
+            return self.pkt_parser
 

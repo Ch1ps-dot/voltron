@@ -5,11 +5,12 @@ api_key='sk-3aNTqYiVNoiOsKXJMUsfmpTEEIdVbS4YXrHhheHRYTsNbMD9'
 model="gpt-4o"
 
 stype=''
-host=''
-port=''
+host='127.0.0.1'
+port='2200'
 pro_name:str
 rfc_name:str # TODO: this fields is useless
-sut_path:Path = Path.cwd()
+pre_script:Path = Path.cwd() / 'tests' / 'bin' / 'lightftp' / 'run.sh'
+post_script:Path = Path.cwd() / 'tests' / 'bin' / 'lightftp' / 'fftpclean.sh'
 pmp_path:Path = Path.cwd() / 'prompts'
-doc_path:Path = Path.cwd() / 'tests' / 'docs'
+doc_path:Path = Path.cwd() / 'rfcs'
 script_path:Path = Path.cwd()

@@ -4,6 +4,7 @@ from pathlib import Path
 from .nio import Nio
 from ..utils.logger import logger
 from ..sheduler.alphabet import Symbol, Alphabet
+from ..handler.handler import Handler
 
 class Executor:
     def __init__(
@@ -12,7 +13,8 @@ class Executor:
             host:str, 
             port:int,
             pre_script:Path, 
-            post_scaript:Path
+            post_scaript:Path,
+            handler:Handler
         ) -> None:
 
         self.pre_script = pre_script
@@ -21,12 +23,15 @@ class Executor:
         self.port = port
 
         self.trans_layer = trans_layer
+        self.handler = handler
 
         self.nio = Nio(
             trans=trans_layer,
             host=host,
             port=port
         )
+       
+        self.pkt_parser = self.handler.parser_instance()
 
     def reset_sut(self):
         try:
@@ -36,20 +41,34 @@ class Executor:
                 shell = False
             )
         except Exception as e:
-            print('Reset Failure')
+            print(f'Reset Failure: {e}')
 
-    def setup_sut(self, args:list = []):
+    def setup_sut(
+            self,
+    ):
+        process = None
         try:
-            subprocess.Popen(
-                args = args,
-                shell=False
+            process = subprocess.Popen(
+                [self.pre_script.resolve()],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
             )
         except Exception as e:
-            print('SUT Execution Failure')
+            print(f'[SUT Execution Failure]: {e}')
+        return process
 
     def run(
             self,
             path: list[Symbol]
     ):
-        for s in path:
-            logger.debug(s.inst())
+        process = self.setup_sut()
+        if process != None:
+            for s in path:
+                msg = s.inst()
+                if msg != None:
+                    self.nio.net_send(msg)
+                    res = self.nio.net_recv()
+                    if(self.pkt_parser != None):
+                        logger.debug(self.pkt_parser(res))
+            process.terminate()
+        self.reset_sut()

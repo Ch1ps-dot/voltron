@@ -24,10 +24,10 @@ class Fuzzer:
             port:int, 
             pro_name:str,
             rfc_name:str, # TODO: this fields is useless
-            sut_path:Path = Path.cwd(),
-            pmp_path:Path = Path.cwd() / 'prompts',
-            doc_path:Path = Path.cwd() / 'rfcs',
-            script_path:Path = Path.cwd()
+            pre_script:Path = settings.pre_script,
+            post_script:Path = settings.post_script,
+            pmp_path:Path = settings.pmp_path,
+            doc_path:Path = settings.doc_path,
         ) -> None:
 
         # key parameter of protocol
@@ -38,8 +38,8 @@ class Fuzzer:
         self.rfc_name = rfc_name
 
         # some file path 
-        self.sut_path = sut_path
-        self.script_path = script_path
+        self.pre_script = pre_script
+        self.post_script = post_script
         self.doc_path = doc_path
         self.pmp_path = pmp_path
 
@@ -48,15 +48,6 @@ class Fuzzer:
     def module_init(
             self
     ) -> None:
-        
-        # network I/O init
-        self.exe = Executor(
-            trans_layer=self.trans,
-            host=self.host,
-            port=self.port,
-            pre_script=Path.cwd(),
-            post_scaript=Path.cwd()
-        )
 
         # llm init
         self.chater = Chater(self.pmp_path)
@@ -77,6 +68,16 @@ class Fuzzer:
 
         # scheduler init
         self.alphabet = Alphabet(self.handler)
+
+        # network I/O init
+        self.exe = Executor(
+            trans_layer=self.trans,
+            host=self.host,
+            port=self.port,
+            pre_script=self.pre_script,
+            post_scaript=self.post_script,
+            handler=self.handler
+        )
 
     def fuzz(
             self,

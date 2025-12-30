@@ -52,7 +52,7 @@ class Nio:
 
     def net_send(
             self, 
-            msg
+            msg : bytes
     ):
         try:
             if (self.trans == 'tcp'):
