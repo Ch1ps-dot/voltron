@@ -1,5 +1,5 @@
 from openai import OpenAI
-from ..configs import settings
+from ..configs import ftp, llm
 
 class LLM:
   def __init__(
@@ -8,8 +8,8 @@ class LLM:
   
     try:
       client = OpenAI(
-        base_url=settings.base_url,
-        api_key=settings.api_key
+        base_url=llm.base_url,
+        api_key=llm.api_key
       )
     except Exception as e:
       print("Connection Error")
@@ -18,7 +18,7 @@ class LLM:
   def chatllm(self, msg: str = "") -> str | None:
     try:
       completion = self.clt.chat.completions.create(
-        model=settings.model,
+        model=llm.model,
         messages=[
           {"role": "system", "content": "You are a protocol fuzzer developer."},
           {"role": "user", "content": msg}

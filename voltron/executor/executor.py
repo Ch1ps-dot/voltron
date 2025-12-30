@@ -64,11 +64,15 @@ class Executor:
         process = self.setup_sut()
         if process != None:
             for s in path:
-                msg = s.inst()
-                if msg != None:
-                    self.nio.net_send(msg)
-                    res = self.nio.net_recv()
-                    if(self.pkt_parser != None):
-                        logger.debug(self.pkt_parser(res))
+                try:
+                    msg = s.inst()
+                    if msg != None:
+                        self.nio.net_send(msg)
+                        res = self.nio.net_recv()
+                        if(self.pkt_parser != None):
+                            logger.debug(self.pkt_parser(res))
+                except Exception as e:
+                    logger.debug(f'[Executor]: {e}')
+                    self.reset_sut()
             process.terminate()
         self.reset_sut()

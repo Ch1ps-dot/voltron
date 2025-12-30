@@ -57,6 +57,7 @@ RUN git clone https://github.com/profuzzbench/aflnet.git
 ARG GITLAB_USERNAME
 ARG GITLAB_TOKEN
 RUN git clone http://${GITLAB_USERNAME}:${GITLAB_TOKEN}@121.248.48.129:8001/pfqiu/voltron.git
+RUN git checkout -b dev-qpf
 
 USER root
 RUN cd voltron && \

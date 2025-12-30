@@ -1,4 +1,5 @@
-from .configs import settings
+from .configs import ftp
+import yaml
 from .utils.logger import logger
 
 from .llm.chat import Chater
@@ -19,29 +20,24 @@ import os, pickle, json
 class Fuzzer:
     def __init__(
             self, 
-            trans:str, 
-            host:str, 
-            port:int, 
-            pro_name:str,
-            rfc_name:str, # TODO: this fields is useless
-            pre_script:Path = settings.pre_script,
-            post_script:Path = settings.post_script,
-            pmp_path:Path = settings.pmp_path,
-            doc_path:Path = settings.doc_path,
+            pro_name:str
         ) -> None:
 
+        with open('configs.yaml', 'r', encoding='utf-8') as f:
+            self.config = yaml.safe_load(f)
+
         # key parameter of protocol
-        self.host = host
-        self.trans = trans # transport layer
-        self.port = port
         self.pro_name = pro_name
-        self.rfc_name = rfc_name
+        self.host = self.config[pro_name]['host']
+        self.trans = self.config[pro_name]['trans'] # transport layer
+        self.port = self.config[pro_name]['port']
+        self.rfc_name = self.config[pro_name]['rfc_name']
 
         # some file path 
-        self.pre_script = pre_script
-        self.post_script = post_script
-        self.doc_path = doc_path
-        self.pmp_path = pmp_path
+        self.pre_script = Path.cwd() / 'scripts' / self.rfc_name / 'pre.sh'
+        self.post_script = Path.cwd() / 'scripts' / self.rfc_name / 'post.sh'
+        self.doc_path = Path.cwd() / 'rfcs' / f'{self.rfc_name}.txt'
+        self.pmp_path = Path.cwd() / 'prompts'
 
         self.module_init()
 
@@ -69,7 +65,7 @@ class Fuzzer:
         # scheduler init
         self.alphabet = Alphabet(self.handler)
 
-        # network I/O init
+        # setup executor
         self.exe = Executor(
             trans_layer=self.trans,
             host=self.host,

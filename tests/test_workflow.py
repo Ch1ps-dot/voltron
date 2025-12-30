@@ -6,33 +6,18 @@ import time
 
 def test_gen():
     fuzzer = Fuzzer(
-        trans='tcp',
-        port=80,
-        host='127.0.0.1',
-        pro_name='ftp',
-        rfc_name='rfc959',
-        doc_path=Path('./rfcs/rfc959.txt').resolve()
+        pro_name='ftp'
     )
 
 def test_alpha():
     fuzzer = Fuzzer(
-        trans='tcp',
-        port=80,
-        host='127.0.0.1',
-        pro_name='ftp',
-        rfc_name='rfc959',
-        doc_path=Path('./rfcs/rfc959.txt').resolve()
+        pro_name='ftp'
     )
     fuzzer.alphabet.show()
 
 def test_rand():
     fuzzer = Fuzzer(
-        trans='tcp',
-        port=80,
-        host='127.0.0.1',
-        pro_name='ftp',
-        rfc_name='rfc959',
-        doc_path=Path('./rfcs/rfc959.txt').resolve()
+        pro_name='ftp'
     )
     fuzzer.fuzz(
         algo='rand'

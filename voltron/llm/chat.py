@@ -3,7 +3,7 @@ from openai import OpenAI
 import time, re
 from re import Match
 
-from ..configs import settings
+from ..configs import ftp, llm
 from .prompt import Prompter
 from ..utils.logger import logger
 
@@ -15,8 +15,8 @@ class Chater:
             dir: Path
     ) -> None:
         client = OpenAI(
-            base_url=settings.base_url,
-            api_key=settings.api_key
+            base_url=llm.base_url,
+            api_key=llm.api_key
         )
 
         self.clt = client
@@ -38,7 +38,7 @@ class Chater:
         """
         start = time.perf_counter()
         completion = self.clt.chat.completions.create(
-            model=settings.model,
+            model=llm.model,
             messages=[
                 {"role": "system", "content": "You are a protocol analyzer."},
                 {"role": "user", "content": prompt}
