@@ -47,6 +47,9 @@ class RFCParser:
         self.res_doc: list = []
         self.ir_path = Path.cwd() / 'ir' / pro_name
 
+        self.poss_res: dict
+        self.req_res_map: dict
+
         self.req_ir = None
         self.res_ir = None
 
@@ -90,7 +93,7 @@ class RFCParser:
     def spe_parse(
             self
     ):
-        """parse specification documents and annotate the section tree.
+        """Parse specification documents and annotate the section tree.
 
         LLM returns four different types
         1. request
@@ -120,7 +123,8 @@ class RFCParser:
         """Workflow of IR generation
 
         1. field extraction for request and response message individually.
-        2. ir generation for request and response.
+        2. message ir generation for request and response.
+        3. state ir generation for state model
 
         """
         """
@@ -136,7 +140,7 @@ class RFCParser:
             ]
         """
         
-        """===Key field parse==="""
+        """===Key Field Parse==="""
         req_path = self.ir_path / 'req.json'
         res_path = self.ir_path / 'res.json'
 
@@ -180,7 +184,7 @@ class RFCParser:
             logger.debug('[bad field format]')
 
 
-        """===IR Generation==="""
+        """===Message IR Generation==="""
 
         # request message IR generation
         req_ir_path =  self.ir_path / 'req_ir.xml'
@@ -191,7 +195,7 @@ class RFCParser:
             root = etree.Element('ir')
 
             # generate ir for every message type
-            with tqdm(total=len(self.req[0]['value']), desc='[REQ IR]', unit='type') as pbar:
+            with tqdm(total=len(self.req[0]['value']), desc='[REQ MSG IR]', unit='type') as pbar:
                 for msg_type in self.req[0]['value']:
 
                     msg_ir = self.chater.llm_ir_generation(
@@ -245,7 +249,7 @@ class RFCParser:
             root = etree.Element('ir')
 
             # generation for every response type
-            with tqdm(total=len(self.req[0]['value']), desc='[RES IR]', unit='type') as pbar:
+            with tqdm(total=len(self.req[0]['value']), desc='[RES MSG IR]', unit='type') as pbar:
                 for msg_type in self.res[0]['value']:
 
                     msg_ir = self.chater.llm_ir_generation(
@@ -290,7 +294,41 @@ class RFCParser:
             )
             self.res_ir = etree.parse(res_ir_path)
 
-        logger.info('[IR Generation]: finish ir generation')
+        logger.info('[IR Generation]: finish message model generation')
+
+
+       
+
+        
+        logger.info('[IR Generation]: finish state model generation')
+
+    def state_model_generation(
+            self
+    ) -> None:
+        """===State Model Generation==="""
+        # generate or load possible response of each request
+        poss_res_path = self.ir_path / "poss_res.json"
+        if (poss_res_path.is_file()):
+            with open(poss_res_path, 'r', encoding='utf-8') as f:
+                self.poss_res = json.load(f)
+            logger.info('[IR Generation]: request description load')
+        else:
+            with tqdm(total=len(self.res[0]['value']), desc='[Possible Response]', unit='type') as pbar:
+                for req_type in self.req[0]['value']:
+
+                    while(True):
+                        try:
+                            ans_str = self.chater.llm_possible_res(
+                                pro_name=self.pro_name,
+                                current_request=req_type,
+                                response_types=json.dumps(self.res[0]['value'])
+                            )
+                            cur_poss_res = json.loads(ans_str)
+                            self.poss_res[req_type] = cur_poss_res['possible_response']
+                        except Exception as e:
+                            logger.debug(e)
+                with open(poss_res_path, 'w') as f:
+                    json.dump(self.poss_res, f)
 
     def _field_check(
             self,

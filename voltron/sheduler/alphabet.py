@@ -32,7 +32,7 @@ class Symbol:
 
 class Alphabet:
     """Alhpabet stands for all actions in protocol statemachine.
-"""
+    """
     def __init__(
             self,
             handler: Handler

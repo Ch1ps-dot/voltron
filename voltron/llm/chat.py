@@ -238,3 +238,61 @@ class Chater:
             else:
                 logger.debug(f'[Chat]: didn\'t match valid python code')
         return ""
+    
+    def llm_possible_res(
+            self,
+            pro_name: str,
+            current_request: str,
+            response_types: str
+    ) -> str:
+        ans = self.chat_llm(
+            prompt=self.pmp.possible_response(
+                pro_name=pro_name,
+                current_request=current_request,
+                response_types=response_types
+            ),
+            usage = "possible_res"
+        )
+
+        pattern = re.compile(
+            r'```(?:json)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: didn\'t match valid python code')
+        return ""
+    
+    def llm_infer_dependency(
+            self,
+            pro_name: str,
+            current_request: str,
+            response_types: str,
+            request_types: str
+    ) -> str:
+        ans = self.chat_llm(
+            prompt=self.pmp.infer_dependency(
+                pro_name=pro_name,
+                current_request=current_request,
+                response_types=response_types,
+                request_types=request_types
+            ),
+            usage = "possible_res"
+        )
+
+        pattern = re.compile(
+            r'```(?:json)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: didn\'t match valid python code')
+        return ""
