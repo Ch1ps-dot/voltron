@@ -10,11 +10,6 @@ Your task is to **infer all possible response message types for a given request 
 You will be given:
 
 * **Protocol name**: $pro_name
-* **Protocol description or RFC excerpt**:
-
-  ```
-  $rfc_doc
-  ```
 
 * **Current request message type**:
 

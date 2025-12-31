@@ -8,7 +8,7 @@ Your task is to **infer which request message types can be sent next**, given a 
 
 You will be given:
 
-* **Protocol name**: `$pro_name`
+* **Protocol name**: $pro_name
 * **Current request message type**:
 
   ```

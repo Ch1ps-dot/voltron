@@ -29,7 +29,7 @@ class Fuzzer:
         # key parameter of protocol
         self.pro_name = pro_name
         self.host = self.config[pro_name]['host']
-        self.trans = self.config[pro_name]['trans'] # transport layer
+        self.tra_layer = self.config[pro_name]['tra_layer'] # transport layer
         self.port = self.config[pro_name]['port']
         self.rfc_name = self.config[pro_name]['rfc_name']
 
@@ -67,7 +67,7 @@ class Fuzzer:
 
         # setup executor
         self.exe = Executor(
-            trans_layer=self.trans,
+            trans_layer=self.tra_layer,
             host=self.host,
             port=self.port,
             pre_script=self.pre_script,
