@@ -11,25 +11,25 @@ You will be given:
 * **Protocol name**: $pro_name
 * **Current request message type**:
 
-  ```
   $current_request
-  ```
-* **Possible response message types for the current request**:
 
-  ```
-  $response_types
-  ```
+* **One possible response message type for the current request**:
+
+  $response_type
+
 * **Candidate request message types**:
 
-  ```
   $request_types
-  ```
+
+* **Related content of specification document**:
+
+  $rfc_content
 
 ---
 
 ### **Task Definition**
 
-For **each response message type** resulting from the current request:
+For **the response message type** resulting from the current request:
 
 * Determine which request message types are **valid to be sent next**
 * The validity must be evaluated **conditioned on that specific response**
@@ -58,7 +58,6 @@ For **each response message type** resulting from the current request:
 
 * Select **only** from the provided `Candidate request message types`
 * Do **NOT** invent new request types
-* Evaluate each `(response → next request)` relation independently
 
 ---
 
@@ -74,9 +73,7 @@ For **each response message type** resulting from the current request:
 
 ```json
 {
-  "331": ["PASS"],
-  "230": ["PWD", "CWD", "TYPE", "PASV", "QUIT"],
-  "530": ["USER", "QUIT"]
+  "next_request": ["PWD", "CWD", "TYPE", "PASV", "QUIT"],
 }
 ```
 
@@ -87,7 +84,7 @@ For **each response message type** resulting from the current request:
 Before finalizing the output, ensure:
 
 * The output is valid JSON
-* Every key corresponds to a response message type in `$response_types`
+* The key of output correspond to the response message type in `$response_type`
 * Every listed request appears in `Candidate request message types`
 * No request requiring unsatisfied preconditions is included
 * Each response is treated as a distinct protocol state

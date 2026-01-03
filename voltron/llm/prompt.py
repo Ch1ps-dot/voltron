@@ -161,8 +161,15 @@ class Prompter:
             self,
             pro_name: str,
             current_request: str,
-            response_types: str,
-            request_types: str
+            response_type: str,
+            request_types: str,
+            rfc_content: str
     ) -> str:
         msg = Template(self._tem_infer_dependency)
-        return msg.substitute(pro_name = pro_name, current_request=current_request, response_types=response_types, request_types=request_types)
+        return msg.substitute(
+            pro_name = pro_name, 
+            current_request=current_request, 
+            response_type=response_type, 
+            request_types=request_types,
+            rfc_content=rfc_content
+            )

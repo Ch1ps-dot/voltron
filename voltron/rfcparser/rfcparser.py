@@ -1,10 +1,10 @@
-import chromadb
 import time, pickle, json, re
 from pprint import pprint
 from pathlib import Path
 from typing import Self
 from lxml import etree # type: ignore
 from tqdm import tqdm
+from fastbm25 import fastbm25
 
 from .setciontree import SectionTree
 from ..utils.logger import logger
@@ -49,8 +49,8 @@ class RFCParser:
         self.res_doc: list = []
         self.ir_path = Path.cwd() / 'ir' / pro_name
 
-        self.poss_res: dict[str, str]
-        self.req_res_map: dict[str, str]
+        self.poss_res: dict[str, str] = {}
+        self.req_res_map: dict[str, str] = {}
 
         self.req_ir = None
         self.res_ir = None
@@ -66,6 +66,10 @@ class RFCParser:
             logger.info('[RFC Parse]: parse document')
             self._query_prepare()
         logger.info('[RFC Parse]: finish parse')
+
+        self.rag_req: fastbm25 = self.rag_init(self.req_doc)
+        self.rag_res: fastbm25 = self.rag_init(self.res_doc)
+        self.rag_all: fastbm25 = self.rag_init(list(dict.fromkeys(self.req_doc + self.res_doc)))
 
         # ir generation
         self.ir_generation()
@@ -317,7 +321,7 @@ class RFCParser:
                             ans_str = self.chater.llm_possible_res(
                                 pro_name=self.pro_name,
                                 current_request=req_type,
-                                response_types=json.dumps(self.res_json[0]['value'])
+                                response_types=json.dumps(self.res_types)
                             )
                             cur_poss_res = json.loads(ans_str[7:-4])
                             self.poss_res[req_type] = cur_poss_res['possible_response']
@@ -329,25 +333,37 @@ class RFCParser:
                 json.dump(self.poss_res, f)
                
         # infer dependency in method
-        with tqdm(total=len(self.req_types), desc=f'[Infer {req_type}]', unit='type') as pbar1:
-            for req_type in self.req_types:
-                with tqdm(total=len(self.poss_res[res_type]), desc=f'[Infer {req_type}-{res_type}]', unit='type') as pbar2:
-                    for res_type in self.poss_res[req_type]:
-                        while(True):
-                            try:
-                                ans_str = self.chater.llm_infer_dependency(
-                                    pro_name=self.pro_name,
-                                    current_request=req_type,
-                                    request_types=res_type,
-                                    response_types=json.dumps(self.res_types)
-                                )
-                                cur_poss_res = json.loads(ans_str[7:-4])
-                                self.poss_res[req_type] = cur_poss_res['possible_response']
-                                break
-                            except Exception as e:
-                                logger.debug(e)
-                        pbar2.update(1)
-                pbar1.update(1)
+        req_res_map_path = self.ir_path / "state_dependency.json"
+        if (req_res_map_path.is_file()):
+            with open(req_res_map_path, 'r', encoding='utf-8') as f:
+                self.req_res_map = json.load(f)
+            logger.info('[IR Generation]: request description load')
+        else:
+            with tqdm(total=len(self.req_types), desc=f'[Infer Dependency]', unit='type') as pbar1:
+                for req_type in self.req_types:
+                    with tqdm(total=len(self.poss_res[req_type]), desc=f'[Infer req-res pair]', unit='type') as pbar2:
+                        for res_type in self.poss_res[req_type]:
+                            while(True):
+                                try:
+                                    query = [req_type, res_type]
+                                    results = self.rag_all.top_k_sentence(query, 5)
+                                    logger.debug(f'[Rag]: topk {' '.join(results[0][0])}')
+                                    ans_str = self.chater.llm_infer_dependency(
+                                        pro_name=self.pro_name,
+                                        current_request=req_type,
+                                        request_types=json.dumps(self.req_types),
+                                        response_type=res_type,
+                                        rfc_content=''.join([' '.join(item[0]) for item in results])
+                                    )
+                                    next_request = json.loads(ans_str[7:-4])
+                                    self.req_res_map[f'{req_type}-{res_type}'] = next_request['next_request']
+                                    break
+                                except Exception as e:
+                                    logger.debug(e)
+                            pbar2.update(1)
+                    pbar1.update(1)
+                with open(req_res_map_path, 'w') as f:
+                    json.dump(self.req_res_map, f)
 
         logger.info('[IR Generation]: finish state model generation')
 
@@ -412,10 +428,16 @@ class RFCParser:
             pickle.dump(self.st, f)
             logger.debug("[Save Sectiontree]")   
 
-    def db_create(
-            self
-    ):
-        pass
+    def rag_init(
+        self,
+        sections: list[str]
+    ) -> fastbm25:
+        corpus = [s.split() for s in sections]
+        bm25 = fastbm25(corpus)
+        return bm25
+    
+
+    
 
     
 

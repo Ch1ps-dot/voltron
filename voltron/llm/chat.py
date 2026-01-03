@@ -271,18 +271,22 @@ class Chater:
             self,
             pro_name: str,
             current_request: str,
-            response_types: str,
-            request_types: str
+            response_type: str,
+            request_types: str,
+            rfc_content: str
     ) -> str:
         ans = self.chat_llm(
             prompt=self.pmp.infer_dependency(
                 pro_name=pro_name,
                 current_request=current_request,
-                response_types=response_types,
-                request_types=request_types
+                response_type=response_type,
+                request_types=request_types,
+                rfc_content=rfc_content
             ),
             usage = "possible_res"
         )
+
+        logger.debug(rfc_content)
 
         pattern = re.compile(
             r'```(?:json)\s*\n(.*?)\n\s*```',
