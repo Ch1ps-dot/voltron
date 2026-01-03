@@ -52,3 +52,9 @@ utils/rag.py: be able to resolve documents to data structure.
 ### 2025-12-28
 
 finish the basic workflow that start from parsing document to generating real message
+
+### 2026-1-2
+
+implemeted state model generation and add rag support for state dependenct inference
+
+**the fuzzer generation module has been finished so far.**
