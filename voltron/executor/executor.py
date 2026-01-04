@@ -7,6 +7,7 @@ from ..utils.logger import logger
 from ..sheduler.alphabet import Symbol, Alphabet
 from ..handler.handler import Handler
 from ..utils.analyze import Analyzer
+import math
 
 class Executor:
     def __init__(
@@ -14,11 +15,13 @@ class Executor:
             trans_layer:str, 
             host:str, 
             port:int,
-            pre_script:Path, 
-            post_scaript:Path,
-            handler:Handler,
+            pre_script:Path | None, 
+            post_scaript:Path | None,
+            handler: Handler,
+            analyzer: Analyzer,
             setup_time_s:float = 0.1,
-            recv_time_ms:int = 1000 
+            send_time_ms:int = 1000,
+            recv_time_ms:int = 1000
         ) -> None:
 
         self.pre_script = pre_script
@@ -30,56 +33,79 @@ class Executor:
         self.handler = handler
 
         self.setup_time_s = setup_time_s
-        self.recv_time_ms = recv_time_ms
+        self.recv_time_ms = -1
+        self.send_time_ms = send_time_ms
        
         self.pkt_parser = self.handler.parser_instance()
-        self.analyzer = Analyzer()
+        self.analyzer = analyzer
+
+        self.last_sent = ''
+        self.last_recv = ''
+
+        self.max_timeout = 5000
+        self.time_probe = 3
+
 
     def reset_sut(self):
-        try:
-            subprocess.run(
-                [self.post_script.resolve()],
-                check = True,
-                shell = False
-            )
-        except Exception as e:
-            print(f'Reset Failure: {e}')
+        if (self.post_script != None):
+            try:
+                subprocess.run(
+                    [self.post_script.resolve()],
+                    check = True,
+                    shell = False
+                )
+            except Exception as e:
+                logger.debug(f'Reset Failure: {e}')
+            logger.debug('SUT Reset Execution Success')
 
     def setup_sut(
             self,
     ) -> subprocess.Popen | None:
-        try:
-            process = subprocess.Popen(
-                [self.pre_script.resolve()],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            return process
-        except Exception as e:
-            logger.debug(f'[SUT Execution Failure]: {e}')
+        if (self.pre_script != None):
+            try:
+                process = subprocess.Popen(
+                    [self.pre_script.resolve()],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                return process
+            except Exception as e:
+                logger.debug(f'[SUT Execution Failure]: {e}')
+            logger.debug('SUT Execution Success')
 
     def run(
             self,
             path: list[Symbol]
     ):
-        sut = self.setup_sut()
+        self.setup_sut()
         sock = self.setup_socket()
-        poller = select.poll()
-        poller.register(sock, select.POLLIN)
-        events = poller.poll(self.recv_time_ms)
         
         # wait for server setup
         time.sleep(self.setup_time_s)
 
-        if sut != None:
-            for s in path:
-                msg = s.inst()
-                self.net_send(msg, sock)
-                res = self.net_recv(timeout_ms=self.recv_time_ms, sock=sock)
-                if(self.pkt_parser != None):
-                    logger.debug(self.pkt_parser(res))
+        for s in path:
+            msg = s.inst()
+            if(self.net_send(msg, sock)):
+                logger.debug(f'sent {s.name}')
+                self.last_sent = s.name
+                with self.analyzer.lock:
+                    self.analyzer.req_num = self.analyzer.req_num + 1
+
+                res = self.net_recv(sock=sock)
+                if(self.pkt_parser == None): raise Exception
+                if(res != False):
+                    self.last_recv = self.pkt_parser(res)
+                    logger.debug(f'recv {self.last_recv}')
+                    with self.analyzer.lock:
+                        self.analyzer.res_types_update(self.last_recv)
+                        self.analyzer.trans_types_update(f'{self.last_sent}-{self.last_recv}')
+            else:
+                logger.debug('run: socket closed')
+                break
+        with self.analyzer.lock:
+            self.analyzer.path_num = self.analyzer.path_num + 1
+        if sock is None:
             sock.close()
-            sut.terminate()
         self.reset_sut()
     
     def setup_socket(
@@ -105,7 +131,7 @@ class Executor:
                 else:
                     raise ValueError("Unsupport protocol")
             except Exception as e:
-                print("Setup Socket Failure")
+                logger.debug(f"Setup Socket Failure {e}")
             
             return sock
 
@@ -114,29 +140,90 @@ class Executor:
             msg : bytes,
             sock: socket.socket
     ):
+        """Send message over network
+
+        use poll to monitor the status of socket
+        """
+        if sock is None or sock.fileno() < 0:
+            logger.debug("net_send: invalid socket")
+            return False
+        
         try:
             if (self.trans_layer == 'tcp'):
-                sock.sendall(msg)
+                poller = select.poll()
+                poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
+
+                events = poller.poll(self.send_time_ms)
+                if not events:
+                    logger.debug("net_send: poll timeout")
+                    return False
+
+                fd, event = events[0]
+
+                if event & (select.POLLERR | select.POLLHUP):
+                    logger.debug("net_send: poll error / hup")
+                    return False
+
+                if event & select.POLLOUT:
+                    sock.sendall(msg)
+                    return True
+                
             elif (self.trans_layer == 'udp'):
                 sock.sendto(msg, (self.host, self.port))
             else:
                 raise ValueError("Unsupport protocol")
         except Exception as e:
-            print(f'Network Send Failure: {e}')
+            logger.debug(f'Network Send Failure: {e}')
+        logger.debug(f'send {msg}')
+        return False
     
     def net_recv(
             self, 
-            timeout_ms: int,
             sock: socket.socket
     ):
+        """Recv message over network
+
+        use poll to monitor the status of socket
+        """
+        response = ''
+        if sock is None or sock.fileno() < 0:
+            logger.debug("net_send: invalid socket")
+            return False
+        
         try:
             if (self.trans_layer == 'tcp'):
-                response = sock.recv(1024)
+                poller = select.poll()
+                poller.register(sock, select.POLLIN)
+                if (self.time_probe > 0):
+                    s_time = time.time()
+                    events = poller.poll(self.max_timeout)
+                    if not events:
+                        logger.debug('net recv: time out is too bad')
+                        return False
+                    else:
+                        self.time_probe -= 1
+                        if (self.recv_time_ms < 0):
+                            self.recv_time_ms = int(1000*(time.time()-s_time))
+                        else:
+                            self.recv_time_ms = math.floor((self.recv_time_ms + int(1000*(time.time()-s_time))) / 2)
+                else:
+                    events = poller.poll(self.recv_time_ms)
+
+                if not events:
+                    logger.debug('net recv: time out')
+                    return False
+
+                fd, event = events[0]
+                if event & select.POLLIN:
+                    response = sock.recv(1024)
+                    if not response:
+                        logger.debug('no reply')
+                        return False
+                
             elif (self.trans_layer == 'udp'):
                 response = sock.recvfrom(1024)
-            else:
-                raise ValueError("Unsupport protocol")
+                return response
         except Exception as e:
-            print(f'Network Recv Failure: {e}')
+            logger.debug(f'Network Recv Failure: {e}')
         
-        return response
+        return False

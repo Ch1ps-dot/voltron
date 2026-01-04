@@ -55,17 +55,20 @@ class RFCParser:
         self.req_ir = None
         self.res_ir = None
 
+        if (not self.ir_path.is_dir()):
+            self.ir_path.mkdir()
+
         # sectiontree parse pass
         fn = self.ir_path / "section_tree.pkl"
         if(fn.is_file()):
             self.load_st()
-            logger.info('[RFC Parse]: load parser')
+            logger.debug('[RFC Parse]: load parser')
             self._query_prepare()
         else:
             self.spe_parse()
-            logger.info('[RFC Parse]: parse document')
+            logger.debug('[RFC Parse]: parse document')
             self._query_prepare()
-        logger.info('[RFC Parse]: finish parse')
+        logger.debug('[RFC Parse]: finish parse')
 
         self.rag_req: fastbm25 = self.rag_init(self.req_doc)
         self.rag_res: fastbm25 = self.rag_init(self.res_doc)
@@ -94,7 +97,7 @@ class RFCParser:
                     pass
                 case _:
                     logger.debug("[Section type]: unexpected type {_}")
-        logger.info('[RFCParser]: query prepare')
+        logger.debug('[RFCParser]: query prepare')
 
     def spe_parse(
             self
@@ -119,7 +122,8 @@ class RFCParser:
                     )
                     if ans != None:
                         node.content_type = ans
-            pbar.update(1)
+                        logger.debug(f'[Tree Annotate]: {node.name}-{ans}')
+                pbar.update(1)
                     
         self.save_st()           
     
@@ -154,37 +158,47 @@ class RFCParser:
         if(req_path.is_file()):
             with open(req_path, 'r', encoding='utf-8') as f:
                 self.req_json = json.load(f)
-            logger.info('[IR Generation]: request description load')
+            logger.debug('[IR Generation]: request description load')
         else:
-            req_json = self.chater.llm_request_query(
-                rfc_num = self.rfc_name,
-                pro_name = self.pro_name,
-                rfc_doc = ''.join([s for s in self.req_doc])
-            )
+            while(True):
+                try:
+                    req_json = self.chater.llm_request_query(
+                        rfc_num = self.rfc_name,
+                        pro_name = self.pro_name,
+                        rfc_doc = ''.join([s for s in self.req_doc])
+                    )
 
-            if (req_json != None):
-                self.req_json = json.loads(req_json[7:-4])
-                with open(req_path, 'w', encoding="utf-8") as f:
-                    json.dump(self.req_json, f)
-            logger.info('[IR Generation]: request description generation')
+                    if (req_json != None):
+                        self.req_json = json.loads(req_json[7:-4])
+                        with open(req_path, 'w', encoding="utf-8") as f:
+                            json.dump(self.req_json, f)
+                        break
+                except Exception as e:
+                    logger.debug('[IR Generation]: {e}')
+            logger.debug('[IR Generation]: request description generation')
 
         # response field extraction
         if(res_path.is_file()):
             with open(res_path, 'r', encoding='utf-8') as f:
                 self.res_json = json.load(f)
-            logger.info('[IR Generation]: response description load')
+            logger.debug('[IR Generation]: response description load')
         else:
-            res_json = self.chater.llm_response_query(
-                rfc_num = self.rfc_name,
-                pro_name = self.pro_name,
-                rfc_doc = ''.join([s for s in self.res_doc])
-            )
+            while(True):
+                try:
+                    res_json = self.chater.llm_response_query(
+                        rfc_num = self.rfc_name,
+                        pro_name = self.pro_name,
+                        rfc_doc = ''.join([s for s in self.res_doc])
+                    )
 
-            if (res_json != None):
-                self.res_json = json.loads(res_json[7:-4])
-                with open(res_path, 'w', encoding="utf-8") as f:
-                    json.dump(self.res_json, f)
-            logger.info('[IR Generation]: response description generation')
+                    if (res_json != None):
+                        self.res_json = json.loads(res_json[7:-4])
+                        with open(res_path, 'w', encoding="utf-8") as f:
+                            json.dump(self.res_json, f)
+                        break
+                except Exception as e:
+                    logger.debug('[IR Generation]: {e}')
+                logger.debug('[IR Generation]: response description generation')
 
         if(self._field_check(self.req_json[0]) and self._field_check(self.res_json[0])):
             logger.debug('[bad field format]')
@@ -204,12 +218,12 @@ class RFCParser:
         req_ir_path =  self.ir_path / 'req_ir.xml'
         if (req_ir_path.is_file()):
             self.req_ir = etree.parse(req_ir_path)
-            logger.info('[IR Generation]: req ir load')
+            logger.debug('[IR Generation]: req ir load')
         else:
             root = etree.Element('ir')
             # generate ir for every message type
-            with tqdm(total=len(self.req_json[0]['value']), desc='[REQ MSG IR]', unit='type') as pbar:
-                for msg_type in self.req_json[0]['value']:
+            with tqdm(total=len(self.req_types), desc='[REQ MSG IR]', unit='type') as pbar:
+                for msg_type in self.req_types:
                     msg_ir = self.chater.llm_ir_generation(
                         pro_name=self.pro_name,
                         message_name=msg_type,
@@ -251,13 +265,13 @@ class RFCParser:
         res_ir_path = self.ir_path / 'res_ir.xml'
         if (res_ir_path.is_file()):
             self.res_ir = etree.parse(res_ir_path)
-            logger.info('[IR Generation]: res ir load')
+            logger.debug('[IR Generation]: res ir load')
         else:
             root = etree.Element('ir')
 
             # generation for every response type
-            with tqdm(total=len(self.req_json[0]['value']), desc='[RES MSG IR]', unit='type') as pbar:
-                for msg_type in self.res_json[0]['value']:
+            with tqdm(total=len(self.res_types), desc='[RES MSG IR]', unit='type') as pbar:
+                for msg_type in self.res_types:
 
                     msg_ir = self.chater.llm_ir_generation(
                         pro_name=self.pro_name,
@@ -299,7 +313,7 @@ class RFCParser:
             )
             self.res_ir = etree.parse(res_ir_path)
 
-        logger.info('[IR Generation]: finish message model generation')
+        logger.debug('[IR Generation]: finish message model generation')
 
 
     def state_model_generation(
@@ -312,9 +326,9 @@ class RFCParser:
         if (poss_res_path.is_file()):
             with open(poss_res_path, 'r', encoding='utf-8') as f:
                 self.poss_res = json.load(f)
-            logger.info('[IR Generation]: request description load')
+            logger.debug('[IR Generation]: request description load')
         else:
-            with tqdm(total=len(self.res_types), desc='[Possible Response]', unit='type') as pbar:
+            with tqdm(total=len(self.req_types), desc='[Possible Response]', unit='type') as pbar:
                 for req_type in self.req_types:
                     while(True):
                         try:
@@ -337,7 +351,7 @@ class RFCParser:
         if (req_res_map_path.is_file()):
             with open(req_res_map_path, 'r', encoding='utf-8') as f:
                 self.req_res_map = json.load(f)
-            logger.info('[IR Generation]: request description load')
+            logger.debug('[IR Generation]: request description load')
         else:
             with tqdm(total=len(self.req_types), desc=f'[Infer Dependency]', unit='type') as pbar1:
                 for req_type in self.req_types:
@@ -365,7 +379,7 @@ class RFCParser:
                 with open(req_res_map_path, 'w') as f:
                     json.dump(self.req_res_map, f)
 
-        logger.info('[IR Generation]: finish state model generation')
+        logger.debug('[IR Generation]: finish state model generation')
 
 
     def _field_check(

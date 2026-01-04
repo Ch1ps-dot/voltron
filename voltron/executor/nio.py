@@ -1,5 +1,6 @@
 import socket
 from typing import Optional
+from ..utils.logger import logger
 
 class Nio:
     """ Network sender and receiver
@@ -46,7 +47,7 @@ class Nio:
                 else:
                     raise ValueError("Unsupport protocol")
             except Exception as e:
-                print("Setup Socket Failure")
+                logger.debug("Setup Socket Failure")
             
             return skt
 

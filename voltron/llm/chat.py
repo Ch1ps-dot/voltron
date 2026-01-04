@@ -49,7 +49,7 @@ class Chater:
         end = time.perf_counter()
         
         response: str | None = completion.choices[0].message.content
-        logger.debug(f"[Chat]:{usage} cost_time:{end - start}")
+        logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
         return response
 
     def llm_query_rfc(

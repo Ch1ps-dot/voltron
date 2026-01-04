@@ -28,6 +28,9 @@ class Handler:
 
         self.handler_path = Path.cwd() / 'handler' / rfcp.pro_name
 
+        if (not self.handler_path.is_dir()):
+            self.handler_path.mkdir()
+
         self.chater = chater
         self.rfcp = rfcp
         self.inputs_code: dict[str, str] = {}
@@ -70,7 +73,7 @@ class Handler:
         if(inputs_path.is_file()):
             with open(inputs_path, 'r', encoding='utf-8') as f:
                 self.inputs_code = json.load(f)
-            logger.info("[Handler]: load inputs")
+            logger.debug("[Handler]: load inputs")
 
         else:
             with tqdm(total=len(self.req_ir.findall("message")), desc='[Input Generation]', unit='type') as pbar:
@@ -97,7 +100,7 @@ class Handler:
                     logger.debug(input_code)
                     pbar.update(1)
 
-            logger.info("[Handler]: finish inputs generation")
+            logger.debug("[Handler]: finish inputs generation")
 
             with open(inputs_path, 'w', encoding='utf-8') as f:
                 json.dump(self.inputs_code, f)
@@ -113,7 +116,7 @@ class Handler:
                 self.pkt_parser_code = f.read()
         else:
             
-            res_info = json.dumps(self.rfcp.res)
+            res_info = json.dumps(self.rfcp.res_doc)
 
             try_times = 0
             while(True):
@@ -122,7 +125,7 @@ class Handler:
                         pro_name=self.rfcp.pro_name,
                         res_info=res_info
                     )[9:-4]
-                    compile(self.pkt_parser_code, '<string>', 'exec')
+                    compile(pkt_parser_code, '<string>', 'exec')
                     self.pkt_parser_code = pkt_parser_code
                     break
                 except SyntaxError as e:
