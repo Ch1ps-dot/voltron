@@ -62,10 +62,11 @@ class Nio:
             else:
                 raise ValueError("Unsupport protocol")
         except Exception as e:
-            print('Network Send Failure')
+            print(f'Network Send Failure: {e}')
     
     def net_recv(
-            self
+            self, 
+            timeout_ms:int
     ):
         try:
             if (self.trans == 'tcp'):
@@ -75,6 +76,6 @@ class Nio:
             else:
                 raise ValueError("Unsupport protocol")
         except Exception as e:
-            print('Network Recv Failure')
+            print(f'Network Recv Failure: {e}')
         
         return response

@@ -1,4 +1,3 @@
-from .configs import ftp
 import yaml
 from .utils.logger import logger
 
@@ -15,12 +14,13 @@ from .sheduler.alphabet import Alphabet, Symbol
 from .sheduler.rands import Rands
 
 from pathlib import Path
-import os, pickle, json
+import os, pickle, json, time
 
 class Fuzzer:
     def __init__(
             self, 
-            pro_name:str
+            pro_name: str,
+            time: int
         ) -> None:
 
         with open('configs.yaml', 'r', encoding='utf-8') as f:
@@ -77,7 +77,8 @@ class Fuzzer:
 
     def fuzz(
             self,
-            algo:str
+            algo: str,
+            time_limit: int
     ):
         """Fuzz the target one
         """
@@ -86,6 +87,16 @@ class Fuzzer:
                 sched = Rands(self.alphabet)
                 path = sched.select(10)
                 self.exe.run(path=path)
+
+    def rand_fuzz(
+            self,
+            time_limit: int
+    ):
+        start_time = time.time()
+        while time.time() - start_time < time_limit:
+            sched = Rands(self.alphabet)
+            path = sched.select(10)
+            self.exe.run(path=path)
     
     def fuzz_loop(self):
         pass
