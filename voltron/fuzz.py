@@ -103,20 +103,12 @@ class Fuzzer:
         start_time = time.time()
         self.analyzer.start_time = start_time
 
-        # layout = self.make_ui()
         stop_event = threading.Event()
         t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, stop_event))
         t_fuzz = threading.Thread(target=fuzz_loop, args=(stop_event,))
 
         t_fuzz.start()
         t_ui.start()
-        # with Live(layout, refresh_per_second=1):
-        #     layout['settings'].update(self.make_info_table(algo))
-        #     layout['runtime'].update(self.make_runtime_table(start_time=start_time))
-
-        #     while time.time() - start_time < self.time_limit * 60:
-        #         fuzzing()
-        #         layout['runtime'].update(self.make_runtime_table(start_time=start_time))
 
     def rand_fuzz(
             self,
@@ -129,85 +121,4 @@ class Fuzzer:
             if (self.time_limit > time.time() - self.analyzer.start_time):
                 stop_event.is_set()
 
-    # """ 
-    # ==== UI Related Function ===
-    # """
-
-    # def make_ui(
-    #         self
-    #     ):
-    #     layout = Layout()
-
-    #     layout.split(
-    #         Layout(name="header", size=3),
-    #         Layout(name="body"),
-    #     )
-
-    #     layout["body"].split_row(
-    #         Layout(name="settings"),
-    #         Layout(name="runtime"),
-    #     )
-
-    #     header = Panel(
-    #         Text(
-    #             f" Protocol Fuzzer [v0.0.1] ",
-    #             justify="center",
-    #             style="bold cyan",
-    #         ),
-    #         style="white on black",
-    #     )
-    #     layout["header"].update(header)
-
-    #     return layout
-
-    # def format_duration(
-    #         self, 
-    #         seconds: int
-    # ) -> str:
-    #     d, rem = divmod(seconds, 86400)
-    #     h, rem = divmod(rem, 3600)
-    #     m, s = divmod(rem, 60)
-    #     return f"{d} days, {h:02d} hrs, {m:02d} min, {s:02d} sec"
-
-    # def make_runtime_table(
-    #         self,
-    #         start_time
-    # ):
-    #     elapsed = int(time.time() - start_time)
-    #     table = Table(title="Fuzzer Runtime", show_header=False, box=None)
-    #     table.add_column(justify='left')
-    #     table.add_column(justify='right')
-    #     data = {
-    #         'run time': self.format_duration(elapsed),
-    #         'sent request num': self.analyzer.req_num,
-    #         'exec path num': self.analyzer.path_num,
-    #         'recv response types': self.analyzer.res_types_num(),
-    #         'req/res pairs': self.analyzer.trans_types_num()
-    #     }
-
-    #     for k, v in data.items():
-    #         table.add_row(k, str(v))
-
-    #     return table
     
-    # def make_info_table(
-    #         self,
-    #         strategy: str
-    # ):
-    #     data = {
-    #         'target name': self.target_name,
-    #         'protol type': self.pro_name,
-    #         'strategy': strategy
-    #     }
-    #     table = Table(title="Settings Info", show_header=False, box=None)
-    #     table.add_column(justify='left')
-    #     table.add_column(justify='right')
-
-    #     for k, v in data.items():
-    #         table.add_row(k, str(v))
-
-    #     return table
-
-
-        
-

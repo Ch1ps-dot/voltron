@@ -145,6 +145,47 @@ class Chater:
         else:
             return ''
         
+    def llm_input_repair(
+            self,
+            pro_name: str = '',
+            msg_type: str = '',
+            code: str = '',
+            info: str = ''
+    ) -> str:
+        """Repair teh python code
+
+        Args:
+            pro_name: name of protocol
+            msg_type: required protocol message type
+
+        Returns:
+            generated input
+        """
+        ans = self.chat_llm(
+            prompt=self.pmp.input_repair(
+                pro_name=pro_name, 
+                msg_type=msg_type, 
+                code=code
+            ),
+            usage = "input_gen"
+        )
+
+        pattern = re.compile(
+            r'```(?:python|py)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()
+            else:
+                logger.debug(f'[Chat]: didn\'t match valid python code')
+        if ans != None:
+            return ans
+        else:
+            return ''
+        
     def llm_parser_gen(
             self,
             pro_name: str,

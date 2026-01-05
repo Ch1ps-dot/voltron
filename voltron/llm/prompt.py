@@ -16,6 +16,7 @@ class Prompter:
         self._path_rfc_query = dir / "rfc_query.md"
 
         self._path_gen_input = dir / "input_generation.md"
+        self._path_repair_input = dir / "input_repair.md"
         self._path_gen_parser = dir / "parser_generation.md"
 
         self._path_req_query = dir / "request_query.md"
@@ -31,8 +32,10 @@ class Prompter:
 
         # template of prompts
         self._tem_rfc_query = ''
+
         self._tem_gen_input = ''
         self._tem_gen_parser = ''
+        self._tem_repair_input = ''
 
         self._tem_res_query = ''
         self._tem_req_query = ''
@@ -67,6 +70,8 @@ class Prompter:
                 self._tem_possible_response = f.read()
             with self._path_infer_dependency.open('r+') as f:
                 self._tem_infer_dependency = f.read()
+            with self._path_repair_input.open('r+') as f:
+                self._tem_input_repair = f.read()
         else:
             logger.info("[prompter]: template directory error")
     
@@ -86,6 +91,15 @@ class Prompter:
     ) -> str:
         msg = Template(self._tem_gen_input)
         return msg.substitute(msg_type = msg_type, pro_name = pro_name, msg_ir=msg_ir)
+    
+    def input_repair(
+            self,
+            pro_name: str,
+            msg_type: str,
+            code: str
+    ) -> str:
+        msg = Template(self._tem_repair_input)
+        return msg.substitute(msg_type = msg_type, pro_name = pro_name, code=code, )
     
     def parser_gen(
             self,

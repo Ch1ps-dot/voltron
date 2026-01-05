@@ -24,6 +24,7 @@ class Executor:
             recv_time_ms:int = 1000
         ) -> None:
 
+        # some attributes for sut
         self.pre_script = pre_script
         self.post_script = post_scaript
         self.host = host
@@ -32,19 +33,19 @@ class Executor:
         self.trans_layer = trans_layer
         self.handler = handler
 
+        # time related values
         self.setup_time_s = setup_time_s
         self.recv_time_ms = -1
         self.send_time_ms = send_time_ms
+        
+        self.max_timeout = 5000
+        self.time_probe = 3 # for estimating suitable response time
        
         self.pkt_parser = self.handler.parser_instance()
         self.analyzer = analyzer
 
         self.last_sent = ''
         self.last_recv = ''
-
-        self.max_timeout = 5000
-        self.time_probe = 3
-
 
     def reset_sut(self):
         if (self.post_script != None):
@@ -70,8 +71,8 @@ class Executor:
                 )
                 return process
             except Exception as e:
-                logger.debug(f'[SUT Execution Failure]: {e}')
-            logger.debug('SUT Execution Success')
+                logger.debug(f'[SUT Setup Failure]: {e}')
+            logger.debug('SUT Setup Success')
 
     def run(
             self,
@@ -84,7 +85,7 @@ class Executor:
         time.sleep(self.setup_time_s)
 
         for s in path:
-            msg = s.inst()
+            msg = s.inst
             if(self.net_send(msg, sock)):
                 logger.debug(f'sent {s.name}')
                 self.last_sent = s.name
@@ -102,6 +103,7 @@ class Executor:
             else:
                 logger.debug('run: socket closed')
                 break
+
         with self.analyzer.lock:
             self.analyzer.path_num = self.analyzer.path_num + 1
         if sock is None:

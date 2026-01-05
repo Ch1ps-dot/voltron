@@ -69,6 +69,7 @@ class Handler:
         """Generate and save input generator
         """
 
+        # load the cached code if it exists
         inputs_path = self.handler_path / 'inputs.json'
         if(inputs_path.is_file()):
             with open(inputs_path, 'r', encoding='utf-8') as f:
@@ -79,17 +80,25 @@ class Handler:
             with tqdm(total=len(self.req_ir.findall("message")), desc='[Input Generation]', unit='type') as pbar:
                 for msg in self.req_ir.findall("message"):
                     try_times = 0
+
+                    # retry generation until the generated code can be compiled successfully
                     while(True):
                         try:
                             msg_ir = etree.tostring(msg, encoding="utf-8", pretty_print=True).decode("utf-8")
                             msg_type = msg.get('name')
 
+                            # generate input generator and save it
                             input_code = self.chater.llm_input_gen(
                                 pro_name=self.rfcp.pro_name,
                                 msg_type=msg.get('name'),
                                 msg_ir=msg_ir
                             )[9:-4]
+
                             compile(input_code, '<string>', "exec")
+                            with open(self.handler_path / msg_type / '.py', 'w', encoding='utf-8') as f:
+                                f.write(input_code)
+
+                            # save the code in a in-memory data structure
                             self.inputs_code[msg_type] = input_code
                             break
                         except SyntaxError as e:
@@ -102,6 +111,7 @@ class Handler:
 
             logger.debug("[Handler]: finish inputs generation")
 
+            # save the code base as a json file
             with open(inputs_path, 'w', encoding='utf-8') as f:
                 json.dump(self.inputs_code, f)
 
@@ -110,17 +120,22 @@ class Handler:
     ) -> None:
         """Generate and save packet parser
         """
+        # load the cached code if it exists
         parser_path = self.handler_path / 'pkt_parser.py'
         if (parser_path.is_file()):
             with open(parser_path, 'r', encoding='utf-8') as f:
                 self.pkt_parser_code = f.read()
         else:
             
+            # use the info of response field as augmentaion information
             res_info = json.dumps(self.rfcp.res_doc)
-
             try_times = 0
+
+            # retry generation until the generated code can be compiled successfully
             while(True):
                 try:
+
+                    # generate input generator and save it
                     pkt_parser_code = self.chater.llm_parser_gen(
                         pro_name=self.rfcp.pro_name,
                         res_info=res_info
@@ -136,25 +151,6 @@ class Handler:
                 f.write(self.pkt_parser_code)
                 logger.debug(self.pkt_parser_code)
                 logger.debug("[Handler]: finish parser generation")
-
-    # def input_instance(
-    #         self,
-    #         msg_type: str
-    # ) -> Callable:
-    #     """Execute message input generator
-
-    #     Args:
-    #         msg_type: name of message type
-        
-    #     Return:
-    #         generated message
-    #     """
-    #     if(msg_type not in self.inputs):
-    #         name_space = {}
-    #         code = self.inputs_code[msg_type]
-    #         exec(code, name_space)
-    #         self.inputs[msg_type] = name_space[f'input_{msg_type}']
-    #     return self.inputs[msg_type]
 
     def parser_instance(
             self

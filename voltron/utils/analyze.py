@@ -6,16 +6,21 @@ class Analyzer:
             target_name,
             pro_name
     ) -> None:
+        
+        # counter for metric
         self.req_types_cnt: dict[str, int] = {}
         self.res_types_cnt: dict[str, int] = {}
         self.trans_types_cnt: dict[str, int] = {}
-        self.autamata = None
         self.req_num = 0
         self.path_num = 0
+
+        # information of fuzzer
         self.target_name = target_name
         self.pro_name = pro_name
         self.start_time: float
         self.strategy = ''
+
+        self.autamata = None
         self.lock: threading.Lock = threading.Lock()
 
     def req_types_update(
