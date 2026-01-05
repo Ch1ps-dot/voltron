@@ -7,7 +7,7 @@ from ..utils.logger import logger
 from ..sheduler.alphabet import Symbol, Alphabet
 from ..handler.handler import Handler
 from ..utils.analyze import Analyzer
-import math
+import math, statistics
 
 class Executor:
     def __init__(
@@ -16,7 +16,7 @@ class Executor:
             host:str, 
             port:int,
             pre_script:Path | None, 
-            post_scaript:Path | None,
+            post_script:Path | None,
             handler: Handler,
             analyzer: Analyzer,
             setup_time_s:float = 0.1,
@@ -26,7 +26,7 @@ class Executor:
 
         # some attributes for sut
         self.pre_script = pre_script
-        self.post_script = post_scaript
+        self.post_script = post_script
         self.host = host
         self.port = port
 
@@ -37,9 +37,9 @@ class Executor:
         self.setup_time_s = setup_time_s
         self.recv_time_ms = -1
         self.send_time_ms = send_time_ms
-        
         self.max_timeout = 5000
-        self.time_probe = 3 # for estimating suitable response time
+        self.probe_times = 5 # for estimating suitable response time
+        self.probe_recv_times = []
        
         self.pkt_parser = self.handler.parser_instance()
         self.analyzer = analyzer
@@ -47,45 +47,48 @@ class Executor:
         self.last_sent = ''
         self.last_recv = ''
 
-    def reset_sut(self):
+    def post_exe(self):
         if (self.post_script != None):
             try:
                 subprocess.run(
-                    [self.post_script.resolve()],
+                    [self.post_script],
                     check = True,
                     shell = False
                 )
             except Exception as e:
                 logger.debug(f'Reset Failure: {e}')
-            logger.debug('SUT Reset Execution Success')
 
-    def setup_sut(
+    def pre_exe(
             self,
     ) -> subprocess.Popen | None:
         if (self.pre_script != None):
             try:
                 process = subprocess.Popen(
-                    [self.pre_script.resolve()],
+                    [self.pre_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
                 return process
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
-            logger.debug('SUT Setup Success')
 
     def run(
             self,
             path: list[Symbol]
-    ):
-        self.setup_sut()
+    ):  
+        # prepare some settings and setup SUT
+        self.pre_exe()
         sock = self.setup_socket()
         
         # wait for server setup
         time.sleep(self.setup_time_s)
 
+        # send the message path
+        # TODO: symbolize timeout
         for s in path:
             msg = s.inst
+
+            # send message and parse response
             if(self.net_send(msg, sock)):
                 logger.debug(f'sent {s.name}')
                 self.last_sent = s.name
@@ -93,8 +96,12 @@ class Executor:
                     self.analyzer.req_num = self.analyzer.req_num + 1
 
                 res = self.net_recv(sock=sock)
-                if(self.pkt_parser == None): raise Exception
-                if(res != False):
+                if(self.pkt_parser == None):
+                    logger.debug('packet parser: no packet parser')
+                    return
+                
+                # parse response
+                if(res):
                     self.last_recv = self.pkt_parser(res)
                     logger.debug(f'recv {self.last_recv}')
                     with self.analyzer.lock:
@@ -108,7 +115,7 @@ class Executor:
             self.analyzer.path_num = self.analyzer.path_num + 1
         if sock is None:
             sock.close()
-        self.reset_sut()
+        self.post_exe()
     
     def setup_socket(
             self
@@ -150,82 +157,96 @@ class Executor:
             logger.debug("net_send: invalid socket")
             return False
         
-        try:
-            if (self.trans_layer == 'tcp'):
-                poller = select.poll()
-                poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
+        if (self.trans_layer == 'tcp'):
 
-                events = poller.poll(self.send_time_ms)
-                if not events:
-                    logger.debug("net_send: poll timeout")
-                    return False
+            # use poll to check the status of socket
+            poller = select.poll()
+            poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
 
-                fd, event = events[0]
+            # handler poll timeout
+            events = poller.poll(self.send_time_ms)
+            if not events:
+                logger.debug("net_send: poll timeout")
+                return False
 
-                if event & (select.POLLERR | select.POLLHUP):
-                    logger.debug("net_send: poll error / hup")
-                    return False
+            fd, event = events[0]
 
-                if event & select.POLLOUT:
-                    sock.sendall(msg)
-                    return True
-                
-            elif (self.trans_layer == 'udp'):
-                sock.sendto(msg, (self.host, self.port))
-            else:
-                raise ValueError("Unsupport protocol")
-        except Exception as e:
-            logger.debug(f'Network Send Failure: {e}')
-        logger.debug(f'send {msg}')
+            # handler poll error and hup
+            if event & (select.POLLERR | select.POLLHUP):
+                logger.debug("net_send: poll error / hup")
+                return False
+
+            # send message
+            if event & select.POLLOUT:
+                sock.sendall(msg)
+                return True
+        
+        # TODO: support udp
+        elif (self.trans_layer == 'udp'):
+            sock.sendto(msg, (self.host, self.port))
+
         return False
     
     def net_recv(
             self, 
             sock: socket.socket
-    ):
+    ) -> bytes | None:
         """Recv message over network
 
         use poll to monitor the status of socket
         """
-        response = ''
+
+        # check socket before response
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
-            return False
+            return None
         
-        try:
-            if (self.trans_layer == 'tcp'):
-                poller = select.poll()
-                poller.register(sock, select.POLLIN)
-                if (self.time_probe > 0):
-                    s_time = time.time()
-                    events = poller.poll(self.max_timeout)
-                    if not events:
-                        logger.debug('net recv: time out is too bad')
-                        return False
-                    else:
-                        self.time_probe -= 1
-                        if (self.recv_time_ms < 0):
-                            self.recv_time_ms = int(1000*(time.time()-s_time))
-                        else:
-                            self.recv_time_ms = math.floor((self.recv_time_ms + int(1000*(time.time()-s_time))) / 2)
-                else:
-                    events = poller.poll(self.recv_time_ms)
+        if (self.trans_layer == 'tcp'):
 
+            # use poll to check socket
+            poller = select.poll()
+            poller.register(sock, select.POLLIN | select.POLLERR | select.POLLHUP)
+
+            # estimate the suitable timeout for recv
+            if (self.probe_times > 0):
+                s_time = time.time()
+                events = poller.poll(self.max_timeout)
                 if not events:
-                    logger.debug('net recv: time out')
-                    return False
+                    logger.debug('net recv: time out is too bad')
+                    return None
+                else:
+                    self.probe_times -= 1
+                    if (self.probe_times <= 0):
+                        # timeout = mean_value + 2 * standard_error
+                        mean_time: float = statistics.mean(self.probe_recv_times)
+                        std_dev: float = statistics.stdev(self.probe_recv_times)
+                        self.recv_time_ms = (mean_time + 2 * std_dev) * 1000
+                    else:
+                        self.probe_recv_times.append(time.time() - s_time)
+            else:
+                # recv with estimated timeout 
+                events = poller.poll(self.recv_time_ms)
 
-                fd, event = events[0]
-                if event & select.POLLIN:
-                    response = sock.recv(1024)
-                    if not response:
-                        logger.debug('no reply')
-                        return False
-                
-            elif (self.trans_layer == 'udp'):
-                response = sock.recvfrom(1024)
-                return response
-        except Exception as e:
-            logger.debug(f'Network Recv Failure: {e}')
-        
-        return False
+            # handler recv time out
+            if not events:
+                logger.debug('net recv: timeout')
+                return None
+            
+            fd, event = events[0]
+            
+            if event & (select.POLLERR | select.POLLHUP):
+                logger.debug("net_recv: poll error / hup")
+                return None
+            # response can be read
+
+            if event & select.POLLIN:
+                response = sock.recv(1024)
+                if not response:
+                    logger.debug('no reply')
+                    return None
+            
+        elif (self.trans_layer == 'udp'):
+            response, _ = sock.recvfrom(1024)
+            return response
+    
+        return None

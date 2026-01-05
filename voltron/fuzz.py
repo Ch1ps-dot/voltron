@@ -21,27 +21,29 @@ from .utils.ui import ui_loop
 class Fuzzer:
     def __init__(
             self, 
-            pro_name: str,
+            target: str,
             time_limit: int,
             target_name: str = ''
         ) -> None:
 
         with open('configs.yaml', 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
+        
+        self.base_path = Path(__file__).resolve().parent.parent
 
         # key parameter of protocol
-        self.pro_name = pro_name
-        self.target_name = target_name
-        self.host = self.config[pro_name]['host']
-        self.tra_layer = self.config[pro_name]['trans_layer']
-        self.port = self.config[pro_name]['port']
-        self.rfc_name = self.config[pro_name]['rfc_name']
+        self.pro_name = self.config[target_name]['protocol']
+        self.target_name = target
+        self.host = self.config[target_name]['host']
+        self.tra_layer = self.config[target_name]['trans_layer']
+        self.port = self.config[target_name]['port']
+        self.rfc_name = self.config[target_name]['rfc_name']
 
         # some file path 
-        self.pre_script = self.config[pro_name]['pre_script']
-        self.post_script = self.config[pro_name]['post_script']
-        self.doc_path = Path.cwd() / 'rfcs' / f'{self.rfc_name}.txt'
-        self.pmp_path = Path.cwd() / 'prompts'
+        self.pre_script = self.base_path / 'script' / self.target_name / 'pre.sh'
+        self.post_script =  self.base_path / 'script' / self.target_name / 'post.sh'
+        self.doc_path = self.base_path / 'rfcs' / f'{self.rfc_name}.txt'
+        self.pmp_path = self.base_path / 'prompts'
 
         self.time_limit = time_limit
 
@@ -59,13 +61,15 @@ class Fuzzer:
             doc_path=self.doc_path,
             pro_name=self.pro_name,
             chater=self.chater,
-            rfc_name = self.rfc_name
+            rfc_name = self.rfc_name,
+            base_path = self.base_path
         )
 
         # handler init
         self.handler = Handler(
             chater=self.chater,
-            rfcp=self.rfcparser
+            rfcp=self.rfcparser,
+            base_path = self.base_path 
         )
 
         # scheduler init
@@ -82,7 +86,7 @@ class Fuzzer:
             host=self.host,
             port=self.port,
             pre_script=self.pre_script,
-            post_scaript=self.post_script,
+            post_script=self.post_script,
             handler=self.handler,
             analyzer=self.analyzer
         )

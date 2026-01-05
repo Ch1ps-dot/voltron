@@ -4,31 +4,18 @@ from pathlib import Path
 from voltron.fuzz import Fuzzer
 import time
 
-def test_gen():
+def test_http():
     fuzzer = Fuzzer(
-        pro_name='ftp',
-        time_limit=10
-    )
-
-def test_alpha():
-    fuzzer = Fuzzer(
-        pro_name='ftp',
-        time_limit=10
-    )
-    fuzzer.alphabet.show()
-
-def test_rand():
-    fuzzer = Fuzzer(
-        pro_name='ftp',
+        target='http',
         time_limit=10
     )
     fuzzer.fuzz(
         algo='rand'
     )
 
-def test_http():
+def test_lightftp():
     fuzzer = Fuzzer(
-        pro_name='http',
+        target='lightftp',
         time_limit=10
     )
     fuzzer.fuzz(

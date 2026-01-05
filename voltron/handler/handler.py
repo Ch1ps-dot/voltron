@@ -19,14 +19,15 @@ class Handler:
     def __init__(
             self,
             chater: Chater,
-            rfcp: RFCParser
+            rfcp: RFCParser,
+            base_path: Path
     ) -> None:
         if rfcp.req_ir != None:
             self.req_ir = rfcp.req_ir.getroot()
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.handler_path = Path.cwd() / 'handler' / rfcp.pro_name
+        self.handler_path = base_path / 'handler' / rfcp.pro_name
 
         if (not self.handler_path.is_dir()):
             self.handler_path.mkdir()

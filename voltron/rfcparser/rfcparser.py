@@ -27,6 +27,7 @@ class RFCParser:
             pro_name: str,
             rfc_name: str,
             chater: Chater,
+            base_path: Path
     ) -> None:
         self.chater =chater
 
@@ -47,7 +48,7 @@ class RFCParser:
         self.res_types: list[str]
         self.req_doc: list = []
         self.res_doc: list = []
-        self.ir_path = Path.cwd() / 'ir' / pro_name
+        self.ir_path = base_path / 'ir' / pro_name
 
         self.poss_res: dict[str, str] = {}
         self.req_res_map: dict[str, str] = {}
