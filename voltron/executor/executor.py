@@ -86,17 +86,17 @@ class Executor:
         proc = self.pre_exe()
         if proc is None:
             return
-        if proc.returncode != 0: 
+        if proc.poll() is not None: 
             out, err = proc.communicate()
-            logger.debug(f'SUT Setup Failure:{out} err:{err}')
-            stop_event.is_set()
+            logger.debug(f'SUT Setup Failure:{err}')
+            stop_event.set()
 
         # wait for server setup
         time.sleep(self.setup_time_s)
         sock = self.setup_socket()
         if sock == None:
             logger.debug('Socket Setup Failure' )
-            stop_event.is_set()
+            stop_event.set()
         
         # send the message path
         # TODO: symbolize timeout
@@ -131,7 +131,7 @@ class Executor:
 
         if sock:
             sock.close()
-        if proc.poll():
+        if proc.poll() is None:
             proc.terminate()
 
         self.post_exe()
