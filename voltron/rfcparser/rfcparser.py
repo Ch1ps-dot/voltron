@@ -1,7 +1,5 @@
-import time, pickle, json, re
-from pprint import pprint
+import pickle, json, re
 from pathlib import Path
-from typing import Self
 from lxml import etree # type: ignore
 from tqdm import tqdm
 from fastbm25 import fastbm25

@@ -1,5 +1,4 @@
 import socket
-from typing import Optional
 from voltron.utils.logger import logger
 
 class Nio:

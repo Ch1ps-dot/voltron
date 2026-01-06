@@ -1,11 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from logging import Logger
 import os
-
-import time
-import sys
-from typing import Optional
 
 def get_logger(
         mode, 

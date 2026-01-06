@@ -2,7 +2,6 @@ from pathlib import Path
 from openai import OpenAI
 import time, re
 from re import Match
-import yaml
 
 from voltron.llm.prompt import Prompter
 from voltron.utils.logger import logger

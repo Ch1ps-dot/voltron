@@ -1,27 +1,20 @@
 from pathlib import Path
-import sys
-ROOT_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT_DIR))
+import yaml, time, threading
 
-import yaml
-from .utils.logger import logger
+from voltron.utils.logger import logger
 
-from .llm.chat import Chater
+from voltron.llm.chat import Chater
 
-from .rfcparser.rfcparser import RFCParser
-from .rfcparser.setciontree import SectionTree
+from voltron.rfcparser.rfcparser import RFCParser
 
-from .handler.handler import Handler
+from voltron.handler.handler import Handler
 
-from .executor.executor import Executor
-from .utils.analyze import Analyzer
+from voltron.executor.executor import Executor
+from voltron.utils.analyze import Analyzer
 
-from .sheduler.alphabet import Alphabet, Symbol
-from .sheduler.rands import Rands
-
-
-import os, pickle, json, time, threading
-from .utils.ui import ui_loop
+from voltron.sheduler.alphabet import Alphabet
+from voltron.sheduler.rands import Rands
+from voltron.utils.ui import ui_loop
 
 
 class Fuzzer:
@@ -32,14 +25,14 @@ class Fuzzer:
             target_name: str = ''
         ) -> None:
 
+        self.base_path = Path(__file__).resolve().parents[1]
+
         self.configs: dict
-        with open('configs.yaml', 'r', encoding='utf-8') as f:
+        with open(self.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
         if(self.config == None):
             logger.debug('No Configs') 
             exit(0)
-        
-        self.base_path = Path(__file__).resolve().parent.parent
 
         # key parameter of protocol
         self.pro_name = self.config[target_name]['protocol']

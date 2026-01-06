@@ -1,8 +1,6 @@
 from string import Template
-import textwrap
 from pathlib import Path
 from voltron.utils.logger import logger
-import re
 
 class Prompter:
     """Construct prompt for client
