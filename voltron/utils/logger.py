@@ -30,7 +30,7 @@ def get_logger(
     if name == 'debug':
         mode = 'w'
         current_time_struct = time.localtime()
-        formatted_time = time.strftime("%m%d%-H:%M:%S", current_time_struct)
+        formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
         log_file = os.path.join(log_dir, f"debug_{formatted_time}.log")
     else:
         log_file = os.path.join(log_dir, "app.log")

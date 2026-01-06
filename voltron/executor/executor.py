@@ -38,15 +38,15 @@ class Executor:
         self.setup_time_s = setup_time_s
         self.recv_time_ms = -1
         self.send_time_ms = send_time_ms
-        self.max_timeout = 5000
+        self.max_timeout_ms = 5000
         self.probe_times = 5 # for estimating suitable response time
-        self.probe_recv_times = []
+        self.probe_recv_time_s = []
        
         self.pkt_parser: Callable = self.handler.parser_instance()
         self.analyzer = analyzer
 
-        self.last_sent = ''
-        self.last_recv = ''
+        self.last_sent = '-'
+        self.last_recv = '-'
 
     def post_exe(
             self
@@ -99,6 +99,12 @@ class Executor:
             logger.debug('Executor: Socket Setup Failure' )
             stop_event.set()
         
+        res = self.net_recv(sock=sock)
+                
+        # recv initialize message
+        if(res):
+            logger.debug(f'Executor: recv {res}')
+
         # send the message path
         # TODO: symbolize timeout problem
         for s in state_path:
@@ -110,13 +116,13 @@ class Executor:
                 # handle response. If socket closed, stop sending.
                 if(res):
                     self.last_recv = self.pkt_parser(res)
-                    logger.debug(f'Executor recv: {res}')
+                    logger.debug(f'Executor: recv {res}')
                 else:
                     break
             
             # If socket closed, stop sending
             else:
-                logger.debug('Executor run: socket closed')
+                logger.debug('Executor: socket closed')
                 break
 
         with self.analyzer.lock:
@@ -212,7 +218,7 @@ class Executor:
 
         # check socket before response
         if sock is None or sock.fileno() < 0:
-            logger.debug("net_send: invalid socket")
+            logger.debug("Executor: socket closed")
             return None
         
         if (self.trans_layer == 'tcp'):
@@ -224,7 +230,7 @@ class Executor:
             # estimate the suitable timeout for recv
             if (self.probe_times > 0):
                 s_time = time.time()
-                events = poller.poll(self.max_timeout)
+                events = poller.poll(self.max_timeout_ms)
                 if not events:
                     logger.debug('Executor: recv timeout exceed the max limit')
                     return None
@@ -232,11 +238,11 @@ class Executor:
                     self.probe_times -= 1
                     if (self.probe_times <= 0):
                         # timeout = mean_value + 2 * standard_error
-                        mean_time: float = statistics.mean(self.probe_recv_times)
-                        std_dev: float = statistics.stdev(self.probe_recv_times)
+                        mean_time: float = statistics.mean(self.probe_recv_time_s)
+                        std_dev: float = statistics.stdev(self.probe_recv_time_s)
                         self.recv_time_ms = (mean_time + 2 * std_dev) * 1000
                     else:
-                        self.probe_recv_times.append(time.time() - s_time)
+                        self.probe_recv_time_s.append(time.time() - s_time)
             else:
                 # recv with estimated timeout 
                 events = poller.poll(self.recv_time_ms)

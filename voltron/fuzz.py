@@ -20,7 +20,7 @@ from voltron.utils.ui import ui_loop
 class Fuzzer:
     def __init__(
             self, 
-            time_limit: int,
+            time_limit_min: int,
             target_name: str
         ) -> None:
 
@@ -47,7 +47,7 @@ class Fuzzer:
         self.doc_path = self.base_path / 'rfcs' / f'{self.rfc_name}.txt'
         self.pmp_path = self.base_path / 'prompts'
 
-        self.time_limit = time_limit
+        self.time_limit_s = time_limit_min * 60
 
         self.module_init()
 
@@ -124,7 +124,7 @@ class Fuzzer:
             sched = Rands(self.alphabet)
             state_path = sched.select(10)
             self.exe.run(state_path=state_path, stop_event=stop_event)
-            if (self.time_limit > time.time() - self.analyzer.start_time):
-                stop_event.is_set()
+            if (self.time_limit_s > time.time() - self.analyzer.start_time):
+                stop_event.set()
 
     
