@@ -1,2 +1,2 @@
 #!/bin/bash
-./fftp fftp.conf 2200
+/home/ubuntu/experiments/fftp /home/ubuntu/experiments/fftp.conf 2200

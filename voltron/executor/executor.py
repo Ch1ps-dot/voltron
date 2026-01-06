@@ -86,7 +86,7 @@ class Executor:
         proc = self.pre_exe()
         if proc is None:
             return
-        if proc.poll() is None: 
+        if proc.returncode != 0: 
             out, err = proc.communicate()
             logger.debug(f'SUT Setup Failure:{out} err:{err}')
             stop_event.is_set()
