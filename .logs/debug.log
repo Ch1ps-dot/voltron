@@ -1,0 +1,358 @@
+2026-01-06 15:44:41,680 - debug - DEBUG - rfcparser:64 - [RFC Parse]: load parser
+2026-01-06 15:44:41,680 - debug - DEBUG - rfcparser:99 - [RFCParser]: query prepare
+2026-01-06 15:44:41,680 - debug - DEBUG - rfcparser:70 - [RFC Parse]: finish parse
+2026-01-06 15:44:41,690 - debug - DEBUG - rfcparser:160 - [IR Generation]: request description load
+2026-01-06 15:44:41,690 - debug - DEBUG - rfcparser:183 - [IR Generation]: response description load
+2026-01-06 15:44:41,695 - debug - DEBUG - rfcparser:220 - [IR Generation]: req ir load
+2026-01-06 15:44:41,697 - debug - DEBUG - rfcparser:267 - [IR Generation]: res ir load
+2026-01-06 15:44:41,697 - debug - DEBUG - rfcparser:315 - [IR Generation]: finish message model generation
+2026-01-06 15:44:41,698 - debug - DEBUG - rfcparser:328 - [IR Generation]: request description load
+2026-01-06 15:44:41,699 - debug - DEBUG - rfcparser:353 - [IR Generation]: request description load
+2026-01-06 15:44:41,700 - debug - DEBUG - rfcparser:381 - [IR Generation]: finish state model generation
+2026-01-06 15:44:41,701 - debug - DEBUG - handler:78 - [Handler]: load inputs
+2026-01-06 15:54:21,270 - debug - DEBUG - rfcparser:64 - [RFC Parse]: load parser
+2026-01-06 15:54:21,271 - debug - DEBUG - rfcparser:99 - [RFCParser]: query prepare
+2026-01-06 15:54:21,271 - debug - DEBUG - rfcparser:70 - [RFC Parse]: finish parse
+2026-01-06 15:54:21,281 - debug - DEBUG - rfcparser:160 - [IR Generation]: request description load
+2026-01-06 15:54:21,282 - debug - DEBUG - rfcparser:183 - [IR Generation]: response description load
+2026-01-06 15:54:21,286 - debug - DEBUG - rfcparser:220 - [IR Generation]: req ir load
+2026-01-06 15:54:21,288 - debug - DEBUG - rfcparser:267 - [IR Generation]: res ir load
+2026-01-06 15:54:21,288 - debug - DEBUG - rfcparser:315 - [IR Generation]: finish message model generation
+2026-01-06 15:54:21,289 - debug - DEBUG - rfcparser:328 - [IR Generation]: request description load
+2026-01-06 15:54:21,290 - debug - DEBUG - rfcparser:353 - [IR Generation]: request description load
+2026-01-06 15:54:21,291 - debug - DEBUG - rfcparser:381 - [IR Generation]: finish state model generation
+2026-01-06 15:54:21,291 - debug - DEBUG - handler:78 - [Handler]: load inputs
+2026-01-06 15:54:21,299 - debug - DEBUG - alphabet:44 - [Alphabet: finish init]
+2026-01-06 15:54:21,299 - debug - DEBUG - fuzz:104 - [Begin Fuzzing]
+2026-01-06 15:54:21,306 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:21,309 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:21,410 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:21,410 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:21,411 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:21,412 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:21,413 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:21,514 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:21,514 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:21,515 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:21,516 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:21,517 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:21,617 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:21,617 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:21,618 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:21,619 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:21,620 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:21,720 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:21,720 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:21,721 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:21,722 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:21,723 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:21,824 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:21,824 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:21,825 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:21,825 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:21,827 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:21,928 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:21,928 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:21,929 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:21,930 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:21,931 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,031 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,031 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,032 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,033 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,034 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,135 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,135 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,136 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,137 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,137 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,238 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,238 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,240 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,241 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,241 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,342 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,342 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,343 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,344 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,344 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,445 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,445 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,446 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,447 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,448 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,548 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,548 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,549 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,550 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,551 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,651 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,651 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,652 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,653 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,654 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,755 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,755 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,757 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,757 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,758 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,858 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,858 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,861 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,862 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,863 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:22,963 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:22,963 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:22,964 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:22,965 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:22,966 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,066 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,066 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,067 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,068 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,069 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,169 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,169 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,170 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,171 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,171 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,272 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,272 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,273 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,274 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,275 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,375 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,376 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,377 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,378 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,378 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,479 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,480 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,481 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,482 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,483 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,583 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,583 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,584 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,586 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,587 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,687 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,687 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,688 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,689 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,689 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,790 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,790 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,792 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,793 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,793 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,894 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,894 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,894 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,895 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:23,896 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:23,996 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:23,996 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:23,998 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:23,999 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,000 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,100 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,101 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,101 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,102 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,103 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,203 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,204 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,204 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,205 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,206 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,306 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,306 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,308 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,309 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,310 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,411 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,411 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,412 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,413 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,414 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,514 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,514 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,516 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,517 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,517 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,618 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,618 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,619 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,620 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,620 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,721 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,721 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,722 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,723 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,723 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,824 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,824 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,825 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,826 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,827 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:24,927 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:24,927 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:24,929 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:24,930 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:24,930 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,031 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,031 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,032 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,034 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,034 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,135 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,135 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,136 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,137 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,137 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,237 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,238 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,238 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,239 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,240 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,340 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,340 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,341 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,341 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,342 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,442 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,442 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,444 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,445 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,445 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,546 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,546 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,547 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,548 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,548 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,649 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,649 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,650 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,651 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,652 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,753 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,753 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,754 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,754 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,755 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,855 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,856 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,856 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,857 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,857 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:25,958 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:25,958 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:25,959 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:25,959 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:25,960 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,061 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,061 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,062 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,063 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,063 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,164 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,164 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,165 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,166 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,167 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,268 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,268 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,269 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,270 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,271 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,372 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,372 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,372 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,373 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,374 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,474 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,474 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,476 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,477 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,478 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,578 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,579 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,580 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,581 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,582 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,683 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,683 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,684 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,685 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,685 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,786 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,786 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,787 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,788 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,789 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,889 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,889 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,890 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,891 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,892 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:26,992 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:26,993 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:26,994 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:26,995 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:26,996 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,096 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,096 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,097 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,098 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,098 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,199 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,199 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,201 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,202 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,203 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,304 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,304 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,305 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,306 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,306 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,407 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,407 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,408 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,409 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,409 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,510 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,510 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,510 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,512 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,512 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,613 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,613 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,614 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,615 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,616 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,716 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,717 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,718 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,719 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,719 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,820 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,820 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,821 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,822 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,823 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:27,923 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:27,923 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:27,924 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:27,925 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:27,925 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:28,026 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:28,026 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:28,027 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:28,028 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:28,029 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused
+2026-01-06 15:54:28,129 - debug - DEBUG - executor:171 - net_send: poll error / hup
+2026-01-06 15:54:28,129 - debug - DEBUG - executor:111 - run: socket closed
+2026-01-06 15:54:28,130 - debug - DEBUG - executor:59 - Reset Failure: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/post.sh')
+2026-01-06 15:54:28,132 - debug - DEBUG - executor:73 - [SUT Setup Failure]: [Errno 2] No such file or directory: PosixPath('/root/project/voltron/script/lightftp/pre.sh')
+2026-01-06 15:54:28,132 - debug - DEBUG - executor:138 - Setup Socket Failure [Errno 111] Connection refused

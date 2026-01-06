@@ -86,7 +86,7 @@ class Executor:
         # send the message path
         # TODO: symbolize timeout
         for s in path:
-            msg = s.inst
+            msg = s.mapper()
 
             # send message and parse response
             if(self.net_send(msg, sock)):
@@ -121,11 +121,6 @@ class Executor:
             self
     ) -> socket.socket:
             """Setup the socket for network communication
-
-            Args:
-                trans: socket type is tcp or udp.
-                host: host name.
-                port: port number.
             
             Returns:
                 socket for sending and receiving

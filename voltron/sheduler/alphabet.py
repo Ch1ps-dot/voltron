@@ -17,7 +17,6 @@ class Symbol:
         self.name: str = name
         self.func: Callable = func
         self.type = type
-        self.inst: bytes = self.mapper()
     
     def mapper(
             self,

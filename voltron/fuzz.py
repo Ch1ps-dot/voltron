@@ -20,27 +20,26 @@ from voltron.utils.ui import ui_loop
 class Fuzzer:
     def __init__(
             self, 
-            target: str,
             time_limit: int,
-            target_name: str = ''
+            target_name: str
         ) -> None:
 
         self.base_path = Path(__file__).resolve().parents[1]
 
         self.configs: dict
         with open(self.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:
-            self.config = yaml.safe_load(f)
-        if(self.config == None):
+            self.configs = yaml.safe_load(f)
+        if(self.configs == None):
             logger.debug('No Configs') 
             exit(0)
 
         # key parameter of protocol
-        self.pro_name = self.config[target_name]['protocol']
-        self.target_name = target
-        self.host = self.config[target_name]['host']
-        self.tra_layer = self.config[target_name]['trans_layer']
-        self.port = self.config[target_name]['port']
-        self.rfc_name = self.config[target_name]['rfc_name']
+        self.pro_name = self.configs[target_name]['protocol']
+        self.target_name = target_name
+        self.host = self.configs[target_name]['host']
+        self.tra_layer = self.configs[target_name]['trans_layer']
+        self.port = self.configs[target_name]['port']
+        self.rfc_name = self.configs[target_name]['rfc_name']
 
         # some file path 
         self.pre_script = self.base_path / 'script' / self.target_name / 'pre.sh'
