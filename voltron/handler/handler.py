@@ -155,12 +155,16 @@ class Handler:
 
     def parser_instance(
             self
-    ) -> Callable | None:
+    ) -> Callable:
         if(self.pkt_parser):
             return self.pkt_parser
         else:
             name_space = {}
             exec(self.pkt_parser_code, name_space)
             self.pkt_parser = name_space['packet_parser']
-            return self.pkt_parser
+            if self.pkt_parser is None:
+                logger.debug('parser instance failure')
+                raise Exception
+            else:
+                return self.pkt_parser
 

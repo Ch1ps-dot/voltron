@@ -1,6 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
-import os
+import os, time
 
 def get_logger(
         mode, 
@@ -22,14 +22,16 @@ def get_logger(
     logger.propagate = False
 
     # create logs file
-    log_dir = ".logs"
+    log_dir = "fuzz_logs"
     log_file = None
     mode = 'a'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     if name == 'debug':
         mode = 'w'
-        log_file = os.path.join(log_dir, "debug.log")
+        current_time_struct = time.localtime()
+        formatted_time = time.strftime("%m%d%-H:%M:%S", current_time_struct)
+        log_file = os.path.join(log_dir, f"debug_{formatted_time}.log")
     else:
         log_file = os.path.join(log_dir, "app.log")
 

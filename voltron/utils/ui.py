@@ -69,8 +69,8 @@ def make_runtime_table(
     data = {
         'run time': format_duration(elapsed),
         'sent request num': ana.req_num,
-        'exec path num': ana.path_num,
-        'recv response types': ana.res_types_num(),
+        'exec state path num': ana.path_num,
+        'response types': ana.res_types_num(),
         'req/res pairs': ana.trans_types_num()
     }
 

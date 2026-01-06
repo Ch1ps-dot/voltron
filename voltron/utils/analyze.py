@@ -48,9 +48,9 @@ class Analyzer:
     ):
         if trans in self.trans_types_cnt.keys():
             self.trans_types_cnt[trans] += self.trans_types_cnt[trans] + 1
-            logger.debug(f'new transition: {trans}')
         else:
             self.trans_types_cnt[trans] = 1
+            logger.debug(f'new transition: {trans}')
 
     
     def req_types_num(

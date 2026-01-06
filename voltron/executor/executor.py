@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+from typing import Callable
 import time, select, socket
 
 from voltron.executor.nio import Nio
@@ -41,7 +42,7 @@ class Executor:
         self.probe_times = 5 # for estimating suitable response time
         self.probe_recv_times = []
        
-        self.pkt_parser = self.handler.parser_instance()
+        self.pkt_parser: Callable = self.handler.parser_instance()
         self.analyzer = analyzer
 
         self.last_sent = ''
@@ -88,47 +89,40 @@ class Executor:
             return
         if proc.poll() is not None: 
             out, err = proc.communicate()
-            logger.debug(f'SUT Setup Failure:{err}')
+            logger.debug(f'Executor: SUT Setup Failure:{err}')
             stop_event.set()
 
         # wait for server setup
         time.sleep(self.setup_time_s)
         sock = self.setup_socket()
         if sock == None:
-            logger.debug('Socket Setup Failure' )
+            logger.debug('Executor: Socket Setup Failure' )
             stop_event.set()
         
         # send the message path
-        # TODO: symbolize timeout
+        # TODO: symbolize timeout problem
         for s in state_path:
-            msg = s.mapper()
 
             # send message and parse response
-            if(self.net_send(msg, sock)):
-                logger.debug(f'sent {s.name}')
-                self.last_sent = s.name
-                with self.analyzer.lock:
-                    self.analyzer.req_num = self.analyzer.req_num + 1
-
+            if(self.net_send(s, sock)):
                 res = self.net_recv(sock=sock)
-                if(self.pkt_parser == None):
-                    logger.debug('packet parser: no packet parser')
-                    return
                 
-                # parse response
+                # handle response. If socket closed, stop sending.
                 if(res):
                     self.last_recv = self.pkt_parser(res)
-                    logger.debug(f'recv {self.last_recv}')
-                    with self.analyzer.lock:
-                        self.analyzer.res_types_update(self.last_recv)
-                        self.analyzer.trans_types_update(f'{self.last_sent}-{self.last_recv}')
+                    logger.debug(f'Executor recv: {res}')
+                else:
+                    break
+            
+            # If socket closed, stop sending
             else:
-                logger.debug('run: socket closed')
+                logger.debug('Executor run: socket closed')
                 break
 
         with self.analyzer.lock:
             self.analyzer.path_num = self.analyzer.path_num + 1
 
+        # close socket and SUT
         if sock:
             sock.close()
         if proc.poll() is None:
@@ -160,7 +154,7 @@ class Executor:
 
     def net_send(
             self, 
-            msg : bytes,
+            s : Symbol,
             sock: socket.socket
     ):
         """Send message over network
@@ -192,11 +186,17 @@ class Executor:
 
             # send message
             if event & select.POLLOUT:
+                msg = s.mapper()
                 sock.sendall(msg)
+                self.last_sent = s.name
+                logger.debug(f'sent {s.name}')
+                with self.analyzer.lock:
+                    self.analyzer.req_num = self.analyzer.req_num + 1
                 return True
         
         # TODO: support udp
         elif (self.trans_layer == 'udp'):
+            msg = s.mapper()
             sock.sendto(msg, (self.host, self.port))
 
         return False
@@ -204,7 +204,7 @@ class Executor:
     def net_recv(
             self, 
             sock: socket.socket
-    ) -> bytes | None:
+    ) -> str | None:
         """Recv message over network
 
         use poll to monitor the status of socket
@@ -226,7 +226,7 @@ class Executor:
                 s_time = time.time()
                 events = poller.poll(self.max_timeout)
                 if not events:
-                    logger.debug('net recv: time out is too bad')
+                    logger.debug('Executor: recv timeout exceed the max limit')
                     return None
                 else:
                     self.probe_times -= 1
@@ -241,28 +241,37 @@ class Executor:
                 # recv with estimated timeout 
                 events = poller.poll(self.recv_time_ms)
 
-            # handler recv time out
+            # handler recv timeout
             if not events:
-                logger.debug('net recv: timeout')
+                logger.debug('Executor: recv time out')
                 return None
             
             fd, event = events[0]
             
             if event & (select.POLLERR | select.POLLHUP):
-                logger.debug("net_recv: poll error / hup")
+                logger.debug("Executor: recv poll error / hup")
                 return None
             # response can be read
 
             if event & select.POLLIN:
                 response = sock.recv(1024)
-                if not response:
-                    logger.debug('no reply')
-                    return None
+                if response is None:
+                    logger.debug('Executor: recv no reply')
+                    self.last_recv = '-'
+                    with self.analyzer.lock:
+                        self.analyzer.res_types_update(self.last_recv)
+                        self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+                    return '-'
                 else:
-                    return response
+                    resp_code = self.pkt_parser(response)
+                    self.last_recv = resp_code
+                    with self.analyzer.lock:
+                        self.analyzer.res_types_update(self.last_recv)
+                        self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+                    return resp_code
             
         elif (self.trans_layer == 'udp'):
             response, _ = sock.recvfrom(1024)
-            return response
+            return self.pkt_parser(response)
     
         return None
