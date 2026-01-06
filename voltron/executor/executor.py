@@ -258,6 +258,8 @@ class Executor:
                 if not response:
                     logger.debug('no reply')
                     return None
+                else:
+                    return response
             
         elif (self.trans_layer == 'udp'):
             response, _ = sock.recvfrom(1024)
