@@ -7,7 +7,7 @@ from voltron.utils.logger import logger
 from voltron.sheduler.alphabet import Symbol, Alphabet
 from voltron.handler.handler import Handler
 from voltron.utils.analyze import Analyzer
-import math, statistics
+import math, statistics, threading
 
 class Executor:
     def __init__(
@@ -15,8 +15,8 @@ class Executor:
             trans_layer:str, 
             host:str, 
             port:int,
-            pre_script:Path | None, 
-            post_script:Path | None,
+            pre_script:Path, 
+            post_script:Path,
             handler: Handler,
             analyzer: Analyzer,
             setup_time_s:float = 0.1,
@@ -25,8 +25,8 @@ class Executor:
         ) -> None:
 
         # some attributes for sut
-        self.pre_script = pre_script
-        self.post_script = post_script
+        self.pre_script: Path = pre_script
+        self.post_script: Path = post_script
         self.host = host
         self.port = port
 
@@ -47,8 +47,10 @@ class Executor:
         self.last_sent = ''
         self.last_recv = ''
 
-    def post_exe(self):
-        if (self.post_script != None):
+    def post_exe(
+            self
+    ) -> subprocess.Popen | None:
+        if (self.post_script.is_file()):
             try:
                 subprocess.run(
                     [self.post_script],
@@ -74,10 +76,12 @@ class Executor:
 
     def run(
             self,
-            path: list[Symbol]
+            state_path: list[Symbol],
+            stop_event: threading.Event
     ):  
         # prepare some settings and setup SUT
-        self.pre_exe()
+        if self.pre_exe() == None: 
+            stop_event.is_set()
         sock = self.setup_socket()
         
         # wait for server setup
@@ -85,7 +89,7 @@ class Executor:
 
         # send the message path
         # TODO: symbolize timeout
-        for s in path:
+        for s in state_path:
             msg = s.mapper()
 
             # send message and parse response
@@ -121,7 +125,7 @@ class Executor:
             self
     ) -> socket.socket:
             """Setup the socket for network communication
-            
+
             Returns:
                 socket for sending and receiving
             """

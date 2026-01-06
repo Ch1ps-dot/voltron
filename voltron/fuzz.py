@@ -24,7 +24,7 @@ class Fuzzer:
             target_name: str
         ) -> None:
 
-        self.base_path = Path(__file__).resolve().parents[1]
+        self.base_path = Path(__file__).resolve().parents[0]
 
         self.configs: dict
         with open(self.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:
@@ -42,8 +42,8 @@ class Fuzzer:
         self.rfc_name = self.configs[target_name]['rfc_name']
 
         # some file path 
-        self.pre_script = self.base_path / 'script' / self.target_name / 'pre.sh'
-        self.post_script =  self.base_path / 'script' / self.target_name / 'post.sh'
+        self.pre_script = self.base_path / 'scripts' / self.target_name / 'pre.sh'
+        self.post_script =  self.base_path / 'scripts' / self.target_name / 'post.sh'
         self.doc_path = self.base_path / 'rfcs' / f'{self.rfc_name}.txt'
         self.pmp_path = self.base_path / 'prompts'
 
@@ -122,8 +122,8 @@ class Fuzzer:
     ):
         while not stop_event.is_set():
             sched = Rands(self.alphabet)
-            path = sched.select(10)
-            self.exe.run(path=path)
+            state_path = sched.select(10)
+            self.exe.run(state_path=state_path, stop_event=stop_event)
             if (self.time_limit > time.time() - self.analyzer.start_time):
                 stop_event.is_set()
 
