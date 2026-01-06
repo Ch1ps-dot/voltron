@@ -3,7 +3,7 @@ name = "voltron"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "aalpy>=1.5.3",
     "chromadb>=1.3.5",
@@ -17,6 +17,13 @@ dependencies = [
 
 [project.scripts]
 voltron = "voltron.main:main"
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+python = "3.12" 
 
 [[tool.uv.index]]
 name = "tencent"
