@@ -54,8 +54,8 @@ class Executor:
             try:
                 proc = subprocess.Popen(
                     [self.post_script],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 return proc
             except Exception as e:
@@ -69,8 +69,8 @@ class Executor:
             try:
                 proc = subprocess.Popen(
                     [self.pre_script],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 return proc
             except Exception as e:
@@ -84,10 +84,13 @@ class Executor:
     ):  
         # prepare some settings and setup SUT
         proc = self.pre_exe()
-        if proc is None or proc.poll() is None: 
-            stop_event.is_set()
+        if proc is None:
             return
-        
+        if proc.poll() is None: 
+            out, err = proc.communicate()
+            logger.debug(f'SUT Setup Failure:{out} err:{err}')
+            stop_event.is_set()
+
         # wait for server setup
         time.sleep(self.setup_time_s)
         sock = self.setup_socket()
@@ -125,7 +128,7 @@ class Executor:
 
         with self.analyzer.lock:
             self.analyzer.path_num = self.analyzer.path_num + 1
-            
+
         if sock:
             sock.close()
         if proc.poll():
