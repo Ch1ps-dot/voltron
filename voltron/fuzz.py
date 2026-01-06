@@ -24,7 +24,7 @@ class Fuzzer:
             target_name: str
         ) -> None:
 
-        self.base_path = Path(__file__).resolve().parents[0]
+        self.base_path = Path(__file__).resolve().parents[1]
 
         self.configs: dict
         with open(self.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:

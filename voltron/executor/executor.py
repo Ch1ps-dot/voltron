@@ -19,7 +19,7 @@ class Executor:
             post_script:Path,
             handler: Handler,
             analyzer: Analyzer,
-            setup_time_s:float = 0.1,
+            setup_time_s:float = 1,
             send_time_ms:int = 1000,
             recv_time_ms:int = 1000
         ) -> None:
@@ -52,27 +52,30 @@ class Executor:
     ) -> subprocess.Popen | None:
         if (self.post_script.is_file()):
             try:
-                subprocess.run(
+                proc = subprocess.Popen(
                     [self.post_script],
-                    check = True,
-                    shell = False
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
+                return proc
             except Exception as e:
-                logger.debug(f'Reset Failure: {e}')
+                logger.debug(f'[SUT Setup Failure]: {e}')
+                return None
 
     def pre_exe(
             self,
     ) -> subprocess.Popen | None:
-        if (self.pre_script != None):
+        if (self.pre_script.is_file()):
             try:
-                process = subprocess.Popen(
+                proc = subprocess.Popen(
                     [self.pre_script],
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
                 )
-                return process
+                return proc
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
+                return None
 
     def run(
             self,
@@ -80,13 +83,18 @@ class Executor:
             stop_event: threading.Event
     ):  
         # prepare some settings and setup SUT
-        if self.pre_exe() == None: 
+        proc = self.pre_exe()
+        if proc is None or proc.poll() is None: 
             stop_event.is_set()
-        sock = self.setup_socket()
+            return
         
         # wait for server setup
         time.sleep(self.setup_time_s)
-
+        sock = self.setup_socket()
+        if sock == None:
+            logger.debug('Socket Setup Failure' )
+            stop_event.is_set()
+        
         # send the message path
         # TODO: symbolize timeout
         for s in state_path:
@@ -117,8 +125,12 @@ class Executor:
 
         with self.analyzer.lock:
             self.analyzer.path_num = self.analyzer.path_num + 1
-        if sock is None:
+            
+        if sock:
             sock.close()
+        if proc.poll():
+            proc.terminate()
+
         self.post_exe()
     
     def setup_socket(
