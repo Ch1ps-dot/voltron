@@ -4,9 +4,9 @@ from tqdm import tqdm
 import json
 from collections.abc import Callable
 
-from ..rfcparser.rfcparser import RFCParser
-from ..utils.logger import logger
-from ..llm.chat import Chater
+from voltron.rfcparser.rfcparser import RFCParser
+from voltron.utils.logger import logger
+from voltron.llm.chat import Chater
 
 class Handler:
     """Prepare message handler (input generator and packet parser).
@@ -27,7 +27,7 @@ class Handler:
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.handler_path = base_path / 'handler' / rfcp.pro_name
+        self.handler_path = base_path / 'tools' / rfcp.pro_name
 
         if (not self.handler_path.is_dir()):
             self.handler_path.mkdir()

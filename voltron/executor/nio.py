@@ -1,6 +1,6 @@
 import socket
 from typing import Optional
-from ..utils.logger import logger
+from voltron.utils.logger import logger
 
 class Nio:
     """ Network sender and receiver

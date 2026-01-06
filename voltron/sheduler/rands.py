@@ -1,4 +1,4 @@
-from .alphabet import Symbol, Alphabet
+from voltron.sheduler.alphabet import Symbol, Alphabet
 import random
 
 random.seed(42)

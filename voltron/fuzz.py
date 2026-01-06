@@ -1,3 +1,8 @@
+from pathlib import Path
+import sys
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
+
 import yaml
 from .utils.logger import logger
 
@@ -14,9 +19,10 @@ from .utils.analyze import Analyzer
 from .sheduler.alphabet import Alphabet, Symbol
 from .sheduler.rands import Rands
 
-from pathlib import Path
+
 import os, pickle, json, time, threading
 from .utils.ui import ui_loop
+
 
 class Fuzzer:
     def __init__(
@@ -26,8 +32,12 @@ class Fuzzer:
             target_name: str = ''
         ) -> None:
 
+        self.configs: dict
         with open('configs.yaml', 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
+        if(self.config == None):
+            logger.debug('No Configs') 
+            exit(0)
         
         self.base_path = Path(__file__).resolve().parent.parent
 
@@ -54,7 +64,7 @@ class Fuzzer:
     ) -> None:
 
         # llm init
-        self.chater = Chater(self.pmp_path)
+        self.chater = Chater(self.pmp_path, self.configs)
 
         # rfcparser init
         self.rfcparser = RFCParser(

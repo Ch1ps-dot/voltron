@@ -1,7 +1,7 @@
 import threading
 import time
 from dataclasses import dataclass, field
-from .analyze import Analyzer
+from voltron.utils.analyze import Analyzer
 from rich.layout import Layout
 from rich.live import Live
 from rich.console import Console

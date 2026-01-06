@@ -1,7 +1,7 @@
 from string import Template
 import textwrap
 from pathlib import Path
-from ..utils.logger import logger
+from voltron.utils.logger import logger
 import re
 
 class Prompter:

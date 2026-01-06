@@ -1,6 +1,6 @@
 from collections.abc import Callable
-from ..handler.handler import Handler
-from ..utils.logger import logger
+from voltron.handler.handler import Handler
+from voltron.utils.logger import logger
 
 class Symbol:
     """Symbol stands for unique action in protocol statemachine.

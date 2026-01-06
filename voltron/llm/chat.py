@@ -2,21 +2,23 @@ from pathlib import Path
 from openai import OpenAI
 import time, re
 from re import Match
+import yaml
 
-from ..configs import ftp, llm
-from .prompt import Prompter
-from ..utils.logger import logger
+from voltron.llm.prompt import Prompter
+from voltron.utils.logger import logger
 
 class Chater:
     """Chat with llm through api and manage the context.
     """
     def __init__(
             self,
-            dir: Path
+            dir: Path,
+            configs
     ) -> None:
+        self.configs = configs
         client = OpenAI(
-            base_url=llm.base_url,
-            api_key=llm.api_key
+            base_url=configs['llm']['base_url'],
+            api_key=configs['llm']['api_key']
         )
 
         self.clt = client
@@ -38,7 +40,7 @@ class Chater:
         """
         start = time.perf_counter()
         completion = self.clt.chat.completions.create(
-            model=llm.model,
+            model=self.configs['llm']['api_key'],
             messages=[
                 {"role": "system", "content": "You are a protocol analyzer."},
                 {"role": "user", "content": prompt}

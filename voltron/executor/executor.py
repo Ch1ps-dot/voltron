@@ -2,11 +2,11 @@ import subprocess
 from pathlib import Path
 import time, select, socket
 
-from .nio import Nio
-from ..utils.logger import logger
-from ..sheduler.alphabet import Symbol, Alphabet
-from ..handler.handler import Handler
-from ..utils.analyze import Analyzer
+from voltron.executor.nio import Nio
+from voltron.utils.logger import logger
+from voltron.sheduler.alphabet import Symbol, Alphabet
+from voltron.handler.handler import Handler
+from voltron.utils.analyze import Analyzer
 import math, statistics
 
 class Executor:

@@ -9,5 +9,5 @@ def test_lightftp():
         algo='rand'
     )
 
-if __name__ == "__main__":
+def main():
     test_lightftp()

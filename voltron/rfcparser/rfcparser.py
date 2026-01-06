@@ -6,9 +6,9 @@ from lxml import etree # type: ignore
 from tqdm import tqdm
 from fastbm25 import fastbm25
 
-from .setciontree import SectionTree
-from ..utils.logger import logger
-from ..llm.chat import Chater
+from voltron.rfcparser.setciontree import SectionTree
+from voltron.utils.logger import logger
+from voltron.llm.chat import Chater
 
 class RFCParser:
     """Read protocol specification and parse it to section tree, then use these information to generate IR.

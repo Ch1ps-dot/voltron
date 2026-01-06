@@ -15,14 +15,17 @@ dependencies = [
     "rich>=14.2.0",
 ]
 
+[project.scripts]
+voltron = "voltron.main:main"
+
 [[tool.uv.index]]
 name = "tencent"
 url = "https://mirrors.cloud.tencent.com/pypi/simple/"
 
 [[tool.uv.index]]
 name = "aliyun"
-https://mirrors.aliyun.com/pypi/simple/
+url = "https://mirrors.aliyun.com/pypi/simple/"
 
 [[tool.uv.index]]
 name = "tsinghua"
-https://pypi.tuna.tsinghua.edu.cn/simple/
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"

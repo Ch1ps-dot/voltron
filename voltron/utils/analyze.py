@@ -1,5 +1,5 @@
 import threading
-from .logger import logger
+from voltron.utils.logger import logger
 class Analyzer:
     def __init__(
             self,
