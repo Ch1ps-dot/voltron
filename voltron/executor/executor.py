@@ -170,40 +170,41 @@ class Executor:
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
             return False
-        
-        if (self.trans_layer == 'tcp'):
+        # use poll to check the status of socket
+        poller = select.poll()
+        poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
 
-            # use poll to check the status of socket
-            poller = select.poll()
-            poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
+        try:
+            if (self.trans_layer == 'tcp'):
+                # handler poll timeout
+                events = poller.poll(self.send_time_ms)
+                if not events:
+                    logger.debug("net_send: poll timeout")
+                    return False
 
-            # handler poll timeout
-            events = poller.poll(self.send_time_ms)
-            if not events:
-                logger.debug("net_send: poll timeout")
-                return False
+                fd, event = events[0]
 
-            fd, event = events[0]
+                # handler poll error and hup
+                if event & (select.POLLERR | select.POLLHUP):
+                    logger.debug("net_send: poll error / hup")
+                    return False
 
-            # handler poll error and hup
-            if event & (select.POLLERR | select.POLLHUP):
-                logger.debug("net_send: poll error / hup")
-                return False
-
-            # send message
-            if event & select.POLLOUT:
+                # send message
+                if event & select.POLLOUT:
+                    msg = s.mapper()
+                    sock.sendall(msg)
+                    self.last_sent = s.name
+                    logger.debug(f'sent {s.name}')
+                    with self.analyzer.lock:
+                        self.analyzer.req_num = self.analyzer.req_num + 1
+                    return True
+            
+            # TODO: support udp
+            elif (self.trans_layer == 'udp'):
                 msg = s.mapper()
-                sock.sendall(msg)
-                self.last_sent = s.name
-                logger.debug(f'sent {s.name}')
-                with self.analyzer.lock:
-                    self.analyzer.req_num = self.analyzer.req_num + 1
-                return True
-        
-        # TODO: support udp
-        elif (self.trans_layer == 'udp'):
-            msg = s.mapper()
-            sock.sendto(msg, (self.host, self.port))
+                sock.sendto(msg, (self.host, self.port))
+        finally:
+            poller.unregister(sock)
 
         return False
     
@@ -221,63 +222,69 @@ class Executor:
             logger.debug("Executor: socket closed")
             return None
         
-        if (self.trans_layer == 'tcp'):
+        # use poll to check socket
+        poller = select.poll()
+        poller.register(sock, select.POLLIN | select.POLLERR | select.POLLHUP)
 
-            # use poll to check socket
-            poller = select.poll()
-            poller.register(sock, select.POLLIN | select.POLLERR | select.POLLHUP)
-
-            # estimate the suitable timeout for recv
-            if (self.probe_times > 0):
-                s_time = time.time()
-                events = poller.poll(self.max_timeout_ms)
-                if not events:
-                    logger.debug('Executor: recv timeout exceed the max limit')
-                    return None
-                else:
-                    self.probe_times -= 1
-                    if (self.probe_times <= 0):
-                        # timeout = mean_value + 2 * standard_error
-                        mean_time: float = statistics.mean(self.probe_recv_time_s)
-                        std_dev: float = statistics.stdev(self.probe_recv_time_s)
-                        self.recv_time_ms = (mean_time + 2 * std_dev) * 1000
+        logger.debug('Executor: begin recv')
+        
+        try:
+            if (self.trans_layer == 'tcp'):
+                
+                # estimate the suitable timeout for recv
+                if (self.probe_times > 0):
+                    s_time = time.time()
+                    events = poller.poll(self.max_timeout_ms)
+                    if not events:
+                        logger.debug('Executor: recv timeout exceed the max limit')
+                        return None
                     else:
-                        self.probe_recv_time_s.append(time.time() - s_time)
-            else:
-                # recv with estimated timeout 
-                events = poller.poll(self.recv_time_ms)
-
-            # handler recv timeout
-            if not events:
-                logger.debug('Executor: recv time out')
-                return None
-            
-            fd, event = events[0]
-            
-            if event & (select.POLLERR | select.POLLHUP):
-                logger.debug("Executor: recv poll error / hup")
-                return None
-            # response can be read
-
-            if event & select.POLLIN:
-                response = sock.recv(1024)
-                if response is None:
-                    logger.debug('Executor: recv no reply')
-                    self.last_recv = '-'
-                    with self.analyzer.lock:
-                        self.analyzer.res_types_update(self.last_recv)
-                        self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
-                    return '-'
+                        self.probe_times -= 1
+                        if (self.probe_times <= 0):
+                            # timeout = mean_value + 2 * standard_error
+                            mean_time: float = statistics.mean(self.probe_recv_time_s)
+                            std_dev: float = statistics.stdev(self.probe_recv_time_s)
+                            self.recv_time_ms = (mean_time + 2 * std_dev) * 1000
+                        else:
+                            self.probe_recv_time_s.append(time.time() - s_time)
                 else:
-                    resp_code = self.pkt_parser(response)
-                    self.last_recv = resp_code
-                    with self.analyzer.lock:
-                        self.analyzer.res_types_update(self.last_recv)
-                        self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
-                    return resp_code
+                    # recv with estimated timeout 
+                    events = poller.poll(self.recv_time_ms)
+
+                # handler recv timeout
+                if not events:
+                    logger.debug('Executor: recv time out')
+                    return None
+                
+                fd, event = events[0]
+                
+                if event & (select.POLLERR | select.POLLHUP):
+                    logger.debug("Executor: recv poll error / hup")
+                    return None
+                # response can be read
+
+                if event & select.POLLIN:
+                    response = sock.recv(1024)
+                    if response is None:
+                        logger.debug('Executor: recv no reply')
+                        self.last_recv = '-'
+                        with self.analyzer.lock:
+                            self.analyzer.res_types_update(self.last_recv)
+                            self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+                        return '-'
+                    else:
+                        resp_code = self.pkt_parser(response)
+                        self.last_recv = resp_code
+                        with self.analyzer.lock:
+                            self.analyzer.res_types_update(self.last_recv)
+                            self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+                        return resp_code
+                
+            elif (self.trans_layer == 'udp'):
+                response, _ = sock.recvfrom(1024)
+                return self.pkt_parser(response)
             
-        elif (self.trans_layer == 'udp'):
-            response, _ = sock.recvfrom(1024)
-            return self.pkt_parser(response)
+        finally:
+            poller.unregister(sock)
     
         return None

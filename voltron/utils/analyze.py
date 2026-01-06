@@ -38,7 +38,7 @@ class Analyzer:
     ):
         if res_code in self.res_types_cnt.keys():
             self.res_types_cnt[res_code] += self.res_types_cnt[res_code] + 1
-            logger.debug(f'new reply: {res_code}')
+            logger.debug(f'Analyzer: new reply {res_code}')
         else:
             self.res_types_cnt[res_code] = 1
 
@@ -50,7 +50,7 @@ class Analyzer:
             self.trans_types_cnt[trans] += self.trans_types_cnt[trans] + 1
         else:
             self.trans_types_cnt[trans] = 1
-            logger.debug(f'new transition: {trans}')
+            logger.debug(f'Analyzer: new transition {trans}')
 
     
     def req_types_num(

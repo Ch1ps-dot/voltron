@@ -1,7 +1,7 @@
 from voltron.sheduler.alphabet import Symbol, Alphabet
-import random
+import random, time
 
-random.seed(42)
+random.seed(time.time())
 
 class Rands:
     def __init__(
