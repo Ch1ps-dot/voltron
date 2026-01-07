@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading
+import yaml, time, threading, signal, sys
 
 from voltron.utils.logger import logger
 
@@ -82,6 +82,7 @@ class Fuzzer:
             target_name=self.target_name
         )
 
+        
         # setup executor
         self.exe = Executor(
             trans_layer=self.tra_layer,
@@ -108,12 +109,16 @@ class Fuzzer:
         if fuzz_loop == None:
             logger.debug('Fuzzer: no algorithm') 
             return
+        
+        with self.analyzer.lock:
+            self.analyzer.strategy = algo
         start_time = time.time()
         self.analyzer.start_time = start_time
 
-        stop_event = threading.Event()
-        t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, stop_event,))
-        t_fuzz = threading.Thread(target=fuzz_loop, args=(stop_event,))
+        self.stop_event = threading.Event()
+        signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+        t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, self.stop_event,))
+        t_fuzz = threading.Thread(target=fuzz_loop, args=(self.stop_event,))
 
         t_fuzz.start()
         t_ui.start()
@@ -121,6 +126,8 @@ class Fuzzer:
         t_fuzz.join()
         t_ui.join()
         logger.debug('Fuzzer: finish fuzzing')
+        with self.analyzer.lock:
+            self.analyzer.collect_results()
 
     def rand_fuzz(
             self,
@@ -136,5 +143,16 @@ class Fuzzer:
             if (self.time_limit_s < time.time() - self.analyzer.start_time):
                 stop_event.set()
                 logger.debug('Fuzzer: timeout')
+
+    def handle_normal_fuzzer_exit(
+            self,
+            signal_num, 
+            frame
+    ):
+        self.stop_event.set()
+        with self.analyzer.lock:
+            self.analyzer.collect_results()
+        sys.exit(0)
+        
 
     

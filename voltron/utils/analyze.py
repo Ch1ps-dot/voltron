@@ -1,4 +1,5 @@
-import threading
+import threading, time
+from pathlib import Path
 from voltron.utils.logger import logger
 class Analyzer:
     def __init__(
@@ -22,6 +23,29 @@ class Analyzer:
 
         self.autamata = None
         self.lock: threading.Lock = threading.Lock()
+
+    def collect_results(
+            self
+    ):  
+        current_time_struct = time.localtime()
+        formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
+        results_dir = Path.cwd() / f'out-{self.target_name}-voltron-{formatted_time}'
+        if not results_dir.is_dir():
+            results_dir.mkdir()
+
+        results_file = results_dir / f'fuzzer_stats'
+        try:
+            with results_file.open(mode='w', encoding='utf-8') as f:
+                f.write(f'{"start_time":<15}: {self.start_time}')
+                f.write(f'{"running_time":<15}: {self.seconds_to_hms(time.time() - self.start_time)}')
+                f.write(f'{"target_name":<15}: {self.target_name}')
+                f.write(f'{"protocol_name":<15}: {self.pro_name}')
+                f.write(f'{"exec_path_num":<15}: {self.path_num}')
+                f.write(f'{"sent_request":<15}: {self.req_num}')
+                f.write(f'{"distinct_resp":<15}: {self.res_types_num()}')
+                f.write(f'{"req/res_pair":<15}: {self.trans_types_num()}')
+        except Exception as e:
+            logger.debug('Analyzer: collect results failure')
 
     def req_types_update(
             self,
@@ -67,3 +91,20 @@ class Analyzer:
             self
     ):
         return len(self.trans_types_cnt.keys())
+    
+    def seconds_to_hms(
+            self, 
+            seconds: float
+        ) -> str:
+        total_seconds = int(seconds)
+        remaining_seconds = seconds - total_seconds
+        
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+        
+        if remaining_seconds > 0:
+            return f"{hours:02d}:{minutes:02d}:{secs + remaining_seconds:.1f}"
+        else:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    
