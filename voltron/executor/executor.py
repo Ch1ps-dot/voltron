@@ -118,7 +118,7 @@ class Executor:
                 
                 # handle response. If socket closed, stop sending.
                 if(res):
-                    self.last_recv = self.pkt_parser(res)
+                    self.last_recv = res
                     logger.debug(f'Executor: recv {res}')
                 else:
                     break
@@ -235,7 +235,7 @@ class Executor:
         try:
             if (self.trans_layer == 'tcp'):
                 events = poller.poll(self.max_timeout_ms)
-                
+
                 # # estimate the suitable timeout for recv
                 # if (self.probe_times > 0):
                 #     s_time = time.time()
@@ -274,8 +274,9 @@ class Executor:
                 # response can be read
 
                 if event & select.POLLIN:
-                    response = sock.recv(1024)
-                    if len(response) == 0:
+                    buf = sock.recv(1024)
+                    logger.debug(f'recv {buf}')
+                    if len(buf) == 0:
                         logger.debug('Executor: recv no reply')
                         self.last_recv = '-'
                         with self.analyzer.lock:
@@ -283,7 +284,7 @@ class Executor:
                             self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
                         return '-'
                     else:
-                        resp_code = self.pkt_parser(response)
+                        resp_code = self.pkt_parser(buf)
                         self.last_recv = resp_code
                         with self.analyzer.lock:
                             self.analyzer.res_types_update(self.last_recv)
@@ -291,8 +292,8 @@ class Executor:
                         return resp_code
                 
             elif (self.trans_layer == 'udp'):
-                response, _ = sock.recvfrom(1024)
-                return self.pkt_parser(response)
+                buf, _ = sock.recvfrom(1024)
+                return self.pkt_parser(buf)
             
         finally:
             poller.unregister(sock)
