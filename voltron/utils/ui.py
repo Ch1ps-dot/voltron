@@ -1,5 +1,6 @@
 import threading
 import time
+from voltron.utils.logger import logger
 from dataclasses import dataclass, field
 from voltron.utils.analyze import Analyzer
 from rich.layout import Layout
@@ -103,6 +104,7 @@ def ui_loop(
     layout = make_ui()
 
     with Live(layout, refresh_per_second=1):
+        logger.debug('UI: setup')
         while not stop_event.is_set():
             with ana.lock:
                 layout["info"].update(make_info_table(ana))

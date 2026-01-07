@@ -118,6 +118,10 @@ class Fuzzer:
         t_fuzz.start()
         t_ui.start()
 
+        t_fuzz.join()
+        t_ui.join()
+        logger.debug('Fuzzer: finish fuzzing')
+
     def rand_fuzz(
             self,
             stop_event: threading.Event
@@ -126,7 +130,8 @@ class Fuzzer:
             sched = Rands(self.alphabet)
             state_path = sched.select(10)
             self.exe.run(state_path=state_path, stop_event=stop_event)
-            if (self.time_limit_s > time.time() - self.analyzer.start_time):
+            if (self.time_limit_s < time.time() - self.analyzer.start_time):
                 stop_event.set()
+                logger.debug('Fuzzer: timeout')
 
     
