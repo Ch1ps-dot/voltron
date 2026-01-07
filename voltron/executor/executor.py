@@ -102,11 +102,11 @@ class Executor:
             stop_event.set()
             return
         
-        res = self.net_recv(sock=sock)
+        resp_code = self.net_recv(sock=sock)
                 
         # recv initialize message
-        if(res):
-            logger.debug(f'Executor: recv {res}')
+        if(resp_code):
+            logger.debug(f'Executor: recv {resp_code}')
 
         # send the message path
         # TODO: symbolize timeout problem
@@ -114,12 +114,12 @@ class Executor:
 
             # send message and parse response
             if(self.net_send(s, sock)):
-                res = self.net_recv(sock=sock)
+                resp_code = self.net_recv(sock=sock)
                 
                 # handle response. If socket closed, stop sending.
-                if(res):
-                    self.last_recv = res
-                    logger.debug(f'Executor: recv {res}')
+                if(resp_code):
+                    self.last_recv = resp_code
+                    logger.debug(f'Executor: recv {resp_code}')
                 else:
                     break
             
