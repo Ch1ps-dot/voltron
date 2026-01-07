@@ -112,14 +112,14 @@ class Fuzzer:
         self.analyzer.start_time = start_time
 
         stop_event = threading.Event()
-        t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, stop_event,))
+        # t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, stop_event,))
         t_fuzz = threading.Thread(target=fuzz_loop, args=(stop_event,))
 
         t_fuzz.start()
-        t_ui.start()
+        # t_ui.start()
 
         t_fuzz.join()
-        t_ui.join()
+        # t_ui.join()
         logger.debug('Fuzzer: finish fuzzing')
 
     def rand_fuzz(
