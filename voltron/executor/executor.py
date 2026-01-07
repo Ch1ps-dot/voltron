@@ -97,7 +97,10 @@ class Executor:
         sock = self.setup_socket()
         if sock == None:
             logger.debug('Executor: Socket Setup Failure' )
+            if proc.poll() is None:
+                proc.terminate()
             stop_event.set()
+            return
         
         res = self.net_recv(sock=sock)
                 
@@ -129,8 +132,6 @@ class Executor:
             self.analyzer.path_num = self.analyzer.path_num + 1
 
         # close socket and SUT
-        if sock:
-            sock.close()
         if proc.poll() is None:
             proc.terminate()
 
@@ -138,7 +139,7 @@ class Executor:
     
     def setup_socket(
             self
-    ) -> socket.socket:
+    ) -> socket.socket | None:
             """Setup the socket for network communication
 
             Returns:
@@ -152,9 +153,10 @@ class Executor:
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 else:
-                    raise ValueError("Unsupport protocol")
+                    return None
             except Exception as e:
                 logger.debug(f"Setup Socket Failure {e}")
+                return None
             sock.setblocking(False)
             return sock
 
@@ -266,6 +268,7 @@ class Executor:
                 
                 if event & (select.POLLERR | select.POLLHUP):
                     logger.debug("Executor: recv poll error / hup")
+                    sock.close()
                     return None
                 # response can be read
 
