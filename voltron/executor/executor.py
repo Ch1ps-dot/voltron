@@ -155,7 +155,7 @@ class Executor:
                     raise ValueError("Unsupport protocol")
             except Exception as e:
                 logger.debug(f"Setup Socket Failure {e}")
-            
+            sock.setblocking(False)
             return sock
 
     def net_send(
@@ -167,12 +167,14 @@ class Executor:
 
         use poll to monitor the status of socket
         """
+        logger.debug("net_send: begin send")
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
             return False
         # use poll to check the status of socket
         poller = select.poll()
         poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
+        
 
         try:
             if (self.trans_layer == 'tcp'):
@@ -216,7 +218,7 @@ class Executor:
 
         use poll to monitor the status of socket
         """
-
+        logger.debug("Executor: begin recv")
         # check socket before response
         if sock is None or sock.fileno() < 0:
             logger.debug("Executor: socket closed")
@@ -243,10 +245,14 @@ class Executor:
                         if (self.probe_times <= 0):
                             # timeout = mean_value + 2 * standard_error
                             mean_time: float = statistics.mean(self.probe_recv_time_s)
-                            std_dev: float = statistics.stdev(self.probe_recv_time_s)
-                            self.recv_time_ms = (mean_time + 2 * std_dev) * 1000
+                            if (len(self.probe_recv_time_s) > 2):
+                                std_dev: float = statistics.stdev(self.probe_recv_time_s)
+                                self.recv_time_ms = (mean_time + 2 * std_dev) * 1000
+                            else:
+                                self.recv_time_ms = (mean_time + 0.1) * 1000
                         else:
                             self.probe_recv_time_s.append(time.time() - s_time)
+                            logger.debug(f'Executor: probe-remain {self.probe_times} time {self.probe_recv_time_s}')
                 else:
                     # recv with estimated timeout 
                     events = poller.poll(self.recv_time_ms)
@@ -265,7 +271,7 @@ class Executor:
 
                 if event & select.POLLIN:
                     response = sock.recv(1024)
-                    if response is None:
+                    if len(response) == 0:
                         logger.debug('Executor: recv no reply')
                         self.last_recv = '-'
                         with self.analyzer.lock:
