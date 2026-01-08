@@ -1,0 +1,190 @@
+2026-01-08 20:24:57,872 - debug - DEBUG - asyncRFCparser:67 - [RFC Parse]: load parser
+2026-01-08 20:24:57,872 - debug - DEBUG - asyncRFCparser:168 - [RFCParser]: query prepare
+2026-01-08 20:24:57,872 - debug - DEBUG - asyncRFCparser:73 - [RFC Parse]: finish parse
+2026-01-08 20:24:57,910 - debug - DEBUG - asyncRFCparser:126 - RFCParser: finish key field extraction
+2026-01-08 20:24:57,914 - debug - DEBUG - asyncRFCparser:299 - [IR Generation]: req ir load
+2026-01-08 20:24:57,918 - debug - DEBUG - asyncRFCparser:299 - [IR Generation]: res ir load
+2026-01-08 20:24:57,918 - debug - DEBUG - asyncRFCparser:136 - [IR Generation]: finish message model generation
+2026-01-08 20:25:23,576 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:25.152865467010997 resp: ```json
+{
+  "next_response": [
+    "250",
+    "421",
+    "500",
+    "501",
+    "502",
+    "530",
+    "550"
+  ]
+}
+```
+2026-01-08 20:25:28,366 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:29.95113641899661 resp: {
+  "next_response": [
+    "202",
+    "250",
+    "421",
+    "500",
+    "501",
+    "502",
+    "530",
+    "550"
+  ]
+}
+2026-01-08 20:25:33,448 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:35.02787303000514 resp: {
+  "next_response": [
+    "250",
+    "421",
+    "450",
+    "500",
+    "501",
+    "502",
+    "530",
+    "550"
+  ]
+}
+2026-01-08 20:25:36,255 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:37.836929501005216 resp: {
+  "next_response": [
+    "221",
+    "500"
+  ]
+}
+2026-01-08 20:25:36,427 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:37.999725171001046 resp: {
+  "next_response": [
+    "200",
+    "421",
+    "500",
+    "501",
+    "530"
+  ]
+}
+2026-01-08 20:25:42,965 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:19.3878970759979 resp: {
+  "next_response": [
+    "257",
+    "421",
+    "500",
+    "501",
+    "502",
+    "530",
+    "550"
+  ]
+}
+2026-01-08 20:25:46,692 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:48.274931567997555 resp: Based on the provided FTP protocol specification (RFC 959 excerpts), specifically the **Command-Reply Sequences** section for the **ABOR** command, the legal response message types are strictly defined.
+
+The specification for **ABOR** (Page 52) lists:
+*   **Success**: `225`, `226`
+*   **Syntax/Implementation Errors**: `500`, `501`, `502`
+*   **Service Availability**: `421`
+
+The last received response `225` indicates "Data connection open; no transfer in progress". Sending `ABOR` in this state (where no transfer is running) is valid, and the server should respond with one of the allowed codes for `ABOR`. The specification does not list `530` (Not logged in) or `550` (File unavailable) for `ABOR` in the provided text, unlike other commands. Code `426` is associated with the termination of a data transfer command, not the `ABOR` command itself (which receives `225` or `226`).
+
+Therefore, the valid next responses are those explicitly listed for `ABOR`.
+
+```json
+{
+  "next_response": [
+    "225",
+    "226",
+    "421",
+    "500",
+    "501",
+    "502"
+  ]
+}
+```
+2026-01-08 20:25:47,164 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:48.742507088012644 resp: ```json
+{
+  "next_response": [
+    "120",
+    "220",
+    "421",
+    "500",
+    "502"
+  ]
+}
+```
+2026-01-08 20:26:20,709 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:37.7444115410035 resp: {
+  "next_response": [
+    "200",
+    "421",
+    "500",
+    "501",
+    "504",
+    "530"
+  ]
+}
+2026-01-08 20:26:23,224 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:46.968976741991355 resp: Based on **RFC 959**, specifically **Section 5.3.2 (Command-Reply Sequences)**, the `TYPE` command is a mandatory command used to establish the representation type for data transfer.
+
+The valid replies for the `TYPE` command are:
+*   **200**: Command okay (e.g., Type successfully set).
+*   **500**: Syntax error, command unrecognized.
+*   **501**: Syntax error in parameters or arguments (e.g., invalid type specified).
+*   **504**: Command not implemented for that parameter (e.g., specific byte size or type not supported).
+*   **421**: Service not available, closing control connection (valid for any command).
+*   **530**: Not logged in (valid if the server requires authentication before setting type).
+
+Although the previous response was **502** (Command not implemented), this simply indicates the previous attempt failed and the connection returns to an idle state where `TYPE` can be attempted. Since `TYPE` is a minimum implementation requirement (Section 5.1), a response of **502** (Command not implemented) is technically invalid for a compliant server receiving `TYPE`, and is not listed in the command-reply sequence for `TYPE`.
+
+```json
+{
+  "next_response": [
+    "200",
+    "421",
+    "500",
+    "501",
+    "504",
+    "530"
+  ]
+}
+```
+2026-01-08 20:26:23,921 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:55.55367033100629 resp: {
+  "next_response": [
+    "227",
+    "421",
+    "500",
+    "501",
+    "502",
+    "530"
+  ]
+}
+2026-01-08 20:26:46,079 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:25.368939785999828 resp: {
+  "next_response": [
+    "200",
+    "202",
+    "500",
+    "501",
+    "530"
+  ]
+}
+2026-01-08 20:26:53,626 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:29.704896701005055 resp: {
+  "next_response": [
+    "215",
+    "421",
+    "500",
+    "501",
+    "502"
+  ]
+}
+2026-01-08 20:27:02,914 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:89.46576932400058 resp: Based strictly on the provided RFC 959 specification text, specifically the "Command-Reply Sequences" table on page 52, the legal response codes for the **PWD** command are derived. The last received response (**225**) indicates the data connection is open with no transfer in progress (typically following an ABOR), leaving the control connection in a state ready to accept the next command.
+
+The specification lists the following replies for **PWD**:
+*   **257** ("PATHNAME" created - Success)
+*   **500** (Syntax error, command unrecognized)
+*   **501** (Syntax error in parameters or arguments)
+*   **502** (Command not implemented)
+*   **421** (Service not available, closing control connection)
+*   **550** (Requested action not taken)
+
+Note: While code 530 is a common response for "Not logged in" for many commands, the provided text explicitly lists 530 for other commands (e.g., MKD, RMD, CWD) but **omits** it from the specific row defining PWD replies. Therefore, adhering strictly to the provided text, 530 is excluded.
+
+```json
+{
+  "next_response": [
+    "257",
+    "421",
+    "500",
+    "501",
+    "502",
+    "550"
+  ]
+}
+```

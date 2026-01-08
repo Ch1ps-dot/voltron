@@ -82,7 +82,6 @@ For each `<field>` in `$msg_ir`:
 
 ### **Function Prototype (Must Match Exactly)**
 
-```python
 def input_$msg_type():
     """Generate one $msg_type message for the $pro_name protocol.
     - Input: none
@@ -95,7 +94,6 @@ def input_$msg_type():
     # strictly following the provided protoIR specification
     
     return message
-```
 
 ---
 

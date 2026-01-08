@@ -8,7 +8,6 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
 
 **Output the result in the following JSON format:**
 
-```json
 [
   {
     "field_name": "",
@@ -17,11 +16,11 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
     "value": []
   }
 ]
-```
+
 
 **Sample output:**
 
-```json
+
 [
   {
     "field_name": "Method",
@@ -30,7 +29,7 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
     "value": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", ...]
   }
 ]
-```
+
 
 Please extract and explain only the fields related to **request messages**, strictly according to the format and requirements above.
 Only respond with the analysis result in JSON format.

@@ -428,7 +428,7 @@ class SectionTree:
     def fetch_node_content(
             self,
             node: SectionNode
-    ) -> str | None:
+    ) -> str:
         return self.doc_content[node.start:node.end]
     
     def fetch_id_content(

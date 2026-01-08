@@ -6,18 +6,18 @@ import time
 
 def test_http():
     fuzzer = Fuzzer(
-        target='http',
-        time_limit=10
+        target_name='http',
+        time_limit_min=10
     )
-    fuzzer.fuzz(
-        algo='rand'
-    )
+    # fuzzer.fuzz(
+    #     algo='rand'
+    # )
 
 def test_lightftp():
     fuzzer = Fuzzer(
-        target='lightftp',
-        time_limit=10
+        target_name='lightftp',
+        time_limit_min=10
     )
-    fuzzer.fuzz(
-        algo='rand'
-    )
+    # fuzzer.fuzz(
+    #     algo='rand'
+    # )

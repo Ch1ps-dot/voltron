@@ -6,7 +6,7 @@ from re import Match
 from voltron.llm.prompt import Prompter
 from voltron.utils.logger import logger
 
-class Chater:
+class asyncChater:
     """Chat with llm through api and manage the context.
     """
     def __init__(
@@ -15,7 +15,7 @@ class Chater:
             configs
     ) -> None:
         self.configs = configs
-        client = OpenAI(
+        client = AsyncOpenAI(
             base_url=configs['llm']['base_url'],
             api_key=configs['llm']['api_key']
         )
@@ -23,7 +23,7 @@ class Chater:
         self.clt = client
         self.pmp = Prompter(dir)
 
-    def chat_llm(
+    async def chat_llm(
             self, 
             prompt: str = "",
             usage: str = ""
@@ -38,7 +38,7 @@ class Chater:
             response of llm
         """
         start = time.perf_counter()
-        completion = self.clt.chat.completions.create(
+        completion = await self.clt.chat.completions.create(
             model=self.configs['llm']['model'],
             messages=[
                 {"role": "system", "content": "You are a protocol analyzer."},
@@ -49,7 +49,7 @@ class Chater:
             logger.debug("Chat Error")
         end = time.perf_counter()
         
-        response: str | None = completion.choices[0].message.content
+        response = completion.choices[0].message.content
         logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
         return response
 
@@ -58,13 +58,13 @@ class Chater:
     ) -> str | None:
         pass
 
-    def llm_doc_parse(
+    async def llm_doc_parse(
             self,
             rfc_num: str = '',
             pro_name: str = '',
             rfc_doc: str = ''
     ) -> str | None:
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.doc_analyze(
                 pro_name=pro_name, 
                 rfc_num=rfc_num, 
@@ -74,13 +74,13 @@ class Chater:
         )
         return ans
     
-    def llm_ir_generation(
+    async def llm_ir_generation(
             self,
             pro_name: str = '',
             message_name: str = '',
             rfc_doc: str = ''
     ):
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.ir_generation(
                 pro_name=pro_name, 
                 message_name=message_name, 
@@ -88,15 +88,15 @@ class Chater:
             ),
             usage = "ir_generation"
         )
-        return ans
+        return self.xml_extract(ans)
     
-    def llm_ir_repair(
+    async def llm_ir_repair(
             self,
             pro_name: str = '',
             message_name: str = '',
             ir: str = ''
     ):
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.ir_repair(
                 pro_name=pro_name, 
                 message_name=message_name, 
@@ -104,9 +104,9 @@ class Chater:
             ),
             usage = "ir_repair"
         )
-        return ans
+        return self.code_extract(ans)
 
-    def llm_input_gen(
+    async def llm_input_gen(
             self,
             pro_name: str = '',
             msg_type: str = '',
@@ -121,7 +121,7 @@ class Chater:
         Returns:
             generated input
         """
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.input_gen(
                 pro_name=pro_name, 
                 msg_type=msg_type, 
@@ -130,23 +130,9 @@ class Chater:
             usage = "input_gen"
         )
 
-        pattern = re.compile(
-            r'```(?:python|py)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: didn\'t match valid python code')
-        if ans != None:
-            return ans
-        else:
-            return ''
+        return self.code_extract(ans)
         
-    def llm_input_repair(
+    async def llm_input_repair(
             self,
             pro_name: str = '',
             msg_type: str = '',
@@ -162,7 +148,7 @@ class Chater:
         Returns:
             generated input
         """
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.input_repair(
                 pro_name=pro_name, 
                 msg_type=msg_type, 
@@ -171,23 +157,9 @@ class Chater:
             usage = "input_gen"
         )
 
-        pattern = re.compile(
-            r'```(?:python|py)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: didn\'t match valid python code')
-        if ans != None:
-            return ans
-        else:
-            return ''
+        return self.code_extract(ans)
         
-    def llm_parser_gen(
+    async def llm_parser_gen(
             self,
             pro_name: str,
             res_info: str
@@ -201,7 +173,7 @@ class Chater:
         Returns:
             generated input
         """
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.parser_gen(
                 pro_name=pro_name, 
                 res_info=res_info
@@ -209,29 +181,15 @@ class Chater:
             usage = "input_gen"
         )
 
-        pattern = re.compile(
-            r'```(?:python|py)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: didn\'t match valid python code')
-        if ans != None:
-            return ans
-        else:
-            return ''
-
-    def llm_request_query(
+        return self.code_extract(ans)
+    
+    async def llm_request_query(
             self,
             rfc_num:str,
             pro_name: str,
             rfc_doc: str
     ) -> str:
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.req_query(
                 rfc_num=rfc_num,
                 pro_name=pro_name,
@@ -240,26 +198,15 @@ class Chater:
             usage = "req_query"
         )
 
-        pattern = re.compile(
-            r'```(?:json)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: didn\'t match valid json')
-        return ""
+        return self.json_extract(ans)
     
-    def llm_response_query(
+    async def llm_response_query(
             self,
             rfc_num:str,
             pro_name: str,
             rfc_doc: str
     ) -> str:
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.res_query(
                 rfc_num=rfc_num,
                 pro_name=pro_name,
@@ -268,26 +215,15 @@ class Chater:
             usage = "res_query"
         )
 
-        pattern = re.compile(
-            r'```(?:json)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: didn\'t match valid python code')
-        return ""
+        return self.json_extract(ans)
     
-    def llm_possible_res(
+    async def llm_possible_res(
             self,
             pro_name: str,
             current_request: str,
             response_types: str
     ) -> str:
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.possible_response(
                 pro_name=pro_name,
                 current_request=current_request,
@@ -296,40 +232,50 @@ class Chater:
             usage = "possible_res"
         )
 
-        pattern = re.compile(
-            r'```(?:json)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()
-            else:
-                logger.debug(f'[Chat]: didn\'t match valid python code')
-        return ""
+        return self.json_extract(ans)
     
-    def llm_infer_dependency(
+    async def llm_infer_dependency(
             self,
             pro_name: str,
             current_request: str,
-            response_type: str,
-            request_types: str,
+            last_response: str,
+            response_types: str,
             rfc_content: str
     ) -> str:
-        ans = self.chat_llm(
+        ans = await self.chat_llm(
             prompt=self.pmp.infer_dependency(
                 pro_name=pro_name,
                 current_request=current_request,
-                response_type=response_type,
-                request_types=request_types,
+                last_response=last_response,
+                response_types=response_types,
                 rfc_content=rfc_content
             ),
-            usage = "possible_res"
+            usage = "infer_dependency"
         )
 
-        logger.debug(rfc_content)
+        return self.json_extract(ans)
+    
+    def code_extract(
+            self,
+            ans
+    ) -> str:
+        pattern = re.compile(
+            r'```(?:python)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
 
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()[9:-4]
+            else:
+                return ans
+        return ""
+
+    def json_extract(
+            self,
+            ans
+    ) -> str:
         pattern = re.compile(
             r'```(?:json)\s*\n(.*?)\n\s*```',
             re.DOTALL | re.IGNORECASE
@@ -338,7 +284,24 @@ class Chater:
         if ans != None:
             match: Match | None = pattern.search(ans)
             if match:
-                return match.group()
+                return match.group()[7:-4]
             else:
-                logger.debug(f'[Chat]: didn\'t match valid python code')
+                return ans
+        return ""
+
+    def xml_extract(
+            self,
+            ans
+    ) -> str:
+        pattern = re.compile(
+            r'```(?:xml)\s*\n(.*?)\n\s*```',
+            re.DOTALL | re.IGNORECASE
+        )
+
+        if ans != None:
+            match: Match | None = pattern.search(ans)
+            if match:
+                return match.group()[6:-4]
+            else:
+                return ans
         return ""

@@ -65,7 +65,7 @@ $rfc_doc
 
 ### **Expected Output Structure Example**
 
-```xml
+
 <message name="CWD">
     <!-- Command to change the working directory on the FTP server -->
 
@@ -81,7 +81,7 @@ $rfc_doc
     <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
     <!-- Carriage Return and Line Feed indicating end of the command -->
 </message>
-```
+
 
 ---
 

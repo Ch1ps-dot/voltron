@@ -57,7 +57,6 @@ Using the protoIR description **as the primary specification** and the SUT infor
 
 ### **Function Prototype (Must Match Exactly)**
 
-```python
 def input_$msg_type():
     """Generate one $msg_type message for the $pro_name protocol.
     - Input: none

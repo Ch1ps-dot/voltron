@@ -8,7 +8,6 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
 
 **Output the result in the following JSON format:**
 
-```json
 [
   {
     "field_name": "",
@@ -17,11 +16,10 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
     "value": []
   }
 ]
-```
+
 
 **Sample output:**
 
-```json
 [
   {
     "field_name": "Status-Code",
@@ -36,7 +34,6 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
     "value": [110, 120, 125, 150, 200, 220, 221, 226, 230, 331, 332, 421, 425, 426, 530, 550, ...]
   }
 ]
-```
 
 Please extract and explain only the fields related to **response messages**, strictly according to the format and requirements above.
 Only respond with the analysis result in JSON format.

@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from voltron.handler.handler import Handler
+from voltron.handler.asyncHandler import asyncHandler
 from voltron.utils.logger import logger
 
 class Symbol:
@@ -35,7 +35,7 @@ class Alphabet:
     """
     def __init__(
             self,
-            handler: Handler
+            handler: asyncHandler
     ) -> None:
         self.handler = handler
 

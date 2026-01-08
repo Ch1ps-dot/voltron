@@ -1,0 +1,102 @@
+2026-01-08 20:32:10,318 - debug - DEBUG - asyncRFCparser:67 - [RFC Parse]: load parser
+2026-01-08 20:32:10,319 - debug - DEBUG - asyncRFCparser:168 - [RFCParser]: query prepare
+2026-01-08 20:32:10,319 - debug - DEBUG - asyncRFCparser:73 - [RFC Parse]: finish parse
+2026-01-08 20:32:10,348 - debug - DEBUG - asyncRFCparser:126 - RFCParser: finish key field extraction
+2026-01-08 20:32:10,352 - debug - DEBUG - asyncRFCparser:299 - [IR Generation]: req ir load
+2026-01-08 20:32:10,354 - debug - DEBUG - asyncRFCparser:299 - [IR Generation]: res ir load
+2026-01-08 20:32:10,355 - debug - DEBUG - asyncRFCparser:136 - [IR Generation]: finish message model generation
+2026-01-08 20:32:20,251 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:9.453817364003044 resp: {"next_response": ["200", "500", "421"]}
+2026-01-08 20:32:21,654 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:10.86763370000699 resp: {
+  "next_response": ["215", "500", "501", "502", "421"]
+}
+2026-01-08 20:32:24,123 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:13.330092092000996 resp: {
+  "next_response": ["211", "214", "500", "501", "502", "421"]
+}
+2026-01-08 20:32:24,845 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:14.472886253992328 resp: {
+  "next_response": ["200", "500", "501", "504", "421"]
+}
+2026-01-08 20:32:27,491 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:16.702270479989238 resp: {"next_response": ["211", "212", "213", "450", "500", "501", "502", "421", "530"]}
+2026-01-08 20:32:31,516 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:20.725871584989363 resp: {"next_response":["110","125","150","226","250","421","425","426","450","451","500","501","550"]}
+2026-01-08 20:32:33,392 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:5.900635924990638 resp: {
+  "next_response": ["200", "202", "500", "501", "504", "421", "530"]
+}
+2026-01-08 20:32:33,546 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:11.891529528991668 resp: {
+  "next_response": ["230", "530", "500", "501", "421", "331", "332"]
+}
+2026-01-08 20:32:36,730 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:25.941506438000943 resp: {
+  "next_response": ["200", "501", "504", "421"]
+}
+2026-01-08 20:32:43,714 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:32.917792929001735 resp: {
+  "next_response": ["110", "125", "150", "226", "250", "421", "425", "426", "450", "451", "452", "500", "501", "532", "551", "552", "553"]
+}
+2026-01-08 20:32:44,470 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:24.218550887002493 resp: {
+  "next_response": ["110", "125", "150", "226", "250", "421", "425", "426", "450", "451", "452", "500", "501", "532", "551", "552", "553"]
+}
+2026-01-08 20:32:46,004 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:9.274603482990642 resp: {
+  "next_response": ["250", "500", "501", "502", "421", "530", "550"]
+}
+2026-01-08 20:32:46,918 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:13.371688744999119 resp: {"next_response":["350","500","501","502","421"]}
+2026-01-08 20:32:50,890 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:26.765956125003868 resp: {
+  "next_response": ["110", "125", "150", "226", "250", "421", "425", "426", "450", "451", "452", "500", "501", "502", "532", "550", "551", "552", "553"]
+}
+2026-01-08 20:32:52,181 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:7.71155111900589 resp: {
+  "next_response": ["200", "500", "501", "502", "421", "530", "550"]
+}
+2026-01-08 20:32:55,927 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:24.4100851680123 resp: {
+  "next_response": ["500", "501", "503", "421", "530"]
+}
+2026-01-08 20:32:57,614 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:5.431760770996334 resp: {
+  "next_response": ["221", "500"]
+}
+2026-01-08 20:32:58,261 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:11.342762623011367 resp: {
+  "next_response": ["202", "250", "500", "501", "502", "421", "530", "550"]
+}
+2026-01-08 20:33:01,537 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:15.532068136992166 resp: {
+  "next_response": ["500", "501", "502", "503", "421", "530"]
+}
+2026-01-08 20:33:01,940 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:11.049902668994037 resp: {
+  "next_response": ["225", "226", "500", "501", "502", "421"]
+}
+2026-01-08 20:33:06,067 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:10.139983607004979 resp: {
+  "next_response": ["250", "450", "550", "500", "501", "502", "421", "530"]
+}
+2026-01-08 20:33:06,385 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:41.54007954499684 resp: {
+  "next_response": ["500", "501", "503", "421"]
+}
+2026-01-08 20:33:09,012 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:25.297630278000725 resp: {
+  "next_response": ["350", "421", "450", "500", "501", "502", "550"]
+}
+2026-01-08 20:33:09,483 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:11.869633866008371 resp: {
+  "next_response": ["120", "220", "421", "500", "502"]
+}
+2026-01-08 20:33:11,161 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:12.899247159002698 resp: {
+  "next_response": ["250", "421", "500", "501", "502", "550"]
+}
+2026-01-08 20:33:17,680 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:15.739742482997826 resp: {
+  "next_response": ["257", "500", "501", "502", "421", "550"]
+}
+2026-01-08 20:33:18,774 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:12.388140643990482 resp: {
+  "next_response": ["257", "500", "501", "502", "421", "550"]
+}
+2026-01-08 20:33:21,171 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:10.009756618004758 resp: {
+  "next_response": ["200", "500", "501", "504", "421", "530"]
+}
+2026-01-08 20:33:21,953 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:12.468811587008531 resp: {
+  "next_response": ["125", "150", "226", "250", "425", "426", "451", "450", "500", "501", "502", "421", "530"]
+}
+2026-01-08 20:33:22,969 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:16.902235920002568 resp: {
+  "next_response": ["227", "500", "501", "502", "421", "530"]
+}
+2026-01-08 20:33:26,737 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:9.056554474998848 resp: {
+  "next_response": ["125", "150", "226", "250", "425", "426", "451", "450", "500", "501", "502", "421", "530"]
+}
+2026-01-08 20:33:28,168 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:19.15603818000818 resp: {
+  "next_response": ["200", "500", "501", "504"]
+}
+2026-01-08 20:33:31,038 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:8.068298238009447 resp: {
+  "next_response": ["215", "500", "501", "502", "421"]
+}
+2026-01-08 20:33:31,215 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:29.67830079900159 resp: {
+  "next_response": ["200", "202", "226", "250", "421", "500", "501", "502", "503", "504"]
+}
+2026-01-08 20:33:31,748 - debug - DEBUG - asyncChat:53 - [Chat]:infer_dependency cost_time:10.577325487000053 resp: {"next_response": ["200", "202", "500", "501"]}

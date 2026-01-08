@@ -58,7 +58,6 @@ You will be given:
 
 #### **Output Format Example**
 
-```json
 {
   "possible_response": [
     "331",
@@ -72,4 +71,3 @@ You will be given:
     "532"
   ]
 }
-```

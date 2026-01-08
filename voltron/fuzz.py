@@ -4,10 +4,11 @@ import yaml, time, threading, signal, sys
 from voltron.utils.logger import logger
 
 from voltron.llm.chat import Chater
+from voltron.llm.asyncChat import asyncChater
 
-from voltron.rfcparser.rfcparser import RFCParser
+from voltron.rfcparser.asyncRFCparser import asyncRFCParser
 
-from voltron.handler.handler import Handler
+from voltron.handler.asyncHandler import asyncHandler
 
 from voltron.executor.executor import Executor
 from voltron.utils.analyze import Analyzer
@@ -56,10 +57,10 @@ class Fuzzer:
     ) -> None:
 
         # llm init
-        self.chater = Chater(self.pmp_path, self.configs)
+        self.chater = asyncChater(self.pmp_path, self.configs)
 
         # rfcparser init
-        self.rfcparser = RFCParser(
+        self.rfcparser = asyncRFCParser(
             doc_path=self.doc_path,
             pro_name=self.pro_name,
             chater=self.chater,
@@ -67,92 +68,92 @@ class Fuzzer:
             base_path = self.base_path
         )
 
-        # handler init
-        self.handler = Handler(
-            chater=self.chater,
-            rfcp=self.rfcparser,
-            base_path = self.base_path 
-        )
+        # # handler init
+        # self.handler = asyncHandler(
+        #     chater=self.chater,
+        #     rfcp=self.rfcparser,
+        #     base_path = self.base_path 
+        # )
 
-        # scheduler init
-        self.alphabet = Alphabet(self.handler)
+        # # scheduler init
+        # self.alphabet = Alphabet(self.handler)
 
-        self.analyzer = Analyzer(
-            pro_name=self.pro_name,
-            target_name=self.target_name
-        )
+        # self.analyzer = Analyzer(
+        #     pro_name=self.pro_name,
+        #     target_name=self.target_name
+        # )
 
         
-        # setup executor
-        self.exe = Executor(
-            trans_layer=self.tra_layer,
-            host=self.host,
-            port=self.port,
-            pre_script=self.pre_script,
-            post_script=self.post_script,
-            handler=self.handler,
-            analyzer=self.analyzer
-        )
+        # # setup executor
+        # self.exe = Executor(
+        #     trans_layer=self.tra_layer,
+        #     host=self.host,
+        #     port=self.port,
+        #     pre_script=self.pre_script,
+        #     post_script=self.post_script,
+        #     handler=self.handler,
+        #     analyzer=self.analyzer
+        # )
 
-    def fuzz(
-            self,
-            algo: str
-    ):
-        """Fuzz the target one
-        """
-        fuzz_loop = None
+    # def fuzz(
+    #         self,
+    #         algo: str
+    # ):
+    #     """Fuzz the target one
+    #     """
+    #     fuzz_loop = None
         
-        logger.debug(f'[Begin Fuzzing]')
-        match algo:
-            case 'rand':
-                fuzz_loop = self.rand_fuzz
-        if fuzz_loop == None:
-            logger.debug('Fuzzer: no algorithm') 
-            return
+    #     logger.debug(f'[Begin Fuzzing]')
+    #     match algo:
+    #         case 'rand':
+    #             fuzz_loop = self.rand_fuzz
+    #     if fuzz_loop == None:
+    #         logger.debug('Fuzzer: no algorithm') 
+    #         return
         
-        with self.analyzer.lock:
-            self.analyzer.strategy = algo
-        start_time = time.time()
-        self.analyzer.start_time = start_time
+    #     with self.analyzer.lock:
+    #         self.analyzer.strategy = algo
+    #     start_time = time.time()
+    #     self.analyzer.start_time = start_time
 
-        self.stop_event = threading.Event()
-        signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
-        t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, self.stop_event,))
-        t_fuzz = threading.Thread(target=fuzz_loop, args=(self.stop_event,))
+    #     self.stop_event = threading.Event()
+    #     signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+    #     t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, self.stop_event,))
+    #     t_fuzz = threading.Thread(target=fuzz_loop, args=(self.stop_event,))
 
-        t_fuzz.start()
-        t_ui.start()
+    #     t_fuzz.start()
+    #     t_ui.start()
 
-        t_fuzz.join()
-        t_ui.join()
-        logger.debug('Fuzzer: finish fuzzing')
-        with self.analyzer.lock:
-            self.analyzer.collect_results()
+    #     t_fuzz.join()
+    #     t_ui.join()
+    #     logger.debug('Fuzzer: finish fuzzing')
+    #     with self.analyzer.lock:
+    #         self.analyzer.collect_results()
 
-    def rand_fuzz(
-            self,
-            stop_event: threading.Event
-    ):
-        while not stop_event.is_set():
-            try:
-                sched = Rands(self.alphabet)
-                state_path = sched.select(10)
-                self.exe.run(state_path=state_path, stop_event=stop_event)
-            except Exception as e:
-                logger.debug(f'Fuzzer: exit {e}')
-            if (self.time_limit_s < time.time() - self.analyzer.start_time):
-                stop_event.set()
-                logger.debug('Fuzzer: timeout')
+    # def rand_fuzz(
+    #         self,
+    #         stop_event: threading.Event
+    # ):
+    #     while not stop_event.is_set():
+    #         try:
+    #             sched = Rands(self.alphabet)
+    #             state_path = sched.select(10)
+    #             self.exe.run(state_path=state_path, stop_event=stop_event)
+    #         except Exception as e:
+    #             logger.debug(f'Fuzzer: exit {e}')
+    #         if (self.time_limit_s < time.time() - self.analyzer.start_time):
+    #             stop_event.set()
+    #             logger.debug('Fuzzer: timeout')
 
-    def handle_normal_fuzzer_exit(
-            self,
-            signal_num, 
-            frame
-    ):
-        self.stop_event.set()
-        with self.analyzer.lock:
-            self.analyzer.collect_results()
-        sys.exit(0)
+    # def handle_normal_fuzzer_exit(
+    #         self,
+    #         signal_num, 
+    #         frame
+    # ):
+    #     self.stop_event.set()
+    #     with self.analyzer.lock:
+    #         self.analyzer.collect_results()
+    #     sys.exit(0)
         
 
     
