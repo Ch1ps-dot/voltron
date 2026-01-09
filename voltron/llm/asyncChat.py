@@ -108,9 +108,10 @@ class asyncChater:
 
     async def llm_input_gen(
             self,
-            pro_name: str = '',
-            msg_type: str = '',
-            msg_ir: str = ''
+            pro_name: str,
+            msg_type: str,
+            msg_ir: str,
+            name: str
     ) -> str:
         """Generate python code as fuzzer input
 
@@ -125,7 +126,8 @@ class asyncChater:
             prompt=self.pmp.input_gen(
                 pro_name=pro_name, 
                 msg_type=msg_type, 
-                msg_ir=msg_ir
+                msg_ir=msg_ir,
+                name=name
             ),
             usage = "input_gen"
         )

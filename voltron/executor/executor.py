@@ -7,6 +7,7 @@ from voltron.executor.nio import Nio
 from voltron.utils.logger import logger
 from voltron.sheduler.alphabet import Symbol, Alphabet
 from voltron.handler.handler import Handler
+from voltron.handler.asyncHandler import asyncHandler
 from voltron.utils.analyze import Analyzer
 import math, statistics, threading
 
@@ -18,7 +19,7 @@ class Executor:
             port:int,
             pre_script:Path, 
             post_script:Path,
-            handler: Handler,
+            handler: asyncHandler,
             analyzer: Analyzer,
             setup_time_s:float = 1,
             send_time_ms:int = 1000,

@@ -68,32 +68,32 @@ class Fuzzer:
             base_path = self.base_path
         )
 
-        # # handler init
-        # self.handler = asyncHandler(
-        #     chater=self.chater,
-        #     rfcp=self.rfcparser,
-        #     base_path = self.base_path 
-        # )
+        # handler init
+        self.handler = asyncHandler(
+            chater=self.chater,
+            rfcp=self.rfcparser,
+            base_path = self.base_path 
+        )
 
-        # # scheduler init
-        # self.alphabet = Alphabet(self.handler)
+        # scheduler init
+        self.alphabet = Alphabet(self.handler)
 
-        # self.analyzer = Analyzer(
-        #     pro_name=self.pro_name,
-        #     target_name=self.target_name
-        # )
+        self.analyzer = Analyzer(
+            pro_name=self.pro_name,
+            target_name=self.target_name
+        )
 
         
-        # # setup executor
-        # self.exe = Executor(
-        #     trans_layer=self.tra_layer,
-        #     host=self.host,
-        #     port=self.port,
-        #     pre_script=self.pre_script,
-        #     post_script=self.post_script,
-        #     handler=self.handler,
-        #     analyzer=self.analyzer
-        # )
+        # setup executor
+        self.exe = Executor(
+            trans_layer=self.tra_layer,
+            host=self.host,
+            port=self.port,
+            pre_script=self.pre_script,
+            post_script=self.post_script,
+            handler=self.handler,
+            analyzer=self.analyzer
+        )
 
     # def fuzz(
     #         self,

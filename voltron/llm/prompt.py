@@ -85,10 +85,11 @@ class Prompter:
             self,
             pro_name: str,
             msg_type: str,
-            msg_ir: str
+            msg_ir: str,
+            name: str
     ) -> str:
         msg = Template(self._tem_gen_input)
-        return msg.substitute(msg_type = msg_type, pro_name = pro_name, msg_ir=msg_ir)
+        return msg.substitute(msg_type = msg_type, pro_name = pro_name, msg_ir=msg_ir, name=name)
     
     def input_repair(
             self,

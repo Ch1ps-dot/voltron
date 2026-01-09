@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from voltron.handler.asyncHandler import asyncHandler
+from voltron.handler.handler import Handler
 from voltron.utils.logger import logger
 
 class Symbol:
@@ -47,7 +48,7 @@ class Alphabet:
             self
     ) -> dict[str, Symbol]:
         ss:dict[str, Symbol] = {}
-        for msg_s in self.handler.input_types:
+        for msg_s in self.handler.req_types:
             s = Symbol(
                 name=msg_s, 
                 func=self.symbol_instance(
@@ -62,7 +63,7 @@ class Alphabet:
             self
     ) -> dict[str, Symbol]:
         ss:dict[str, Symbol] = {}
-        for msg_s in self.handler.output_types:
+        for msg_s in self.handler.res_types:
             s = Symbol(
                 name=msg_s, 
                 func=self.symbol_instance(
