@@ -1,4 +1,4 @@
-from voltron.sheduler.alphabet import Symbol, Alphabet
+from voltron.sheduler.mapper import InputSymbol, Mapper
 import random, time
 
 random.seed(time.time())
@@ -6,16 +6,16 @@ random.seed(time.time())
 class Rands:
     def __init__(
             self,
-            alphabet: Alphabet
+            mapper: Mapper
     ) -> None:
-        self.al = alphabet
-        self.ins = alphabet.input_symbols
-        self.outs = alphabet.output_symbols
+        self.mapper = mapper
+        self.ins = mapper.input_symbols
+        self.outs = mapper.output_symbols
 
     def select(
             self,
             num:int
-    ) -> list[Symbol]:
+    ) -> list[InputSymbol]:
         s = []
         for i in range(num):
             randkey =random.choice(list(self.ins.keys()))

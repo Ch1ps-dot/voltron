@@ -29,24 +29,24 @@ class asyncHandler:
             self.res_ir = rfcp.res_ir.getroot()
 
         self.handler_path = base_path / 'tools' / rfcp.pro_name
-        self.inputs_path = self.handler_path / 'inputs'
-        self.parser_path = self.handler_path / 'packet_parser'
+        self.generator_path = self.handler_path / 'generators'
+        self.parser_path = self.handler_path / 'parsers'
 
         if (not self.handler_path.is_dir()):
             self.handler_path.mkdir()
 
-        if not self.inputs_path.is_dir():
-            self.inputs_path.mkdir()
+        if not self.generator_path.is_dir():
+            self.generator_path.mkdir()
 
         if not self.parser_path.is_dir():
             self.parser_path.mkdir()
 
         self.chater = chater
         self.rfcp = rfcp
-        self.inputs_code: dict[str, str] = {}
+        self.generator_code: dict[str, str] = {}
         self.pkt_parser_code: str
 
-        self.inputs_info = None
+        self.generator_info = None
         self.parser_info = None
 
         # function instance
@@ -100,26 +100,26 @@ class asyncHandler:
     ) -> None:
         """Generate and save input generator
         """
-        inputs_info_path = self.inputs_path / 'input_info.json'
-        if(inputs_info_path.is_file()):
+        generator_info_path = self.generator_path / 'input_info.json'
+        if(generator_info_path.is_file()):
             try:
-                with open(inputs_info_path, 'r', encoding='utf-8') as f:
-                    self.inputs_info = f.read()
-                logger.debug("[Handler]: load inputs")
+                with open(generator_info_path, 'r', encoding='utf-8') as f:
+                    self.generator_info = f.read()
+                logger.debug("[Handler]: load generator")
             except Exception as e:
                 logger.debug(f'Handler: input load error {e}')
         else:
             results = asyncio.run(self._input_gen_async())
             for msg_type, input_code in results:
-                msg_dir = self.inputs_path / f'{msg_type}'
+                msg_dir = self.generator_path / f'{msg_type}'
                 if not msg_dir.is_dir():
                     msg_dir.mkdir()
-                self.inputs_code[msg_type] = input_code
+                self.generator_code[msg_type] = input_code
                 with open(msg_dir / f'initial.py', 'w', encoding='utf-8') as f:
                     f.write(input_code)
-            with open(inputs_info_path, 'w', encoding='utf-8') as f:
+            with open(generator_info_path, 'w', encoding='utf-8') as f:
                 f.write('init')
-        logger.debug("[Handler]: finish inputs generation")
+        logger.debug("[Handler]: finish generator generation")
 
     async def _parser_gen_async(
             self

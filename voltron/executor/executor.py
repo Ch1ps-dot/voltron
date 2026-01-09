@@ -5,8 +5,7 @@ import time, select, socket
 
 from voltron.executor.nio import Nio
 from voltron.utils.logger import logger
-from voltron.sheduler.alphabet import Symbol, Alphabet
-from voltron.handler.handler import Handler
+from voltron.sheduler.mapper import InputSymbol, Mapper
 from voltron.handler.asyncHandler import asyncHandler
 from voltron.utils.analyze import Analyzer
 import math, statistics, threading
@@ -81,7 +80,7 @@ class Executor:
 
     def run(
             self,
-            state_path: list[Symbol],
+            state_path: list[InputSymbol],
             stop_event: threading.Event
     ):  
         # prepare some settings and setup SUT
@@ -163,7 +162,7 @@ class Executor:
 
     def net_send(
             self, 
-            s : Symbol,
+            s : InputSymbol,
             sock: socket.socket
     ):
         """Send message over network

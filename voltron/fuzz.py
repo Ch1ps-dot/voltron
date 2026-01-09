@@ -3,7 +3,6 @@ import yaml, time, threading, signal, sys
 
 from voltron.utils.logger import logger
 
-from voltron.llm.chat import Chater
 from voltron.llm.asyncChat import asyncChater
 
 from voltron.rfcparser.asyncRFCparser import asyncRFCParser
@@ -13,7 +12,7 @@ from voltron.handler.asyncHandler import asyncHandler
 from voltron.executor.executor import Executor
 from voltron.utils.analyze import Analyzer
 
-from voltron.sheduler.alphabet import Alphabet
+from voltron.sheduler.mapper import Mapper, InputSymbol
 from voltron.sheduler.rands import Rands
 from voltron.utils.ui import ui_loop
 
@@ -76,7 +75,7 @@ class Fuzzer:
         )
 
         # scheduler init
-        self.alphabet = Alphabet(self.handler)
+        self.alphabet = Mapper(self.handler)
 
         self.analyzer = Analyzer(
             pro_name=self.pro_name,
@@ -95,65 +94,72 @@ class Fuzzer:
             analyzer=self.analyzer
         )
 
-    # def fuzz(
-    #         self,
-    #         algo: str
-    # ):
-    #     """Fuzz the target one
-    #     """
-    #     fuzz_loop = None
+    def fuzz(
+            self,
+            algo: str
+    ):
+        """Fuzz the target one
+        """
+        fuzz_loop = None
         
-    #     logger.debug(f'[Begin Fuzzing]')
-    #     match algo:
-    #         case 'rand':
-    #             fuzz_loop = self.rand_fuzz
-    #     if fuzz_loop == None:
-    #         logger.debug('Fuzzer: no algorithm') 
-    #         return
+        logger.debug(f'[Begin Fuzzing]')
+        match algo:
+            case 'rand':
+                fuzz_loop = self.rand_fuzz
+        if fuzz_loop == None:
+            logger.debug('Fuzzer: no algorithm') 
+            return
         
-    #     with self.analyzer.lock:
-    #         self.analyzer.strategy = algo
-    #     start_time = time.time()
-    #     self.analyzer.start_time = start_time
+        with self.analyzer.lock:
+            self.analyzer.strategy = algo
+        start_time = time.time()
+        self.analyzer.start_time = start_time
 
-    #     self.stop_event = threading.Event()
-    #     signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
-    #     t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, self.stop_event,))
-    #     t_fuzz = threading.Thread(target=fuzz_loop, args=(self.stop_event,))
+        self.stop_event = threading.Event()
+        signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+        
+        # start fuzzing and set up ui
+        t_ui   = threading.Thread(target=ui_loop, args=(self.analyzer, self.stop_event,))
+        t_fuzz = threading.Thread(target=fuzz_loop, args=(self.stop_event,))
 
-    #     t_fuzz.start()
-    #     t_ui.start()
+        t_fuzz.start()
+        t_ui.start()
 
-    #     t_fuzz.join()
-    #     t_ui.join()
-    #     logger.debug('Fuzzer: finish fuzzing')
-    #     with self.analyzer.lock:
-    #         self.analyzer.collect_results()
+        t_fuzz.join()
+        t_ui.join()
+        logger.debug('Fuzzer: finish fuzzing')
+        
+        # collect results
+        with self.analyzer.lock:
+            self.analyzer.collect_results()
 
-    # def rand_fuzz(
-    #         self,
-    #         stop_event: threading.Event
-    # ):
-    #     while not stop_event.is_set():
-    #         try:
-    #             sched = Rands(self.alphabet)
-    #             state_path = sched.select(10)
-    #             self.exe.run(state_path=state_path, stop_event=stop_event)
-    #         except Exception as e:
-    #             logger.debug(f'Fuzzer: exit {e}')
-    #         if (self.time_limit_s < time.time() - self.analyzer.start_time):
-    #             stop_event.set()
-    #             logger.debug('Fuzzer: timeout')
+    def rand_fuzz(
+            self,
+            stop_event: threading.Event
+    ):
+        pass
+        # while not stop_event.is_set():
+        #     try:
+        #         sched = Rands(self.alphabet)
+        #         state_path = sched.select(10)
+        #         self.exe.run(state_path=state_path, stop_event=stop_event)
+        #     except Exception as e:
+        #         logger.debug(f'Fuzzer: exit {e}')
+        #     if (self.time_limit_s < time.time() - self.analyzer.start_time):
+        #         stop_event.set()
+        #         logger.debug('Fuzzer: timeout')
 
-    # def handle_normal_fuzzer_exit(
-    #         self,
-    #         signal_num, 
-    #         frame
-    # ):
-    #     self.stop_event.set()
-    #     with self.analyzer.lock:
-    #         self.analyzer.collect_results()
-    #     sys.exit(0)
+    def handle_normal_fuzzer_exit(
+            self,
+            signal_num, 
+            frame
+    ):
+        # Handle normal exit of fuzzer Ctrl+C
+        logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
+        self.stop_event.set()
+        with self.analyzer.lock:
+            self.analyzer.collect_results()
+        sys.exit(0)
         
 
     

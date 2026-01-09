@@ -1,9 +1,10 @@
 from collections.abc import Callable
 from voltron.handler.asyncHandler import asyncHandler
-from voltron.handler.handler import Handler
 from voltron.utils.logger import logger
 
-class Symbol:
+from pathlib import Path
+
+class InputSymbol:
     """Symbol stands for unique action in protocol statemachine.
 
     Attributes
@@ -11,27 +12,13 @@ class Symbol:
     """
     def __init__(
             self,
-            name: str,
-            func: Callable,
-            type: str
+            msg_type: str
     ) -> None:
-        self.name: str = name
-        self.func: Callable = func
+        self.msg_type: str = msg_type
+        self.generator_path: Path = 
         self.type = type
-    
-    def mapper(
-            self,
-            msg = ''
-    ) -> bytes:
-        match self.type:
-            case 'in':
-                return self.func()
-            case 'out':
-                return self.func(msg)
-            case _:
-                raise Exception
 
-class Alphabet:
+class Mapper:
     """Alhpabet stands for all actions in protocol statemachine.
     """
     def __init__(

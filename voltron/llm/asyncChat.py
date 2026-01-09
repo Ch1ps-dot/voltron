@@ -2,6 +2,7 @@ from pathlib import Path
 from openai import OpenAI, AsyncOpenAI
 import time, re
 from re import Match
+from string import Template
 
 from voltron.llm.prompt import Prompter
 from voltron.utils.logger import logger
@@ -25,8 +26,8 @@ class asyncChater:
 
     async def chat_llm(
             self, 
-            prompt: str = "",
-            usage: str = ""
+            prompt: str,
+            usage: str
     ) -> str | None:
         """Chat to llm with the prompt
 
@@ -60,48 +61,42 @@ class asyncChater:
 
     async def llm_doc_parse(
             self,
-            rfc_num: str = '',
-            pro_name: str = '',
-            rfc_doc: str = ''
+            rfc_num: str,
+            pro_name: str,
+            rfc_doc: str
     ) -> str | None:
+        tmp = self.pmp._tem_doc_analyze
+        pmp = tmp.substitute(rfc_num = rfc_num, pro_name = pro_name, rfc_doc = rfc_doc)
         ans = await self.chat_llm(
-            prompt=self.pmp.doc_analyze(
-                pro_name=pro_name, 
-                rfc_num=rfc_num, 
-                rfc_doc=rfc_doc
-            ),
+            prompt=pmp,
             usage = "doc_parse"
         )
         return ans
     
     async def llm_ir_generation(
             self,
-            pro_name: str = '',
-            message_name: str = '',
-            rfc_doc: str = ''
+            pro_name: str,
+            message_name: str,
+            rfc_doc: str
     ):
+        tmp = self.pmp._tem_ir_generation
+        pmp = tmp.substitute(pro_name=pro_name, message_name=message_name, rfc_doc=rfc_doc)
         ans = await self.chat_llm(
-            prompt=self.pmp.ir_generation(
-                pro_name=pro_name, 
-                message_name=message_name, 
-                rfc_doc=rfc_doc
-            ),
+            prompt=pmp,
             usage = "ir_generation"
         )
         return self.xml_extract(ans)
     
     async def llm_ir_repair(
             self,
-            pro_name: str = '',
-            message_name: str = '',
-            ir: str = ''
+            pro_name: str,
+            message_name: str,
+            ir: str
     ):
+        tmp = self.pmp._tem_ir_repair
+        pmp = tmp.substitute(pro_name=pro_name, message_name=message_name, ir=ir)
         ans = await self.chat_llm(
-            prompt=self.pmp.ir_repair(
-                pro_name=pro_name, 
-                message_name=message_name, 
-                ir = ir
-            ),
+            prompt=pmp,
             usage = "ir_repair"
         )
         return self.code_extract(ans)
@@ -113,33 +108,30 @@ class asyncChater:
             msg_ir: str,
             name: str
     ) -> str:
-        """Generate python code as fuzzer input
+        """Generate python code as fuzzer generator
 
         Args:
             pro_name: name of protocol
             msg_type: required protocol message type
 
         Returns:
-            generated input
+            generated generator
         """
+        tmp = self.pmp._tem_gen_generator
+        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, msg_ir=msg_ir, name=name)
         ans = await self.chat_llm(
-            prompt=self.pmp.input_gen(
-                pro_name=pro_name, 
-                msg_type=msg_type, 
-                msg_ir=msg_ir,
-                name=name
-            ),
-            usage = "input_gen"
+            prompt=pmp,
+            usage = "generator_gen"
         )
 
         return self.code_extract(ans)
         
-    async def llm_input_repair(
+    async def llm_generator_evolve(
             self,
-            pro_name: str = '',
-            msg_type: str = '',
-            code: str = '',
-            info: str = ''
+            pro_name: str,
+            msg_type: str,
+            code: str,
+            info: str
     ) -> str:
         """Repair teh python code
 
@@ -148,15 +140,13 @@ class asyncChater:
             msg_type: required protocol message type
 
         Returns:
-            generated input
+            generated generator
         """
+        tmp = self.pmp._tem_generator_evolve
+        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code)
         ans = await self.chat_llm(
-            prompt=self.pmp.input_repair(
-                pro_name=pro_name, 
-                msg_type=msg_type, 
-                code=code
-            ),
-            usage = "input_gen"
+            prompt=pmp,
+            usage = "generator_evolve"
         )
 
         return self.code_extract(ans)
@@ -166,21 +156,20 @@ class asyncChater:
             pro_name: str,
             res_info: str
     ) -> str:
-        """Generate python code as fuzzer input
+        """Generate python code as fuzzer parser
 
         Args:
             pro_name: name of protocol
             msg_type: required protocol message type
 
         Returns:
-            generated input
+            generated parser
         """
+        tmp = self.pmp._tem_gen_parser
+        pmp = tmp.substitute(pro_name=pro_name, res_info=res_info)
         ans = await self.chat_llm(
-            prompt=self.pmp.parser_gen(
-                pro_name=pro_name, 
-                res_info=res_info
-            ),
-            usage = "input_gen"
+            prompt=pmp,
+            usage = "parser_gen"
         )
 
         return self.code_extract(ans)
@@ -191,12 +180,10 @@ class asyncChater:
             pro_name: str,
             rfc_doc: str
     ) -> str:
+        tmp = self.pmp._tem_req_query
+        pmp = tmp.substitute(rfc_num=rfc_num, pro_name=pro_name, rfc_doc=rfc_doc)
         ans = await self.chat_llm(
-            prompt=self.pmp.req_query(
-                rfc_num=rfc_num,
-                pro_name=pro_name,
-                rfc_doc=rfc_doc
-            ),
+            prompt=pmp,
             usage = "req_query"
         )
 
@@ -208,12 +195,10 @@ class asyncChater:
             pro_name: str,
             rfc_doc: str
     ) -> str:
+        tmp = self.pmp._tem_res_query
+        pmp = tmp.substitute(rfc_num=rfc_num, pro_name=pro_name, rfc_doc=rfc_doc)
         ans = await self.chat_llm(
-            prompt=self.pmp.res_query(
-                rfc_num=rfc_num,
-                pro_name=pro_name,
-                rfc_doc=rfc_doc
-            ),
+            prompt=pmp,
             usage = "res_query"
         )
 
@@ -225,12 +210,10 @@ class asyncChater:
             current_request: str,
             response_types: str
     ) -> str:
+        tmp = self.pmp._tem_possible_response
+        pmp = tmp.substitute(pro_name=pro_name, current_request=current_request, response_types=response_types)
         ans = await self.chat_llm(
-            prompt=self.pmp.possible_response(
-                pro_name=pro_name,
-                current_request=current_request,
-                response_types=response_types
-            ),
+            prompt=pmp,
             usage = "possible_res"
         )
 
@@ -244,14 +227,16 @@ class asyncChater:
             response_types: str,
             rfc_content: str
     ) -> str:
+        tmp = self.pmp._tem_infer_dependency
+        pmp = tmp.substitute(
+            pro_name=pro_name, 
+            current_request=current_request, 
+            last_response=last_response, 
+            response_types=response_types, 
+            rfc_content=rfc_content
+        )
         ans = await self.chat_llm(
-            prompt=self.pmp.infer_dependency(
-                pro_name=pro_name,
-                current_request=current_request,
-                last_response=last_response,
-                response_types=response_types,
-                rfc_content=rfc_content
-            ),
+            prompt=pmp,
             usage = "infer_dependency"
         )
 
