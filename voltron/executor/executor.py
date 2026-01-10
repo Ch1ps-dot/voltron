@@ -6,7 +6,7 @@ import time, select, socket
 from voltron.executor.nio import Nio
 from voltron.utils.logger import logger
 from voltron.sheduler.mapper import InputSymbol, Mapper
-from voltron.handler.asyncHandler import asyncHandler
+from voltron.producer.AsyncProducer import AsyncProducer
 from voltron.utils.analyze import Analyzer
 import math, statistics, threading
 
@@ -18,7 +18,7 @@ class Executor:
             port:int,
             pre_script:Path, 
             post_script:Path,
-            handler: asyncHandler,
+            handler: AsyncProducer,
             analyzer: Analyzer,
             setup_time_s:float = 1,
             send_time_ms:int = 1000,
@@ -80,7 +80,7 @@ class Executor:
 
     def run(
             self,
-            state_path: list[InputSymbol],
+            msg_seq: list[bytes],
             stop_event: threading.Event
     ):  
         # prepare some settings and setup SUT
@@ -110,10 +110,10 @@ class Executor:
 
         # send the message path
         # TODO: symbolize timeout problem
-        for s in state_path:
+        for m in msg_seq:
 
             # send message and parse response
-            if(self.net_send(s, sock)):
+            if(self.net_send(m, sock)):
                 resp_code = self.net_recv(sock=sock)
                 
                 # handle response. If socket closed, stop sending.
@@ -128,8 +128,8 @@ class Executor:
                 logger.debug('Executor: socket closed')
                 break
 
-        with self.analyzer.lock:
-            self.analyzer.path_num = self.analyzer.path_num + 1
+        # with self.analyzer.lock:
+        #     self.analyzer.path_num = self.analyzer.path_num + 1
 
         # close socket and SUT
         if proc.poll() is None:
@@ -162,7 +162,7 @@ class Executor:
 
     def net_send(
             self, 
-            s : InputSymbol,
+            msg : bytes,
             sock: socket.socket
     ):
         """Send message over network
@@ -173,11 +173,10 @@ class Executor:
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
             return False
-        # use poll to check the status of socket
+        
         poller = select.poll()
         poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
         
-
         try:
             if (self.trans_layer == 'tcp'):
                 # handler poll timeout
@@ -195,17 +194,16 @@ class Executor:
 
                 # send message
                 if event & select.POLLOUT:
-                    msg = s.mapper()
                     sock.sendall(msg)
-                    self.last_sent = s.name
-                    logger.debug(f'sent {s.name}')
-                    with self.analyzer.lock:
-                        self.analyzer.req_num = self.analyzer.req_num + 1
-                    return True
+                    # self.last_sent = s.name
+                    # logger.debug(f'sent {s.name}')
+                    # with self.analyzer.lock:
+                    #     self.analyzer.req_num = self.analyzer.req_num + 1
+                    # return True
             
             # TODO: support udp
             elif (self.trans_layer == 'udp'):
-                msg = s.mapper()
+                # msg = s.mapper()
                 sock.sendto(msg, (self.host, self.port))
         finally:
             poller.unregister(sock)
@@ -226,9 +224,13 @@ class Executor:
             logger.debug("Executor: socket closed")
             return None
         
-        # use poll to check socket
+        """ 
+        Remote Socket Normal Close (FIN): poll in, recv value 0
+        Remote Socket Exception Close (RST): poll error, recv value -1
+        Remote Program Hang: recv timeout, no poll event
+        """
         poller = select.poll()
-        poller.register(sock, select.POLLIN | select.POLLERR | select.POLLHUP)
+        poller.register(sock, select.POLLIN | select.POLLERR)
 
         logger.debug('Executor: begin recv')
         
@@ -263,11 +265,11 @@ class Executor:
                 # handler recv timeout
                 if not events:
                     logger.debug('Executor: recv time out')
-                    return None
+                    return '-'
                 
                 fd, event = events[0]
                 
-                if event & (select.POLLERR | select.POLLHUP):
+                if event & (select.POLLERR):
                     logger.debug("Executor: recv poll error / hup")
                     sock.close()
                     return None
@@ -277,18 +279,18 @@ class Executor:
                     buf = sock.recv(1024)
                     logger.debug(f'recv {buf}')
                     if len(buf) == 0:
-                        logger.debug('Executor: recv no reply')
-                        self.last_recv = '-'
-                        with self.analyzer.lock:
-                            self.analyzer.res_types_update(self.last_recv)
-                            self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
-                        return '-'
+                        logger.debug('Executor: remote socket closed')
+                        # self.last_recv = '-'
+                        # with self.analyzer.lock:
+                        #     self.analyzer.res_types_update(self.last_recv)
+                        #     self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+                        return 'RCLOSED'
                     else:
                         resp_code = self.pkt_parser(buf)
                         self.last_recv = resp_code
-                        with self.analyzer.lock:
-                            self.analyzer.res_types_update(self.last_recv)
-                            self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+                        # with self.analyzer.lock:
+                        #     self.analyzer.res_types_update(self.last_recv)
+                        #     self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
                         return resp_code
                 
             elif (self.trans_layer == 'udp'):

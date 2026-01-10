@@ -3,11 +3,11 @@ import yaml, time, threading, signal, sys
 
 from voltron.utils.logger import logger
 
-from voltron.llm.asyncChat import asyncChater
+from voltron.llm.AsyncChat import AsyncChater
 
-from voltron.rfcparser.asyncRFCparser import asyncRFCParser
+from voltron.rfcparser.AsyncRFCparser import AsyncRFCParser
 
-from voltron.handler.asyncHandler import asyncHandler
+from voltron.producer.AsyncProducer import AsyncProducer
 
 from voltron.executor.executor import Executor
 from voltron.utils.analyze import Analyzer
@@ -56,10 +56,10 @@ class Fuzzer:
     ) -> None:
 
         # llm init
-        self.chater = asyncChater(self.pmp_path, self.configs)
+        self.chater = AsyncChater(self.pmp_path, self.configs)
 
         # rfcparser init
-        self.rfcparser = asyncRFCParser(
+        self.rfcparser = AsyncRFCParser(
             doc_path=self.doc_path,
             pro_name=self.pro_name,
             chater=self.chater,
@@ -68,7 +68,7 @@ class Fuzzer:
         )
 
         # handler init
-        self.handler = asyncHandler(
+        self.handler = AsyncProducer(
             chater=self.chater,
             rfcp=self.rfcparser,
             base_path = self.base_path 

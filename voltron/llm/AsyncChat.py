@@ -7,7 +7,7 @@ from string import Template
 from voltron.llm.prompt import Prompter
 from voltron.utils.logger import logger
 
-class asyncChater:
+class AsyncChater:
     """Chat with llm through api and manage the context.
     """
     def __init__(

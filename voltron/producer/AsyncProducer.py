@@ -5,11 +5,11 @@ import json, asyncio
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
 
-from voltron.rfcparser.asyncRFCparser import asyncRFCParser
+from voltron.rfcparser.AsyncRFCparser import AsyncRFCParser
 from voltron.utils.logger import logger
-from voltron.llm.asyncChat import asyncChater
+from voltron.llm.AsyncChat import AsyncChater
 
-class asyncHandler:
+class AsyncProducer:
     """Prepare message handler (input generator and packet parser).
 
     Attributes:
@@ -19,8 +19,8 @@ class asyncHandler:
 
     def __init__(
             self,
-            chater: asyncChater,
-            rfcp: asyncRFCParser,
+            chater: AsyncChater,
+            rfcp: AsyncRFCParser,
             base_path: Path
     ) -> None:
         if rfcp.req_ir != None:

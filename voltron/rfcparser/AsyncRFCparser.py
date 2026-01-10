@@ -8,10 +8,10 @@ from fastbm25 import fastbm25
 
 from voltron.rfcparser.setciontree import SectionTree, SectionNode
 from voltron.utils.logger import logger
-from voltron.llm.asyncChat import asyncChater
+from voltron.llm.AsyncChat import AsyncChater
 
 
-class asyncRFCParser:
+class AsyncRFCParser:
     """Read protocol specification and parse it to section tree, then use these information to generate IR.
 
     Attributes:
@@ -27,7 +27,7 @@ class asyncRFCParser:
             doc_path: Path,
             pro_name: str,
             rfc_name: str,
-            chater: asyncChater,
+            chater: AsyncChater,
             base_path: Path
     ) -> None:
         self.chater =chater

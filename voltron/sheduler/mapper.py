@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from voltron.handler.asyncHandler import asyncHandler
+from voltron.producer.AsyncProducer import AsyncProducer
 from voltron.utils.logger import logger
 
 from pathlib import Path
@@ -23,9 +23,9 @@ class Mapper:
     """
     def __init__(
             self,
-            handler: asyncHandler
+            producer: AsyncProducer
     ) -> None:
-        self.handler = handler
+        self.producer = producer
 
         self.input_symbols: dict[str, Symbol] = self.set_input_symbols()
         self.output_symbols: dict[str, Symbol] = self.set_ouput_symbols()
