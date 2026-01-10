@@ -10,7 +10,7 @@ from voltron.utils.logger import logger
 from voltron.llm.AsyncChat import AsyncChater
 
 class AsyncProducer:
-    """Prepare message handler (input generator and packet parser).
+    """Prepare message Producer (input generator and packet parser).
 
     Attributes:
         inputs: dict of {msg_type : function of generator}
@@ -28,12 +28,14 @@ class AsyncProducer:
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.handler_path = base_path / 'tools' / rfcp.pro_name
-        self.generator_path = self.handler_path / 'generators'
-        self.parser_path = self.handler_path / 'parsers'
+        self.producer_path = base_path / 'tools' / rfcp.pro_name
+        self.generator_path = self.producer_path / 'generators'
+        self.parser_path = self.producer_path / 'parsers'
+        self.generator_info_path = self.generator_path / 'generator_info.json'
+        self.parser_info_path = self.parser_path / 'parser_info.json'
 
-        if (not self.handler_path.is_dir()):
-            self.handler_path.mkdir()
+        if (not self.producer_path.is_dir()):
+            self.producer_path.mkdir()
 
         if not self.generator_path.is_dir():
             self.generator_path.mkdir()
@@ -57,8 +59,8 @@ class AsyncProducer:
         self.req_types: list[str] = rfcp.req_types
         self.res_types: list[str] = rfcp.res_types
 
-        # generate handler
-        self.input_gen()
+        # generate Producer
+        self.generator_gen()
         self.parser_gen()
 
     async def _input_gen_one(
@@ -82,7 +84,7 @@ class AsyncProducer:
                     compile(input_code, '<string>', "exec")
                     return msg_type, input_code
                 except SyntaxError as e:
-                    logger.debug(f'Handler :syntax error {e}')
+                    logger.debug(f'Producer :syntax error {e}')
 
     async def _input_gen_async(
             self
@@ -95,19 +97,18 @@ class AsyncProducer:
         results = await tqdm_asyncio.gather(*tasks, desc='generator')
         return results
 
-    def input_gen(
+    def generator_gen(
             self
     ) -> None:
         """Generate and save input generator
         """
-        generator_info_path = self.generator_path / 'input_info.json'
-        if(generator_info_path.is_file()):
+        if(self.generator_info_path.is_file()):
             try:
-                with open(generator_info_path, 'r', encoding='utf-8') as f:
-                    self.generator_info = f.read()
-                logger.debug("[Handler]: load generator")
+                with open(self.generator_info_path, 'r', encoding='utf-8') as f:
+                    self.generator_info = json.load(f)
+                logger.debug("[Producer]: load generator")
             except Exception as e:
-                logger.debug(f'Handler: input load error {e}')
+                logger.debug(f'Producer: input load error {e}')
         else:
             results = asyncio.run(self._input_gen_async())
             for msg_type, input_code in results:
@@ -117,9 +118,9 @@ class AsyncProducer:
                 self.generator_code[msg_type] = input_code
                 with open(msg_dir / f'initial.py', 'w', encoding='utf-8') as f:
                     f.write(input_code)
-            with open(generator_info_path, 'w', encoding='utf-8') as f:
+            with open(self.generator_info_path, 'w', encoding='utf-8') as f:
                 f.write('init')
-        logger.debug("[Handler]: finish generator generation")
+        logger.debug("[Producer]: finish generator generation")
 
     async def _parser_gen_async(
             self
@@ -142,15 +143,17 @@ class AsyncProducer:
     ) -> None:
         """Generate and save packet parser
         """
-        parser_info_path = self.parser_path / 'parser_info.json'
-        if (parser_info_path.is_file()):
-            with open(parser_info_path, 'r', encoding='utf-8') as f:
-                self.parser_info = f.read()
+        if (self.parser_info_path.is_file()):
+            with open(self.parser_info_path, 'r', encoding='utf-8') as f:
+                self.parser_info = json.load(f)
+            logger.debug("Producer: load parser info")
         else:
             result = asyncio.run(self._parser_gen_async())
             with open(self.parser_path / 'initial.py', 'w', encoding='utf-8') as f:
                 f.write(result)
-        logger.debug("[Handler]: finish parser generation")
+            with open(self.parser_info_path, 'w', encoding='utf-8') as f:
+                json.dump(self.parser_info, f)
+        logger.debug("[Producer]: finish parser generation")
 
     def parser_instance(
             self

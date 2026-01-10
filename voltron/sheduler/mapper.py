@@ -19,26 +19,32 @@ class InputSymbol:
         self.type = type
 
 class Mapper:
-    """Alhpabet stands for all actions in protocol statemachine.
+    """Mapper between actual messages and abstract symbols.
+    
+    Recv a request symbol, return an actual message
+    Recv a response message, return an request symbol
     """
     def __init__(
             self,
             producer: AsyncProducer
     ) -> None:
         self.producer = producer
+        
+        self.ins_set: list[str] = producer.req_types
+        self.ous_set: list[str] = producer.res_types
 
-        self.input_symbols: dict[str, Symbol] = self.set_input_symbols()
-        self.output_symbols: dict[str, Symbol] = self.set_ouput_symbols()
+        self.input_InputSymbols: dict[str, InputSymbol] = self.set_input_InputSymbols()
+        self.output_InputSymbols: dict[str, InputSymbol] = self.set_ouput_InputSymbols()
         logger.debug('[Alphabet: finish init]')
 
-    def set_input_symbols(
+    def set_input_InputSymbols(
             self
-    ) -> dict[str, Symbol]:
-        ss:dict[str, Symbol] = {}
+    ) -> dict[str, InputSymbol]:
+        ss:dict[str, InputSymbol] = {}
         for msg_s in self.handler.req_types:
-            s = Symbol(
+            s = InputSymbol(
                 name=msg_s, 
-                func=self.symbol_instance(
+                func=self.InputSymbol_instance(
                     self.handler.inputs_code[msg_s],
                     f'input_{msg_s}'),
                 type='in'
@@ -46,14 +52,14 @@ class Mapper:
             ss[msg_s] = s
         return ss
     
-    def set_ouput_symbols(
+    def set_ouput_InputSymbols(
             self
-    ) -> dict[str, Symbol]:
-        ss:dict[str, Symbol] = {}
+    ) -> dict[str, InputSymbol]:
+        ss:dict[str, InputSymbol] = {}
         for msg_s in self.handler.res_types:
-            s = Symbol(
+            s = InputSymbol(
                 name=msg_s, 
-                func=self.symbol_instance(
+                func=self.InputSymbol_instance(
                     self.handler.pkt_parser_code,
                     'packet_parser'),
                 type='out'
@@ -61,7 +67,7 @@ class Mapper:
             ss[msg_s] = s
         return ss
     
-    def symbol_instance(
+    def InputSymbol_instance(
             self,
             code: str,
             code_name: str
@@ -75,8 +81,8 @@ class Mapper:
             self
     ) -> None:
         print('===input===')
-        for s in self.input_symbols.keys():
+        for s in self.input_InputSymbols.keys():
             print(s)
         print('===output===')
-        for s in self.output_symbols.keys():
+        for s in self.output_InputSymbols.keys():
             print(s)
