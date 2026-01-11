@@ -68,9 +68,6 @@ class AsyncProducer:
         self.generator_code: dict[str, str] = {}
         self.pkt_parser_code: str
 
-        self.generator_info: dict[str, list[dict]] = {}
-        self.parser_info: list[dict] = []
-
         # function instance
         # self.inputs: dict[str, Callable] = {}
         self.pkt_parser: Callable | None = None
@@ -86,7 +83,8 @@ class AsyncProducer:
         if(self.generator_info_path.is_file()):
             try:
                 with open(self.generator_info_path, 'r', encoding='utf-8') as f:
-                    self.generator_info = json.load(f)
+                    generator_info = json.load(f)
+                    self.setup_generator()
                 logger.debug("Producer: load generator")
             except Exception as e:
                 logger.debug(f'Producer: generator load error {e}')
@@ -96,15 +94,13 @@ class AsyncProducer:
         if (self.parser_info_path.is_file()):
             try:
                 with open(self.parser_info_path, 'r', encoding='utf-8') as f:
-                    self.parser_info = json.load(f)
+                    parser_info = json.load(f)
+                    self.setup_parser()
                 logger.debug("Producer: load parser info")
             except Exception as e:
                 logger.debug(f'Producer: parser load error {e}')
         else:
-            self.parser_gen()
-            
-        self.setup_generator()
-        self.setup_parser()
+            self.parser_gen()      
 
     async def _generator_gen_one(
             self,
