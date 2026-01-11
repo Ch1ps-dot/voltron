@@ -35,7 +35,7 @@ COMMENT_CONFIG = {
 # 默认排除的目录（常见的无关目录）
 DEFAULT_EXCLUDE_DIRS = {
     '__pycache__', '.git', '.svn', '.hg', '.idea', 'node_modules',
-    'venv', 'env', 'build', 'dist', 'target', 'out', '.vscode', '.logs', '.venv', 'test'
+    'venv', 'env', 'build', 'dist', 'target', 'out', '.vscode', '.logs', '.venv', 'test', 'equipment', 'tools'
 }
 
 # 默认排除的文件（临时/配置文件）

@@ -2,7 +2,7 @@ import threading
 import time
 from voltron.utils.logger import logger
 from dataclasses import dataclass, field
-from voltron.utils.analyze import Analyzer
+from voltron.analyzer.analyzer import Analyzer
 from rich.layout import Layout
 from rich.live import Live
 from rich.console import Console
@@ -69,8 +69,9 @@ def make_runtime_table(
     table.add_column(justify='right')
     data = {
         'run time': format_duration(elapsed),
-        'sent request num': ana.req_num,
-        'exec state path num': ana.path_num,
+        'request num': ana.req_num,
+        'response num': ana.res_num,
+        'exec requ path num': ana.path_num,
         'response types': ana.res_types_num(),
         'req/res pairs': ana.trans_types_num()
     }

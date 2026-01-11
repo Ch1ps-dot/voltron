@@ -1,13 +1,12 @@
 import subprocess
 from pathlib import Path
-from typing import Callable
 import time, select, socket
+from typing import Callable
 
-from voltron.executor.nio import Nio
 from voltron.utils.logger import logger
-from voltron.sheduler.mapper import InputSymbol, Mapper
-from voltron.producer.AsyncProducer import AsyncProducer
-from voltron.utils.analyze import Analyzer
+from voltron.mapper.mapper import Mapper
+from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.analyzer.analyzer import Analyzer
 import math, statistics, threading
 
 class Executor:
@@ -18,7 +17,7 @@ class Executor:
             port:int,
             pre_script:Path, 
             post_script:Path,
-            handler: AsyncProducer,
+            mapper: Mapper,
             analyzer: Analyzer,
             setup_time_s:float = 1,
             send_time_ms:int = 1000,
@@ -30,9 +29,7 @@ class Executor:
         self.post_script: Path = post_script
         self.host = host
         self.port = port
-
         self.trans_layer = trans_layer
-        self.handler = handler
 
         # time related values
         self.setup_time_s = setup_time_s
@@ -42,11 +39,14 @@ class Executor:
         self.probe_times = 5 # for estimating suitable response time
         self.probe_recv_time_s = []
        
-        self.pkt_parser: Callable = self.handler.parser_instance()
+        self.mapper = mapper
         self.analyzer = analyzer
 
         self.last_sent = '-'
         self.last_recv = '-'
+        
+        self.parser_func: Callable
+        self.load_parser(self.mapper.cur_parser)
 
     def post_exe(
             self
@@ -78,9 +78,9 @@ class Executor:
                 logger.debug(f'[SUT Setup Failure]: {e}')
                 return None
 
-    def run(
+    def communicate(
             self,
-            msg_seq: list[bytes],
+            generator_seq: list[Generator],
             stop_event: threading.Event
     ):  
         # prepare some settings and setup SUT
@@ -109,29 +109,41 @@ class Executor:
             logger.debug(f'Executor: recv {resp_code}')
 
         # send the message path
-        # TODO: symbolize timeout problem
-        for m in msg_seq:
+        for g in generator_seq:
 
             # send message and parse response
-            if(self.net_send(m, sock)):
+            if(self.net_send(g, sock)):
                 resp_code = self.net_recv(sock=sock)
                 
                 # handle response. If socket closed, stop sending.
-                if(resp_code):
-                    self.last_recv = resp_code
-                    logger.debug(f'Executor: recv {resp_code}')
-                else:
-                    break
+                match resp_code:
+                    
+                    # remote crash
+                    case 'ERR':
+                        break
+                    
+                    # remote hang
+                    case 'TIMEOUT':
+                        break
+                    
+                    # remote close the socket
+                    case 'RCLOSED':
+                        break
+                    case _:
+                        self.last_recv = resp_code
+                        logger.debug(f'Executor: recv {resp_code}')
             
             # If socket closed, stop sending
             else:
                 logger.debug('Executor: socket closed')
                 break
 
-        # with self.analyzer.lock:
-        #     self.analyzer.path_num = self.analyzer.path_num + 1
+        with self.analyzer.lock:
+            self.analyzer.path_num = self.analyzer.path_num + 1
 
         # close socket and SUT
+        if sock.fileno() < 0:
+            sock.close()
         if proc.poll() is None:
             proc.terminate()
 
@@ -162,7 +174,7 @@ class Executor:
 
     def net_send(
             self, 
-            msg : bytes,
+            g : Generator,
             sock: socket.socket
     ):
         """Send message over network
@@ -194,16 +206,18 @@ class Executor:
 
                 # send message
                 if event & select.POLLOUT:
+                    msg = self.exe_generator(g)
                     sock.sendall(msg)
-                    # self.last_sent = s.name
-                    # logger.debug(f'sent {s.name}')
-                    # with self.analyzer.lock:
-                    #     self.analyzer.req_num = self.analyzer.req_num + 1
-                    # return True
+
+                    with self.analyzer.lock:
+                        self.analyzer.req_num = self.analyzer.req_num + 1
+                        self.analyzer.req_types_update(g.msg_type)
+                        self.analyzer.last_generator = g
+                    return True
             
             # TODO: support udp
             elif (self.trans_layer == 'udp'):
-                # msg = s.mapper()
+                msg = self.exe_generator(g)
                 sock.sendto(msg, (self.host, self.port))
         finally:
             poller.unregister(sock)
@@ -219,7 +233,7 @@ class Executor:
         use poll to monitor the status of socket
         """
         logger.debug("Executor: begin recv")
-        # check socket before response
+        # check clinet socket before response
         if sock is None or sock.fileno() < 0:
             logger.debug("Executor: socket closed")
             return None
@@ -265,39 +279,74 @@ class Executor:
                 # handler recv timeout
                 if not events:
                     logger.debug('Executor: recv time out')
-                    return '-'
+                    return 'TIMEOUT'
                 
                 fd, event = events[0]
                 
                 if event & (select.POLLERR):
-                    logger.debug("Executor: recv poll error / hup")
-                    sock.close()
-                    return None
+                    logger.debug("Executor: recv poll error")
+                    return 'ERR'
                 # response can be read
 
                 if event & select.POLLIN:
                     buf = sock.recv(1024)
                     logger.debug(f'recv {buf}')
+                    
+                    #TODO: handle invalid response
+                    
+                    # if buf size is 0, socket close
                     if len(buf) == 0:
                         logger.debug('Executor: remote socket closed')
-                        # self.last_recv = '-'
-                        # with self.analyzer.lock:
-                        #     self.analyzer.res_types_update(self.last_recv)
-                        #     self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
                         return 'RCLOSED'
                     else:
-                        resp_code = self.pkt_parser(buf)
+                        # recv response and parse it
+                        resp_code: str = self.parser_func(buf)
                         self.last_recv = resp_code
-                        # with self.analyzer.lock:
-                        #     self.analyzer.res_types_update(self.last_recv)
-                        #     self.analyzer.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+                        
+                        # update some analysis data
+                        with self.analyzer.lock:
+                            self.analyzer.res_num += 1
+                            self.analyzer.last_parser = self.mapper.cur_parser
+                            if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
+                                self.analyzer.last_generator.cur_res.append(resp_code)
+                                
                         return resp_code
                 
             elif (self.trans_layer == 'udp'):
                 buf, _ = sock.recvfrom(1024)
-                return self.pkt_parser(buf)
+                return self.parser_func(buf)
             
         finally:
             poller.unregister(sock)
     
         return None
+    
+    def exe_generator(
+        self,
+        g: Generator
+    ) -> bytes:
+        name_space = {}
+        try:
+            with open(g.path, 'r', encoding='utf-8') as f:
+                code = f.read()
+                exec(code, name_space)
+                obj = name_space[f'generated_{g.msg_type}']
+                return obj()
+        except Exception as e:
+            logger.error(f'Mapper: generated failure {e}')
+            exit(0)
+    
+    def load_parser(
+        self,
+        p: Parser
+    ):
+        name_space = {}
+        try:
+            with open(p.path, 'r', encoding='utf-8') as f:
+                code = f.read()
+                exec(code, name_space)
+                obj = name_space[f'packet_parser']
+                self.parser_func = obj
+        except Exception as e:
+            logger.error(f'Mapper: generated failure {e}')
+            exit(0)

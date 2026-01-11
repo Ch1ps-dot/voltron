@@ -10,10 +10,10 @@ from voltron.rfcparser.AsyncRFCparser import AsyncRFCParser
 from voltron.producer.AsyncProducer import AsyncProducer
 
 from voltron.executor.executor import Executor
-from voltron.utils.analyze import Analyzer
+from voltron.analyzer.analyzer import Analyzer
 
-from voltron.sheduler.mapper import Mapper, InputSymbol
-from voltron.sheduler.rands import Rands
+from voltron.mapper.mapper import Mapper
+from voltron.scheduler.rands import Rands
 from voltron.utils.ui import ui_loop
 
 
@@ -56,7 +56,16 @@ class Fuzzer:
     ) -> None:
 
         # llm init
-        self.chater = AsyncChater(self.pmp_path, self.configs)
+        self.chater = AsyncChater(
+            self.pmp_path, 
+            self.configs
+        )
+        
+        # metrics analyzer
+        self.analyzer = Analyzer(
+            pro_name=self.pro_name,
+            target_name=self.target_name
+        )
 
         # rfcparser init
         self.rfcparser = AsyncRFCParser(
@@ -73,25 +82,19 @@ class Fuzzer:
             rfcp=self.rfcparser,
             base_path = self.base_path 
         )
-
+        
         # scheduler init
-        self.alphabet = Mapper(self.handler)
-
-        self.analyzer = Analyzer(
-            pro_name=self.pro_name,
-            target_name=self.target_name
-        )
-
+        self.mapper = Mapper(self.handler, self.analyzer)
         
         # setup executor
         self.exe = Executor(
             trans_layer=self.tra_layer,
             host=self.host,
             port=self.port,
+            analyzer=self.analyzer,
             pre_script=self.pre_script,
             post_script=self.post_script,
-            handler=self.handler,
-            analyzer=self.analyzer
+            mapper=self.mapper
         )
 
     def fuzz(

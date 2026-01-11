@@ -14,7 +14,7 @@ The protocol format information is given as a list of field descriptors. Each fi
 * `field_name`: the semantic name of the field (e.g., "Reply Code", "Status Code")
 * `position`: a textual description of where the field appears in the response message (e.g., "first three bytes", "first line before space")
 * `explanation`: the semantic meaning of the field
-* `value`: a list of valid values or an empty list if unconstrained
+* `value`: a list of valid values
 
 ---
 
@@ -25,13 +25,8 @@ Using the provided protocol format information as **the only source of truth**, 
 1. Accepts a **response message** as input (string or bytes).
 2. Locates the **status / reply code field** according to the `position` description.
 3. Extracts the status code from the response message.
-4. Converts the extracted status code into an **integer**.
-5. If the `value` list is non-empty, validates that the extracted status code belongs to that list.
-6. Raises a `ValueError` if:
-
-   * The status code cannot be located
-   * The extracted value is not numeric
-   * The value is not in the allowed set (when applicable)
+4. Converts the extracted status code into an **string**.
+5. Return empty string '' if the status code cannot be located
 
 ---
 
@@ -41,7 +36,8 @@ Using the provided protocol format information as **the only source of truth**, 
 * Use **only built-in libraries**
 * Use **packet_parser** as function name
 * Do NOT hard-code protocol-specific assumptions beyond what is stated in the field format information
-* The code should be robust to both `str` and `bytes` inputs
+* Input is 'bytes'
+* Final output type is `str`
 
 ---
 

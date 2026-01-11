@@ -102,6 +102,7 @@ def generate_$msg_type():
 * **Only output the completed Python function code**
 * Do NOT include explanations, comments outside the function, or markdown
 * The function must be directly executable
+* Use generate_$msg_type as function name
 
 ---
 

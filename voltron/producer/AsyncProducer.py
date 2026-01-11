@@ -4,7 +4,7 @@ from tqdm import tqdm
 import json, asyncio
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 from voltron.rfcparser.AsyncRFCparser import AsyncRFCParser
 from voltron.utils.logger import logger
@@ -17,12 +17,20 @@ class Generator:
     msg_type: message type
     """
     msg_type: str
-    path: Path
+    path: str
     evolved_from: str
-    cur_res: list[str] = []
-    pre_res: list[str] = []
-    fut_res: list[str] = []
+    cur_res: list[str] = field(default_factory=list)
+    pre_res: list[str] = field(default_factory=list)
+    fut_res: list[str] = field(default_factory=list)
     was_used: int = 0
+    
+    # def __post_init__(self):
+    #     if self.cur_res is None:
+    #         self.cur_res = []
+    #     if self.pre_res is None:
+    #         self.pre_res = []
+    #     if self.fut_res is None:
+    #         self.fut_res = []
     
 @dataclass
 class Parser:
@@ -30,8 +38,13 @@ class Parser:
 
     msg_type: message type
     """
-    path: Path
-    parsed_res: list[str] = []
+    evolved_from: str
+    path: str
+    parsed_res: list[str] = field(default_factory=list)
+    
+    # def __post_init__(self):
+    #     if self.cur_res is None:
+    #         self.cur_res = []
 
 class AsyncProducer:
     """Prepare message Producer (input generator and packet parser).
@@ -48,7 +61,7 @@ class AsyncProducer:
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.producer_path = base_path / 'tools' / rfcp.pro_name
+        self.producer_path = base_path / 'equipment' / rfcp.pro_name
         self.generator_path = self.producer_path / 'generators'
         self.parser_path = self.producer_path / 'parsers'
         self.generator_info_path = self.generator_path / 'generator_info.json'
@@ -65,12 +78,6 @@ class AsyncProducer:
 
         self.chater = chater
         self.rfcp = rfcp
-        self.generator_code: dict[str, str] = {}
-        self.pkt_parser_code: str
-
-        # function instance
-        # self.inputs: dict[str, Callable] = {}
-        self.pkt_parser: Callable | None = None
 
         # types of symbols
         self.req_types: list[str] = rfcp.req_types
@@ -79,23 +86,24 @@ class AsyncProducer:
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
 
-        # prepare tools
+        # load existed generator info or generate init generators
         if(self.generator_info_path.is_file()):
             try:
                 with open(self.generator_info_path, 'r', encoding='utf-8') as f:
                     generator_info = json.load(f)
-                    self.setup_generator()
+                    self.generators_load(generator_info)
                 logger.debug("Producer: load generator")
             except Exception as e:
                 logger.debug(f'Producer: generator load error {e}')
         else:
             self.generator_gen()
-            
+        
+        # load existed parser info or generate init parser
         if (self.parser_info_path.is_file()):
             try:
                 with open(self.parser_info_path, 'r', encoding='utf-8') as f:
                     parser_info = json.load(f)
-                    self.setup_parser()
+                    self.parsers_load(parser_info)
                 logger.debug("Producer: load parser info")
             except Exception as e:
                 logger.debug(f'Producer: parser load error {e}')
@@ -139,18 +147,23 @@ class AsyncProducer:
     ) -> None:
         """Generate and save input generator
         """
+        
         results = asyncio.run(self._generator_gen_async())
         for msg_type, input_code in results:
             msg_dir = self.generator_path / f'{msg_type}'
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
-            self.generator_code[msg_type] = input_code
-            with open(msg_dir / f'initial.py', 'w', encoding='utf-8') as f:
+            
+            init_gen_path = msg_dir / 'id0.py'
+            with open(init_gen_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
-            info = {'msg_type': msg_type, 'evolved_from': 'init'}
-            self.generator_info[msg_type].append(info)
+                info: dict = {'msg_type': msg_type, 'evolved_from': 'init', 'path': str(init_gen_path.resolve())}
+                self.generators.setdefault(msg_type, [])
+                self.generators[msg_type].append(Generator(**info))
+            
         with open(self.generator_info_path, 'w', encoding='utf-8') as f:
-            json.dump(self.generator_info, f)
+            json.dump(self.generator_info(), f)
+            
         logger.debug("[Producer]: finish generator generation")
 
     async def _parser_gen_async(
@@ -174,22 +187,47 @@ class AsyncProducer:
     ) -> None:
         """Generate and save packet parser
         """
-        result = asyncio.run(self._parser_gen_async())
-        with open(self.parser_path / 'initial.py', 'w', encoding='utf-8') as f:
+        with tqdm(desc='Parser Gen') as pbar:
+            result = asyncio.run(self._parser_gen_async())
+            pbar.update(1)
+        init_p_path = self.parser_path / 'id0.py'
+        with open(init_p_path, 'w', encoding='utf-8') as f:
             f.write(result)
+            info: dict = {'evolved_from': 'init', 'path': str(init_p_path.resolve())}
+            self.parsers.append(Parser(**info))
         with open(self.parser_info_path, 'w', encoding='utf-8') as f:
-            json.dump(self.parser_info, f)
+            json.dump(self.parser_info(), f)
         logger.debug("[Producer]: finish parser generation")
 
-    def setup_generator(
+    def generator_info(
         self
-    ):
-        for msg_type in self.generator_info.keys():
-            for g in self.generator_info[msg_type]:
-                self.generators[msg_type].append(Generator(**g))
+    ) -> dict:
+        info: dict[str, list[dict]]= {}
+        for msg_type in self.generators.keys():
+            for g in self.generators[msg_type]:
+                info.setdefault(msg_type, [])
+                info[msg_type].append(asdict(g))
+        return info
     
-    def setup_parser(
+    def parser_info(
         self
+    ) -> list:
+        info: list[dict] = []
+        for p in self.parsers:
+            info.append(asdict(p))
+        return info
+    
+    def generators_load(
+        self,
+        info: dict
     ):
-        for p in self.parser_info:
+        for msg_type in info:
+            for g in info[msg_type]:
+                self.generators[msg_type].append(Generator(**g))
+                
+    def parsers_load(
+        self,
+        info: list
+    ):
+        for p in info:
             self.parsers.append(Parser(**p))
