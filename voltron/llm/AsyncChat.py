@@ -101,12 +101,11 @@ class AsyncChater:
         )
         return self.code_extract(ans)
 
-    async def llm_input_gen(
+    async def llm_generator_gen(
             self,
             pro_name: str,
             msg_type: str,
-            msg_ir: str,
-            name: str
+            msg_ir: str
     ) -> str:
         """Generate python code as fuzzer generator
 
@@ -118,7 +117,7 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_gen_generator
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, msg_ir=msg_ir, name=name)
+        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, msg_ir=msg_ir)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_gen"
