@@ -9,27 +9,31 @@ def generate_110():
     import random
     import string
 
-    # Field 1: ReplyCode (constant "110", 3 bytes)
-    reply_code = b'110'
+    # Field: ReplyCode (constant "110")
+    message += b'110'
 
-    # Field 2: Whitespace (constant 0x20, 1 byte)
-    whitespace = b'\x20'
+    # Field: Whitespace (constant 0x20)
+    message += bytes([0x20])
 
-    # Field 3: MarkerText (variable, ASCII excluding CR and LF, undefined length -> choose reasonable length)
-    # Build allowed ASCII characters excluding CR and LF
+    # Field: MarkerText (variable, ASCII excluding CR, LF, length undefined)
+    # Choose a reasonable representative length and generate ASCII chars excluding CR and LF.
     allowed_chars = (
-        string.ascii_letters + string.digits + string.punctuation + ' '
+        string.ascii_letters + string.digits + string.punctuation + string.whitespace
     )
+    # Remove CR and LF explicitly if present
     allowed_chars = ''.join(ch for ch in allowed_chars if ch not in '\r\n')
-    # Choose a reasonable length (1 to 30 bytes)
-    marker_length = random.randint(1, 30)
-    marker_text_str = ''.join(random.choice(allowed_chars) for _ in range(marker_length))
-    marker_text = marker_text_str.encode('ascii')
 
-    # Field 4: EndOfLine (constant 0x0D0A, 2 bytes)
-    end_of_line = bytes.fromhex('0D0A')
+    # Choose a length between 1 and 40 for the marker text
+    marker_length = random.randint(1, 40)
+    marker_text = ''.join(random.choice(allowed_chars) for _ in range(marker_length))
+    # Ensure ASCII encoding
+    marker_bytes = marker_text.encode('ascii', errors='ignore')
+    # If encoding dropped characters (unlikely), ensure at least one byte
+    if len(marker_bytes) == 0:
+        marker_bytes = b'Marker1'
+    message += marker_bytes
 
-    # Concatenate fields in the exact order
-    message = reply_code + whitespace + marker_text + end_of_line
+    # Field: EndOfLine (constant 0x0D0A)
+    message += bytes.fromhex('0D0A')
 
     return message

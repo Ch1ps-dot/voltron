@@ -4,33 +4,31 @@ def generate_230():
     - Output: bytes
     """
     
-    message = b''
-    
     import random
 
-    # ReplyCode: constant "230" (3 bytes)
-    reply_code = b'230'
-
-    # Whitespace: single space 0x20
-    whitespace = b'\x20'
-
-    # ReplyText: ASCII, excluding CR and LF.
-    # Choose a reasonable representative reply text commonly used by FTP servers.
-    possible_texts = [
+    message = b''
+    
+    # Field 1: ReplyCode (constant "230", 3 bytes)
+    message += b'230'
+    
+    # Field 2: Whitespace (constant 0x20, 1 byte)
+    message += b'\x20'
+    
+    # Field 3: ReplyText (variable, ASCII excluding CR and LF, length undefined)
+    # Choose a reasonable representative reply text used by FTP servers.
+    reply_options = [
         "User logged in, proceed",
-        "Login successful",
-        "User logged in",
-        "Logged in successfully, proceed",
-        "User logged in, proceed."
+        "User logged in.",
+        "Logged in successfully",
+        "Login successful, proceed",
+        "User logged in; transfer starting"
     ]
-    reply_text_str = random.choice(possible_texts)
-    # Encode as ASCII (no CR or LF present in the chosen strings)
-    reply_text = reply_text_str.encode('ascii')
-
-    # EndOfLine: CR LF (0x0D0A)
-    end_of_line = b'\x0d\x0a'
-
-    # Concatenate fields in the exact order specified by the protoIR
-    message = reply_code + whitespace + reply_text + end_of_line
-
+    reply_text = random.choice(reply_options)
+    # Ensure no CR/LF characters are present (they are not in our options)
+    reply_bytes = reply_text.encode('ascii')
+    message += reply_bytes
+    
+    # Field 4: EndOfLine (constant 0x0D0A, 2 bytes)
+    message += b'\x0D\x0A'
+    
     return message

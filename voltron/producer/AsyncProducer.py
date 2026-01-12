@@ -128,8 +128,8 @@ class AsyncProducer:
                     )
                     compile(input_code, '<string>', "exec")
                     return msg_type, input_code
-                except SyntaxError as e:
-                    logger.debug(f'Producer :syntax error {e}')
+                except Exception as e:
+                    logger.debug(f'Producer :generate error {e}')
 
     async def _generator_gen_async(
             self
@@ -179,7 +179,7 @@ class AsyncProducer:
                 )
                 compile(pkt_parser_code, '<string>', 'exec')
                 return pkt_parser_code
-            except SyntaxError as e:
+            except Exception as e:
                 logger.debug(f'[Parser Generation]: syntax error {e}')
 
     def parser_gen(

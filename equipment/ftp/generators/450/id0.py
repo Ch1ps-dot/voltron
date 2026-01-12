@@ -6,30 +6,30 @@ def generate_450():
     
     message = b''
     
-    # Python code that constructs the message
-    # strictly following the provided protoIR specification
     import random
-    import string
 
-    # Field 1: ReplyCode (constant, 3 bytes) -> "450"
+    # ReplyCode (constant, 3 bytes)
     reply_code = b'450'
 
-    # Field 2: Whitespace (constant, 1 byte) -> 0x20 (space)
-    whitespace = b'\x20'
+    # Whitespace (constant, 1 byte: 0x20)
+    whitespace = b' '
 
-    # Field 3: ReplyText (variable, undefined length) -> ASCII excluding CR, LF
-    # Choose a reasonable length and generate allowed characters (letters, digits, punctuation, space)
-    allowed_chars = string.ascii_letters + string.digits + string.punctuation + ' '
-    # Choose a length typical for an FTP reply text (e.g., between 10 and 40 characters)
-    text_length = random.randint(10, 40)
-    reply_text_str = ''.join(random.choices(allowed_chars, k=text_length))
-    # Encode as ASCII (guaranteed valid since allowed_chars are ASCII)
-    reply_text = reply_text_str.encode('ascii')
+    # ReplyText (variable, ASCII excluding CR, LF). Choose a random, valid human-readable message.
+    reply_text_options = [
+        "File unavailable",
+        "Requested action not taken: file busy",
+        "File busy, try again later",
+        "Cannot access file: resource temporarily unavailable",
+        "Temporary error accessing the file"
+    ]
+    reply_text = random.choice(reply_text_options)
+    # Ensure ASCII encoding and absence of CR/LF
+    reply_text_bytes = reply_text.encode('ascii', 'ignore')
 
-    # Field 4: EndOfLine (constant, 2 bytes) -> 0x0D0A (CR LF)
-    end_of_line = b'\x0d\x0a'
+    # EndOfLine (constant, 2 bytes: 0x0D0A)
+    end_of_line = b'\r\n'
 
     # Concatenate fields in the exact order
-    message = reply_code + whitespace + reply_text + end_of_line
+    message = reply_code + whitespace + reply_text_bytes + end_of_line
 
     return message

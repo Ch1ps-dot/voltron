@@ -6,17 +6,16 @@ def generate_551():
     
     message = b''
     
-    # Field: ReplyCode (constant, 3B, value "551")
+    # ReplyCode (constant "551", 3 bytes)
     message += b'551'
     
-    # Field: Whitespace1 (constant, 1B, value 0x20)
+    # Whitespace1 (constant 0x20, 1 byte)
     message += b'\x20'
     
-    # Field: ReplyText (constant, 33B, value "Requested action aborted. Page type unknown.")
-    # Emit the exact string value encoded in ASCII
+    # ReplyText (constant string, encoded as ASCII)
     message += b'Requested action aborted. Page type unknown.'
     
-    # Field: EndOfLine (constant, 2B, value 0x0D0A)
-    message += b'\x0D\x0A'
+    # EndOfLine (constant 0x0D0A, CRLF, 2 bytes)
+    message += bytes.fromhex('0D0A')
     
     return message

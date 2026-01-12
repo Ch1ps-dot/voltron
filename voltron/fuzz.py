@@ -61,12 +61,14 @@ class Fuzzer:
             self.pmp_path, 
             self.configs
         )
+        print('Chater: setup')
         
         # metrics analyzer
         self.analyzer = Analyzer(
             pro_name=self.pro_name,
             target_name=self.target_name
         )
+        print('Analyzer: setup')
 
         # rfcparser init
         self.rfcparser = AsyncRFCParser(
@@ -76,6 +78,7 @@ class Fuzzer:
             rfc_name = self.rfc_name,
             base_path = self.base_path
         )
+        print('RFCParser: setup')
 
         # handler init
         self.handler = AsyncProducer(
@@ -83,6 +86,7 @@ class Fuzzer:
             rfcp=self.rfcparser,
             base_path = self.base_path 
         )
+        print('Producer: equipment setup')
         
         # scheduler init
         self.mapper = Mapper(self.handler, self.analyzer)
@@ -97,6 +101,7 @@ class Fuzzer:
             post_script=self.post_script,
             mapper=self.mapper
         )
+        print('Executor: equipment setup')
 
     def fuzz(
             self,

@@ -8,27 +8,22 @@ def generate_150():
     
     import random
 
-    # Constant field: ReplyCode (3 bytes) -> "150"
-    reply_code = b'150'
+    # Constant: 3-digit reply code '150'
+    reply_code = b'150'  # length 3B, value "150"
 
-    # Constant field: Whitespace (1 byte) -> 0x20 (space)
-    whitespace = b'\x20'
+    # Constant: single whitespace (space)
+    whitespace = b'\x20'  # length 1B, value 0x20
 
-    # Variable field: ReplyText (undefined length)
-    # Allowed: ASCII printable 0x20-0x7E (exclude CR and LF)
-    allowed_chars = ''.join(chr(i) for i in range(0x20, 0x7F))
-    # Choose a reasonable length for a human-readable reply
-    reply_length = random.randint(20, 60)
-    reply_text_str = ''.join(random.choices(allowed_chars, k=reply_length))
-    reply_text = reply_text_str.encode('ascii')
+    # Variable: ReplyText (ASCII printable 0x20-0x7E), choose a reasonable random length
+    allowed_chars = ''.join(chr(i) for i in range(0x20, 0x7F))  # space through '~'
+    reply_length = random.randint(20, 60)  # choose a reasonable length
+    reply_text = ''.join(random.choice(allowed_chars) for _ in range(reply_length))
+    reply_text_bytes = reply_text.encode('ascii')
 
-    # Constant field: EndOfLine (2 bytes) -> 0x0D0A (CR LF)
-    end_of_line = b'\x0d\x0a'
+    # Constant: End of line CR LF
+    end_of_line = b'\x0D\x0A'  # length 2B, value 0x0D0A
 
-    # Concatenate fields in exact order
-    message += reply_code
-    message += whitespace
-    message += reply_text
-    message += end_of_line
+    # Concatenate fields in the exact order
+    message = reply_code + whitespace + reply_text_bytes + end_of_line
 
     return message

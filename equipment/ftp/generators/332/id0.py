@@ -6,24 +6,22 @@ def generate_332():
     
     message = b''
     
-    # Python code that constructs the message
-    # strictly following the provided protoIR specification
-    import random
+    # ReplyCode: constant "332" (3 bytes, ASCII digits)
+    reply_code = b'332'
+    message += reply_code
 
-    # Field 1: ReplyCode (constant, 3 bytes) -> "332"
-    message += b'332'
+    # Whitespace: constant 0x20 (space)
+    whitespace = bytes([0x20])
+    message += whitespace
 
-    # Field 2: Whitespace (constant, 1 byte) -> 0x20 (space)
-    message += b'\x20'
+    # ReplyText: variable, ASCII excluding CR and LF
+    # Use a representative human-readable message consistent with the IR comment.
+    reply_text_str = "Need account for login."
+    reply_text = reply_text_str.encode('ascii')
+    message += reply_text
 
-    # Field 3: ReplyText (variable, undefined length) -> ASCII excluding CR, LF
-    # Choose a reasonable random length and generate allowed ASCII characters (32..126) excluding CR/LF
-    allowed_chars = ''.join(chr(c) for c in range(32, 127) if c not in (10, 13))
-    text_length = random.randint(10, 40)  # reasonable length for a human-readable reply
-    reply_text = ''.join(random.choices(allowed_chars, k=text_length))
-    message += reply_text.encode('ascii')
-
-    # Field 4: EndOfLine (constant, 2 bytes) -> 0x0D0A (CRLF)
-    message += b'\x0d\x0a'
+    # EndOfLine: constant 0x0D0A (CR LF)
+    end_of_line = bytes([0x0D, 0x0A])
+    message += end_of_line
 
     return message

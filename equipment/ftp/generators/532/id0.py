@@ -9,20 +9,21 @@ def generate_532():
     # Python code that constructs the message
     # strictly following the provided protoIR specification
 
-    # Field: ReplyCode (constant, 3B, value "532")
+    # ReplyCode: constant "532" (3 bytes)
     reply_code = b'532'
 
-    # Field: Whitespace (constant, 1B, value 0x20)
+    # Whitespace: constant 0x20 (space, 1 byte)
     whitespace = bytes([0x20])
 
-    # Field: ReplyText (constant, 28B, value "Need account for storing files")
-    # Emit the exact ASCII bytes for the given literal
+    # ReplyText: constant ASCII string "Need account for storing files"
     reply_text = "Need account for storing files".encode('ascii')
 
-    # Field: EndOfLine (constant, 2B, value 0x0D0A)
-    end_of_line = b'\x0D\x0A'
+    # EndOfLine: constant 0x0D0A (CRLF, 2 bytes)
+    end_of_line = b'\r\n'
 
-    # Concatenate fields in the exact order
-    message = reply_code + whitespace + reply_text + end_of_line
+    message += reply_code
+    message += whitespace
+    message += reply_text
+    message += end_of_line
 
     return message

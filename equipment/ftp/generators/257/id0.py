@@ -9,15 +9,16 @@ def generate_257():
 
     message = b''
 
-    # ReplyCode: constant "257" (3 bytes)
-    message += b'257'
+    # Field 1: ReplyCode (constant, 3B, value "257")
+    reply_code = b'257'
 
-    # Whitespace: constant 0x20 (1 byte)
-    message += b' '
+    # Field 2: Whitespace (constant, 1B, value 0x20)
+    whitespace = b'\x20'  # space
 
-    # Pathname: variable, ASCII, typically enclosed in double quotes
-    # Build a realistic UNIX-like pathname and enclose in double quotes
-    seg_chars = string.ascii_letters + string.digits + "-._"
+    # Field 3: Pathname (variable, undefined length, ASCII, typically enclosed in double quotes)
+    # Generate a representative absolute pathname enclosed in double quotes per RFC convention.
+    # Use allowed characters: letters, digits, underscore, hyphen, dot for path segments.
+    seg_chars = string.ascii_letters + string.digits + '_-.'
     num_segments = random.randint(1, 4)
     segments = []
     for _ in range(num_segments):
@@ -25,25 +26,29 @@ def generate_257():
         seg = ''.join(random.choices(seg_chars, k=seg_len))
         segments.append(seg)
     path = '/' + '/'.join(segments)
-    pathname_str = '"' + path + '"'  # include enclosing double quotes
-    pathname_bytes = pathname_str.encode('ascii')
-    message += pathname_bytes
+    pathname_str = '"' + path + '"'
+    pathname = pathname_str.encode('ascii')
 
-    # OptionalText: variable, ASCII excluding CR, LF; may be omitted
+    # Field 4: OptionalText (variable, undefined length, ASCII excluding CR, LF)
+    # May be omitted. If present, it must be separated from the pathname by a space.
     include_optional = random.choice([True, False])
-    optional_bytes = b''
     if include_optional:
-        # Separator space between pathname and optional text
-        # Generate a short human-readable message
-        opt_chars = string.ascii_letters + string.digits + " .,;:-_()/[]?!"
-        opt_len = random.randint(5, 40)
-        opt_text = ''.join(random.choices(opt_chars, k=opt_len)).strip()
-        # ensure no CR/LF
-        opt_text = opt_text.replace('\r', '').replace('\n', '')
-        optional_bytes = b' ' + opt_text.encode('ascii')
-    message += optional_bytes
+        # Choose a short human-readable ASCII message (no CR or LF), prefixed by a space.
+        optional_phrases = [
+            ' is current directory',
+            ' Directory listing follows',
+            ' Access granted',
+            ' No additional info'
+        ]
+        optional_text_str = ' ' + random.choice(optional_phrases)
+        optional_text = optional_text_str.encode('ascii')
+    else:
+        optional_text = b''
 
-    # EndOfLine: constant 0x0D0A (CRLF)
-    message += bytes.fromhex('0D0A')
+    # Field 5: EndOfLine (constant, 2B, value 0x0D0A)
+    end_of_line = b'\x0d\x0a'
+
+    # Concatenate fields in the exact order
+    message = reply_code + whitespace + pathname + optional_text + end_of_line
 
     return message

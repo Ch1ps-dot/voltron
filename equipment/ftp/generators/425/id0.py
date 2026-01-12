@@ -6,16 +6,16 @@ def generate_425():
     
     message = b''
     
-    # Construct fields in exact order from protoIR:
-    # ReplyCode (constant "425", 3B)
-    reply_code = b"425"
-    # Whitespace (constant 0x20, 1B)
-    whitespace = b"\x20"
-    # ReplyText (constant "Can't open data connection.", 28B as specified)
-    reply_text = b"Can't open data connection."
-    # EndOfLine (constant 0x0D0A, 2B)
-    end_of_line = b"\x0D\x0A"
+    # ReplyCode: constant "425" (3 bytes)
+    message += b'425'
     
-    message = reply_code + whitespace + reply_text + end_of_line
+    # Whitespace: constant 0x20 (1 byte)
+    message += b'\x20'
+    
+    # ReplyText: constant "Can't open data connection." (ASCII)
+    message += b"Can't open data connection."
+    
+    # EndOfLine: CRLF 0x0D0A (2 bytes)
+    message += b'\x0d\x0a'
     
     return message

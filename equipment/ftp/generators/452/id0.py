@@ -6,12 +6,21 @@ def generate_452():
     
     message = b''
     
-    # Fields as specified in the protoIR, in order.
-    ReplyCode = b'452'  # constant, 3 bytes
-    Whitespace = b'\x20'  # constant, 1 byte (space)
-    ReplyText = b'Requested action not taken. Insufficient storage space in system.'  # constant text
-    EndOfLine = b'\x0D\x0A'  # constant CRLF, 2 bytes
-
-    message = ReplyCode + Whitespace + ReplyText + EndOfLine
-
+    # Construct fields exactly as specified in the protoIR
+    
+    # ReplyCode: constant "452" (3 bytes)
+    reply_code = b'452'
+    
+    # Whitespace: constant 0x20 (space, 1 byte)
+    whitespace = b'\x20'
+    
+    # ReplyText: constant ASCII string (as given)
+    reply_text = b'Requested action not taken. Insufficient storage space in system.'
+    
+    # EndOfLine: CRLF (0x0D0A, 2 bytes)
+    end_of_line = b'\x0D\x0A'
+    
+    # Concatenate in the exact field order
+    message = reply_code + whitespace + reply_text + end_of_line
+    
     return message

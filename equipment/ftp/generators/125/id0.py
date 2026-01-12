@@ -4,31 +4,30 @@ def generate_125():
     - Output: bytes
     """
     
-    import random
-    import string
-
     message = b''
     
     # ReplyCode: constant "125" (3 bytes)
-    message += b'125'
+    reply_code = b'125'
     
     # Whitespace: constant 0x20 (space)
-    message += b' '
+    whitespace = bytes([0x20])
     
-    # ReplyText: variable, ASCII excluding CR and LF
-    # Choose a representative valid reply text (RFC959) or a close variant
-    candidates = [
+    # ReplyText: variable, ASCII excluding CR, LF. Choose a representative valid text.
+    import random
+    candidate_texts = [
         "Data connection already open; transfer starting",
         "Opening data connection; transfer starting",
-        "Transfer starting; data connection already open"
+        "File transfer starting"
     ]
-    reply_text = random.choice(candidates)
-    # Ensure no CR/LF characters
-    reply_text = reply_text.replace('\r', '').replace('\n', '')
-    # Encode as ASCII
-    message += reply_text.encode('ascii')
+    reply_text_str = random.choice(candidate_texts)
+    # Ensure no CR or LF characters
+    reply_text_str = reply_text_str.replace('\r', '').replace('\n', '')
+    reply_text = reply_text_str.encode('ascii')
     
     # EndOfLine: constant 0x0D0A (CRLF)
-    message += b'\r\n'
+    end_of_line = bytes([0x0D, 0x0A])
+    
+    # Concatenate fields in the order defined by the protoIR
+    message = reply_code + whitespace + reply_text + end_of_line
     
     return message

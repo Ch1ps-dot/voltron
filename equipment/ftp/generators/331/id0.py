@@ -6,15 +6,20 @@ def generate_331():
     
     message = b''
     
-    # Python code that constructs the message
-    # strictly following the provided protoIR specification
-    # Field 1: ReplyCode (constant, 3B) -> "331"
-    message += b'331'
-    # Field 2: Whitespace (constant, 1B) -> 0x20 (space)
-    message += b'\x20'
-    # Field 3: ReplyText (constant, 22B) -> "User name okay, need password."
-    message += b'User name okay, need password.'
-    # Field 4: EndOfLine (constant, 2B) -> 0x0D0A (CRLF)
-    message += b'\x0D\x0A'
-    
+    # ReplyCode: constant "331" (3 bytes)
+    reply_code = b'331'
+    message += reply_code
+
+    # Whitespace: constant 0x20 (1 byte)
+    whitespace = bytes([0x20])
+    message += whitespace
+
+    # ReplyText: constant "User name okay, need password." (textual, ASCII)
+    reply_text = b'User name okay, need password.'
+    message += reply_text
+
+    # EndOfLine: constant 0x0D0A (CRLF, 2 bytes)
+    end_of_line = bytes.fromhex('0D0A')
+    message += end_of_line
+
     return message

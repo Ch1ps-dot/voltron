@@ -8,22 +8,24 @@ def generate_215():
     
     import random
 
-    # ReplyCode: constant "215" (3 bytes)
+    # Field 1: ReplyCode (constant "215", 3 bytes)
     reply_code = b'215'
     message += reply_code
 
-    # Whitespace: constant 0x20 (space)
-    message += b'\x20'
+    # Field 2: Whitespace (constant 0x20, 1 byte)
+    whitespace = b'\x20'
+    message += whitespace
 
-    # SystemType: variable, ASCII printable characters (0x20-0x7E), excluding CR/LF
-    # Choose a reasonable undefined length between 7 and 20 characters
-    printable_chars = ''.join(chr(i) for i in range(0x20, 0x7F))
-    sys_len = random.randint(7, 20)
-    system_type_str = ''.join(random.choice(printable_chars) for _ in range(sys_len))
-    system_type_bytes = system_type_str.encode('ascii')
-    message += system_type_bytes
+    # Field 3: SystemType (variable, undefined length, ASCII printable characters excluding CR/LF)
+    # Choose a reasonable length consistent with protocol conventions
+    length = random.randint(8, 20)
+    printable_ascii = [chr(c) for c in range(0x20, 0x7f)]  # 0x20 (space) to 0x7E (~)
+    system_type_str = ''.join(random.choices(printable_ascii, k=length))
+    system_type = system_type_str.encode('ascii')
+    message += system_type
 
-    # EndOfLine: constant 0x0D0A (CR LF)
-    message += b'\x0d\x0a'
+    # Field 4: EndOfLine (constant 0x0D0A, 2 bytes)
+    end_of_line = b'\x0d\x0a'
+    message += end_of_line
 
     return message

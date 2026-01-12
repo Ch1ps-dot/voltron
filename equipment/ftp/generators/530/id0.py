@@ -8,28 +8,24 @@ def generate_530():
 
     message = b''
     
-    # Field 1: ReplyCode (constant "530", 3 bytes)
-    reply_code = b'530'
-
-    # Field 2: Whitespace (constant 0x20, 1 byte)
-    whitespace = bytes([0x20])
-
-    # Field 3: MessageText (variable, ASCII excluding CR, LF)
-    # Choose a representative human-readable explanation used by FTP servers.
-    possible_texts = [
-        "Not logged in.",
-        "Login incorrect.",
-        "Please login with USER and PASS.",
-        "Authentication failed."
+    # ReplyCode: constant "530"
+    message += b'530'
+    
+    # Whitespace: constant 0x20 (space)
+    message += b'\x20'
+    
+    # MessageText: variable, ASCII excluding CR, LF. Choose a representative server message.
+    options = [
+        'Not logged in.',
+        'Please login with USER and PASS.',
+        'Authentication failed.',
+        'Login incorrect.'
     ]
-    message_text_str = random.choice(possible_texts)
-    # Ensure no CR or LF characters (they are not present in the chosen strings)
-    message_text = message_text_str.encode('ascii')
-
-    # Field 4: EndOfLine (constant 0x0D0A, 2 bytes)
-    end_of_line = bytes.fromhex('0d0a')
-
-    # Concatenate fields in the exact order
-    message = reply_code + whitespace + message_text + end_of_line
-
+    text = random.choice(options)
+    # Encode as ASCII (no CR or LF in options)
+    message += text.encode('ascii')
+    
+    # EndOfLine: constant 0x0D0A (CRLF)
+    message += bytes.fromhex('0D0A')
+    
     return message

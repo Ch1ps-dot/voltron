@@ -4,23 +4,21 @@ def generate_213():
     - Output: bytes
     """
     
-    import random
-
     message = b''
     
-    # ReplyCode: constant "213"
+    import random
+
+    # Field 1: ReplyCode (constant "213")
     message += b'213'
-    
-    # Whitespace: constant 0x20 (space)
+
+    # Field 2: Whitespace (constant 0x20)
     message += b'\x20'
-    
-    # FileSize: variable, ASCII digits (0-9), length undefined
-    # Choose a reasonable file size between 0 and 10^10-1 and encode as ASCII decimal
-    filesize_int = random.randint(0, 10**10 - 1)
-    filesize_bytes = str(filesize_int).encode('ascii')
-    message += filesize_bytes
-    
-    # EndOfLine: constant 0x0D0A (CRLF)
-    message += b'\x0D\x0A'
-    
+
+    # Field 3: FileSize (variable, ASCII digits). Choose a reasonable non-negative size.
+    file_size = random.randint(0, 10**9)  # up to 10 digits
+    message += str(file_size).encode('ascii')
+
+    # Field 4: EndOfLine (constant 0x0D0A)
+    message += b'\x0d\x0a'
+
     return message

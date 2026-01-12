@@ -6,27 +6,32 @@ def generate_451():
     
     message = b''
     
-    import random, string
+    import random
 
     # ReplyCode: constant "451" (3 bytes)
     reply_code = b'451'
+    message += reply_code
 
     # Whitespace: constant 0x20 (space)
-    whitespace = b'\x20'
+    message += b'\x20'
 
-    # ReplyText: variable, ASCII excluding CR, LF, undefined length -> choose reasonable length
-    # Build allowed ASCII printable characters excluding CR and LF
-    printable = string.ascii_letters + string.digits + string.punctuation + ' '
-    allowed_chars = [c for c in printable if c not in '\r\n']
-    # Choose a reasonable length for human-readable message
-    reply_text_len = random.randint(20, 60)
-    reply_text_str = ''.join(random.choices(allowed_chars, k=reply_text_len))
-    reply_text = reply_text_str.encode('ascii')
+    # ReplyText: variable, ASCII excluding CR and LF
+    # Choose a representative human-readable explanation
+    candidates = [
+        "Local processing error",
+        "Requested action aborted: local error in processing",
+        "Temporary server failure processing request",
+        "File system error during operation",
+        "Unexpected server error occurred"
+    ]
+    reply_text = random.choice(candidates)
+    # Ensure ASCII encoding and no CR/LF
+    reply_text_bytes = reply_text.encode('ascii', 'ignore')
+    # (As a safeguard, remove any CR/LF if present)
+    reply_text_bytes = reply_text_bytes.replace(b'\r', b'').replace(b'\n', b'')
+    message += reply_text_bytes
 
-    # EndOfLine: constant CR LF 0x0D0A
-    end_of_line = b'\x0D\x0A'
-
-    # Concatenate fields in the exact IR order
-    message = reply_code + whitespace + reply_text + end_of_line
+    # EndOfLine: constant 0x0D0A (CRLF)
+    message += b'\x0D\x0A'
 
     return message
