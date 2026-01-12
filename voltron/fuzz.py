@@ -141,16 +141,15 @@ class Fuzzer:
             stop_event: threading.Event
     ):
         pass
-        # while not stop_event.is_set():
-        #     try:
-        #         sched = Rands(self.alphabet)
-        #         state_path = sched.select(10)
-        #         self.exe.run(state_path=state_path, stop_event=stop_event)
-        #     except Exception as e:
-        #         logger.debug(f'Fuzzer: exit {e}')
-        #     if (self.time_limit_s < time.time() - self.analyzer.start_time):
-        #         stop_event.set()
-        #         logger.debug('Fuzzer: timeout')
+        while not stop_event.is_set():
+            try:
+                fuzz = Rands(mapper=self.mapper, executor=self.exe)
+                fuzz.run()
+            except Exception as e:
+                logger.debug(f'Fuzzer: exit {e}')
+            if (self.time_limit_s < time.time() - self.analyzer.start_time):
+                stop_event.set()
+                logger.debug('Fuzzer: timeout')
 
     def handle_normal_fuzzer_exit(
             self,
