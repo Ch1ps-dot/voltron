@@ -39,8 +39,8 @@ class Executor:
         self.probe_times = 5 # for estimating suitable response time
         self.probe_recv_time_s = []
        
-        self.mapper = mapper
-        self.analyzer = analyzer
+        self.mapper = mapper # mapper between symbol and message
+        self.analyzer = analyzer # runtime analyzer
 
         self.last_sent = '-'
         self.last_recv = '-'
@@ -83,6 +83,9 @@ class Executor:
             generator_seq: list[Generator],
             stop_event: threading.Event
     ):  
+        """
+        TODO: Deal with
+        """
         # prepare some settings and setup SUT
         proc = self.pre_exe()
         if proc is None:
