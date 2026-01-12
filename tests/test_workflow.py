@@ -12,11 +12,11 @@ def test_http():
     #     algo='rand'
     # )
 
-def test_lightftp():
+def test_lightftp_rand():
     fuzzer = Fuzzer(
         target_name='lightftp',
         time_limit_min=10
     )
-    # fuzzer.fuzz(
-    #     algo='rand'
-    # )
+    fuzzer.fuzz(
+        algo='rand'
+    )

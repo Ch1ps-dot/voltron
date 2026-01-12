@@ -10,13 +10,16 @@ class Analyzer:
             pro_name
     ) -> None:
         
-        # counter for metric
+        # counters for metric
         self.req_types_cnt: dict[str, int] = {}
         self.res_types_cnt: dict[str, int] = {}
         self.trans_types_cnt: dict[str, int] = {}
         self.req_num = 0
         self.res_num = 0
         self.path_num = 0
+        self.timeout_num = 0
+        self.err_num = 0
+        self.rclose_num = 0
 
         # information of fuzzer
         self.target_name = target_name

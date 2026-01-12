@@ -80,8 +80,7 @@ class Executor:
 
     def communicate(
             self,
-            generator_seq: list[Generator],
-            stop_event: threading.Event
+            generator_seq: list[Generator]
     ):  
         """
         TODO: Deal with
@@ -93,7 +92,7 @@ class Executor:
         if proc.poll() is not None: 
             out, err = proc.communicate()
             logger.debug(f'Executor: SUT Setup Failure:{err}')
-            stop_event.set()
+            exit(1)
 
         # wait for server setup
         time.sleep(self.setup_time_s)
@@ -102,7 +101,7 @@ class Executor:
             logger.debug('Executor: Socket Setup Failure' )
             if proc.poll() is None:
                 proc.terminate()
-            stop_event.set()
+            exit(1)
             return
         
         resp_code = self.net_recv(sock=sock)
@@ -123,14 +122,20 @@ class Executor:
                     
                     # remote crash
                     case 'ERR':
+                        with self.analyzer.lock:
+                            self.analyzer.err_num += 1
                         break
                     
                     # remote hang
                     case 'TIMEOUT':
+                        with self.analyzer.lock:
+                            self.analyzer.timeout_num += 1
                         break
                     
                     # remote close the socket
                     case 'RCLOSED':
+                        with self.analyzer.lock:
+                            self.analyzer.rclose_num += 1
                         break
                     case _:
                         self.last_recv = resp_code

@@ -73,7 +73,10 @@ def make_runtime_table(
         'response num': ana.res_num,
         'exec requ path num': ana.path_num,
         'response types': ana.res_types_num(),
-        'req/res pairs': ana.trans_types_num()
+        'req/res pairs': ana.trans_types_num(),
+        'ERR num': ana.err_num,
+        'TIMEOUT num': ana.timeout_num,
+        'RCLOSE num': ana.rclose_num
     }
 
     for k, v in data.items():

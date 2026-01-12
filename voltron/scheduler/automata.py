@@ -9,16 +9,25 @@ class MealyMachine:
         alphabet,
         delta,
         output,
-        start
+        start,
+        executor
     ) -> None:
         pass
 
     def mem_query(
+        self,
+        word: str
+    ):
+        req_seq = word.split('-')
+        return self.run
+    
+    def equ_query(
         self
     ):
         pass
     
-    def equ_query(
-        self
+    def run(
+        self,
+        req_seq: list[str]
     ):
         pass
