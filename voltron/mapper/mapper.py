@@ -18,6 +18,8 @@ class Mapper:
     ) -> None:
         self.producer = producer
         self.analyzer = analyzer
+        self.gs_path = producer.generator_path
+        self.ps_path = producer.parser_path
         
         self.req_types: list[str] = producer.req_types
         self.res_types: list[str] = producer.res_types
@@ -29,6 +31,18 @@ class Mapper:
         self.equip_parser(self.parsers[-1])
         
         logger.debug('Mapper: finish init')
+    
+    def g_path(
+        self,
+        g: Generator
+    ) -> Path:
+        return self.gs_path / g.msg_type / f'{g.name}.py'
+    
+    def p_path(
+        self,
+        p: Parser
+    ) -> Path:
+        return self.ps_path / f'{p.name}.py'
         
     def generate(
         self,
@@ -36,7 +50,7 @@ class Mapper:
     ) -> bytes:
         name_space = {}
         try:
-            with open(g.path, 'r', encoding='utf-8') as f:
+            with open(self.g_path(g), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
                 obj = name_space[f'generated_{g.msg_type}']

@@ -335,7 +335,7 @@ class Executor:
     ) -> bytes:
         name_space = {}
         try:
-            with open(g.path, 'r', encoding='utf-8') as f:
+            with open(self.mapper.g_path(g), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
                 obj = name_space[f'generated_{g.msg_type}']
@@ -350,7 +350,7 @@ class Executor:
     ):
         name_space = {}
         try:
-            with open(p.path, 'r', encoding='utf-8') as f:
+            with open(self.mapper.p_path(p), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
                 obj = name_space[f'packet_parser']

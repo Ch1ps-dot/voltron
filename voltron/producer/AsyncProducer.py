@@ -17,7 +17,7 @@ class Generator:
     msg_type: message type
     """
     msg_type: str
-    path: str
+    name: str
     evolved_from: str
     cur_res: list[str] = field(default_factory=list)
     pre_res: list[str] = field(default_factory=list)
@@ -39,7 +39,7 @@ class Parser:
     msg_type: message type
     """
     evolved_from: str
-    path: str
+    name: str
     parsed_res: list[str] = field(default_factory=list)
     
     # def __post_init__(self):
@@ -91,7 +91,7 @@ class AsyncProducer:
             try:
                 with open(self.generator_info_path, 'r', encoding='utf-8') as f:
                     generator_info = json.load(f)
-                    self.generators_load(generator_info)
+                    self.generators_info_load(generator_info)
                 logger.debug("Producer: load generator")
             except Exception as e:
                 logger.debug(f'Producer: generator load error {e}')
@@ -103,7 +103,7 @@ class AsyncProducer:
             try:
                 with open(self.parser_info_path, 'r', encoding='utf-8') as f:
                     parser_info = json.load(f)
-                    self.parsers_load(parser_info)
+                    self.parsers_info_load(parser_info)
                 logger.debug("Producer: load parser info")
             except Exception as e:
                 logger.debug(f'Producer: parser load error {e}')
@@ -157,7 +157,7 @@ class AsyncProducer:
             init_gen_path = msg_dir / 'id0.py'
             with open(init_gen_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
-                info: dict = {'msg_type': msg_type, 'evolved_from': 'init', 'path': str(init_gen_path.resolve())}
+                info: dict = {'msg_type': msg_type, 'evolved_from': 'init', 'name': 'id0'}
                 self.generators.setdefault(msg_type, [])
                 self.generators[msg_type].append(Generator(**info))
             
@@ -193,7 +193,7 @@ class AsyncProducer:
         init_p_path = self.parser_path / 'id0.py'
         with open(init_p_path, 'w', encoding='utf-8') as f:
             f.write(result)
-            info: dict = {'evolved_from': 'init', 'path': str(init_p_path.resolve())}
+            info: dict = {'evolved_from': 'init', 'name': 'id0'}
             self.parsers.append(Parser(**info))
         with open(self.parser_info_path, 'w', encoding='utf-8') as f:
             json.dump(self.parser_info(), f)
@@ -217,7 +217,7 @@ class AsyncProducer:
             info.append(asdict(p))
         return info
     
-    def generators_load(
+    def generators_info_load(
         self,
         info: dict
     ):
@@ -225,7 +225,7 @@ class AsyncProducer:
             for g in info[msg_type]:
                 self.generators[msg_type].append(Generator(**g))
                 
-    def parsers_load(
+    def parsers_info_load(
         self,
         info: list
     ):

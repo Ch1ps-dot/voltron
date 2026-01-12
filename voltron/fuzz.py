@@ -46,6 +46,7 @@ class Fuzzer:
         self.post_script =  self.base_path / 'scripts' / self.target_name / 'post.sh'
         self.doc_path = self.base_path / 'rfcs' / f'{self.rfc_name}.txt'
         self.pmp_path = self.base_path / 'prompts'
+        self.eqp_path = self.base_path / 'equipment'
 
         self.time_limit_s = time_limit_min * 60
 
