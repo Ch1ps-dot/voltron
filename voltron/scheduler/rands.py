@@ -21,9 +21,8 @@ class Rands:
     ) -> list[Generator]:
         gs = []
         for i in range(num):
-            randkey =random.choice(self.req_types)
-            gs.append(self.mapper.generators[randkey][0])
-        
+            req_type =random.choice(self.req_types)
+            gs.append(self.mapper.select_generator(req_type))
         return gs
     
     def run(

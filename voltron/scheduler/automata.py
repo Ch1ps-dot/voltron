@@ -1,6 +1,7 @@
 from voltron.analyzer.analyzer import Analyzer
 from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.executor.executor import Executor
 
 class MealyMachine:
     def __init__(
@@ -10,16 +11,18 @@ class MealyMachine:
         delta,
         output,
         start,
-        executor
+        executor: Executor,
+        mapper: Mapper
     ) -> None:
-        pass
+        self.exe = executor
+        self.mapper = mapper
 
     def mem_query(
         self,
         word: str
     ):
         req_seq = word.split('-')
-        return self.run
+        return self.run(req_seq=req_seq)
     
     def equ_query(
         self
@@ -30,4 +33,4 @@ class MealyMachine:
         self,
         req_seq: list[str]
     ):
-        pass
+        gs = self.mapper

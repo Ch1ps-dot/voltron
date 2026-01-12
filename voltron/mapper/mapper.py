@@ -12,9 +12,9 @@ class Mapper:
     Select generator and parser
     """
     def __init__(
-            self,
-            producer: AsyncProducer,
-            analyzer: Analyzer
+        self,
+        producer: AsyncProducer,
+        analyzer: Analyzer
     ) -> None:
         self.producer = producer
         self.analyzer = analyzer
@@ -31,8 +31,8 @@ class Mapper:
         logger.debug('Mapper: finish init')
         
     def generate(
-            self,
-            g: Generator
+        self,
+        g: Generator
     ) -> bytes:
         name_space = {}
         try:
@@ -46,10 +46,25 @@ class Mapper:
             exit(0)
     
     def equip_parser(
-            self,
-            p: Parser
+        self,
+        p: Parser
     ) -> None:
         self.cur_parser = p
+        
+    def select_generators(
+        self,
+        req_seq
+    ) -> list[Generator]:
+        gs: list[Generator] = []
+        for req in req_seq:
+            gs.append(self.generators[req][0])
+        return gs
+    
+    def select_generator(
+        self,
+        req_type
+    ) -> Generator:
+        return self.generators[req_type][0]
             
     # def parse_msg(
     #     self,
