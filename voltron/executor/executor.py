@@ -44,9 +44,6 @@ class Executor:
         self.mapper = mapper # mapper between symbol and message
         self.analyzer = analyzer # runtime analyzer
 
-        self.last_sent = '-'
-        self.last_recv = '-'
-        
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         
@@ -85,8 +82,8 @@ class Executor:
                 return None
 
     def interact(
-            self,
-            generator_seq: list[Generator]
+        self,
+        generator_seq: list[Generator]
     ) -> Tuple[bool, Conversation | None]:  
         """
         TODO: Deal with
@@ -118,6 +115,7 @@ class Executor:
         if(resp_code):
             logger.debug(f'Executor: recv {resp_code}')
             cons.add_state('-', resp_code)
+            cons.add_data(None, resp_data)
 
         # send the message path
         for g in generator_seq:
@@ -326,7 +324,6 @@ class Executor:
                     else:
                         # recv response and parse it
                         resp_code: str = self.parser_func(buf)
-                        self.last_recv = resp_code
                         
                         # update some analysis data
                         with self.analyzer.lock:

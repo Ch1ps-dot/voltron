@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aalpy>=1.5.3",
+    "click>=8.3.1",
     "fastbm25>=0.0.2",
     "lxml>=6.0.2",
     "numpy>=2.4.0",

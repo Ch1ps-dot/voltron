@@ -163,5 +163,3 @@ class Fuzzer:
             self.analyzer.collect_results()
         sys.exit(0)
         
-
-    

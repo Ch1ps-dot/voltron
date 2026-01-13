@@ -4,19 +4,19 @@ class Conversation:
     Maybe record more information in future
     """
     def __init__(self) -> None:
-        self.cons: list[list[bytes]] = []
-        self.trans: list[list[str]] = []
+        self.content: list[list[bytes | None]] = []
+        self.trans: list[list[str | None]] = []
         
     def add_data(
         self,
-        request,
-        response
+        request: bytes | None,
+        response: bytes | None
     ):
-        self.cons.append([request, response])
+        self.content.append([request, response])
         
     def add_state(
         self,
-        req_code,
-        res_code
+        req_code: str | None,
+        res_code: str | None
     ):
         self.trans.append([req_code, res_code])
