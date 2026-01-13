@@ -360,7 +360,7 @@ class Executor:
                 return obj()
         except Exception as e:
             logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.extract_stack())
+            logger.debug(traceback.format_exc())
             return None
     
     def load_parser(
