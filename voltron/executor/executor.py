@@ -113,7 +113,6 @@ class Executor:
                 
         # maybe recv initialize message
         if(resp_code):
-            logger.debug(f'Executor: recv {resp_code}')
             cons.add_state('-', resp_code)
             cons.add_data(None, resp_data)
 
@@ -161,7 +160,6 @@ class Executor:
                         # record conversation data
                         cons.add_data(req_data, resp_data)
                         cons.add_state(g.msg_type, resp_code)
-                        logger.debug(f'Executor: recv {resp_code}')
             
             # If socket closed, stop sending
             else:
@@ -212,7 +210,6 @@ class Executor:
 
         use poll to monitor the status of socket
         """
-        logger.debug("net_send: begin send")
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
             return False, None
@@ -239,7 +236,7 @@ class Executor:
                 if event & select.POLLOUT:
                     
                     sock.sendall(msg)
-
+                    logger.debug(f'net_send: {msg}')
                     return True, msg
             
             # TODO: support udp
@@ -258,7 +255,6 @@ class Executor:
 
         use poll to monitor the status of socket
         """
-        logger.debug("Executor: begin recv")
         # check clinet socket before response
         if sock is None or sock.fileno() < 0:
             logger.debug("Executor: socket closed")
@@ -271,8 +267,6 @@ class Executor:
         """
         poller = select.poll()
         poller.register(sock, select.POLLIN | select.POLLERR)
-
-        logger.debug('Executor: begin recv')
         
         try:
             if (self.trans_layer == 'tcp'):
@@ -316,7 +310,7 @@ class Executor:
 
                 if event & select.POLLIN:
                     buf = sock.recv(1024)
-                    logger.debug(f'recv {buf}')
+                    logger.debug(f'net_recv: recv {buf}')
                     
                     #TODO: handle invalid response
                     
@@ -384,7 +378,7 @@ class Executor:
         """Load rfc parser 
         """
         with open(self.cons_path / "section_tree.pkl", "rb") as f:
-            self.st = pickle.load(f)
+            pickle.load(f)
         
     def save_cons(
             self,
@@ -394,4 +388,4 @@ class Executor:
         """
         with open(self.cons_path / "section_tree.pkl", "wb") as f:
             pickle.dump(cons, f)
-            logger.debug("RFCParser: save sectiontree")  
+            logger.debug("Executor: save cons")  

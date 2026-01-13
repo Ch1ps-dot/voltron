@@ -25,7 +25,6 @@ class Mapper:
         self.res_types: list[str] = producer.res_types
         
         self.generators: dict[str, list[Generator]] = producer.generators
-        logger.debug(self.generators)
         self.parsers: list[Parser] = producer.parsers
         
         self.cur_parser: Parser

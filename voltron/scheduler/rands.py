@@ -30,8 +30,8 @@ class Rands:
     ) -> None:
         gs = self.select(10)
         _, cons = self.exe.interact(gs)
-        if(self.is_interesting(cons) and cons):
-            self.exe.save_cons(cons)
+        # if(self.is_interesting(cons) and cons):
+        #     self.exe.save_cons(cons)
         
     def is_interesting(
         self,
