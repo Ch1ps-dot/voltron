@@ -57,8 +57,8 @@ class Mapper:
                 obj = name_space[f'generated_{g.msg_type}']
                 return obj()
         except Exception as e:
-            logger.error(f'Mapper: generated failure {e}')
-            logger.error(traceback.extract_stack())
+            logger.debug(f'Mapper: generated failure {e}')
+            logger.debug(traceback.extract_stack())
             sys.exit(1)
             
     
