@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys
+import yaml, time, threading, signal, sys, traceback
 
 from voltron.utils.logger import logger
 
@@ -16,6 +16,8 @@ from voltron.mapper.mapper import Mapper
 from voltron.scheduler.rands import Rands
 from voltron.utils.ui import ui_loop
 
+from voltron.configs import configs
+
 
 class Fuzzer:
     def __init__(
@@ -26,27 +28,19 @@ class Fuzzer:
 
         self.base_path = Path(__file__).resolve().parents[1]
 
-        self.configs: dict
-        with open(self.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:
-            self.configs = yaml.safe_load(f)
-        if(self.configs == None):
-            logger.debug('No Configs') 
-            exit(0)
-
         # key parameter of protocol
-        self.pro_name = self.configs[target_name]['protocol']
+        self.pro_name = configs[target_name]['protocol']
         self.target_name = target_name
-        self.host = self.configs[target_name]['host']
-        self.tra_layer = self.configs[target_name]['trans_layer']
-        self.port = self.configs[target_name]['port']
-        self.rfc_name = self.configs[target_name]['rfc_name']
+        self.host = configs[target_name]['host']
+        self.tra_layer = configs[target_name]['trans_layer']
+        self.port = configs[target_name]['port']
+        self.rfc_name = configs[target_name]['rfc_name']
 
         # some file path 
-        self.pre_script = self.base_path / 'scripts' / self.target_name / 'pre.sh'
-        self.post_script =  self.base_path / 'scripts' / self.target_name / 'post.sh'
-        self.doc_path = self.base_path / 'rfcs' / f'{self.rfc_name}.txt'
-        self.pmp_path = self.base_path / 'prompts'
-        self.eqp_path = self.base_path / 'equipment'
+        self.pre_script = self.base_path / 'input' / 'scripts' / self.target_name / 'pre.sh'
+        self.post_script =  self.base_path / 'input' / 'scripts' / self.target_name / 'post.sh'
+        self.doc_path = self.base_path / 'input' / 'rfcs' / f'{self.rfc_name}.txt'
+        self.pmp_path = self.base_path / 'input' / 'prompts'
 
         self.time_limit_s = time_limit_min * 60
 
@@ -58,8 +52,7 @@ class Fuzzer:
 
         # llm init
         self.chater = AsyncChater(
-            self.pmp_path, 
-            self.configs
+            self.pmp_path
         )
         print('Chater: setup')
         
@@ -111,7 +104,6 @@ class Fuzzer:
         """
         fuzz_loop = None
         
-        logger.debug(f'[Begin Fuzzing]')
         match algo:
             case 'rand':
                 fuzz_loop = self.rand_fuzz
@@ -146,14 +138,15 @@ class Fuzzer:
             self,
             stop_event: threading.Event
     ):
-        pass
         while not stop_event.is_set():
             try:
                 fuzz = Rands(mapper=self.mapper, executor=self.exe)
-                fuzz.run()
+                if not fuzz.run():
+                    stop_event.set()
             except Exception as e:
                 logger.debug(f'Fuzzer: exit {e}')
-                exit(0)
+                logger.debug(traceback.format_exc())
+                stop_event.set()
             if (self.time_limit_s < time.time() - self.analyzer.start_time):
                 stop_event.set()
                 logger.debug('Fuzzer: timeout')

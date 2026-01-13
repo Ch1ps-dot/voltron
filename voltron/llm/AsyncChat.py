@@ -6,14 +6,14 @@ from string import Template
 
 from voltron.llm.prompt import Prompter
 from voltron.utils.logger import logger
+from voltron.configs import configs
 
 class AsyncChater:
     """Chat with llm through api and manage the context.
     """
     def __init__(
             self,
-            dir: Path,
-            configs
+            dir: Path
     ) -> None:
         self.configs = configs
         client = AsyncOpenAI(

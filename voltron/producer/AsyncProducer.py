@@ -8,6 +8,7 @@ from dataclasses import dataclass, asdict, field
 
 from voltron.rfcparser.AsyncRFCparser import AsyncRFCParser
 from voltron.utils.logger import logger
+from voltron.configs import configs
 from voltron.llm.AsyncChat import AsyncChater
 
 @dataclass
@@ -61,9 +62,10 @@ class AsyncProducer:
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.producer_path = base_path / 'equipment' / rfcp.pro_name
+        self.producer_path = base_path / 'output' / 'equipment' / rfcp.pro_name
         self.generator_path = self.producer_path / 'generators'
         self.parser_path = self.producer_path / 'parsers'
+        
         self.generator_info_path = self.generator_path / 'generator_info.json'
         self.parser_info_path = self.parser_path / 'parser_info.json'
 
@@ -135,7 +137,7 @@ class AsyncProducer:
     async def _generator_gen_async(
             self
     ):
-        sem = asyncio.Semaphore(8)
+        sem = asyncio.Semaphore(configs['llm']['async_sem'])
         tasks = [
             self._generator_gen_one(msg, sem)
             for msg in self.req_ir.findall("message") 

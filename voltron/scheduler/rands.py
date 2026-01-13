@@ -1,6 +1,6 @@
 from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator
-from voltron.executor.executor import Executor
+from voltron.executor.executor import Executor, Conversation
 import random, time
 
 random.seed(time.time())
@@ -29,5 +29,15 @@ class Rands:
         self
     ) -> None:
         gs = self.select(10)
-        self.exe.communicate(gs)
+        _, cons = self.exe.interact(gs)
+        if(self.is_interesting(cons) and cons):
+            self.exe.save_cons(cons)
         
+    def is_interesting(
+        self,
+        cons: Conversation | None
+    ) -> bool:
+        if (cons):
+            return True
+        else:
+            return False

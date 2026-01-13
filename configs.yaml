@@ -16,3 +16,4 @@ llm:
   base_url: https://xiaoai.plus/v1
   api_key: sk-3aNTqYiVNoiOsKXJMUsfmpTEEIdVbS4YXrHhheHRYTsNbMD9
   model: gpt-5-mini-2025-08-07
+  async_sem: 8

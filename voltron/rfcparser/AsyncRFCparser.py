@@ -9,6 +9,7 @@ from fastbm25 import fastbm25
 from voltron.rfcparser.setciontree import SectionTree, SectionNode
 from voltron.utils.logger import logger
 from voltron.llm.AsyncChat import AsyncChater
+from voltron.configs import configs
 
 
 class AsyncRFCParser:
@@ -49,7 +50,7 @@ class AsyncRFCParser:
         self.res_types: list[str]
         self.req_doc: list = []
         self.res_doc: list = []
-        self.ir_path = base_path / 'ir' / pro_name
+        self.ir_path = base_path / 'output' / 'ir' / pro_name
 
         self.poss_res: dict[str, str] = {}
         self.req_res_map: dict[str, str] = {}
@@ -64,13 +65,13 @@ class AsyncRFCParser:
         fn = self.ir_path / "section_tree.pkl"
         if(fn.is_file()):
             self.load_st()
-            logger.debug('[RFC Parse]: load parser')
+            logger.debug('RFCParser: load parser')
             self._query_prepare()
         else:
             self.spe_parse()
-            logger.debug('[RFC Parse]: parse document')
+            logger.debug('RFCParser: parse document')
             self._query_prepare()
-        logger.debug('[RFC Parse]: finish parse')
+        logger.debug('RFCParser: finish parse')
 
         self.rag_req_msg: fastbm25 = self.rag_init(self.req_doc)
         self.rag_res_msg: fastbm25 = self.rag_init(self.res_doc)
@@ -139,6 +140,8 @@ class AsyncRFCParser:
             self
     ) -> None:
         """State Model Generation"""
+        # infer possible response
+        asyncio.run(self._poss_response_async())
         # infer dependency in method
         asyncio.run(self._state_dependency_async())
 
@@ -170,7 +173,7 @@ class AsyncRFCParser:
     async def _spe_parse_aync(
             self
     ):
-        sem = asyncio.Semaphore(4)
+        sem = asyncio.Semaphore(configs['llm']['async_sem'])
         tasks = [
             self._spe_parse_one(node, sem)
             for node in self.st.leafs
@@ -292,18 +295,24 @@ class AsyncRFCParser:
             self,
             field_type
     ):
-        # request message IR generation
-        req_ir_path =  self.ir_path / f'{field_type}_ir.xml'
-        if (req_ir_path.is_file()):
-            self.req_ir = etree.parse(req_ir_path)
-            logger.debug(f'[IR Generation]: {field_type} ir load')
+        # message IR generation
+        if (field_type == 'req'):
+            ir_path =  self.ir_path / 'req_ir.xml'
+        elif (field_type == 'res'):
+            ir_path =  self.ir_path / 'res_ir.xml'
+        if (ir_path.is_file()):
+            if (field_type == 'req'):
+                self.req_ir = etree.parse(ir_path)
+            elif (field_type == 'res'):
+                self.res_ir = etree.parse(ir_path)
+            logger.debug(f'RFCParser: {field_type} ir load')
         else:
             root = etree.Element('ir')
-            sem = asyncio.Semaphore(4)
+            sem = asyncio.Semaphore(configs['llm']['async_sem'])
 
             tasks = [
                 self._msg_model_gen_one(msg_type, sem)
-                for msg_type in self.res_types
+                for msg_type in self.req_types
             ]
 
             results = await tqdm_asyncio.gather(*tasks, desc=f"{field_type} msg ir")
@@ -312,13 +321,16 @@ class AsyncRFCParser:
 
             tree = etree.ElementTree(root)
             tree.write( 
-                req_ir_path,
+                ir_path,
                 encoding="UTF-8",
                 xml_declaration=True,
                 pretty_print=True,
                 standalone="yes"
             )
-            self.req_ir = etree.parse(req_ir_path)
+            if (field_type == 'req'):
+                self.req_ir = etree.parse(ir_path)
+            elif (field_type == 'res'):
+                self.res_ir = etree.parse(ir_path)
     
     async def _poss_response_async(
             self
@@ -329,7 +341,7 @@ class AsyncRFCParser:
                 self.poss_res = json.load(f)
             logger.debug('RFCParser: poss response load')
         else:
-            sem = asyncio.Semaphore(4)
+            sem = asyncio.Semaphore(configs['llm']['async_sem'])
             tasks = [
                 self._poss_response_one(req_type, sem)
                 for req_type in self.req_types
@@ -366,9 +378,9 @@ class AsyncRFCParser:
         if (req_res_map_path.is_file()):
             with open(req_res_map_path, 'r', encoding='utf-8') as f:
                 self.req_res_map = json.load(f)
-            logger.debug('[IR Generation]: request description load')
+            logger.debug('RFCParser: request description load')
         else:
-            sem = asyncio.Semaphore(8)
+            sem = asyncio.Semaphore(configs['llm']['async_sem'])
             tasks = [
                 self._state_dependency_one(res, req, sem)
                 for res in self.res_types
@@ -466,7 +478,7 @@ class AsyncRFCParser:
         """
         with open(self.ir_path / "section_tree.pkl", "wb") as f:
             pickle.dump(self.st, f)
-            logger.debug("[Save Sectiontree]")   
+            logger.debug("RFCParser: save sectiontree")   
 
     def rag_init(
         self,

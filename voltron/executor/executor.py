@@ -1,12 +1,14 @@
 import subprocess
 from pathlib import Path
-import time, select, socket
-from typing import Callable
+import time, select, socket, pickle
+from typing import Callable, Tuple
 
+from voltron.configs import base_path
 from voltron.utils.logger import logger
 from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
 from voltron.analyzer.analyzer import Analyzer
+from voltron.executor.conversation import Conversation
 import math, statistics, threading
 
 class Executor:
@@ -47,6 +49,10 @@ class Executor:
         
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
+        
+        self.cons_path = base_path / 'testcases'
+        if (not self.cons_path.is_dir()):
+            self.cons_path.mkdir()
 
     def post_exe(
             self
@@ -78,10 +84,10 @@ class Executor:
                 logger.debug(f'[SUT Setup Failure]: {e}')
                 return None
 
-    def communicate(
+    def interact(
             self,
             generator_seq: list[Generator]
-    ):  
+    ) -> Tuple[bool, Conversation | None]:  
         """
         TODO: Deal with
         """
@@ -89,11 +95,11 @@ class Executor:
         proc = self.pre_exe()
         if proc is None:
             logger.debug(f'Executor: SUT Setup Failure')
-            exit(1)
+            return False, None
         if proc.poll() is not None: 
             out, err = proc.communicate()
             logger.debug(f'Executor: SUT Setup Failure:{err}')
-            exit(1)
+            return False, None
 
         # wait for server setup
         time.sleep(self.setup_time_s)
@@ -102,44 +108,53 @@ class Executor:
             logger.debug('Executor: Socket Setup Failure' )
             if proc.poll() is None:
                 proc.terminate()
-            exit(1)
-            return
+            return False, None
         
-        resp_code = self.net_recv(sock=sock)
+        # keep request and response in Conversation
+        cons: Conversation = Conversation()
+        resp_code, resp_data = self.net_recv(sock=sock)
                 
-        # recv initialize message
+        # maybe recv initialize message
         if(resp_code):
             logger.debug(f'Executor: recv {resp_code}')
+            cons.add_state('-', resp_code)
 
         # send the message path
         for g in generator_seq:
 
             # send message and parse response
-            if(self.net_send(g, sock)):
-                resp_code = self.net_recv(sock=sock)
+            flag, req_data = self.net_send(g, sock)
+            if(flag):
+                resp_code, resp_data = self.net_recv(sock=sock)
                 
-                # handle response. If socket closed, stop sending.
                 match resp_code:
                     
                     # remote crash
                     case 'ERR':
+                        cons.add_state(g.msg_type, 'ERR')
                         with self.analyzer.lock:
                             self.analyzer.err_num += 1
                         break
                     
                     # remote hang
                     case 'TIMEOUT':
+                        cons.add_state(g.msg_type, 'TIMEOUT')
                         with self.analyzer.lock:
                             self.analyzer.timeout_num += 1
                         break
                     
                     # remote close the socket
                     case 'RCLOSED':
+                        cons.add_state(g.msg_type, 'RCLOSED')
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
                         break
                     case _:
                         self.last_recv = resp_code
+                        
+                        # record conversation data
+                        cons.add_data(req_data, resp_data)
+                        cons.add_state(g.msg_type, resp_code)
                         logger.debug(f'Executor: recv {resp_code}')
             
             # If socket closed, stop sending
@@ -157,6 +172,7 @@ class Executor:
             proc.terminate()
 
         self.post_exe()
+        return True, cons
     
     def setup_socket(
             self
@@ -185,7 +201,7 @@ class Executor:
             self, 
             g : Generator,
             sock: socket.socket
-    ):
+    ) -> Tuple[bool, bytes | None]:
         """Send message over network
 
         use poll to monitor the status of socket
@@ -193,7 +209,7 @@ class Executor:
         logger.debug("net_send: begin send")
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
-            return False
+            return False, None
         
         poller = select.poll()
         poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
@@ -204,14 +220,14 @@ class Executor:
                 events = poller.poll(self.send_time_ms)
                 if not events:
                     logger.debug("net_send: poll timeout")
-                    return False
+                    return False, None
 
                 fd, event = events[0]
 
                 # handler poll error and hup
                 if event & (select.POLLERR | select.POLLHUP):
                     logger.debug("net_send: poll error / hup")
-                    return False
+                    return False, None
 
                 # send message
                 if event & select.POLLOUT:
@@ -222,7 +238,7 @@ class Executor:
                         self.analyzer.req_num = self.analyzer.req_num + 1
                         self.analyzer.req_types_update(g.msg_type)
                         self.analyzer.last_generator = g
-                    return True
+                    return True, msg
             
             # TODO: support udp
             elif (self.trans_layer == 'udp'):
@@ -231,12 +247,12 @@ class Executor:
         finally:
             poller.unregister(sock)
 
-        return False
+        return False, None
     
     def net_recv(
             self, 
             sock: socket.socket
-    ) -> str | None:
+    ) -> Tuple[str | None, bytes | None]:
         """Recv message over network
 
         use poll to monitor the status of socket
@@ -245,7 +261,7 @@ class Executor:
         # check clinet socket before response
         if sock is None or sock.fileno() < 0:
             logger.debug("Executor: socket closed")
-            return None
+            return None, None
         
         """ 
         Remote Socket Normal Close (FIN): poll in, recv value 0
@@ -288,13 +304,13 @@ class Executor:
                 # handler recv timeout
                 if not events:
                     logger.debug('Executor: recv time out')
-                    return 'TIMEOUT'
+                    return 'TIMEOUT', None
                 
                 fd, event = events[0]
                 
                 if event & (select.POLLERR):
                     logger.debug("Executor: recv poll error")
-                    return 'ERR'
+                    return 'ERR', None
                 # response can be read
 
                 if event & select.POLLIN:
@@ -306,7 +322,7 @@ class Executor:
                     # if buf size is 0, socket close
                     if len(buf) == 0:
                         logger.debug('Executor: remote socket closed')
-                        return 'RCLOSED'
+                        return 'RCLOSED', None
                     else:
                         # recv response and parse it
                         resp_code: str = self.parser_func(buf)
@@ -319,16 +335,17 @@ class Executor:
                             if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
                                 self.analyzer.last_generator.cur_res.append(resp_code)
                                 
-                        return resp_code
+                        return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):
                 buf, _ = sock.recvfrom(1024)
-                return self.parser_func(buf)
+                resp_code = self.parser_func(buf)
+                return resp_code, buf
             
         finally:
             poller.unregister(sock)
     
-        return None
+        return None, None
     
     def exe_generator(
         self,
@@ -359,3 +376,22 @@ class Executor:
         except Exception as e:
             logger.error(f'Mapper: generated failure {e}')
             exit(0)
+    
+    def load_cons(
+            self,
+            cons: Conversation
+    ):
+        """Load rfc parser 
+        """
+        with open(self.cons_path / "section_tree.pkl", "rb") as f:
+            self.st = pickle.load(f)
+        
+    def save_cons(
+            self,
+            cons: Conversation
+    ):
+        """Use pickle to store section tree instance
+        """
+        with open(self.cons_path / "section_tree.pkl", "wb") as f:
+            pickle.dump(cons, f)
+            logger.debug("RFCParser: save sectiontree")  
