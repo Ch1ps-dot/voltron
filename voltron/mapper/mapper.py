@@ -45,23 +45,21 @@ class Mapper:
     ) -> Path:
         return self.ps_path / f'{p.name}.py'
         
-    def generate(
-        self,
-        g: Generator
-    ) -> bytes:
-        name_space = {}
-        try:
-            with open(self.g_path(g), 'r', encoding='utf-8') as f:
-                code = f.read()
-                exec(code, name_space)
-                obj = name_space[f'generated_{g.msg_type}']
-                return obj()
-        except Exception as e:
-            logger.debug(f'Mapper: generated failure {e}')
-            logger.debug(traceback.extract_stack())
-            sys.exit(1)
-            
-    
+    # def generate(
+    #     self,
+    #     g: Generator
+    # ) -> bytes | None:
+    #     name_space = {}
+    #     try:
+    #         with open(self.g_path(g), 'r', encoding='utf-8') as f:
+    #             code = f.read()
+    #             exec(code, name_space)
+    #             obj = name_space[f'generated_{g.msg_type}']
+    #             return obj()
+    #     except Exception as e:
+    #         logger.debug(f'Mapper: generated failure {e}')
+    #         logger.debug(traceback.extract_stack())
+    #         return None
     def equip_parser(
         self,
         p: Parser

@@ -9,7 +9,7 @@ from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
 from voltron.analyzer.analyzer import Analyzer
 from voltron.executor.conversation import Conversation
-import math, statistics, threading
+import math, statistics, threading, traceback
 
 class Executor:
     def __init__(
@@ -121,8 +121,16 @@ class Executor:
         for g in generator_seq:
 
             # send message and parse response
-            flag, req_data = self.net_send(g, sock)
+            msg = self.exe_generator(g)
+            if msg == None:
+                return False, None
+            
+            flag, req_data = self.net_send(msg, sock)
             if(flag):
+                with self.analyzer.lock:
+                    self.analyzer.req_num = self.analyzer.req_num + 1
+                    self.analyzer.req_types_update(g.msg_type)
+                    self.analyzer.last_generator = g
                 resp_code, resp_data = self.net_recv(sock=sock)
                 
                 match resp_code:
@@ -197,7 +205,7 @@ class Executor:
 
     def net_send(
             self, 
-            g : Generator,
+            msg : bytes,
             sock: socket.socket
     ) -> Tuple[bool, bytes | None]:
         """Send message over network
@@ -229,18 +237,13 @@ class Executor:
 
                 # send message
                 if event & select.POLLOUT:
-                    msg = self.exe_generator(g)
+                    
                     sock.sendall(msg)
 
-                    with self.analyzer.lock:
-                        self.analyzer.req_num = self.analyzer.req_num + 1
-                        self.analyzer.req_types_update(g.msg_type)
-                        self.analyzer.last_generator = g
                     return True, msg
             
             # TODO: support udp
             elif (self.trans_layer == 'udp'):
-                msg = self.exe_generator(g)
                 sock.sendto(msg, (self.host, self.port))
         finally:
             poller.unregister(sock)
@@ -347,7 +350,7 @@ class Executor:
     def exe_generator(
         self,
         g: Generator
-    ) -> bytes:
+    ) -> bytes | None:
         name_space = {}
         try:
             with open(self.mapper.g_path(g), 'r', encoding='utf-8') as f:
@@ -356,8 +359,9 @@ class Executor:
                 obj = name_space[f'generated_{g.msg_type}']
                 return obj()
         except Exception as e:
-            logger.error(f'Mapper: generated failure {e}')
-            exit(0)
+            logger.debug(f'Executor: generated failure {e}')
+            logger.debug(traceback.extract_stack())
+            return None
     
     def load_parser(
         self,
@@ -371,8 +375,7 @@ class Executor:
                 obj = name_space[f'packet_parser']
                 self.parser_func = obj
         except Exception as e:
-            logger.error(f'Mapper: generated failure {e}')
-            exit(0)
+            logger.debug(f'Mapper: generated failure {e}')
     
     def load_cons(
             self,
