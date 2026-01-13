@@ -4,29 +4,27 @@ def generate_LIST():
     - Output: bytes
     """
     
+    message = b''
+    
     import random
     import string
 
-    message = b''
-    
-    # CommandCode: constant "LIST" (4B)
+    # CommandCode: constant "LIST"
     message += b'LIST'
 
-    # Decide whether to include a pathname argument.
-    # If a pathname is included, emit the Whitespace constant (0x20) then the Pathname.
-    include_path = random.choice([True, True, True, False])  # bias towards including a pathname
+    # Generate a pathname argument (optional). We'll include one to exercise the Whitespace field.
+    # Pathname: ASCII excluding CR(0x0D) and LF(0x0A). Choose a reasonable length.
+    allowed_chars = string.ascii_letters + string.digits + "/._-"
+    pathname_length = random.randint(1, 20)
+    pathname = ''.join(random.choice(allowed_chars) for _ in range(pathname_length))
 
-    if include_path:
-        # Whitespace: constant 0x20 (1B)
-        message += bytes([0x20])
+    # Whitespace (0x20) present because we include a pathname
+    message += b' '
 
-        # Pathname: variable, ASCII excluding CR/LF. Choose a reasonable length (1-16).
-        length = random.randint(1, 16)
-        allowed_chars = string.ascii_letters + string.digits + "/._- "  # exclude CR (0x0D) and LF (0x0A)
-        pathname = ''.join(random.choice(allowed_chars) for _ in range(length))
-        message += pathname.encode('ascii')
+    # Pathname encoded as ASCII
+    message += pathname.encode('ascii')
 
-    # EndOfLine: constant CR LF (0x0D0A) (2B)
-    message += b'\x0D\x0A'
+    # EndOfLine: CR LF (0x0D0A)
+    message += b'\r\n'
     
     return message

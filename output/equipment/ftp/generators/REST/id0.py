@@ -4,26 +4,22 @@ def generate_REST():
     - Output: bytes
     """
     
-    message = b''
-    
-    # Python code that constructs the message
-    # strictly following the provided protoIR specification
     import random
 
+    message = b''
+
     # CommandCode: constant "REST" (4 bytes ASCII)
-    command = b'REST'
+    message += b'REST'
 
-    # SP: constant 0x20 (single space)
-    sp = bytes([0x20])
+    # SP: single space 0x20
+    message += b'\x20'
 
-    # Marker: variable, decimal-integer (ASCII digits '0'-'9'), >= 0
-    # Length is undefined; choose a reasonable value within protocol conventions
-    marker_value = random.randint(0, 1000000)  # choose a non-negative integer
-    marker = str(marker_value).encode('ascii')
+    # Marker: variable, ASCII decimal integer >= 0, length undefined -> choose a random non-negative integer
+    marker_int = random.randint(0, 2**31 - 1)
+    marker_bytes = str(marker_int).encode('ascii')
+    message += marker_bytes
 
     # CRLF: constant 0x0D0A
-    crlf = bytes([0x0d, 0x0a])
-
-    message = command + sp + marker + crlf
+    message += b'\x0d\x0a'
 
     return message

@@ -6,10 +6,13 @@ def generate_CDUP():
     
     message = b''
     
-    # CommandCode: literal "CDUP" (4 ASCII characters)
-    message += b'CDUP'
+    # Field 1: CommandCode (constant "CDUP", 4 ASCII bytes)
+    command_code = b'CDUP'
     
-    # EndOfLine: CRLF sequence (0x0D0A)
-    message += b'\x0D\x0A'
+    # Field 2: EndOfLine (constant CRLF, 2 bytes 0x0D0A)
+    end_of_line = b'\x0D\x0A'
+    
+    # Concatenate fields in the exact order
+    message = command_code + end_of_line
     
     return message

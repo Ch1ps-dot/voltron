@@ -3,29 +3,28 @@ def generate_RMD():
     - Input: none
     - Output: bytes
     """
-    
-    message = b''
-    
     import random
     import string
 
-    # Field 1: CommandCode (constant, 3B) -> "RMD"
-    command = b'RMD'
+    message = b''
 
-    # Field 2: Separator (constant, 1B) -> 0x20 (space)
-    separator = b'\x20'
+    # CommandCode: constant "RMD" (3 bytes)
+    message += b'RMD'
 
-    # Field 3: Pathname (variable, undefined length) -> ASCII excluding CR, LF
-    # Choose a reasonable length and characters allowed by FTP pathname semantics.
-    allowed = string.ascii_letters + string.digits + "/._- "  # spaces allowed; exclude CR and LF
-    pathname_length = random.randint(1, 16)  # choose a reasonable length
-    pathname_str = ''.join(random.choice(allowed) for _ in range(pathname_length))
-    pathname = pathname_str.encode('ascii')
+    # Separator: single SPACE (0x20)
+    message += b'\x20'
 
-    # Field 4: EndOfLine (constant, 2B) -> 0x0D0A (CRLF)
-    eol = b'\x0d\x0a'
+    # Pathname: variable, ASCII excluding CR and LF, choose a reasonable length
+    # Allowed characters: letters, digits, common pathname symbols, and space
+    allowed_chars = string.ascii_letters + string.digits + "-_./ "
+    pathname_length = random.randint(1, 32)  # reasonable length for a pathname
+    pathname = ''.join(random.choices(allowed_chars, k=pathname_length))
+    # Ensure pathname is not all spaces (still valid per spec but undesirable)
+    if pathname.strip() == '':
+        pathname = 'dir' + pathname[0: max(0, pathname_length - 3)]
+    message += pathname.encode('ascii')
 
-    # Concatenate fields in order
-    message = command + separator + pathname + eol
+    # EndOfLine: CRLF (0x0D0A)
+    message += b'\x0d\x0a'
 
     return message

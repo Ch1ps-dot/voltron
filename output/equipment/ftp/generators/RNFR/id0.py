@@ -9,31 +9,33 @@ def generate_RNFR():
 
     message = b''
 
-    # CommandCode: constant "RNFR" (4 bytes)
-    command_code = b'RNFR'
+    # CommandCode: constant "RNFR" (4 bytes ASCII)
+    message += b'RNFR'
 
-    # Whitespace: single SPACE (0x20)
-    whitespace = b'\x20'
+    # Whitespace: single SP (0x20)
+    message += bytes([0x20])
 
-    # Pathname: variable, ASCII excluding CR and LF, may include space.
-    # Choose a reasonable random length between 1 and 32 and generate from allowed ASCII chars.
-    allowed_chars = string.ascii_letters + string.digits + string.punctuation + ' '
-    # Ensure CR and LF are not included (they are not in the above sets, but filter defensively)
-    allowed_chars = ''.join(ch for ch in allowed_chars if ch not in '\r\n')
+    # Pathname: variable length, ASCII excluding CR and LF, may include SP
+    # Choose a reasonable length and ensure at least one non-space character
+    min_len = 1
+    max_len = 64
+    pathname_len = random.randint(min_len, max_len)
 
-    path_length = random.randint(1, 32)
-    # Ensure the pathname is a sensible filename (avoid producing only spaces)
-    while True:
-        pathname_str = ''.join(random.choices(allowed_chars, k=path_length))
-        if any(ch != ' ' for ch in pathname_str):
-            break
+    non_space_chars = string.ascii_letters + string.digits + "._-/"  # allowed non-space characters
+    allowed_chars = non_space_chars + " "  # spaces allowed
 
-    pathname = pathname_str.encode('ascii')
+    if pathname_len == 1:
+        pathname = random.choice(non_space_chars)
+    else:
+        # ensure first char is non-space to avoid an all-space pathname
+        first_char = random.choice(non_space_chars)
+        rest = ''.join(random.choice(allowed_chars) for _ in range(pathname_len - 1))
+        pathname = first_char + rest
+
+    pathname_bytes = pathname.encode('ascii')
+    message += pathname_bytes
 
     # EndOfLine: CRLF (0x0D0A)
-    end_of_line = b'\x0d\x0a'
-
-    # Concatenate fields in the exact order
-    message = command_code + whitespace + pathname + end_of_line
+    message += b'\x0d\x0a'
 
     return message

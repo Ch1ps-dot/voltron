@@ -6,12 +6,10 @@ def generate_REIN():
     
     message = b''
     
-    # CommandCode: constant 4B value "REIN"
-    command_code = b'REIN'
-    message += command_code
-
-    # EndOfLine: constant 2B value 0x0D0A (CR LF)
-    end_of_line = bytes.fromhex('0D0A')
-    message += end_of_line
-
+    # Field 1: CommandCode (constant, 4B) -> ASCII "REIN"
+    message += b'REIN'
+    
+    # Field 2: EndOfLine (constant, 2B) -> 0x0D0A (CR LF)
+    message += bytes.fromhex('0D0A')
+    
     return message

@@ -8,13 +8,9 @@ def generate_SYST():
     
     # Python code that constructs the message
     # strictly following the provided protoIR specification
-
-    # Field 1: CommandCode (constant, 4B, value="SYST")
-    command_code = b'SYST'  # ASCII bytes for "SYST"
-    message += command_code
-
-    # Field 2: EndOfLine (constant, 2B, value="0x0D0A")
-    end_of_line = bytes.fromhex('0D0A')  # CRLF
-    message += end_of_line
-
+    # Field 1: CommandCode (constant "SYST", 4 bytes)
+    message += b"SYST"
+    # Field 2: EndOfLine (constant 0x0D0A, CRLF, 2 bytes)
+    message += bytes.fromhex('0D0A')
+    
     return message

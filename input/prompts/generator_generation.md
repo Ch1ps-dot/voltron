@@ -16,6 +16,15 @@ You will be given:
 
 The msg_ir describes the **exact message format**, including field order, field types, lengths, and allowed values.
 
+* **SUT (Server Under Test) Information**: 
+  $info
+  
+  - The SUT information above may include:
+    - Observed server responses (e.g., error codes, rejection reasons)
+    - Accepted / rejected field values
+    - Transport-layer behavior
+    - State-related constraints inferred from prior interactions
+
 ---
 
 ### **Your Task**

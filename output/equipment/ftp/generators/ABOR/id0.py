@@ -6,10 +6,10 @@ def generate_ABOR():
     
     message = b''
     
-    # CommandCode: constant ASCII 'ABOR' (4 bytes)
+    # Field: CommandCode (constant "ABOR", 4 bytes ASCII)
     message += b'ABOR'
     
-    # EndOfLine: constant CRLF (0x0D0A)
-    message += bytes.fromhex('0d0a')
+    # Field: EndOfLine (constant 0x0D0A, CRLF)
+    message += b'\x0D\x0A'
     
     return message

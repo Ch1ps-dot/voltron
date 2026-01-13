@@ -8,25 +8,25 @@ def generate_APPE():
     
     import random
 
-    # CommandCode (constant "APPE")
-    command = b'APPE'
+    # Field 1: CommandCode (constant "APPE", 4 bytes)
+    command_code = b'APPE'
 
-    # Whitespace (constant 0x20)
+    # Field 2: Whitespace (constant 0x20, 1 byte)
     whitespace = b'\x20'
 
-    # Pathname (variable, US-ASCII excluding CR, LF, length undefined -> choose reasonable length)
-    # Use printable US-ASCII range 0x20..0x7E (space through ~), which excludes CR (0x0D) and LF (0x0A)
-    min_len = 1
-    max_len = 64
-    pathname_len = random.randint(min_len, max_len)
-    allowed_chars = ''.join(chr(c) for c in range(0x20, 0x7F))
-    pathname_str = ''.join(random.choice(allowed_chars) for _ in range(pathname_len))
+    # Field 3: Pathname (variable, US-ASCII printable excluding CR/LF, length undefined)
+    # Choose a reasonable random length between 1 and 64
+    pathname_length = random.randint(1, 64)
+    # Build list of printable US-ASCII chars from 0x20 to 0x7E inclusive
+    printable_chars = [chr(c) for c in range(0x20, 0x7F)]
+    # Ensure no CR (0x0D) or LF (0x0A) are present - they aren't in the range above
+    pathname_str = ''.join(random.choices(printable_chars, k=pathname_length))
     pathname = pathname_str.encode('ascii')
 
-    # EndOfLine (constant 0x0D0A)
-    end_of_line = b'\x0d\x0a'
+    # Field 4: EndOfLine (constant 0x0D0A, CRLF, 2 bytes)
+    end_of_line = b'\x0D\x0A'
 
-    # Concatenate fields in exact order
-    message = command + whitespace + pathname + end_of_line
+    # Concatenate fields in the exact order specified
+    message = command_code + whitespace + pathname + end_of_line
 
     return message

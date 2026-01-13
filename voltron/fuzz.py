@@ -25,59 +25,63 @@ class Fuzzer:
             time_limit_min: int,
             target_name: str
         ) -> None:
-
-        self.base_path = Path(__file__).resolve().parents[1]
-
-        # key parameter of protocol
-        self.pro_name = configs[target_name]['protocol']
         self.target_name = target_name
-        self.host = configs[target_name]['host']
-        self.tra_layer = configs[target_name]['trans_layer']
-        self.port = configs[target_name]['port']
-        self.rfc_name = configs[target_name]['rfc_name']
-
-        # some file path 
-        self.pre_script = self.base_path / 'input' / 'scripts' / self.target_name / 'pre.sh'
-        self.post_script =  self.base_path / 'input' / 'scripts' / self.target_name / 'post.sh'
-        self.doc_path = self.base_path / 'input' / 'rfcs' / f'{self.rfc_name}.txt'
-        self.pmp_path = self.base_path / 'input' / 'prompts'
-
         self.time_limit_s = time_limit_min * 60
 
+        self.load_configs()
         self.module_init()
+        
+    def load_configs(
+        self
+    ) -> None:
+        self.configs_yaml: str
+        try:
+            with open(configs.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:
+                configs_yaml = yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f'Fuzzer: config load failure {e}')
+            
+        # key parameter of protocol
+        configs.pro_name = configs_yaml[self.target_name]['protocol']
+        configs.target_name = self.target_name
+        configs.host = configs_yaml[self.target_name]['host']
+        configs.trans_layer = configs_yaml[self.target_name]['trans_layer']
+        configs.port = configs_yaml[self.target_name]['port']
+        configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
+
+        # some file path 
+        configs.pre_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'pre.sh'
+        configs.post_script =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
+        configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.txt'
+        configs.doc_path = configs.base_path / 'input' / 'rfcs' / f'{configs.rfc_name}.txt'
+        configs.pmp_path = configs.base_path / 'input' / 'prompts'
+        configs.base_url = configs_yaml['llm']['base_url']
+        configs.api_key = configs_yaml['llm']['api_key']
+        configs.model = configs_yaml['llm']['model']
+        configs.async_sem = configs_yaml['llm']['async_sem']
 
     def module_init(
             self
     ) -> None:
 
         # llm init
-        self.chater = AsyncChater(
-            self.pmp_path
-        )
+        self.chater = AsyncChater()
         print('Chater: setup')
         
         # metrics analyzer
-        self.analyzer = Analyzer(
-            pro_name=self.pro_name,
-            target_name=self.target_name
-        )
+        self.analyzer = Analyzer()
         print('Analyzer: setup')
 
         # rfcparser init
         self.rfcparser = AsyncRFCParser(
-            doc_path=self.doc_path,
-            pro_name=self.pro_name,
-            chater=self.chater,
-            rfc_name = self.rfc_name,
-            base_path = self.base_path
+            chater=self.chater
         )
         print('RFCParser: setup')
 
         # handler init
         self.handler = AsyncProducer(
             chater=self.chater,
-            rfcp=self.rfcparser,
-            base_path = self.base_path 
+            rfcp=self.rfcparser
         )
         print('Producer: equipment setup')
         
@@ -86,12 +90,7 @@ class Fuzzer:
         
         # setup executor
         self.exe = Executor(
-            trans_layer=self.tra_layer,
-            host=self.host,
-            port=self.port,
             analyzer=self.analyzer,
-            pre_script=self.pre_script,
-            post_script=self.post_script,
             mapper=self.mapper
         )
         print('Executor: equipment setup')

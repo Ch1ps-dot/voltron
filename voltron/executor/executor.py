@@ -3,7 +3,7 @@ from pathlib import Path
 import time, select, socket, pickle
 from typing import Callable, Tuple
 
-from voltron.configs import base_path
+from voltron.configs import configs
 from voltron.utils.logger import logger
 from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
@@ -14,11 +14,6 @@ import math, statistics, threading, traceback
 class Executor:
     def __init__(
             self,
-            trans_layer:str, 
-            host:str, 
-            port:int,
-            pre_script:Path, 
-            post_script:Path,
             mapper: Mapper,
             analyzer: Analyzer,
             setup_time_s:float = 1,
@@ -27,11 +22,11 @@ class Executor:
         ) -> None:
 
         # some attributes for sut
-        self.pre_script: Path = pre_script
-        self.post_script: Path = post_script
-        self.host = host
-        self.port = port
-        self.trans_layer = trans_layer
+        self.pre_script: Path = configs.pre_script
+        self.post_script: Path = configs.post_script
+        self.host = configs.host
+        self.port = configs.port
+        self.trans_layer = configs.trans_layer
 
         # time related values
         self.setup_time_s = setup_time_s
@@ -47,7 +42,7 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         
-        self.cons_path = base_path / 'testcases'
+        self.cons_path = configs.base_path / 'testcases'
         if (not self.cons_path.is_dir()):
             self.cons_path.mkdir()
 

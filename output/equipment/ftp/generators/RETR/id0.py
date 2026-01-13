@@ -4,34 +4,39 @@ def generate_RETR():
     - Output: bytes
     """
     
-    message = b''
-    
     import random
 
-    # Field 1: CommandCode (constant "RETR", 4 bytes)
-    command_code = b'RETR'
+    message = b''
+    
+    # CommandCode: constant "RETR" (4 bytes)
+    command = b'RETR'
+    message += command
 
-    # Field 2: Whitespace (one or more SP, choose 1-4)
-    num_spaces = random.randint(1, 4)
-    whitespace = b' ' * num_spaces
+    # Whitespace: one or more SP (0x20). Choose between 1 and 4 spaces.
+    sp_count = random.randint(1, 4)
+    whitespace = b' ' * sp_count
+    message += whitespace
 
-    # Field 3: Pathname (printable NVT-ASCII 0x20-0x7E excluding CR/LF), must not be empty.
-    # Ensure at least one non-space character so pathname is not effectively empty.
-    allowed_chars = ''.join(chr(c) for c in range(0x20, 0x7F) if c not in (0x0D, 0x0A))
-    non_space_chars = ''.join(chr(c) for c in range(0x21, 0x7F) if c not in (0x0D, 0x0A))
-    pathname_length = random.randint(1, 32)
-    if pathname_length == 1:
-        pathname_str = random.choice(non_space_chars)
+    # Pathname: printable NVT-ASCII characters (0x20-0x7E), excluding CR and LF.
+    # Must be non-empty; ensure first character is not a space to avoid all-space pathname.
+    min_len = 1
+    max_len = 32
+    name_len = random.randint(min_len, max_len)
+
+    allowed_chars = ''.join(chr(c) for c in range(0x20, 0x7F))       # 0x20..0x7E
+    allowed_first = ''.join(chr(c) for c in range(0x21, 0x7F))       # 0x21..0x7E (not space)
+
+    if name_len == 1:
+        pathname = random.choice(allowed_first)
     else:
-        first_char = random.choice(non_space_chars)
-        rest = ''.join(random.choices(allowed_chars, k=pathname_length - 1))
-        pathname_str = first_char + rest
-    pathname = pathname_str.encode('ascii')
+        first_char = random.choice(allowed_first)
+        rest = ''.join(random.choice(allowed_chars) for _ in range(name_len - 1))
+        pathname = first_char + rest
 
-    # Field 4: EndOfLine (constant CRLF 0x0D0A)
-    end_of_line = b'\x0d\x0a'
+    pathname_bytes = pathname.encode('ascii')
+    message += pathname_bytes
 
-    # Concatenate fields in order
-    message = command_code + whitespace + pathname + end_of_line
-
+    # EndOfLine: constant CRLF (0x0D0A)
+    message += b'\x0D\x0A'
+    
     return message

@@ -12,17 +12,16 @@ class AsyncChater:
     """Chat with llm through api and manage the context.
     """
     def __init__(
-            self,
-            dir: Path
+            self
     ) -> None:
         self.configs = configs
         client = AsyncOpenAI(
-            base_url=configs['llm']['base_url'],
-            api_key=configs['llm']['api_key']
+            base_url=configs.base_url,
+            api_key=configs.api_key
         )
 
         self.clt = client
-        self.pmp = Prompter(dir)
+        self.pmp = Prompter(configs.pmp_path)
 
     async def chat_llm(
             self, 
@@ -40,7 +39,7 @@ class AsyncChater:
         """
         start = time.perf_counter()
         completion = await self.clt.chat.completions.create(
-            model=self.configs['llm']['model'],
+            model=configs.model,
             messages=[
                 {"role": "system", "content": "You are a protocol analyzer."},
                 {"role": "user", "content": prompt}
@@ -105,7 +104,8 @@ class AsyncChater:
             self,
             pro_name: str,
             msg_type: str,
-            msg_ir: str
+            msg_ir: str,
+            info: str
     ) -> str:
         """Generate python code as fuzzer generator
 
@@ -117,7 +117,7 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_gen_generator
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, msg_ir=msg_ir)
+        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, msg_ir=msg_ir, info=info)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_gen"

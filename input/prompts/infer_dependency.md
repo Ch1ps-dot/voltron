@@ -13,8 +13,6 @@ You will be given:
 * **Candidate response message types**: $response_types
 * **Related content of specification document**: $rfc_content
 
----
-
 ### **Task Definition**
 
 For the combination of **the last received response message** and **the current sent request message**:

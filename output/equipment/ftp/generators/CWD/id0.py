@@ -4,28 +4,30 @@ def generate_CWD():
     - Output: bytes
     """
     
+    message = b''
+    
+    # Python code that constructs the message
+    # strictly following the provided protoIR specification
     import random
     import string
 
-    message = b''
+    # Field 1: CommandCode (constant, 3B, value="CWD")
+    message += b'CWD'
 
-    # CommandCode: constant "CWD" (3 bytes ASCII)
-    command = b'CWD'
+    # Field 2: Whitespace (constant, 1B, value=0x20)
+    message += bytes([0x20])
 
-    # Whitespace: single SPACE (0x20)
-    whitespace = b' '
+    # Field 3: Pathname (variable, undefined length, printable ASCII excluding CR and LF)
+    # Choose a reasonable length for the pathname (at least 1 char)
+    valid_chars = string.ascii_letters + string.digits + string.punctuation + ' '
+    # Ensure CR and LF are not present
+    valid_chars = valid_chars.replace('\r', '').replace('\n', '')
+    pathname_length = random.randint(1, 32)
+    pathname = ''.join(random.choices(valid_chars, k=pathname_length))
+    pathname_bytes = pathname.encode('ascii')
+    message += pathname_bytes
 
-    # Pathname: variable, printable ASCII and permitted path characters excluding CR and LF
-    # Choose a reasonable length between 1 and 64 (required field)
-    allowed_chars = string.ascii_letters + string.digits + "/._- ~"
-    length = random.randint(1, 64)
-    pathname_str = ''.join(random.choices(allowed_chars, k=length))
-    pathname = pathname_str.encode('ascii')
-
-    # EndOfLine: CRLF (0x0D0A)
-    eol = b'\r\n'
-
-    # Concatenate fields in the exact order
-    message = command + whitespace + pathname + eol
+    # Field 4: EndOfLine (constant, 2B, value=0x0D0A)
+    message += bytes([0x0D, 0x0A])
 
     return message

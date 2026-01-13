@@ -6,10 +6,13 @@ def generate_STOU():
     
     message = b''
     
+    # Python code that constructs the message
+    # strictly following the provided protoIR specification
     # Field 1: CommandCode (constant, 4B) value "STOU"
-    message += b"STOU"
-    
+    command_code = b"STOU"
     # Field 2: EndOfLine (constant, 2B) value 0x0D0A (CRLF)
-    message += bytes.fromhex("0D0A")
+    end_of_line = bytes.fromhex("0D0A")
+    
+    message = command_code + end_of_line
     
     return message

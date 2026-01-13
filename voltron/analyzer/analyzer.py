@@ -2,12 +2,11 @@ import threading, time
 from pathlib import Path
 from voltron.utils.logger import logger
 from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.configs import configs
 
 class Analyzer:
     def __init__(
-            self,
-            target_name,
-            pro_name
+            self
     ) -> None:
         
         # counters for metric
@@ -24,8 +23,8 @@ class Analyzer:
         self.rclose_num = 0
 
         # information of fuzzer
-        self.target_name = target_name
-        self.pro_name = pro_name
+        self.target_name = configs.target_name
+        self.pro_name = configs.pro_name
         self.start_time: float
         self.strategy = ''
 
@@ -56,7 +55,7 @@ class Analyzer:
                 f.write(f'{"exec_path_num":<15}: {self.path_num}\n')
                 f.write(f'{"sent_request":<15}: {self.req_num}\n')
                 f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
-                f.write(f'{"req/res_pair":<15}: {self.trans_types_num()}\n')
+                f.write(f'{"resp_transitions":<15}: {self.trans_types_num()}\n')
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
 

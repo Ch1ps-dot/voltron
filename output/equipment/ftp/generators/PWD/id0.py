@@ -6,15 +6,10 @@ def generate_PWD():
     
     message = b''
     
-    # Python code that constructs the message
-    # strictly following the provided protoIR specification
+    # CommandCode: constant "PWD" (3 bytes, ASCII)
+    message += b'PWD'
     
-    # Field 1: CommandCode (constant, 3B, value "PWD")
-    command_code = b'PWD'  # ASCII three-letter token
-    
-    # Field 2: EndOfLine (constant, 2B, value 0x0D0A -> CRLF)
-    end_of_line = b'\x0D\x0A'
-    
-    message += command_code + end_of_line
+    # EndOfLine: constant CRLF (0x0D0A, 2 bytes)
+    message += bytes.fromhex('0D0A')
     
     return message

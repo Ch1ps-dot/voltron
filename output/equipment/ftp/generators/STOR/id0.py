@@ -4,28 +4,27 @@ def generate_STOR():
     - Output: bytes
     """
     
-    message = b''
-    
     import random
 
-    # Field 1: CommandCode (constant "STOR", 4 bytes ASCII)
+    message = b''
+    
+    # CommandCode: constant "STOR" (4 ASCII bytes)
     command_code = b'STOR'
-
-    # Field 2: Whitespace (constant 0x20)
+    
+    # Whitespace: single SPACE (0x20)
     whitespace = b'\x20'
-
-    # Field 3: Pathname (variable, printable ASCII 0x20-0x7E excluding CR/LF; may include spaces)
-    # Choose a reasonable length between 1 and 32 characters
+    
+    # Pathname: printable ASCII 0x20-0x7E excluding CR (0x0D) and LF (0x0A)
+    # Choose a reasonable length for an undefined-length field (1..32 bytes)
+    charset = [chr(i) for i in range(0x20, 0x7F) if i not in (0x0A, 0x0D)]
     pathname_length = random.randint(1, 32)
-    # Build allowed character set
-    allowed_chars = [chr(c) for c in range(0x20, 0x7F) if c not in (0x0A, 0x0D)]
-    pathname_str = ''.join(random.choices(allowed_chars, k=pathname_length))
+    pathname_str = ''.join(random.choice(charset) for _ in range(pathname_length))
     pathname = pathname_str.encode('ascii')
-
-    # Field 4: EndOfLine (constant CR LF 0x0D0A)
-    end_of_line = b'\x0D\x0A'
-
-    # Concatenate fields in order
+    
+    # EndOfLine: CR LF (0x0D0A)
+    end_of_line = b'\x0d\x0a'
+    
+    # Concatenate fields in the order specified by the protoIR
     message = command_code + whitespace + pathname + end_of_line
-
+    
     return message

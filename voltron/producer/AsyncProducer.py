@@ -55,16 +55,16 @@ class AsyncProducer:
             self,
             chater: AsyncChater,
             rfcp: AsyncRFCParser,
-            base_path: Path
     ) -> None:
         if rfcp.req_ir != None:
             self.req_ir = rfcp.req_ir.getroot()
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.producer_path = base_path / 'output' / 'equipment' / rfcp.pro_name
+        self.producer_path = configs.base_path / 'output' / 'equipment' / rfcp.pro_name
         self.generator_path = self.producer_path / 'generators'
         self.parser_path = self.producer_path / 'parsers'
+        self.info_path = configs.info_path
         
         self.generator_info_path = self.generator_path / 'generator_info.json'
         self.parser_info_path = self.parser_path / 'parser_info.json'
@@ -123,11 +123,15 @@ class AsyncProducer:
                 try:
                     msg_ir = etree.tostring(msg, encoding="utf-8", pretty_print=True).decode("utf-8")
                     msg_type = msg.get('name')
+                    info = ''
+                    with open(self.info_path, 'r', encoding='utf-8') as f:
+                        info = f.read()
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_gen(
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
-                        msg_ir=msg_ir
+                        msg_ir=msg_ir,
+                        info=info
                     )
                     compile(input_code, '<string>', "exec")
                     return msg_type, input_code
@@ -137,7 +141,7 @@ class AsyncProducer:
     async def _generator_gen_async(
             self
     ):
-        sem = asyncio.Semaphore(configs['llm']['async_sem'])
+        sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
             self._generator_gen_one(msg, sem)
             for msg in self.req_ir.findall("message") 

@@ -8,20 +8,25 @@ def generate_SMNT():
 
     message = b''
 
-    # CommandCode: constant "SMNT" (4 bytes)
+    # CommandCode: constant "SMNT" (4 bytes ASCII)
     message += b'SMNT'
 
-    # Whitespace: constant 0x20 (1 byte)
-    message += b'\x20'
+    # Whitespace: single space (0x20)
+    message += bytes([0x20])
 
-    # Pathname: variable, ASCII excluding CR and LF, length undefined -> choose 1-64 bytes
-    # Allowed bytes: 0x20 (space) through 0x7E (tilde), excluding 0x0A and 0x0D
-    allowed_bytes = [c for c in range(0x20, 0x7F) if c not in (0x0A, 0x0D)]
-    pathname_length = random.randint(1, 64)
-    pathname_bytes = bytes(random.choices(allowed_bytes, k=pathname_length))
-    message += pathname_bytes
+    # Pathname: variable, ASCII printable characters excluding CR and LF.
+    # Choose a reasonable length between 1 and 64 and start with '/' to form a typical pathname.
+    length = random.randint(1, 64)
+    # Generate printable US-ASCII range 0x20 (space) to 0x7E (~)
+    printable = ''.join(chr(i) for i in range(0x20, 0x7F))
+    if length == 1:
+        pathname = '/'
+    else:
+        # Ensure no CR/LF (they are not in the printable range selected)
+        pathname = '/' + ''.join(random.choice(printable) for _ in range(length - 1))
+    message += pathname.encode('ascii')
 
-    # EndOfLine: constant 0x0D0A (CR LF, 2 bytes)
-    message += b'\x0D\x0A'
+    # EndOfLine: CR LF (0x0D 0x0A)
+    message += b'\r\n'
 
     return message

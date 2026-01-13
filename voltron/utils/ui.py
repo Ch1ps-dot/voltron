@@ -73,7 +73,7 @@ def make_runtime_table(
         'response num': ana.res_num,
         'exec requ path num': ana.path_num,
         'response types': ana.res_types_num(),
-        'req/res pairs': ana.trans_types_num(),
+        'response transitions': ana.trans_types_num(),
         'crash_num': ana.crash_num,
         'ERR num': ana.pollerr_num,
         'TIMEOUT num': ana.timeout_num,

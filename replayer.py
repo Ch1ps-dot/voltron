@@ -1,6 +1,6 @@
 from voltron.executor.executor import Executor, Conversation
 from pathlib import Path
-import socket, pickle, select, click
+import socket, pickle, select, click, traceback
 from voltron.configs import configs
 
 class Relayer:
@@ -153,13 +153,12 @@ class Relayer:
 )
 def main(file_path: Path, target: str):
     try:
-        # 初始化Relayer实例
         relayer = Relayer(path=file_path, target=target)
-        # 执行报文收发逻辑
         relayer.communicate()
         print("communicate success")
     except Exception as e:
         print(f"execution error {e}")
+        print(traceback.format_exc())
         exit(1)
         
 if __name__ == '__main__':

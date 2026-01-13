@@ -25,20 +25,16 @@ class AsyncRFCParser:
     """
     def __init__(
             self, 
-            doc_path: Path,
-            pro_name: str,
-            rfc_name: str,
             chater: AsyncChater,
-            base_path: Path
     ) -> None:
         self.chater =chater
 
         # doc related value
-        self.doc_path: Path = doc_path
-        self.doc_file = doc_path.open('r+', encoding='utf-8')
+        self.doc_path: Path = configs.doc_path
+        self.doc_file = configs.doc_path.open('r+', encoding='utf-8')
         self.doc_content: str = self.doc_file.read()
-        self.pro_name = pro_name
-        self.rfc_name = rfc_name
+        self.pro_name = configs.pro_name
+        self.rfc_name = configs.rfc_name
 
         # initialize the sectiontree which stands for the section structure of documents 
         self.st = SectionTree(id='', content=self.doc_content)
@@ -50,7 +46,7 @@ class AsyncRFCParser:
         self.res_types: list[str]
         self.req_doc: list = []
         self.res_doc: list = []
-        self.ir_path = base_path / 'output' / 'ir' / pro_name
+        self.ir_path = configs.base_path / 'output' / 'ir' / configs.pro_name
 
         self.poss_res: dict[str, str] = {}
         self.req_res_map: dict[str, str] = {}
@@ -173,7 +169,7 @@ class AsyncRFCParser:
     async def _spe_parse_aync(
             self
     ):
-        sem = asyncio.Semaphore(configs['llm']['async_sem'])
+        sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
             self._spe_parse_one(node, sem)
             for node in self.st.leafs
@@ -308,7 +304,7 @@ class AsyncRFCParser:
             logger.debug(f'RFCParser: {field_type} ir load')
         else:
             root = etree.Element('ir')
-            sem = asyncio.Semaphore(configs['llm']['async_sem'])
+            sem = asyncio.Semaphore(configs.async_sem)
 
             tasks = [
                 self._msg_model_gen_one(msg_type, sem)
@@ -341,7 +337,7 @@ class AsyncRFCParser:
                 self.poss_res = json.load(f)
             logger.debug('RFCParser: poss response load')
         else:
-            sem = asyncio.Semaphore(configs['llm']['async_sem'])
+            sem = asyncio.Semaphore(configs.async_sem)
             tasks = [
                 self._poss_response_one(req_type, sem)
                 for req_type in self.req_types
@@ -380,7 +376,7 @@ class AsyncRFCParser:
                 self.req_res_map = json.load(f)
             logger.debug('RFCParser: request description load')
         else:
-            sem = asyncio.Semaphore(configs['llm']['async_sem'])
+            sem = asyncio.Semaphore(configs.async_sem)
             tasks = [
                 self._state_dependency_one(res, req, sem)
                 for res in self.res_types

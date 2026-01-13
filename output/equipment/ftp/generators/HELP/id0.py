@@ -7,26 +7,23 @@ def generate_HELP():
     import random
 
     message = b''
-
-    # CommandCode (constant 4B "HELP")
+    
+    # CommandCode: constant "HELP" (4 ASCII bytes)
     message += b'HELP'
-
-    # Decide to include an argument for this instance (so SpaceIfArgument and ArgumentString will be present)
+    
+    # Decide to include an argument (the SpaceIfArgument constant must be present if an argument is supplied)
     include_argument = True
 
     if include_argument:
-        # SpaceIfArgument (constant 1B 0x20)
+        # SpaceIfArgument: constant 0x20
         message += b'\x20'
-
-        # ArgumentString (variable, NVT-ASCII printable characters 0x20-0x7E, excluding CR/LF)
-        # Choose a reasonable length between 1 and 12
-        allowed_chars = ''.join(chr(i) for i in range(0x20, 0x7F))
-        arg_len = random.randint(1, 12)
-        arg_str = ''.join(random.choice(allowed_chars) for _ in range(arg_len))
-        # Encode as ASCII bytes
-        message += arg_str.encode('ascii')
-
-    # EndOfLine (constant 2B 0x0D0A)
+        # ArgumentString: NVT-ASCII printable characters (0x20-0x7E), excluding CR and LF
+        allowed_chars = [chr(c) for c in range(0x20, 0x7F) if c not in (0x0D, 0x0A)]
+        arg_len = random.randint(1, 12)  # choose a reasonable length
+        argument = ''.join(random.choices(allowed_chars, k=arg_len))
+        message += argument.encode('ascii')
+    
+    # EndOfLine: constant CRLF 0x0D0A
     message += b'\x0D\x0A'
-
+    
     return message
