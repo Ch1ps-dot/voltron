@@ -131,14 +131,20 @@ class Executor:
                     self.analyzer.req_types_update(g.msg_type)
                     self.analyzer.last_generator = g
                 resp_code, resp_data = self.net_recv(sock=sock)
-                
+
                 match resp_code:
                     
                     # remote crash
-                    case 'ERR':
-                        cons.add_state(g.msg_type, 'ERR')
-                        with self.analyzer.lock:
-                            self.analyzer.err_num += 1
+                    case 'POLLERR':
+                        return_code = proc.poll()
+                        if return_code:
+                            cons.add_state(g.msg_type, 'CRASH')
+                            with self.analyzer.lock:
+                                self.analyzer.crash_num += 1
+                        else:
+                            cons.add_state(g.msg_type, 'POLLERR')
+                            with self.analyzer.lock:
+                                self.analyzer.pollerr_num += 1
                         break
                     
                     # remote hang
@@ -155,7 +161,11 @@ class Executor:
                             self.analyzer.rclose_num += 1
                         break
                     case _:
-                        self.last_recv = resp_code
+                        if(resp_code == None):
+                            logger.debug('Executor: Parser error')
+                            continue
+                        with self.analyzer.lock:
+                            self.analyzer.res_types_update(resp_code)
                         
                         # record conversation data
                         cons.add_data(req_data, resp_data)
@@ -175,7 +185,8 @@ class Executor:
         if proc.poll() is None:
             proc.terminate()
 
-        self.post_exe()
+        # self.post_exe()
+        logger.debug(f'Executor: conversation done')
         return True, cons
     
     def setup_socket(
@@ -305,12 +316,12 @@ class Executor:
                 
                 if event & (select.POLLERR):
                     logger.debug("Executor: recv poll error")
-                    return 'ERR', None
+                    return 'POLLERR', None
                 # response can be read
 
                 if event & select.POLLIN:
                     buf = sock.recv(1024)
-                    logger.debug(f'net_recv: recv {buf}')
+                    logger.debug(f'net_recv: {buf}')
                     
                     #TODO: handle invalid response
                     

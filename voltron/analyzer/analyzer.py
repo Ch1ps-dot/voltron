@@ -18,7 +18,9 @@ class Analyzer:
         self.res_num = 0
         self.path_num = 0
         self.timeout_num = 0
-        self.err_num = 0
+        self.pollerr_num = 0
+        self.crash_num = 0
+        self.crash_num = 0
         self.rclose_num = 0
 
         # information of fuzzer
@@ -77,9 +79,10 @@ class Analyzer:
         else:
             self.res_types_cnt[res_code] = 1
         
-        self.trans_types_update(f'{self.last_sent}/{self.last_recv}')
+        self.resp_trans_update(f'{self.last_recv}/{res_code}')
+        self.last_recv = res_code
 
-    def trans_types_update(
+    def resp_trans_update(
             self,
             trans: str
     ):
