@@ -1,3 +1,5 @@
+The password of user ubuntu is ubuntu
+
 This is the configuration file(INI format) for executing lightftp
 
 #
