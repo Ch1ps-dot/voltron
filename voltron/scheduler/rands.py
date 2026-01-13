@@ -27,11 +27,12 @@ class Rands:
     
     def run(
         self
-    ) -> None:
+    ) -> bool:
         gs = self.select(10)
-        _, cons = self.exe.interact(gs)
+        flag, cons = self.exe.interact(gs)
         # if(self.is_interesting(cons) and cons):
         #     self.exe.save_cons(cons)
+        return flag
         
     def is_interesting(
         self,

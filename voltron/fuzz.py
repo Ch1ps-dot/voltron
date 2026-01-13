@@ -138,9 +138,9 @@ class Fuzzer:
             self,
             stop_event: threading.Event
     ):
+        fuzz = Rands(mapper=self.mapper, executor=self.exe)
         while not stop_event.is_set():
             try:
-                fuzz = Rands(mapper=self.mapper, executor=self.exe)
                 if not fuzz.run():
                     stop_event.set()
             except Exception as e:
