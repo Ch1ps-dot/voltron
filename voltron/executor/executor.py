@@ -88,7 +88,8 @@ class Executor:
         # prepare some settings and setup SUT
         proc = self.pre_exe()
         if proc is None:
-            return
+            logger.debug(f'Executor: SUT Setup Failure')
+            exit(1)
         if proc.poll() is not None: 
             out, err = proc.communicate()
             logger.debug(f'Executor: SUT Setup Failure:{err}')

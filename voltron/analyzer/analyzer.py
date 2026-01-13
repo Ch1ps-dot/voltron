@@ -47,14 +47,14 @@ class Analyzer:
         results_file = results_dir / f'fuzzer_stats'
         try:
             with results_file.open(mode='w', encoding='utf-8') as f:
-                f.write(f'{"start_time":<15}: {self.start_time}')
-                f.write(f'{"running_time":<15}: {self.seconds_to_hms(time.time() - self.start_time)}')
-                f.write(f'{"target_name":<15}: {self.target_name}')
-                f.write(f'{"protocol_name":<15}: {self.pro_name}')
-                f.write(f'{"exec_path_num":<15}: {self.path_num}')
-                f.write(f'{"sent_request":<15}: {self.req_num}')
-                f.write(f'{"distinct_resp":<15}: {self.res_types_num()}')
-                f.write(f'{"req/res_pair":<15}: {self.trans_types_num()}')
+                f.write(f'{"start_time":<15}: {self.start_time}\n')
+                f.write(f'{"running_time":<15}: {self.seconds_to_hms(time.time() - self.start_time)}\n')
+                f.write(f'{"target_name":<15}: {self.target_name}\n')
+                f.write(f'{"protocol_name":<15}: {self.pro_name}\n')
+                f.write(f'{"exec_path_num":<15}: {self.path_num}\n')
+                f.write(f'{"sent_request":<15}: {self.req_num}\n')
+                f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
+                f.write(f'{"req/res_pair":<15}: {self.trans_types_num()}\n')
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
 

@@ -95,6 +95,7 @@ class AsyncProducer:
                 logger.debug("Producer: load generator")
             except Exception as e:
                 logger.debug(f'Producer: generator load error {e}')
+                exit(1)
         else:
             self.generator_gen()
         
@@ -221,9 +222,14 @@ class AsyncProducer:
         self,
         info: dict
     ):
-        for msg_type in info:
-            for g in info[msg_type]:
-                self.generators[msg_type].append(Generator(**g))
+        try:
+            for msg_type in info:
+                for g in info[msg_type]:
+                    self.generators.setdefault(msg_type, [])
+                    self.generators[msg_type].append(Generator(**g))
+        except Exception as e:
+            logger.debug(f'Producer: load error {e}')
+        
                 
     def parsers_info_load(
         self,

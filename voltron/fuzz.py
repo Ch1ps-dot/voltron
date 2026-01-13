@@ -153,6 +153,7 @@ class Fuzzer:
                 fuzz.run()
             except Exception as e:
                 logger.debug(f'Fuzzer: exit {e}')
+                exit(0)
             if (self.time_limit_s < time.time() - self.analyzer.start_time):
                 stop_event.set()
                 logger.debug('Fuzzer: timeout')
