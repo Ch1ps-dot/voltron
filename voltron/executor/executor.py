@@ -356,7 +356,7 @@ class Executor:
             with open(self.mapper.g_path(g), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
-                obj = name_space[f'generated_{g.msg_type}']
+                obj = name_space[f'generate_{g.msg_type}']
                 return obj()
         except Exception as e:
             logger.debug(f'Executor: generated failure {e}')
