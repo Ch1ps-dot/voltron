@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from voltron.producer.AsyncProducer import AsyncProducer, Generator, Parser
 from voltron.analyzer.analyzer import Analyzer
-
+import traceback, sys
 from voltron.utils.logger import logger
 
 from pathlib import Path
@@ -58,7 +58,9 @@ class Mapper:
                 return obj()
         except Exception as e:
             logger.error(f'Mapper: generated failure {e}')
-            exit(0)
+            logger.error(traceback.extract_stack())
+            sys.exit(1)
+            
     
     def equip_parser(
         self,

@@ -162,4 +162,3 @@ class Fuzzer:
         with self.analyzer.lock:
             self.analyzer.collect_results()
         sys.exit(0)
-        
