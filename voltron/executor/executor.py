@@ -42,7 +42,7 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         
-        self.cons_path = configs.base_path / 'testcases'
+        self.cons_path = configs.results_path / 'testcases'
         if (not self.cons_path.is_dir()):
             self.cons_path.mkdir()
 

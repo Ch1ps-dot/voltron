@@ -10,27 +10,21 @@ class MealyMachine:
         alphabet,
         delta,
         output,
-        start,
-        executor: Executor,
-        mapper: Mapper
+        start
     ) -> None:
-        self.exe = executor
-        self.mapper = mapper
-
-    def mem_query(
-        self,
-        word: list[str]
-    ):
-        req_seq = word.split('-')
-        return self.run(req_seq=req_seq)
-    
-    def equ_query(
-        self
-    ):
-        pass
+        self.states = states
+        self.alphabet = alphabet
+        self.delta = delta
+        self.output = output
+        self.start = start
     
     def run(
-        self,
-        req_seq: list[str]
+        self, 
+        word: str
     ):
-        gs = self.mapper
+        state = self.start
+        outputs = []
+        for a in word:
+            outputs.append(self.output[(state, a)])
+            state = self.delta[(state, a)]
+        return outputs

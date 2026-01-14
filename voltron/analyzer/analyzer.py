@@ -39,13 +39,9 @@ class Analyzer:
     def collect_results(
             self
     ):  
-        current_time_struct = time.localtime()
-        formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
-        results_dir = Path.cwd() / f'results-{self.target_name}-voltron-{formatted_time}'
-        if not results_dir.is_dir():
-            results_dir.mkdir()
+        
 
-        status_file = results_dir / f'fuzzer_status'
+        status_file = configs.results_path / f'fuzzer_status'
         try:
             with status_file.open(mode='w', encoding='utf-8') as f:
                 f.write(f'{"start_time":<15}: {self.start_time}\n')
@@ -59,7 +55,7 @@ class Analyzer:
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
             
-        states_file = results_dir / f'states_info'
+        states_file = configs.results_path / f'states_info'
         try:
             with states_file.open(mode='w', encoding='utf-8') as f:
                 f.write(f'{"response types":<15}:\n')

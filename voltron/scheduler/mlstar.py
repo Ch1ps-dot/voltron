@@ -1,21 +1,25 @@
 from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
 from voltron.scheduler.automata import MealyMachine
+from voltron.scheduler.EquOracle import EquOracle
+from voltron.scheduler.MembOracle import MembershipOracle
+
 
 class ObTable:
     def __init__(
         self,
-        mapper: Mapper,
-        automata: MealyMachine
+        mq: MembershipOracle,
+        eq: EquOracle
     ) -> None:
-        self.alphabet: list[str] = mapper.req_types # request symbol
+        self.alphabet: list[str] = mq.alphabet # request symbol
         
         self.S: set[str] = {''} # prefix of request symbols
         self.E: set[str] = {''} # suffix of request symbols
         
         self.T: dict[tuple[str, str, str], str] = {} # (s, a, e) -> output. Transition
         
-        self.automata = automata
+        self.mq = mq
+        self.eq = eq
         
         self._fill_table()
 
@@ -25,8 +29,9 @@ class ObTable:
                 for e in self.E:
                     key = (s, a, e)
                     if key not in self.T:
-                        out = self.automata.mem_query(s + a + e)[len(s)]
-                        self.T[key] = out
+                        out = self.mq.query(f'{s}/{a}/{e}')
+                        if (out):
+                            self.T[key] = out
 
     def row(self, s):
         return tuple(
@@ -40,7 +45,7 @@ class ObTable:
         rows = {self.row(s) for s in self.S}
         for s in list(self.S):
             for a in self.alphabet:
-                sa = s + a
+                sa = f'{s}/{a}'
                 if self.row(sa) not in rows:
                     return False, sa
         return True, None
@@ -70,7 +75,7 @@ class ObTable:
             if ok or data == None:
                 return
             s1, s2, a, e = data
-            self.E.add(a + e)
+            self.E.add(f'{a}/{e}')
             self._fill_table()
 
     # ---------- Hypothesis ----------

@@ -11,6 +11,7 @@ class Config:
         self.post_script: Path
         self.doc_path: Path
         self.pmp_path: Path
+        self.results_path: Path
         
         self.target_name: str
         self.trans_layer: str

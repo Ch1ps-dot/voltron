@@ -67,11 +67,12 @@ class Mapper:
         
     def select_generators(
         self,
-        req_seq
+        req_seq: list[str]
     ) -> list[Generator]:
         gs: list[Generator] = []
         for req in req_seq:
-            gs.append(self.generators[req][0])
+            if req in self.generators.keys():
+                gs.append(self.generators[req][0])
         return gs
     
     def select_generator(

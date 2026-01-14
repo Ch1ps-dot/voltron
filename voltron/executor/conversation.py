@@ -5,7 +5,7 @@ class Conversation:
     """
     def __init__(self) -> None:
         self.content: list[list[bytes | None]] = []
-        self.trans: list[list[str | None]] = []
+        self.req_res_pair: list[list[str | None]] = []
         
     def add_data(
         self,
@@ -19,4 +19,4 @@ class Conversation:
         req_code: str | None,
         res_code: str | None
     ):
-        self.trans.append([req_code, res_code])
+        self.req_res_pair.append([req_code, res_code])

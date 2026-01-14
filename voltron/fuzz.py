@@ -59,6 +59,14 @@ class Fuzzer:
         configs.api_key = configs_yaml['llm']['api_key']
         configs.model = configs_yaml['llm']['model']
         configs.async_sem = configs_yaml['llm']['async_sem']
+        
+        current_time_struct = time.localtime()
+        formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
+        results_dir = Path.cwd() / f'results-{self.target_name}-voltron-{formatted_time}'
+        if not results_dir.is_dir():
+            results_dir.mkdir()
+        
+        configs.results_path = results_dir
 
     def module_init(
             self
