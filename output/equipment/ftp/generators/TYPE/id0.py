@@ -8,42 +8,59 @@ def generate_TYPE():
 
     message = b''
 
-    # CommandCode (constant, 4 bytes): "TYPE"
-    message += b'TYPE'
+    # CommandCode (constant 4B) -> "TYPE"
+    command_code = b"TYPE"
+    message += command_code
 
-    # Whitespace (constant, 1 byte): single space 0x20
-    message += b' '
+    # Whitespace (constant 1B) -> 0x20
+    whitespace = b"\x20"
+    message += whitespace
 
-    # TypeCode (variable, 1 byte): one of 'A','E','I','L'
-    type_code = random.choice(['A', 'E', 'I', 'L'])
-    message += type_code.encode('ascii')
+    # TypeCode (variable 1B) -> one of 'A','E','I','L'
+    type_code_char = random.choice(['A', 'E', 'I', 'L'])
+    type_code = type_code_char.encode('ascii')
+    message += type_code
 
-    # Conditional parameters based on TypeCode
-    if type_code in ('A', 'E'):
-        # Optionally include a format/control parameter (single-letter ASCII)
-        include_format = random.choice([True, False])
-        if include_format:
-            # WhitespaceParam (constant, 1 byte): space before the parameter
-            message += b' '
-            # FormatControl (variable, 1 byte): choose among standard controls
-            format_control = random.choice(['N', 'T', 'C'])
-            message += format_control.encode('ascii')
-        # No ByteSize for A/E unless explicitly provided (we choose optional omission sometimes)
-    elif type_code == 'L':
-        # For Local byte, ByteSize is obligatory.
-        # WhitespaceParam (constant, 1 byte): space before the ByteSize parameter
-        message += b' '
-        # ByteSize (variable, undefined length): decimal integer (positive), choose reasonable value
-        # Common logical byte sizes include e.g., 8, 16, 32, 36, 64; allow 1..64
-        byte_size_value = random.choice([8, 16, 32, 36, 64]) if random.random() < 0.8 else random.randint(1, 64)
-        byte_size_str = str(byte_size_value)
-        # No separate WhitespaceBeforeByteSize is needed here (we used WhitespaceParam)
-        message += byte_size_str.encode('ascii')
+    # Determine which parameters follow based on TypeCode
+    # WhitespaceParam (constant 1B, 0x20) present only if a parameter follows
+    param_follows = False
+    format_control = None
+    byte_size_str = None
+
+    if type_code_char in ('A', 'E'):
+        param_follows = True
+        # FormatControl (variable 1B) -> one of 'N','T','C'
+        format_control = random.choice(['N', 'T', 'C']).encode('ascii')
+    elif type_code_char == 'L':
+        # Local byte requires ByteSize parameter
+        param_follows = True
+        # ByteSize (variable, decimal integer positive). Choose a reasonable value.
+        # Common logical byte sizes include 8,16,32,36,64 but any positive integer is allowed.
+        byte_size_value = random.choice([8, 16, 32, 36, 64])
+        byte_size_str = str(byte_size_value).encode('ascii')
     else:
-        # type_code == 'I' -> Image (binary), no parameters
-        pass
+        # 'I' (Image) has no parameters
+        param_follows = False
 
-    # EndOfLine (constant, 2 bytes): CRLF 0x0D0A
-    message += b'\r\n'
+    # WhitespaceParam: include if a parameter follows
+    if param_follows:
+        whitespace_param = b"\x20"
+        message += whitespace_param
+
+    # FormatControl: include if present
+    if format_control is not None:
+        message += format_control
+
+    # WhitespaceBeforeByteSize: present only when a ByteSize is supplied AND
+    # there is a preceding parameter that must be separated from the ByteSize.
+    # In our construction, for TypeCode 'L' there is no preceding format-control token,
+    # so we do not emit an extra whitespace here to avoid double spaces.
+    # (If there were a preceding parameter and a ByteSize followed, we would emit b"\x20" here.)
+    if byte_size_str is not None:
+        # Since for 'L' we already emitted WhitespaceParam before the ByteSize, do not add another space.
+        message += byte_size_str
+
+    # EndOfLine (constant 2B) -> 0x0D0A (CRLF)
+    message += b"\x0D\x0A"
 
     return message

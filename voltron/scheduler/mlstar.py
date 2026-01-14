@@ -8,12 +8,12 @@ class ObTable:
         mapper: Mapper,
         automata: MealyMachine
     ) -> None:
-        self.alphabet = mapper.req_types # request symbol
+        self.alphabet: list[str] = mapper.req_types # request symbol
         
-        self.S = {''} # prefix of request symbols
-        self.E = {''} # suffix of request symbols
+        self.S: set[str] = {''} # prefix of request symbols
+        self.E: set[str] = {''} # suffix of request symbols
         
-        self.T = {} # (s, a, e) -> output. Transition
+        self.T: dict[tuple[str, str, str], str] = {} # (s, a, e) -> output. Transition
         
         self.automata = automata
         
@@ -25,7 +25,7 @@ class ObTable:
                 for e in self.E:
                     key = (s, a, e)
                     if key not in self.T:
-                        out = self.automata.mem_query(f'{s}-{a}-{e}')[len(s)]
+                        out = self.automata.mem_query(s + a + e)[len(s)]
                         self.T[key] = out
 
     def row(self, s):
@@ -48,7 +48,7 @@ class ObTable:
     def close(self):
         while True:
             closed, sa = self.is_closed()
-            if closed:
+            if closed or sa == None:
                 return
             self.S.add(sa)
             self._fill_table()
@@ -61,13 +61,13 @@ class ObTable:
                     for a in self.alphabet:
                         for e in self.E:
                             if self.T[(s1, a, e)] != self.T[(s2, a, e)]:
-                                return False, s1, s2, a, e
+                                return False, (s1, s2, a, e)
         return True, None
 
     def make_consistent(self):
         while True:
             ok, data = self.is_consistent()
-            if ok:
+            if ok or data == None:
                 return
             s1, s2, a, e = data
             self.E.add(a + e)

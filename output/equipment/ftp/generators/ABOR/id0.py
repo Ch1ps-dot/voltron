@@ -6,10 +6,13 @@ def generate_ABOR():
     
     message = b''
     
-    # Field: CommandCode (constant "ABOR", 4 bytes ASCII)
+    # Python code that constructs the message
+    # strictly following the provided protoIR specification
+    
+    # Field 1: CommandCode (constant, 4 bytes) -> ASCII 'ABOR'
     message += b'ABOR'
     
-    # Field: EndOfLine (constant 0x0D0A, CRLF)
-    message += b'\x0D\x0A'
+    # Field 2: EndOfLine (constant, 2 bytes) -> 0x0D0A (CRLF)
+    message += bytes.fromhex('0D0A')
     
     return message

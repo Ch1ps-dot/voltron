@@ -3,30 +3,33 @@ def generate_APPE():
     - Input: none
     - Output: bytes
     """
-    
-    message = b''
-    
     import random
+    import string
 
-    # Field 1: CommandCode (constant "APPE", 4 bytes)
-    command_code = b'APPE'
+    message = b''
 
-    # Field 2: Whitespace (constant 0x20, 1 byte)
-    whitespace = b'\x20'
+    # CommandCode: constant "APPE" (4 bytes)
+    message += b'APPE'
 
-    # Field 3: Pathname (variable, US-ASCII printable excluding CR/LF, length undefined)
-    # Choose a reasonable random length between 1 and 64
-    pathname_length = random.randint(1, 64)
-    # Build list of printable US-ASCII chars from 0x20 to 0x7E inclusive
-    printable_chars = [chr(c) for c in range(0x20, 0x7F)]
-    # Ensure no CR (0x0D) or LF (0x0A) are present - they aren't in the range above
-    pathname_str = ''.join(random.choices(printable_chars, k=pathname_length))
-    pathname = pathname_str.encode('ascii')
+    # Whitespace: single SP (0x20)
+    message += b'\x20'
 
-    # Field 4: EndOfLine (constant 0x0D0A, CRLF, 2 bytes)
-    end_of_line = b'\x0D\x0A'
+    # Pathname: variable, US-ASCII excluding CR(0x0D) and LF(0x0A)
+    # Choose a reasonable length (1..32) and characters from printable ASCII (including space and punctuation)
+    allowed_chars = ''.join(ch for ch in (string.ascii_letters + string.digits + string.punctuation + ' ') if ch not in '\r\n')
+    pathname_length = random.randint(1, 32)
+    # Ensure pathname does not consist solely of spaces (use at least one non-space if random chosen all spaces)
+    pathname_chars = []
+    for _ in range(pathname_length):
+        pathname_chars.append(random.choice(allowed_chars))
+    if all(c == ' ' for c in pathname_chars):
+        # replace first char with a safe visible char
+        pathname_chars[0] = random.choice(string.ascii_letters + string.digits + string.punctuation.replace('/', '') )
+    pathname = ''.join(pathname_chars)
+    # Encode as US-ASCII
+    message += pathname.encode('ascii')
 
-    # Concatenate fields in the exact order specified
-    message = command_code + whitespace + pathname + end_of_line
+    # EndOfLine: CRLF (0x0D0A)
+    message += b'\x0D\x0A'
 
     return message

@@ -6,10 +6,12 @@ def generate_PWD():
     
     message = b''
     
-    # CommandCode: constant "PWD" (3 bytes, ASCII)
-    message += b'PWD'
-    
-    # EndOfLine: constant CRLF (0x0D0A, 2 bytes)
-    message += bytes.fromhex('0D0A')
-    
+    # Field 1: CommandCode (constant "PWD", 3 bytes, ASCII)
+    command_code = b'PWD'
+    message += command_code
+
+    # Field 2: EndOfLine (constant 0x0D0A, 2 bytes)
+    end_of_line = b'\x0D\x0A'
+    message += end_of_line
+
     return message

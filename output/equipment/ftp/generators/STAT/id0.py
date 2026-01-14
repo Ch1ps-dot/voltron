@@ -4,33 +4,32 @@ def generate_STAT():
     - Output: bytes
     """
     
-    message = b''
-    
     import random
     import string
 
-    # CommandCode: constant "STAT"
-    command = b'STAT'
+    message = b''
 
-    # Decide to include a pathname argument (optional). If present, Whitespace must be included.
-    # Generate a random pathname consisting of ASCII chars excluding CR and LF.
-    allowed_chars = string.ascii_letters + string.digits + "/._-"
-    # choose a reasonable length for the pathname (1..40)
-    total_len = random.randint(1, 40)
-    # ensure pathname starts with '/' to make it a filesystem path
-    if total_len == 1:
-        pathname_str = '/'
-    else:
-        pathname_str = '/' + ''.join(random.choices(allowed_chars, k=total_len-1))
-    pathname = pathname_str.encode('ascii')
+    # CommandCode (constant "STAT")
+    message += b'STAT'
 
-    # Whitespace: single SP (0x20) required when pathname is present
-    whitespace = b'\x20'
+    # Construct a valid Pathname (ASCII excluding CR and LF).
+    # Choose a representative pathname starting with '/' and containing safe characters.
+    allowed_chars = string.ascii_letters + string.digits + '._-'
+    num_components = random.randint(1, 4)  # 1-4 path components
+    components = []
+    for _ in range(num_components):
+        comp_len = random.randint(1, 12)  # each component 1-12 chars
+        comp = ''.join(random.choice(allowed_chars) for _ in range(comp_len))
+        components.append(comp)
+    pathname = '/' + '/'.join(components)
 
-    # EndOfLine: CRLF 0x0D0A
-    eol = bytes.fromhex('0d0a')
+    # Whitespace (0x20) is required because Pathname is present
+    message += b'\x20'
 
-    # Assemble fields in the exact order: CommandCode, Whitespace, Pathname, EndOfLine
-    message = command + whitespace + pathname + eol
+    # Pathname (ASCII)
+    message += pathname.encode('ascii')
+
+    # EndOfLine (CRLF)
+    message += b'\x0D\x0A'
 
     return message

@@ -4,39 +4,29 @@ def generate_RETR():
     - Output: bytes
     """
     
-    import random
-
     message = b''
     
-    # CommandCode: constant "RETR" (4 bytes)
+    import random
+
+    # Field 1: CommandCode (constant "RETR", 4 bytes)
     command = b'RETR'
-    message += command
 
-    # Whitespace: one or more SP (0x20). Choose between 1 and 4 spaces.
-    sp_count = random.randint(1, 4)
-    whitespace = b' ' * sp_count
-    message += whitespace
+    # Field 2: Whitespace (one or more SP (0x20))
+    # Choose a small random number of spaces to be compliant
+    space_count = random.randint(1, 4)
+    whitespace = b' ' * space_count
 
-    # Pathname: printable NVT-ASCII characters (0x20-0x7E), excluding CR and LF.
-    # Must be non-empty; ensure first character is not a space to avoid all-space pathname.
-    min_len = 1
-    max_len = 32
-    name_len = random.randint(min_len, max_len)
+    # Field 3: Pathname (printable NVT-ASCII 0x20-0x7E excluding CR/LF), must be non-empty
+    # Build allowed characters range
+    allowed_chars = ''.join(chr(i) for i in range(0x20, 0x7F) if i not in (0x0A, 0x0D))
+    pathname_length = random.randint(1, 32)
+    pathname_str = ''.join(random.choice(allowed_chars) for _ in range(pathname_length))
+    pathname = pathname_str.encode('ascii')
 
-    allowed_chars = ''.join(chr(c) for c in range(0x20, 0x7F))       # 0x20..0x7E
-    allowed_first = ''.join(chr(c) for c in range(0x21, 0x7F))       # 0x21..0x7E (not space)
+    # Field 4: EndOfLine (constant CR LF -> 0x0D0A)
+    end_of_line = b'\x0d\x0a'
 
-    if name_len == 1:
-        pathname = random.choice(allowed_first)
-    else:
-        first_char = random.choice(allowed_first)
-        rest = ''.join(random.choice(allowed_chars) for _ in range(name_len - 1))
-        pathname = first_char + rest
+    # Concatenate fields in exact order
+    message = command + whitespace + pathname + end_of_line
 
-    pathname_bytes = pathname.encode('ascii')
-    message += pathname_bytes
-
-    # EndOfLine: constant CRLF (0x0D0A)
-    message += b'\x0D\x0A'
-    
     return message

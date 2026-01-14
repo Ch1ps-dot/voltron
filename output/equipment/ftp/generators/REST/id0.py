@@ -7,19 +7,23 @@ def generate_REST():
     import random
 
     message = b''
+    
+    # Field 1: CommandCode (constant "REST", 4 bytes ASCII)
+    command_code = b'REST'
+    message += command_code
 
-    # CommandCode: constant "REST" (4 bytes ASCII)
-    message += b'REST'
+    # Field 2: SP (constant 0x20)
+    sp = b'\x20'
+    message += sp
 
-    # SP: single space 0x20
-    message += b'\x20'
+    # Field 3: Marker (variable, decimal-integer ASCII digits, >= 0, undefined length)
+    # Choose a reasonable non-negative integer value (e.g., up to 1 billion)
+    marker_int = random.randint(0, 10**9)
+    marker = str(marker_int).encode('ascii')
+    message += marker
 
-    # Marker: variable, ASCII decimal integer >= 0, length undefined -> choose a random non-negative integer
-    marker_int = random.randint(0, 2**31 - 1)
-    marker_bytes = str(marker_int).encode('ascii')
-    message += marker_bytes
-
-    # CRLF: constant 0x0D0A
-    message += b'\x0d\x0a'
+    # Field 4: CRLF (constant 0x0D0A)
+    crlf = b'\x0d\x0a'
+    message += crlf
 
     return message

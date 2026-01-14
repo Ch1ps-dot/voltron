@@ -6,13 +6,13 @@ def generate_QUIT():
     
     message = b''
     
-    # CommandCode: constant "QUIT" (4 ASCII bytes)
-    command_code = "QUIT".encode('ascii')
-    # EndOfLine: constant 0x0D0A (CRLF)
-    end_of_line = bytes.fromhex('0D0A')
+    # Python code that constructs the message
+    # strictly following the provided protoIR specification
     
-    # Serialize fields in order
-    message += command_code
-    message += end_of_line
+    # Field 1: CommandCode (constant, 4B) -> ASCII "QUIT"
+    message += b'QUIT'
+    
+    # Field 2: EndOfLine (constant, 2B) -> CRLF 0x0D0A
+    message += b'\x0D\x0A'
     
     return message

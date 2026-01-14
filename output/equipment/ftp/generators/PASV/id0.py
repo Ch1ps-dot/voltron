@@ -6,10 +6,15 @@ def generate_PASV():
     
     message = b''
     
-    # CommandCode: constant "PASV" (4 bytes, ASCII)
-    message += b'PASV'
-    
-    # EndOfLine: constant 0x0D0A (CRLF, 2 bytes)
-    message += bytes.fromhex('0D0A')
-    
+    # CommandCode (constant, 4 bytes): "PASV"
+    command_code = "PASV".encode('ascii')
+    # Ensure it's exactly 4 bytes as specified
+    if len(command_code) != 4:
+        command_code = command_code[:4].ljust(4, b' ')
+    message += command_code
+
+    # EndOfLine (constant, 2 bytes): 0x0D0A (CRLF)
+    end_of_line = bytes.fromhex('0D0A')
+    message += end_of_line
+
     return message

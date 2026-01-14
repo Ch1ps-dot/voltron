@@ -1,4 +1,4 @@
-import threading, time
+import threading, time, pprint
 from pathlib import Path
 from voltron.utils.logger import logger
 from voltron.producer.AsyncProducer import Generator, Parser
@@ -12,7 +12,7 @@ class Analyzer:
         # counters for metric
         self.req_types_cnt: dict[str, int] = {}
         self.res_types_cnt: dict[str, int] = {}
-        self.trans_types_cnt: dict[str, int] = {}
+        self.resp_trans_cnt: dict[str, int] = {}
         self.req_num = 0
         self.res_num = 0
         self.path_num = 0
@@ -41,13 +41,13 @@ class Analyzer:
     ):  
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
-        results_dir = Path.cwd() / f'out-{self.target_name}-voltron-{formatted_time}'
+        results_dir = Path.cwd() / f'results-{self.target_name}-voltron-{formatted_time}'
         if not results_dir.is_dir():
             results_dir.mkdir()
 
-        results_file = results_dir / f'fuzzer_stats'
+        status_file = results_dir / f'fuzzer_status'
         try:
-            with results_file.open(mode='w', encoding='utf-8') as f:
+            with status_file.open(mode='w', encoding='utf-8') as f:
                 f.write(f'{"start_time":<15}: {self.start_time}\n')
                 f.write(f'{"running_time":<15}: {self.seconds_to_hms(time.time() - self.start_time)}\n')
                 f.write(f'{"target_name":<15}: {self.target_name}\n')
@@ -55,7 +55,23 @@ class Analyzer:
                 f.write(f'{"exec_path_num":<15}: {self.path_num}\n')
                 f.write(f'{"sent_request":<15}: {self.req_num}\n')
                 f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
-                f.write(f'{"resp_transitions":<15}: {self.trans_types_num()}\n')
+                f.write(f'{"resp_transitions":<15}: {self.resp_trans_num()}\n')
+        except Exception as e:
+            logger.debug('Analyzer: collect results failure')
+            
+        states_file = results_dir / f'states_info'
+        try:
+            with states_file.open(mode='w', encoding='utf-8') as f:
+                f.write(f'{"response types":<15}:\n')
+                pprint.pprint(
+                    self.res_types_cnt,
+                    stream=f
+                )
+                f.write(f'{"response transitions":<15}:\n')
+                pprint.pprint(
+                    self.resp_trans_cnt,
+                    stream=f
+                )
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
 
@@ -85,10 +101,10 @@ class Analyzer:
             self,
             trans: str
     ):
-        if trans in self.trans_types_cnt.keys():
-            self.trans_types_cnt[trans] += self.trans_types_cnt[trans] + 1
+        if trans in self.resp_trans_cnt.keys():
+            self.resp_trans_cnt[trans] += self.resp_trans_cnt[trans] + 1
         else:
-            self.trans_types_cnt[trans] = 1
+            self.resp_trans_cnt[trans] = 1
             logger.debug(f'Analyzer: new transition {trans}')
 
     
@@ -102,10 +118,10 @@ class Analyzer:
     ):
         return len(self.res_types_cnt.keys())
     
-    def trans_types_num(
+    def resp_trans_num(
             self
     ):
-        return len(self.trans_types_cnt.keys())
+        return len(self.resp_trans_cnt.keys())
     
     def unseen_res_types(
         self

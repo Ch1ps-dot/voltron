@@ -19,7 +19,7 @@ class MealyMachine:
 
     def mem_query(
         self,
-        word: str
+        word: list[str]
     ):
         req_seq = word.split('-')
         return self.run(req_seq=req_seq)

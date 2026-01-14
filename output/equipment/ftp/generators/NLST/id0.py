@@ -7,28 +7,32 @@ def generate_NLST():
     import random
     import string
 
-    message = b''
-
-    # CommandCode: constant "NLST" (4 bytes)
+    # Field 1: CommandCode (constant "NLST")
     command_code = b'NLST'
-    message += command_code
 
-    # Pathname: optional; generate a valid ASCII pathname excluding CR and LF.
-    # We'll include a pathname in this instance.
-    allowed_chars = string.ascii_letters + string.digits + "/._-*"
-    pathname_length = random.randint(1, 32)  # reasonable variable length
-    pathname_str = ''.join(random.choice(allowed_chars) for _ in range(pathname_length))
-    pathname_bytes = pathname_str.encode('ascii')
+    # Decide to include an optional Pathname (so Whitespace must be present)
+    include_pathname = True
 
-    # Whitespace: present because pathname is included (single SP, 0x20)
-    whitespace = b'\x20'
-    message += whitespace
+    # Field 2: Whitespace (constant 0x20) - present only if Pathname follows
+    whitespace = b' ' if include_pathname else b''
 
-    # Pathname field (variable, ASCII excluding CR and LF)
-    message += pathname_bytes
+    # Field 3: Pathname (variable, ASCII excluding CR and LF, undefined length)
+    if include_pathname:
+        # choose a reasonable length between 1 and 20
+        length = random.randint(1, 20)
+        # allowed ASCII characters excluding CR (0x0D) and LF (0x0A)
+        extra_symbols = "/.-_~*?[]()"
+        allowed_chars = string.ascii_letters + string.digits + extra_symbols + ' '
+        # generate the pathname string and encode as ASCII
+        pathname_str = ''.join(random.choice(allowed_chars) for _ in range(length))
+        pathname = pathname_str.encode('ascii')
+    else:
+        pathname = b''
 
-    # EndOfLine: CRLF (0x0D0A)
+    # Field 4: EndOfLine (constant CRLF 0x0D0A)
     end_of_line = b'\x0d\x0a'
-    message += end_of_line
+
+    # Concatenate fields in exact order
+    message = command_code + whitespace + pathname + end_of_line
 
     return message

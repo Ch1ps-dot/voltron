@@ -11,23 +11,22 @@ def generate_CWD():
     import random
     import string
 
-    # Field 1: CommandCode (constant, 3B, value="CWD")
-    message += b'CWD'
+    # Field 1: CommandCode (constant "CWD", 3 bytes)
+    message += b"CWD"
 
-    # Field 2: Whitespace (constant, 1B, value=0x20)
-    message += bytes([0x20])
+    # Field 2: Whitespace (constant 0x20, 1 byte)
+    message += b"\x20"
 
-    # Field 3: Pathname (variable, undefined length, printable ASCII excluding CR and LF)
-    # Choose a reasonable length for the pathname (at least 1 char)
-    valid_chars = string.ascii_letters + string.digits + string.punctuation + ' '
-    # Ensure CR and LF are not present
-    valid_chars = valid_chars.replace('\r', '').replace('\n', '')
-    pathname_length = random.randint(1, 32)
-    pathname = ''.join(random.choices(valid_chars, k=pathname_length))
-    pathname_bytes = pathname.encode('ascii')
-    message += pathname_bytes
+    # Field 3: Pathname (variable, printable ASCII excluding CR and LF, length undefined but >=1)
+    # Build an allowed character set: letters, digits, punctuation and space (exclude CR and LF)
+    allowed_chars = string.ascii_letters + string.digits + string.punctuation + " "
+    # Choose a reasonable length for the pathname (1..24)
+    pathname_len = random.randint(1, 24)
+    pathname_str = "".join(random.choice(allowed_chars) for _ in range(pathname_len))
+    # Encode as ASCII bytes (CR and LF are excluded by construction)
+    message += pathname_str.encode("ascii")
 
-    # Field 4: EndOfLine (constant, 2B, value=0x0D0A)
-    message += bytes([0x0D, 0x0A])
+    # Field 4: EndOfLine (constant CRLF 0x0D0A, 2 bytes)
+    message += b"\x0d\x0a"
 
     return message

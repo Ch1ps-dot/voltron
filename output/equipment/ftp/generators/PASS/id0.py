@@ -6,25 +6,24 @@ def generate_PASS():
     
     message = b''
     
-    import random
+    # CommandCode (constant, 4 bytes): "PASS"
+    command_code = b'PASS'
+    message += command_code
 
-    # CommandCode: constant "PASS" (4 bytes, ASCII)
-    command = b'PASS'
+    # Whitespace (constant, 1 byte): 0x20 (SP)
+    message += b'\x20'
 
-    # Whitespace: single space (0x20)
-    whitespace = bytes([0x20])
+    # Password (variable, undefined length): use the known SUT password for user 'ubuntu'
+    # Must be printable NVT-ASCII excluding CR (0x0D) and LF (0x0A)
+    password_str = 'ubuntu'
+    password_bytes = password_str.encode('ascii')
+    # Ensure it does not contain CR or LF
+    if b'\r' in password_bytes or b'\n' in password_bytes:
+        # Fallback to empty password if invalid (should not happen for 'ubuntu')
+        password_bytes = b''
+    message += password_bytes
 
-    # Password: variable, printable NVT-ASCII characters excluding CR (0x0D) and LF (0x0A); may be empty
-    # Choose a reasonable length between 0 and 16 (inclusive)
-    pwd_length = random.randint(0, 16)
-    allowed_chars = [chr(i) for i in range(0x20, 0x7F) if i not in (0x0A, 0x0D)]
-    password_str = ''.join(random.choices(allowed_chars, k=pwd_length))
-    password = password_str.encode('ascii')
-
-    # EndOfLine: CR LF (0x0D 0x0A)
-    eol = bytes([0x0D, 0x0A])
-
-    # Concatenate fields in the exact order
-    message = command + whitespace + password + eol
-
+    # EndOfLine (constant, 2 bytes): CR LF (0x0D 0x0A)
+    message += b'\x0d\x0a'
+    
     return message

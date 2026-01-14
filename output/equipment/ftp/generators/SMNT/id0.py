@@ -5,28 +5,33 @@ def generate_SMNT():
     """
     
     import random
+    import string
 
     message = b''
-
-    # CommandCode: constant "SMNT" (4 bytes ASCII)
+    
+    # CommandCode: constant "SMNT" (4 bytes)
     message += b'SMNT'
 
     # Whitespace: single space (0x20)
-    message += bytes([0x20])
+    message += b'\x20'
 
-    # Pathname: variable, ASCII printable characters excluding CR and LF.
-    # Choose a reasonable length between 1 and 64 and start with '/' to form a typical pathname.
-    length = random.randint(1, 64)
-    # Generate printable US-ASCII range 0x20 (space) to 0x7E (~)
-    printable = ''.join(chr(i) for i in range(0x20, 0x7F))
+    # Pathname: variable, printable US-ASCII excluding CR and LF.
+    # Choose a reasonable length between 1 and 32 and make it a pathname starting with '/'.
+    allowed_chars = string.ascii_letters + string.digits + string.punctuation + ' '
+    # Ensure CR and LF are not present (they are not in allowed_chars as constructed)
+    length = random.randint(1, 32)
     if length == 1:
         pathname = '/'
     else:
-        # Ensure no CR/LF (they are not in the printable range selected)
-        pathname = '/' + ''.join(random.choice(printable) for _ in range(length - 1))
-    message += pathname.encode('ascii')
+        # first char '/' to resemble a pathname, rest random from allowed set
+        rest = ''.join(random.choice(allowed_chars) for _ in range(length - 1))
+        pathname = '/' + rest
 
-    # EndOfLine: CR LF (0x0D 0x0A)
-    message += b'\r\n'
+    # Encode as ASCII bytes
+    pathname_bytes = pathname.encode('ascii', errors='ignore')
+    message += pathname_bytes
 
+    # EndOfLine: CR LF (0x0D0A)
+    message += b'\x0d\x0a'
+    
     return message

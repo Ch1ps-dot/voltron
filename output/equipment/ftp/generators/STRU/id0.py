@@ -7,18 +7,18 @@ def generate_STRU():
     import random
 
     message = b''
-
-    # CommandCode: constant "STRU" (4 bytes)
+    
+    # CommandCode: constant 'STRU' (4 bytes)
     message += b'STRU'
-
-    # Whitespace: constant 0x20 (1 byte, space)
-    message += bytes([0x20])
-
-    # StructureCode: variable 1 byte, one of 'F', 'R', 'P'
-    structure_code = random.choice(['F', 'R', 'P']).encode('ascii')
-    message += structure_code
-
-    # EndOfLine: constant CRLF (0x0D0A, 2 bytes)
+    
+    # Whitespace: constant single space (0x20)
+    message += b'\x20'
+    
+    # StructureCode: variable 1 byte, choose among 'F', 'R', 'P'
+    structure_code = random.choice(['F', 'R', 'P'])
+    message += structure_code.encode('ascii')
+    
+    # EndOfLine: constant CRLF (0x0D0A)
     message += b'\x0D\x0A'
-
+    
     return message

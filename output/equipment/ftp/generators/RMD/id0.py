@@ -3,28 +3,35 @@ def generate_RMD():
     - Input: none
     - Output: bytes
     """
+    
+    message = b''
+    
     import random
     import string
 
-    message = b''
+    # Field 1: CommandCode (constant, 3B, value "RMD")
+    command_code = b'RMD'
 
-    # CommandCode: constant "RMD" (3 bytes)
-    message += b'RMD'
+    # Field 2: Separator (constant, 1B, value 0x20 -> space)
+    separator = b' '
 
-    # Separator: single SPACE (0x20)
-    message += b'\x20'
+    # Field 3: Pathname (variable, undefined length, ASCII excluding CR, LF)
+    # Choose a reasonable length and characters allowed by the comment.
+    # We'll allow letters, digits, common pathname chars, spaces, dots, underscores, hyphens and slashes.
+    allowed_chars = string.ascii_letters + string.digits + " ./_-"
+    # Ensure length at least 1 and not excessively long
+    path_len = random.randint(1, 32)
+    pathname_str = ''.join(random.choices(allowed_chars, k=path_len))
+    # Ensure CR and LF are not present (they are not in allowed_chars)
+    pathname = pathname_str.encode('ascii')
 
-    # Pathname: variable, ASCII excluding CR and LF, choose a reasonable length
-    # Allowed characters: letters, digits, common pathname symbols, and space
-    allowed_chars = string.ascii_letters + string.digits + "-_./ "
-    pathname_length = random.randint(1, 32)  # reasonable length for a pathname
-    pathname = ''.join(random.choices(allowed_chars, k=pathname_length))
-    # Ensure pathname is not all spaces (still valid per spec but undesirable)
-    if pathname.strip() == '':
-        pathname = 'dir' + pathname[0: max(0, pathname_length - 3)]
-    message += pathname.encode('ascii')
+    # Field 4: EndOfLine (constant, 2B, value 0x0D0A -> CRLF)
+    end_of_line = b'\x0D\x0A'
 
-    # EndOfLine: CRLF (0x0D0A)
-    message += b'\x0d\x0a'
+    # Concatenate fields in the exact order
+    message += command_code
+    message += separator
+    message += pathname
+    message += end_of_line
 
     return message

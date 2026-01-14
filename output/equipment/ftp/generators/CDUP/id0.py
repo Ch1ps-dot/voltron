@@ -6,13 +6,13 @@ def generate_CDUP():
     
     message = b''
     
-    # Field 1: CommandCode (constant "CDUP", 4 ASCII bytes)
+    # CommandCode: constant "CDUP" (4 ASCII characters)
     command_code = b'CDUP'
     
-    # Field 2: EndOfLine (constant CRLF, 2 bytes 0x0D0A)
-    end_of_line = b'\x0D\x0A'
+    # EndOfLine: constant CRLF (0x0D0A)
+    end_of_line = bytes.fromhex('0D0A')
     
-    # Concatenate fields in the exact order
+    # Serialize fields in the order defined by the protoIR
     message = command_code + end_of_line
     
     return message

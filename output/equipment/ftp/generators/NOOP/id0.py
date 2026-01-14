@@ -6,10 +6,13 @@ def generate_NOOP():
     
     message = b''
     
-    # Field 1: CommandCode (constant, 4B) -> ASCII "NOOP"
-    message += b'NOOP'
+    # CommandCode: constant 4B "NOOP" (ASCII)
+    command_code = b'NOOP'
     
-    # Field 2: TelnetEndOfLine (constant, 2B) -> 0x0D0A (CRLF)
-    message += bytes.fromhex('0D0A')
+    # TelnetEndOfLine: constant 2B 0x0D0A (CRLF)
+    telnet_eol = bytes.fromhex('0D0A')
+    
+    message += command_code
+    message += telnet_eol
     
     return message
