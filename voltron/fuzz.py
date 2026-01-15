@@ -114,6 +114,8 @@ class Fuzzer:
         match algo:
             case 'rand':
                 fuzz_loop = self.rand_fuzz
+            case 'state':
+                fuzz_loop = self.state_fuzz
         if fuzz_loop == None:
             logger.debug('Fuzzer: no algorithm') 
             return
@@ -146,6 +148,26 @@ class Fuzzer:
             stop_event: threading.Event
     ):
         fuzz = Rands(mapper=self.mapper, executor=self.exe)
+        while not stop_event.is_set():
+            try:
+                if not fuzz.run():
+                    stop_event.set()
+            except Exception as e:
+                logger.debug(f'Fuzzer: exit {e}')
+                logger.debug(traceback.format_exc())
+                stop_event.set()
+            if (self.time_limit_s < time.time() - self.analyzer.start_time):
+                stop_event.set()
+                logger.debug('Fuzzer: timeout')
+                
+    def state_fuzz(
+        self,
+        stop_event: threading.Event
+    ):
+        from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
+        mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
+        eq = EquOracle(mapper=self.mapper, executor=self.exe)
+        fuzz = MealyLstar(mq, eq)
         while not stop_event.is_set():
             try:
                 if not fuzz.run():

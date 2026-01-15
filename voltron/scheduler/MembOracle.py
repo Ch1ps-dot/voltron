@@ -14,10 +14,9 @@ class MembershipOracle:
     
     def query(
         self, 
-        word: str
+        word: tuple[str,...]
     ) -> str | None:
-        req_seq = word.split('/')
-        generators = self.mapper.select_generators(req_seq)
+        generators = self.mapper.select_generators(list(word))
         flag, cons = self.executor.interact(generators)
         if (flag and cons):
             if cons.req_res_pair[-1][1]:
