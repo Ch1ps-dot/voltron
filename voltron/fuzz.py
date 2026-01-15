@@ -164,21 +164,26 @@ class Fuzzer:
         self,
         stop_event: threading.Event
     ):
-        from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
-        mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
-        eq = EquOracle(mapper=self.mapper, executor=self.exe)
-        fuzz = MealyLstar(mq, eq)
-        while not stop_event.is_set():
-            try:
-                if not fuzz.run():
+        try:
+            from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
+            mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
+            eq = EquOracle(mapper=self.mapper, executor=self.exe)
+            fuzz = MealyLstar(mq, eq)
+            while not stop_event.is_set():
+                try:
+                    if not fuzz.run():
+                        stop_event.set()
+                except Exception as e:
+                    logger.debug(f'Fuzzer: exit {e}')
+                    logger.debug(traceback.format_exc())
                     stop_event.set()
-            except Exception as e:
-                logger.debug(f'Fuzzer: exit {e}')
-                logger.debug(traceback.format_exc())
-                stop_event.set()
-            if (self.time_limit_s < time.time() - self.analyzer.start_time):
-                stop_event.set()
-                logger.debug('Fuzzer: timeout')
+                if (self.time_limit_s < time.time() - self.analyzer.start_time):
+                    stop_event.set()
+                    logger.debug('Fuzzer: timeout')
+        except Exception as e:
+            logger.debug(f'Fuzzer: exit {e}')
+            logger.debug(traceback.format_exc())
+            stop_event.set()
 
     def handle_normal_fuzzer_exit(
             self,
