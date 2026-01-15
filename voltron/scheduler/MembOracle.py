@@ -19,8 +19,7 @@ class MembershipOracle:
         self, 
         word: tuple[str,...]
     ) -> list[str] | None:
-        with open(configs.results_path / 'mq', 'a', encoding='utf-8') as f:
-            f.write(f'Learner: query {word}')
+        
         generators = self.mapper.select_generators(list(word))
         flag, cons = self.executor.interact(generators)
         if (flag and cons):

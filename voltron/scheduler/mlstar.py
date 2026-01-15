@@ -34,6 +34,8 @@ class ObTable:
                     if p not in self.T.keys():
                         self.T[p] = {}
                     if e not in self.T[p].keys():
+                        with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
+                            f.write(f'--Query--\ns: {p}\ne: {e}')
                         out = self.mq.query(p + e)
                         if (out):
                             self.T[p][e] = tuple(out[-len(e):])
