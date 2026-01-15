@@ -31,7 +31,7 @@ class ObTable:
             for a in self.alphabet:
                 for e in self.E:
                     p = s + (a,) # S + i (element in alphabet)
-                    if p not in self.T.keys() and e not in self.T[p].keys():
+                    if p not in self.T.keys() or e not in self.T[p].keys():
                         out = self.mq.query(p + e)
                         if (out):
                             self.T[p][e] = tuple(out[-len(e):])
