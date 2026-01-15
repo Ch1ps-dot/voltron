@@ -107,9 +107,9 @@ class Executor:
         resp_code, resp_data = self.net_recv(sock=sock)
                 
         # maybe recv initialize message
-        if(resp_code):
+        if(resp_code and resp_data):
             cons.add_state('-', resp_code)
-            cons.add_data(None, resp_data)
+            cons.add_data(bytes(), resp_data)
 
         # send the message path
         for g in generator_seq:
@@ -163,7 +163,8 @@ class Executor:
                             self.analyzer.res_types_update(resp_code)
                         
                         # record conversation data
-                        cons.add_data(req_data, resp_data)
+                        if(req_data and resp_data):
+                            cons.add_data(req_data, resp_data)
                         cons.add_state(g.msg_type, resp_code)
             
             # If socket closed, stop sending
