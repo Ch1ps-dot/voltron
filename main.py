@@ -8,9 +8,18 @@ def test_lightftp():
     fuzzer.fuzz(
         algo='rand'
     )
+    
+def test_state():
+    fuzzer = Fuzzer(
+        target_name='lightftp',
+        time_limit_min=10
+    )
+    fuzzer.fuzz(
+        algo='state'
+    )
 
 def main():
-    test_lightftp()
+    test_state()
 
 if __name__ == '__main__':
     main()
