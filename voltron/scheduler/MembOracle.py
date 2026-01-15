@@ -2,6 +2,7 @@ from voltron.executor.executor import Executor
 from voltron.executor.conversation import Conversation
 from voltron.mapper.mapper import Mapper
 from voltron.utils.logger import logger
+from voltron.configs import configs
 import pprint
 
 class MembershipOracle:
@@ -18,7 +19,8 @@ class MembershipOracle:
         self, 
         word: tuple[str,...]
     ) -> list[str] | None:
-        logger.debug(f'Learner: query {word}')
+        with open(configs.results_path / 'mq', 'a', encoding='utf-8') as f:
+            f.write(f'Learner: query {word}')
         generators = self.mapper.select_generators(list(word))
         flag, cons = self.executor.interact(generators)
         if (flag and cons):
