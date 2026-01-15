@@ -1,6 +1,8 @@
 from voltron.executor.executor import Executor
 from voltron.executor.conversation import Conversation
 from voltron.mapper.mapper import Mapper
+from voltron.utils.logger import logger
+import pprint
 
 class MembershipOracle:
     def __init__(
@@ -16,6 +18,7 @@ class MembershipOracle:
         self, 
         word: tuple[str,...]
     ) -> list[str] | None:
+        logger.debug(f'Learner: query {pprint.pformat(word)}')
         generators = self.mapper.select_generators(list(word))
         flag, cons = self.executor.interact(generators)
         if (flag and cons):

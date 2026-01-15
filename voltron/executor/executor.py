@@ -81,7 +81,7 @@ class Executor:
         generator_seq: list[Generator]
     ) -> Tuple[bool, Conversation | None]:  
         """
-        TODO: Deal with
+        TODO: Deal with interaction
         """
         # prepare some settings and setup SUT
         proc = self.pre_exe()
