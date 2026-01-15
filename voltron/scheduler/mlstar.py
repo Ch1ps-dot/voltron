@@ -17,7 +17,7 @@ class ObTable:
         self.alphabet: list[str] = mq.alphabet # request symbol
         
         self.S: set[tuple[str,...]] = {('',)} # prefix of request symbols
-        self.E: set[tuple[str,...]] = {tuple(a for a in self.alphabet)} # suffix of request symbols
+        self.E: set[tuple[str,...]] = {tuple(a) for a in self.alphabet} # suffix of request symbols
         
         self.T: dict[tuple[str,...], dict[tuple[str,...], tuple[str,...]]] = {} # (s, a, e) -> output. Transition
         
