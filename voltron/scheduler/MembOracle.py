@@ -18,7 +18,7 @@ class MembershipOracle:
         self, 
         word: tuple[str,...]
     ) -> list[str] | None:
-        logger.debug(f'Learner: query {pprint.pformat(word)}')
+        logger.debug(f'Learner: query {word}')
         generators = self.mapper.select_generators(list(word))
         flag, cons = self.executor.interact(generators)
         if (flag and cons):

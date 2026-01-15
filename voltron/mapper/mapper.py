@@ -73,6 +73,8 @@ class Mapper:
         for req in req_seq:
             if req in self.generators.keys():
                 gs.append(self.generators[req][0])
+            else:
+                logger.debug(f'Mapper: unexpected type {req}')
         return gs
     
     def select_generator(
