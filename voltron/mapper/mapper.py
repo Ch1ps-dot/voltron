@@ -21,8 +21,8 @@ class Mapper:
         self.gs_path = producer.generator_path
         self.ps_path = producer.parser_path
         
-        self.req_types: list[str] = producer.req_types
-        self.res_types: list[str] = producer.res_types
+        self.request_types: list[str] = producer.req_types
+        self.response_types: list[str] = producer.res_types
         
         self.generators: dict[str, list[Generator]] = producer.generators
         self.parsers: list[Parser] = producer.parsers
