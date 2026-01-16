@@ -60,12 +60,12 @@ class Analyzer:
             with states_file.open(mode='w', encoding='utf-8') as f:
                 f.write(f'{"response types":<15}:\n')
                 pprint.pprint(
-                    self.res_types_cnt,
+                    self.res_types_cnt.keys(),
                     stream=f
                 )
                 f.write(f'{"response transitions":<15}:\n')
                 pprint.pprint(
-                    self.resp_trans_cnt,
+                    self.resp_trans_cnt.keys(),
                     stream=f
                 )
         except Exception as e:
