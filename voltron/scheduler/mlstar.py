@@ -17,7 +17,7 @@ class ObTable:
         self.alphabet: list[str] = mq.alphabet # request symbol
         
         self.S: set[tuple[str,...]] = {tuple('')} # prefix of request symbols
-        self.E: set[tuple[str,...]] = {tuple(a) for a in self.alphabet} # suffix of request symbols
+        self.E: set[tuple[str,...]] = {tuple([a]) for a in self.alphabet} # suffix of request symbols
         
         self.T: dict[tuple[str,...], dict[tuple[str,...], tuple[str,...]]] = {} # (s, a, e) -> output. Transition
         
@@ -33,7 +33,7 @@ class ObTable:
                     self.T[s] = {}
                 if e not in self.T[s].keys():
                     with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
-                        f.write(f'--Query--\ns: {s}\ne: {e}')
+                        f.write(f'\n--Query--\ns: {s}\ne: {e}')
                     out = self.mq.query(s + e)
                     if (out):
                         self.T[s][e] = tuple(out[-len(e):])
@@ -46,7 +46,7 @@ class ObTable:
                         self.T[si] = {}
                     if e not in self.T[si].keys():
                         with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
-                            f.write(f'--Query--\ns: {si}\ne: {e}')
+                            f.write(f'\n--Query--\ns: {si}\ne: {e}')
                         out = self.mq.query(si + e)
                         if (out):
                             self.T[si][e] = tuple(out[-len(e):])
