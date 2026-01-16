@@ -121,7 +121,10 @@ class Executor:
         # send the message path
         for g in generator_seq:
             
-            if self.stop_event.is_set(): 
+            if self.stop_event.is_set():
+                sock.close()
+                if proc.poll() is None:
+                    proc.terminate()
                 sys.exit(0)
             # send message and parse response
             msg = self.exe_generator(g)
@@ -136,47 +139,43 @@ class Executor:
                     self.analyzer.last_generator = g
                 resp_code, resp_data = self.net_recv(sock=sock)
 
-                match resp_code:
-                    
-                    # remote crash
-                    case 'POLLERR':
-                        return_code = proc.poll()
-                        if return_code:
-                            cons.add_state(g.msg_type, 'CRASH')
-                            with self.analyzer.lock:
-                                self.analyzer.crash_num += 1
-                        else:
-                            cons.add_state(g.msg_type, 'POLLERR')
-                            with self.analyzer.lock:
-                                self.analyzer.pollerr_num += 1
-                        break
-                    
-                    # remote hang
-                    case 'TIMEOUT':
-                        cons.add_state(g.msg_type, 'TIMEOUT')
+                if resp_code == 'POLLERR':
+                    return_code = proc.poll()
+                    if return_code:
+                        cons.add_state(g.msg_type, 'CRASH')
                         with self.analyzer.lock:
-                            self.analyzer.timeout_num += 1
-                        break
-                    
-                    # remote close the socket
-                    case 'RCLOSED':
-                        cons.add_state(g.msg_type, 'RCLOSED')
+                            self.analyzer.crash_num += 1
+                    else:
+                        cons.add_state(g.msg_type, 'POLLERR')
                         with self.analyzer.lock:
-                            self.analyzer.rclose_num += 1
-                        break
-                    case _:
-                        if(resp_code == None):
+                            self.analyzer.pollerr_num += 1
+                    break
+                
+                elif resp_code == 'TIMEOUT':
+                    cons.add_state(g.msg_type, 'TIMEOUT')
+                    with self.analyzer.lock:
+                        self.analyzer.timeout_num += 1
+                    break
+                
+                elif resp_code == 'RCLOSED':
+                    cons.add_state(g.msg_type, 'RCLOSED')
+                    with self.analyzer.lock:
+                        self.analyzer.rclose_num += 1
+                    break
+                
+                else:
+                    if(resp_code == None):
                             logger.debug('Executor: Parser error')
                             continue
-                        with self.analyzer.lock:
-                            self.analyzer.res_types_update(resp_code)
-                            self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
-                        last_recv = resp_code
-                        
-                        # record conversation data
-                        if(req_data and resp_data):
-                            cons.add_data(req_data, resp_data)
-                        cons.add_state(g.msg_type, resp_code)
+                    with self.analyzer.lock:
+                        self.analyzer.res_types_update(resp_code)
+                        self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
+                    last_recv = resp_code
+                    
+                    # record conversation data
+                    if(req_data and resp_data):
+                        cons.add_data(req_data, resp_data)
+                    cons.add_state(g.msg_type, resp_code)
             
             # If socket closed, stop sending
             else:
@@ -315,13 +314,11 @@ class Executor:
 
                 # handler recv timeout
                 if not events:
-                    logger.debug('Executor: recv time out')
                     return 'TIMEOUT', None
                 
                 fd, event = events[0]
                 
                 if event & (select.POLLERR):
-                    logger.debug("Executor: recv poll error")
                     return 'POLLERR', None
                 # response can be read
 
@@ -333,7 +330,6 @@ class Executor:
                     
                     # if buf size is 0, socket close
                     if len(buf) == 0:
-                        logger.debug('Executor: remote socket closed')
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
@@ -342,9 +338,9 @@ class Executor:
                         # update some analysis data
                         with self.analyzer.lock:
                             self.analyzer.res_num += 1
-                            self.analyzer.last_parser = self.mapper.cur_parser
-                            if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
-                                self.analyzer.last_generator.cur_res.append(resp_code)
+                            # self.analyzer.last_parser = self.mapper.cur_parser
+                            # if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
+                            #     self.analyzer.last_generator.cur_res.append(resp_code)
                                 
                         return resp_code, buf
                 

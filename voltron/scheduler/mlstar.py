@@ -6,7 +6,7 @@ from voltron.scheduler.MembOracle import MembershipOracle
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint, pickle, threading, sys
+import pprint, pickle, threading, sys, traceback
 
 
 class ObTable:
@@ -193,10 +193,14 @@ class MealyLstar:
     def run(
         self
     ):
-        self.table.make_close()
-        self.table.make_consistent()
-        h = self.table.build_hypothesis()
-        with open(configs.results_path / 'model.pkl', 'wb') as f:
-            pickle.dump(h, f)
-        h.graph()
+        try:
+            self.table.make_close()
+            self.table.make_consistent()
+            h = self.table.build_hypothesis()
+            with open(configs.results_path / 'model.pkl', 'wb') as f:
+                pickle.dump(h, f)
+            h.graph()
+        except Exception as e:
+            logger.debug(f'LM: {e}')
+            logger.debug(f'{traceback.format_exc()}')
         return h
