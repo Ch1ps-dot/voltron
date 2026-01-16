@@ -61,7 +61,7 @@ class Executor:
                 return None
 
     def pre_exe(
-            self,
+        self
     ) -> subprocess.Popen | None:
         if (self.pre_script.is_file()):
             try:

@@ -6,7 +6,7 @@ from voltron.scheduler.MembOracle import MembershipOracle
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint
+import pprint, pickle
 
 
 class ObTable:
@@ -68,7 +68,10 @@ class ObTable:
                                 analyzer.out = f'{' '.join(out)}'
                             self.T[si][e] = tuple(out[-len(e):])
 
-    def row(self, s):
+    def row(
+        self, 
+        s: tuple[str, ...]
+    ):
         return tuple(
             self.T[s][e]
             for e in self.E
@@ -134,10 +137,10 @@ class ObTable:
                 delta[(state_id, a)] = states[r2]
                 output[(state_id, a)] = str(self.T[s][(a,)])
 
-        start = states[self.row('')]
+        start = states[self.row(('',))]
         return MealyMachine(
             states=set(states.values()),
-            alphabet=self.alphabet,
+            alphabet=set(self.alphabet),
             delta=delta,
             output=output,
             start=start
@@ -157,4 +160,6 @@ class MealyLstar:
         self.table.make_close()
         self.table.make_consistent()
         h = self.table.build_hypothesis()
+        with open(configs.results_path / 'model.pkl', 'wb') as f:
+            pickle.dump(h, f)
         return h

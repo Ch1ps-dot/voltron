@@ -12,7 +12,7 @@ class Rands:
         executor: Executor,
     ) -> None:
         self.mapper = mapper
-        self.req_types = mapper.req_types
+        self.req_types = mapper.request_types
         self.exe: Executor = executor
 
     def select(
