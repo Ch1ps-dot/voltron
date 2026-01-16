@@ -16,8 +16,8 @@ class ObTable:
     ) -> None:
         self.alphabet: list[str] = mq.alphabet # request symbol
         
-        self.S: set[tuple[str,...]] = {tuple('')} # prefix of request symbols
-        self.E: set[tuple[str,...]] = {tuple([a]) for a in self.alphabet} # suffix of request symbols
+        self.S: set[tuple[str,...]] = {('',)} # prefix of request symbols
+        self.E: set[tuple[str,...]] = {(a,) for a in self.alphabet} # suffix of request symbols
         
         self.T: dict[tuple[str,...], dict[tuple[str,...], tuple[str,...]]] = {} # (s, a, e) -> output. Transition
         
@@ -41,7 +41,7 @@ class ObTable:
         for s in self.S:
             for a in self.alphabet:
                 for e in self.E:
-                    si = s + tuple(a) # S + i (element in alphabet)
+                    si = s + (a,) # S + i (element in alphabet)
                     if si not in self.T.keys():
                         self.T[si] = {}
                     if e not in self.T[si].keys():
@@ -62,7 +62,7 @@ class ObTable:
         rows = {self.row(s) for s in self.S}
         for s in self.S:
             for a in self.alphabet:
-                sa = s + tuple(a)
+                sa = s + (a,)
                 if self.row(sa) not in rows:
                     return False, sa
         return True, None
@@ -125,8 +125,6 @@ class ObTable:
             output=output,
             start=start
         )
-    
-    
         
 class MealyLstar:
     def __init__(

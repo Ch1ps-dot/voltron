@@ -243,7 +243,7 @@ class Executor:
                 if event & select.POLLOUT:
                     
                     sock.sendall(msg)
-                    logger.debug(f'net_send: {msg}')
+                    # logger.debug(f'net_send: {msg}')
                     return True, msg
             
             # TODO: support udp
@@ -317,7 +317,7 @@ class Executor:
 
                 if event & select.POLLIN:
                     buf = sock.recv(1024)
-                    logger.debug(f'net_recv: {buf}')
+                    # logger.debug(f'net_recv: {buf}')
                     
                     #TODO: handle invalid response
                     
