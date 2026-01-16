@@ -91,7 +91,8 @@ def make_info_table():
         'protol type': ana.pro_name,
         'strategy': ana.strategy,
         'stage': ana.stage,
-        'query': ana.mq,
+        'pre_cnt': ana.prefix,
+        'suf_cnt': ana.suffix,
         'out': ana.out
     }
     table = Table(title="Fuzzer Info", show_header=False, box=None)

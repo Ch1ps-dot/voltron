@@ -30,33 +30,42 @@ class ObTable:
         self._fill_table()
 
     def _fill_table(self):
-        iter = 0
+        iter_s = 0
+        iter_e = 0
         logger.debug('Ob: fill table')
         for s in self.S:
-            iter += 1
+            iter_s += 1
+            with analyzer.lock:
+                analyzer.prefix = f'({iter_s}/{len(self.S)}) {'/'.join(s)}'
             for e in self.E:
                 if s not in self.T.keys():
                     self.T[s] = {}
                 if e not in self.T[s].keys():
+                    iter_e += 1
+                    with analyzer.lock:
+                        analyzer.suffix = f'({iter_e}/{len(self.E)}) {'/'.join(e)}'
                     # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                     #     f.write(f'--Query--\ns: {s}\ne: {e}\n')
-                    with analyzer.lock:
-                        analyzer.mq = f'({iter}/{len(self.S)}) {' '.join(s)}:{' '.join(e)}'
                     out = self.mq.query(s + e)
                     if (out):
                         with analyzer.lock:
                             analyzer.out = f'{' '.join(out)}'
                         self.T[s][e] = tuple(out[-len(e):])
                        
-        iter = 0                
+        iter_s = 0
+        iter_e = 0                
         for s in self.S:
             for a in self.alphabet:
-                iter += 1
+                iter_s += 1
                 si = s + (a,) # S + i (element in alphabet)
+                with analyzer.lock:
+                    analyzer.prefix = f'({iter_s}/{len(self.S)}) {'/'.join(s)}'
                 if si not in self.T.keys():
                     self.T[si] = {}
                 for e in self.E:
-                    
+                    iter_e += 1
+                    with analyzer.lock:
+                        analyzer.suffix = f'({iter_e}/{len(self.E)}) {'/'.join(e)}'
                     # connection was closed before sending suffix request
                     # in this situation, there is no more response and destroy the evaluation
                     # so we consider they are same state and jump the query
@@ -67,8 +76,7 @@ class ObTable:
                     if e not in self.T[si].keys():
                         # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                         #     f.write(f'--Query--\ns: {si} e: {e}\n')
-                        with analyzer.lock:
-                            analyzer.mq = f'({iter}/{len(self.S)}) {' '.join(si)}:{' '.join(e)}'
+                    
                         out = self.mq.query(si + e)
                         if (out):
                             with analyzer.lock:

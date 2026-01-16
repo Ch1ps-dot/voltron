@@ -28,7 +28,8 @@ class Analyzer:
         self.start_time: float
         self.strategy = ''
         self.stage = ''
-        self.mq = ''
+        self.prefix = ''
+        self.suffix = ''
         self.out = ''
 
         self.autamata = None
