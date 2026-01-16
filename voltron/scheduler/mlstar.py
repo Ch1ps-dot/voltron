@@ -28,17 +28,28 @@ class ObTable:
 
     def _fill_table(self):
         for s in self.S:
+            for e in self.E:
+                if s not in self.T.keys():
+                    self.T[s] = {}
+                if e not in self.T[s].keys():
+                    with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
+                        f.write(f'--Query--\ns: {s}\ne: {e}')
+                    out = self.mq.query(s + e)
+                    if (out):
+                        self.T[s][e] = tuple(out[-len(e):])
+                        
+        for s in self.S:
             for a in self.alphabet:
                 for e in self.E:
-                    p = s + tuple(a) # S + i (element in alphabet)
-                    if p not in self.T.keys():
-                        self.T[p] = {}
-                    if e not in self.T[p].keys():
+                    si = s + tuple(a) # S + i (element in alphabet)
+                    if si not in self.T.keys():
+                        self.T[si] = {}
+                    if e not in self.T[si].keys():
                         with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
-                            f.write(f'--Query--\ns: {p}\ne: {e}')
-                        out = self.mq.query(p + e)
+                            f.write(f'--Query--\ns: {si}\ne: {e}')
+                        out = self.mq.query(si + e)
                         if (out):
-                            self.T[p][e] = tuple(out[-len(e):])
+                            self.T[si][e] = tuple(out[-len(e):])
 
     def row(self, s):
         return tuple(
