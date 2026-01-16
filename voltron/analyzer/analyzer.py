@@ -23,8 +23,8 @@ class Analyzer:
         self.rclose_num = 0
 
         # information of fuzzer
-        self.target_name = configs.target_name
-        self.pro_name = configs.pro_name
+        self.target_name: str
+        self.pro_name: str
         self.start_time: float
         self.strategy = ''
         self.stage = ''

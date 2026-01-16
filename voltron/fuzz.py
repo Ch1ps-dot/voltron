@@ -67,6 +67,9 @@ class Fuzzer:
             results_dir.mkdir()
         
         configs.results_path = results_dir
+        
+        analyzer.pro_name = configs.pro_name
+        analyzer.target_name = configs.target_name
 
     def module_init(
             self
