@@ -6,14 +6,15 @@ from voltron.scheduler.MembOracle import MembershipOracle
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint, pickle
+import pprint, pickle, threading
 
 
 class ObTable:
     def __init__(
         self,
         mq: MembershipOracle,
-        eq: EquOracle
+        eq: EquOracle,
+        stop_event: threading.Event
     ) -> None:
         self.alphabet: list[str] = mq.alphabet # request symbol
         
@@ -24,6 +25,7 @@ class ObTable:
         
         self.mq = mq
         self.eq = eq
+        self.stop_event = stop_event
         
         with analyzer.lock:
             analyzer.stage = f'init obtable'
@@ -41,6 +43,9 @@ class ObTable:
                 if s not in self.T.keys():
                     self.T[s] = {}
                 if e not in self.T[s].keys():
+                    
+                    if self.stop_event.is_set(): return
+                    
                     iter_e += 1
                     with analyzer.lock:
                         analyzer.suffix = f'({iter_e}/{len(self.E)}) {'/'.join(e)}'
@@ -59,10 +64,13 @@ class ObTable:
                 iter_s += 1
                 si = s + (a,) # S + i (element in alphabet)
                 with analyzer.lock:
-                    analyzer.prefix = f'({iter_s}/{len(self.S)}) {'/'.join(s)}'
+                    analyzer.prefix = f'({iter_s}/{len(self.S)* len(self.alphabet)}) {'/'.join(s)}'
                 if si not in self.T.keys():
                     self.T[si] = {}
                 for e in self.E:
+                    
+                    if self.stop_event.is_set(): return
+                    
                     iter_e += 1
                     with analyzer.lock:
                         analyzer.suffix = f'({iter_e}/{len(self.E)}) {'/'.join(e)}'
@@ -107,6 +115,7 @@ class ObTable:
             analyzer.stage = f'make close'
         logger.debug('Ob: make close')
         while True:
+            if self.stop_event.is_set(): return
             closed, sa = self.is_closed()
             if closed or sa == None:
                 return
@@ -130,6 +139,7 @@ class ObTable:
             analyzer.stage = f'make consistent'
         logger.debug('Ob: make consistent')
         while True:
+            if self.stop_event.is_set(): return
             ok, data = self.is_consistent()
             if ok or data == None:
                 return
@@ -172,9 +182,10 @@ class MealyLstar:
     def __init__(
         self,
         mq,
-        eq
+        eq,
+        stop_event: threading.Event
     ) -> None:
-        self.table = ObTable(mq, eq)
+        self.table = ObTable(mq, eq, stop_event)
     
     def run(
         self
