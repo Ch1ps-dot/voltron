@@ -169,7 +169,7 @@ class Fuzzer:
             from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
-            fuzz = MealyLstar(mq, eq)
+            fuzz = MealyLstar(mq, eq, self.stop_event)
             while not stop_event.is_set():
                 try:
                     if not fuzz.run():
