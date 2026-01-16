@@ -124,7 +124,7 @@ class ObTable:
             closed, sa = self.is_closed()
             if closed or sa == None:
                 return
-            logger.debug(f'close add: {sa}')
+            logger.debug(f'add new suffix: {sa}')
             self.S.add(sa)
             self._fill_table()
 
@@ -145,7 +145,8 @@ class ObTable:
             analyzer.stage = f'make consistent'
         logger.debug('Ob: make consistent')
         while True:
-            if self.stop_event.is_set(): sys.exit(0)
+            if self.stop_event.is_set(): 
+                sys.exit(0)
             ok, data = self.is_consistent()
             if ok or data == None:
                 return
@@ -155,22 +156,23 @@ class ObTable:
 
     # ---------- Hypothesis ----------
     def build_hypothesis(self):
-        states: dict[tuple[tuple[str,...],...], int] = {(('',),): 0}
+        states = {}
         sid = 1
 
         for s in self.S:
             r = self.row(s)
-            logger.debug(s)
             if r not in states:
-                logger.debug(f'unique state: {r}')
-                states[r] = sid
+                logger.debug(f'unique state: {s}')
+                states[r] = (sid, s)
                 sid += 1
 
         delta: dict[tuple[int, str], int] = {}
         output: dict[tuple[int, str], str] = {}
 
-        for r, state_id in states.items():
-            s = next(x for x in self.S if self.row(x) == r)
+        for r, id in states.items():
+            state_id = id[0]
+            s = id[1]
+            # s = next(x for x in self.S if self.row(x) == r)
             for a in self.alphabet:
                 r2 = self.row(s + (a,))
                 delta[(state_id, a)] = states[r2]
@@ -193,6 +195,7 @@ class MealyLstar:
         stop_event: threading.Event
     ) -> None:
         self.table = ObTable(mq, eq, stop_event)
+        self.stop_event = stop_event
     
     def run(
         self
@@ -204,6 +207,7 @@ class MealyLstar:
             with open(configs.results_path / 'model.pkl', 'wb') as f:
                 pickle.dump(h, f)
             h.graph()
+            self.stop_event.set()
         except Exception as e:
             logger.debug(f'LM: {e}')
             logger.debug(f'{traceback.format_exc()}')
