@@ -181,7 +181,6 @@ class Executor:
             proc.terminate()
 
         # self.post_exe()
-        logger.debug(f'Executor: conversation done')
         return True, cons
     
     def setup_socket(
