@@ -9,12 +9,13 @@ from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
-import math, statistics, threading, traceback
+import math, statistics, threading, traceback, sys
 
 class Executor:
     def __init__(
             self,
             mapper: Mapper,
+            stop_event:threading.Event,
             setup_time_s:float = 0.1,
             send_time_ms:int = 1000,
             recv_time_ms:int = 1000
@@ -40,6 +41,7 @@ class Executor:
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
+        self.stop_event = stop_event
         
         self.cons_path = configs.results_path / 'testcases'
         if (not self.cons_path.is_dir()):
@@ -102,20 +104,25 @@ class Executor:
             else:
                 break
         
-        last_sent = '-'
-        last_recv = '-'
         # keep request and response in Conversation
         cons: Conversation = Conversation()
         resp_code, resp_data = self.net_recv(sock=sock)
-                
+        
+        last_recv = '-'
         # maybe recv initialize message
         if(resp_code and resp_data):
             cons.add_state('-', resp_code)
             cons.add_data(bytes(), resp_data)
+            last_recv = resp_code
+            with self.analyzer.lock:
+                self.analyzer.res_types_update(resp_code)
+                self.analyzer.resp_trans_update(f'-/{resp_code}')
 
         # send the message path
         for g in generator_seq:
-
+            
+            if self.stop_event.is_set(): 
+                sys.exit(0)
             # send message and parse response
             msg = self.exe_generator(g)
             if msg == None:
@@ -163,6 +170,8 @@ class Executor:
                             continue
                         with self.analyzer.lock:
                             self.analyzer.res_types_update(resp_code)
+                            self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
+                        last_recv = resp_code
                         
                         # record conversation data
                         if(req_data and resp_data):

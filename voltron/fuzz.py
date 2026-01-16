@@ -98,10 +98,13 @@ class Fuzzer:
         # scheduler init
         self.mapper = Mapper(self.handler)
         
+        self.stop_event = threading.Event()
         # setup executor
         self.exe = Executor(
-            mapper=self.mapper
+            mapper=self.mapper,
+            stop_event=self.stop_event
         )
+       
         print('Executor: equipment setup')
 
     def fuzz(
@@ -126,7 +129,7 @@ class Fuzzer:
             start_time = time.time()
             analyzer.start_time = start_time
 
-        self.stop_event = threading.Event()
+        
         signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
         
         # start fuzzing and set up ui

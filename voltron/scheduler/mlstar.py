@@ -6,7 +6,7 @@ from voltron.scheduler.MembOracle import MembershipOracle
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint, pickle, threading
+import pprint, pickle, threading, sys
 
 
 class ObTable:
@@ -33,18 +33,20 @@ class ObTable:
 
     def _fill_table(self):
         iter_s = 0
-        iter_e = 0
+        
         logger.debug('Ob: fill table')
         for s in self.S:
             iter_s += 1
             with analyzer.lock:
                 analyzer.prefix = f'({iter_s}/{len(self.S)}) {'/'.join(s)}'
+                
+            iter_e = 0
             for e in self.E:
                 if s not in self.T.keys():
                     self.T[s] = {}
                 if e not in self.T[s].keys():
                     
-                    if self.stop_event.is_set(): return
+                    if self.stop_event.is_set(): sys.exit(0)
                     
                     iter_e += 1
                     with analyzer.lock:
@@ -58,7 +60,7 @@ class ObTable:
                         self.T[s][e] = tuple(out[-len(e):])
                        
         iter_s = 0
-        iter_e = 0                
+                       
         for s in self.S:
             for a in self.alphabet:
                 iter_s += 1
@@ -67,9 +69,10 @@ class ObTable:
                     analyzer.prefix = f'({iter_s}/{len(self.S)* len(self.alphabet)}) {'/'.join(s)}'
                 if si not in self.T.keys():
                     self.T[si] = {}
+                iter_e = 0
                 for e in self.E:
                     
-                    if self.stop_event.is_set(): return
+                    if self.stop_event.is_set(): sys.exit(0)
                     
                     iter_e += 1
                     with analyzer.lock:
@@ -139,7 +142,7 @@ class ObTable:
             analyzer.stage = f'make consistent'
         logger.debug('Ob: make consistent')
         while True:
-            if self.stop_event.is_set(): return
+            if self.stop_event.is_set(): sys.exit(0)
             ok, data = self.is_consistent()
             if ok or data == None:
                 return

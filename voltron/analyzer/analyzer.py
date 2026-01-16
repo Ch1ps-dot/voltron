@@ -93,9 +93,6 @@ class Analyzer:
         else:
             self.res_types_cnt[res_code] = 1
             logger.debug(f'Analyzer: new reply {res_code}')
-        
-        self.resp_trans_update(f'{self.last_recv}/{res_code}')
-        self.last_recv = res_code
 
     def resp_trans_update(
             self,
