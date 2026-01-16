@@ -20,10 +20,7 @@ The msg_ir describes the **exact message format**, including field order, field 
   $info
   
   - The SUT information above may include:
-    - Observed server responses (e.g., error codes, rejection reasons)
-    - Accepted / rejected field values
-    - Transport-layer behavior
-    - State-related constraints inferred from prior interactions
+    - configuration file of SUT
 
 ---
 

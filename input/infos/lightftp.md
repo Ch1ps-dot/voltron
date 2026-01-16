@@ -1,7 +1,9 @@
-The password of user ubuntu is ubuntu
 
-This is the configuration file(INI format) for executing lightftp
+- Server information: The FTP server will run in local mode. The password of the user **ubuntu** on the local server is **ubuntu**.
 
+- Server configs: The following text is the configuration file(INI format) for executing lightftp:
+
+```INI
 #
 # ftpconfig is the main settings section
 #
@@ -92,3 +94,4 @@ root=/home/user/ftpshare
 pswd=VeryStrongadminpassword222
 accs=admin
 root=/home/user/ftpshare
+```

@@ -52,7 +52,7 @@ class Fuzzer:
         # some file path 
         configs.pre_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'pre.sh'
         configs.post_script =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
-        configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.txt'
+        configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.md'
         configs.doc_path = configs.base_path / 'input' / 'rfcs' / f'{configs.rfc_name}.txt'
         configs.pmp_path = configs.base_path / 'input' / 'prompts'
         configs.base_url = configs_yaml['llm']['base_url']
