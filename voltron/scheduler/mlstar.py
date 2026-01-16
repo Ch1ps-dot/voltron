@@ -41,7 +41,7 @@ class ObTable:
                     # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                     #     f.write(f'--Query--\ns: {s}\ne: {e}\n')
                     with analyzer.lock:
-                        analyzer.mq = f'({iter}/{len(s)}) {' '.join(s)}:{' '.join(e)}'
+                        analyzer.mq = f'({iter}/{len(self.S)}) {' '.join(s)}:{' '.join(e)}'
                     out = self.mq.query(s + e)
                     if (out):
                         with analyzer.lock:
@@ -68,7 +68,7 @@ class ObTable:
                         # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                         #     f.write(f'--Query--\ns: {si} e: {e}\n')
                         with analyzer.lock:
-                            analyzer.mq = f'({iter}/{len(s)}) {' '.join(si)}:{' '.join(e)}'
+                            analyzer.mq = f'({iter}/{len(self.S)}) {' '.join(si)}:{' '.join(e)}'
                         out = self.mq.query(si + e)
                         if (out):
                             with analyzer.lock:
