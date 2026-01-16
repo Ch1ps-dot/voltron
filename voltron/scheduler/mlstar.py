@@ -52,7 +52,7 @@ class ObTable:
             for a in self.alphabet:
                 with analyzer.lock:
                     iter += 1
-                    analyzer.stage = f'fill si table: {iter}/{len(s)*len(a)}'
+                    analyzer.stage = f'fill si table: {iter}/{len(s)*len(self.alphabet)}'
                 for e in self.E:
                     si = s + (a,) # S + i (element in alphabet)
                     if si not in self.T.keys():
