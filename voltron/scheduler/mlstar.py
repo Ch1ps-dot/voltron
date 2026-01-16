@@ -56,7 +56,7 @@ class ObTable:
                     out = self.mq.query(s + e)
                     if (out):
                         with analyzer.lock:
-                            analyzer.out = f'{' '.join(out)}'
+                            analyzer.out = f'{'/'.join(out)}'
                         self.T[s][e] = tuple(out[-len(e):])
                        
         iter_s = 0
@@ -66,9 +66,10 @@ class ObTable:
                 iter_s += 1
                 si = s + (a,) # S + i (element in alphabet)
                 with analyzer.lock:
-                    analyzer.prefix = f'({iter_s}/{len(self.S)* len(self.alphabet)}) {'/'.join(s)}'
+                    analyzer.prefix = f'({iter_s}/{len(self.S) * len(self.alphabet)}) {'/'.join(s)}'
                 if si not in self.T.keys():
                     self.T[si] = {}
+                    
                 iter_e = 0
                 for e in self.E:
                     
@@ -80,7 +81,7 @@ class ObTable:
                     # connection was closed before sending suffix request
                     # in this situation, there is no more response and destroy the evaluation
                     # so we consider they are same state and jump the query
-                    if(self.T[s][(a,)] == 'POLLERR'):
+                    if(self.T[s][(a,)] == ('POLLERR',)):
                         self.T[si][e] = ('POLLERR',)
                         continue
                     
@@ -91,8 +92,9 @@ class ObTable:
                         out = self.mq.query(si + e)
                         if (out):
                             with analyzer.lock:
-                                analyzer.out = f'{' '.join(out)}'
+                                analyzer.out = f'{'/'.join(out)}'
                             self.T[si][e] = tuple(out[-len(e):])
+                            logger.debug(f'Ob: {si} + {e} = {tuple(out[-len(e):])} ')
 
     def row(
         self, 
@@ -122,6 +124,7 @@ class ObTable:
             closed, sa = self.is_closed()
             if closed or sa == None:
                 return
+            logger.debug(f'close add: {sa}')
             self.S.add(sa)
             self._fill_table()
 
@@ -157,8 +160,9 @@ class ObTable:
 
         for s in self.S:
             r = self.row(s)
+            logger.debug(s)
             if r not in states:
-                logger.debug(r)
+                logger.debug(f'unique state: {r}')
                 states[r] = sid
                 sid += 1
 
