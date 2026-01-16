@@ -95,6 +95,8 @@ class ObTable:
         return True, None
 
     def make_close(self):
+        with analyzer.lock:
+            analyzer.stage = f'make close'
         logger.debug('Ob: make close')
         while True:
             closed, sa = self.is_closed()
@@ -116,6 +118,8 @@ class ObTable:
         return True, None
 
     def make_consistent(self):
+        with analyzer.lock:
+            analyzer.stage = f'make consistent'
         logger.debug('Ob: make consistent')
         while True:
             ok, data = self.is_consistent()

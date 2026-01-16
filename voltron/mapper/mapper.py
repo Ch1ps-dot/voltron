@@ -70,7 +70,7 @@ class Mapper:
     ) -> list[Generator]:
         gs: list[Generator] = []
         for req in req_seq:
-            if req == '':
+            if req == '-':
                 continue
             elif req in self.generators.keys():
                 gs.append(self.generators[req][0])
