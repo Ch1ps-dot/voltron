@@ -2,7 +2,7 @@ import threading
 import time
 from voltron.utils.logger import logger
 from dataclasses import dataclass, field
-from voltron.analyzer.analyzer import Analyzer
+from voltron.analyzer.analyzer import analyzer
 from rich.layout import Layout
 from rich.live import Live
 from rich.console import Console
@@ -60,9 +60,8 @@ def format_duration(
     m, s = divmod(rem, 60)
     return f"{d} days, {h:02d} hrs, {m:02d} min, {s:02d} sec"
 
-def make_runtime_table(
-        ana: Analyzer
-):
+def make_runtime_table():
+    ana = analyzer
     elapsed = int(time.time() - ana.start_time)
     table = Table(title="Fuzzer Runtime", show_header=False, box=None)
     table.add_column(justify='left')
@@ -85,13 +84,14 @@ def make_runtime_table(
 
     return table
 
-def make_info_table(
-        ana: Analyzer
-):
+def make_info_table():
+    ana = analyzer
     data = {
         'target name': ana.target_name,
         'protol type': ana.pro_name,
-        'strategy': ana.strategy
+        'strategy': ana.strategy,
+        'stage': ana.stage,
+        'query': ana.query
     }
     table = Table(title="Settings Info", show_header=False, box=None)
     table.add_column(justify='left')
@@ -103,16 +103,15 @@ def make_info_table(
     return table
 
 def ui_loop(
-        ana: Analyzer, 
-        stop_event: threading.Event
+    stop_event: threading.Event
     ):
     layout = make_ui()
-
+    ana = analyzer
     with Live(layout, refresh_per_second=1):
         logger.debug('UI: setup')
         while not stop_event.is_set():
             with ana.lock:
-                layout["info"].update(make_info_table(ana))
-                layout["runtime"].update(make_runtime_table(ana))
+                layout["info"].update(make_info_table())
+                layout["runtime"].update(make_runtime_table())
 
             time.sleep(1)

@@ -7,7 +7,7 @@ from voltron.configs import configs
 from voltron.utils.logger import logger
 from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
-from voltron.analyzer.analyzer import Analyzer
+from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback
 
@@ -15,7 +15,6 @@ class Executor:
     def __init__(
             self,
             mapper: Mapper,
-            analyzer: Analyzer,
             setup_time_s:float = 1,
             send_time_ms:int = 1000,
             recv_time_ms:int = 1000

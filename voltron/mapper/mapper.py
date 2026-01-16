@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from voltron.producer.AsyncProducer import AsyncProducer, Generator, Parser
-from voltron.analyzer.analyzer import Analyzer
+from voltron.analyzer.analyzer import analyzer
 import traceback, sys
 from voltron.utils.logger import logger
 
@@ -13,8 +13,7 @@ class Mapper:
     """
     def __init__(
         self,
-        producer: AsyncProducer,
-        analyzer: Analyzer
+        producer: AsyncProducer
     ) -> None:
         self.producer = producer
         self.analyzer = analyzer
@@ -71,7 +70,9 @@ class Mapper:
     ) -> list[Generator]:
         gs: list[Generator] = []
         for req in req_seq:
-            if req in self.generators.keys():
+            if req == '':
+                continue
+            elif req in self.generators.keys():
                 gs.append(self.generators[req][0])
             else:
                 logger.debug(f'Mapper: unexpected type {req}')

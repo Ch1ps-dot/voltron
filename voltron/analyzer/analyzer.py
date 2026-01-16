@@ -27,6 +27,8 @@ class Analyzer:
         self.pro_name = configs.pro_name
         self.start_time: float
         self.strategy = ''
+        self.stage = ''
+        self.query = ''
 
         self.autamata = None
         self.lock: threading.Lock = threading.Lock()
@@ -86,9 +88,9 @@ class Analyzer:
     ):
         if res_code in self.res_types_cnt.keys():
             self.res_types_cnt[res_code] += self.res_types_cnt[res_code] + 1
-            logger.debug(f'Analyzer: new reply {res_code}')
         else:
             self.res_types_cnt[res_code] = 1
+            logger.debug(f'Analyzer: new reply {res_code}')
         
         self.resp_trans_update(f'{self.last_recv}/{res_code}')
         self.last_recv = res_code
@@ -139,4 +141,6 @@ class Analyzer:
             return f"{hours:02d}:{minutes:02d}:{secs + remaining_seconds:.1f}"
         else:
             return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        
+analyzer = Analyzer()
     
