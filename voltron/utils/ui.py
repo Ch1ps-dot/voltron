@@ -63,7 +63,7 @@ def format_duration(
 def make_runtime_table():
     ana = analyzer
     elapsed = int(time.time() - ana.start_time)
-    table = Table(title="Fuzzer Runtime", show_header=False, box=None)
+    table = Table(title="Runtime Metric", show_header=False, box=None)
     table.add_column(justify='left')
     table.add_column(justify='right')
     data = {
@@ -94,7 +94,7 @@ def make_info_table():
         'query': ana.mq,
         'out': ana.out
     }
-    table = Table(title="Settings Info", show_header=False, box=None)
+    table = Table(title="Fuzzer Info", show_header=False, box=None)
     table.add_column(justify='left')
     table.add_column(justify='right')
 

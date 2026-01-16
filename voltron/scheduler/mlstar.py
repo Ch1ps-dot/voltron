@@ -17,7 +17,7 @@ class ObTable:
     ) -> None:
         self.alphabet: list[str] = mq.alphabet # request symbol
         
-        self.S: set[tuple[str,...]] = {('',)} # prefix of request symbols
+        self.S: set[tuple[str,...]] = {('-',)} # prefix of request symbols
         self.E: set[tuple[str,...]] = {(a,) for a in self.alphabet} # suffix of request symbols
         
         self.T: dict[tuple[str,...], dict[tuple[str,...], tuple[str,...]]] = {} # (s, a, e) -> output. Transition
@@ -25,14 +25,15 @@ class ObTable:
         self.mq = mq
         self.eq = eq
         
+        with analyzer.lock:
+            analyzer.stage = f'init obtable'
         self._fill_table()
 
     def _fill_table(self):
         iter = 0
+        logger.debug('Ob: fill table')
         for s in self.S:
             iter += 1
-            with analyzer.lock:
-                analyzer.stage = f'fill s table: {iter}/{len(s)}'
             for e in self.E:
                 if s not in self.T.keys():
                     self.T[s] = {}
@@ -40,7 +41,7 @@ class ObTable:
                     # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                     #     f.write(f'--Query--\ns: {s}\ne: {e}\n')
                     with analyzer.lock:
-                        analyzer.mq = f'{' '.join(s)}//{' '.join(e)}'
+                        analyzer.mq = f'({iter}/{len(s)}) {' '.join(s)}:{' '.join(e)}'
                     out = self.mq.query(s + e)
                     if (out):
                         with analyzer.lock:
@@ -50,18 +51,24 @@ class ObTable:
         iter = 0                
         for s in self.S:
             for a in self.alphabet:
-                with analyzer.lock:
-                    iter += 1
-                    analyzer.stage = f'fill si table: {iter}/{len(s)*len(self.alphabet)}'
+                iter += 1
+                si = s + (a,) # S + i (element in alphabet)
+                if si not in self.T.keys():
+                    self.T[si] = {}
                 for e in self.E:
-                    si = s + (a,) # S + i (element in alphabet)
-                    if si not in self.T.keys():
-                        self.T[si] = {}
+                    
+                    # connection was closed before sending suffix request
+                    # in this situation, there is no more response and destroy the evaluation
+                    # so we consider they are same state and jump the query
+                    if(self.T[s][(a,)] == 'POLLERR'):
+                        self.T[si][e] = ('POLLERR',)
+                        continue
+                    
                     if e not in self.T[si].keys():
                         # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                         #     f.write(f'--Query--\ns: {si} e: {e}\n')
                         with analyzer.lock:
-                            analyzer.mq = f'{' '.join(si)}//{' '.join(e)}'
+                            analyzer.mq = f'({iter}/{len(s)}) {' '.join(si)}:{' '.join(e)}'
                         out = self.mq.query(si + e)
                         if (out):
                             with analyzer.lock:
@@ -88,6 +95,7 @@ class ObTable:
         return True, None
 
     def make_close(self):
+        logger.debug('Ob: make close')
         while True:
             closed, sa = self.is_closed()
             if closed or sa == None:
@@ -103,10 +111,12 @@ class ObTable:
                     for a in self.alphabet:
                         for e in self.E:
                             if self.T[s1 + (a,)][e] != self.T[s2 + (a,)][e]:
+                                logger.debug(f'Ob: inconsistent {'/'.join(s1)} and {'/'.join(s2)}')
                                 return False, (s1, s2, a, e)
         return True, None
 
     def make_consistent(self):
+        logger.debug('Ob: make consistent')
         while True:
             ok, data = self.is_consistent()
             if ok or data == None:

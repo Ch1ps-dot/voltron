@@ -15,7 +15,7 @@ class Executor:
     def __init__(
             self,
             mapper: Mapper,
-            setup_time_s:float = 1,
+            setup_time_s:float = 0.1,
             send_time_ms:int = 1000,
             recv_time_ms:int = 1000
         ) -> None:
@@ -94,13 +94,16 @@ class Executor:
 
         # wait for server setup
         time.sleep(self.setup_time_s)
-        sock = self.setup_socket()
-        if sock == None:
-            logger.debug('Executor: Socket Setup Failure' )
-            if proc.poll() is None:
-                proc.terminate()
-            return False, None
+        while(True):
+            sock = self.setup_socket()
+            if sock == None:
+                logger.debug('Executor: Socket Setup Failure' )
+                continue
+            else:
+                break
         
+        last_sent = '-'
+        last_recv = '-'
         # keep request and response in Conversation
         cons: Conversation = Conversation()
         resp_code, resp_data = self.net_recv(sock=sock)
