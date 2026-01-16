@@ -162,4 +162,5 @@ class MealyLstar:
         h = self.table.build_hypothesis()
         with open(configs.results_path / 'model.pkl', 'wb') as f:
             pickle.dump(h, f)
+        h.graph()
         return h
