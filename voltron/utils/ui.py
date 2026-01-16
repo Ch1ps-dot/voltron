@@ -91,7 +91,8 @@ def make_info_table():
         'protol type': ana.pro_name,
         'strategy': ana.strategy,
         'stage': ana.stage,
-        'query': ana.query
+        'query': ana.mq,
+        'out': ana.out
     }
     table = Table(title="Settings Info", show_header=False, box=None)
     table.add_column(justify='left')

@@ -32,7 +32,7 @@ class ObTable:
         for s in self.S:
             iter += 1
             with analyzer.lock:
-                analyzer.stage = f'fill_table: {iter}/{len(s)}'
+                analyzer.stage = f'fill s table: {iter}/{len(s)}'
             for e in self.E:
                 if s not in self.T.keys():
                     self.T[s] = {}
@@ -40,13 +40,19 @@ class ObTable:
                     # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                     #     f.write(f'--Query--\ns: {s}\ne: {e}\n')
                     with analyzer.lock:
-                        analyzer.query = f'{' '.join(s)}//{' '.join(e)}'
+                        analyzer.mq = f'{' '.join(s)}//{' '.join(e)}'
                     out = self.mq.query(s + e)
                     if (out):
+                        with analyzer.lock:
+                            analyzer.out = f'{' '.join(out)}'
                         self.T[s][e] = tuple(out[-len(e):])
-                        
+                       
+        iter = 0                
         for s in self.S:
             for a in self.alphabet:
+                with analyzer.lock:
+                    iter += 1
+                    analyzer.stage = f'fill si table: {iter}/{len(s)*len(a)}'
                 for e in self.E:
                     si = s + (a,) # S + i (element in alphabet)
                     if si not in self.T.keys():
@@ -55,9 +61,11 @@ class ObTable:
                         # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
                         #     f.write(f'--Query--\ns: {si} e: {e}\n')
                         with analyzer.lock:
-                            analyzer.query = f'{' '.join(si)}//{' '.join(e)}'
+                            analyzer.mq = f'{' '.join(si)}//{' '.join(e)}'
                         out = self.mq.query(si + e)
                         if (out):
+                            with analyzer.lock:
+                                analyzer.out = f'{' '.join(out)}'
                             self.T[si][e] = tuple(out[-len(e):])
 
     def row(self, s):

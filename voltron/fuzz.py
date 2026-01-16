@@ -193,7 +193,7 @@ class Fuzzer:
     ):
         # Handle normal exit of fuzzer Ctrl+C
         logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
-        # self.stop_event.set()
+        self.stop_event.set()
         with analyzer.lock:
             analyzer.collect_results()
         sys.exit(0)

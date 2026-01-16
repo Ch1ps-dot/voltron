@@ -28,7 +28,8 @@ class Analyzer:
         self.start_time: float
         self.strategy = ''
         self.stage = ''
-        self.query = ''
+        self.mq = ''
+        self.out = ''
 
         self.autamata = None
         self.lock: threading.Lock = threading.Lock()
