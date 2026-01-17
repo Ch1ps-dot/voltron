@@ -8,13 +8,13 @@ from graphviz import Digraph
 class MealyMachine:
     def __init__(
         self,
-        states,
+        states: set[int],
         alphabet,
-        delta,
-        output,
-        start
+        delta: dict[tuple[int, str], int],
+        output: dict[tuple[int, str], str],
+        start: int
     ) -> None:
-        self.states: dict[tuple[tuple[str,...],...], int] = states
+        self.states: set[int] = states
         self.alphabet: set[str] = alphabet
         self.delta: dict[tuple[int, str], int] = delta
         self.output: dict[tuple[int, str], str] = output
@@ -35,7 +35,7 @@ class MealyMachine:
         self
     ):
         g = Digraph(comment='automata')
-        for sid in self.states.values():
+        for sid in self.states:
             g.node(str(sid), str(sid))
         for k, v in self.delta.items():
             g.edge(str(k[0]), str(v), label=f'{k[1]}/{self.output[k]}')

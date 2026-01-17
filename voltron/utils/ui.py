@@ -70,7 +70,7 @@ def make_runtime_table():
         'run time': format_duration(elapsed),
         'request num': ana.req_num,
         'response num': ana.res_num,
-        'exec requ path num': ana.path_num,
+        'query num': ana.path_num,
         'response types': ana.res_types_num(),
         'response transitions': ana.resp_trans_num(),
         'CRASH_num': ana.crash_num,
