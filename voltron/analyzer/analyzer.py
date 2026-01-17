@@ -43,9 +43,6 @@ class Analyzer:
         self.last_parser: Parser | None = None # last executed parser
         
         # UI progress
-        self.total_tasks: int = 0
-        self.completed_tasks: int = 0
-        self.desc: str = ''
         self.show_progress: bool = False
 
     def collect_results(

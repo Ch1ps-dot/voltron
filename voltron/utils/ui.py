@@ -70,7 +70,7 @@ def format_duration(
 def make_runtime_table():
     ana = analyzer
     elapsed = int(time.time() - ana.start_time)
-    table = Table(title="Runtime Metric", show_header=False, box=None)
+    table = Table(title="Runtime Metric", show_header=False, box=None, expand=True)
     table.add_column(justify='left')
     table.add_column(justify='right')
     data = {
@@ -103,11 +103,9 @@ def make_info_table():
         'target name': ana.target_name,
         'protol type': ana.pro_name,
         'strategy': ana.strategy,
-        'stage': ana.stage,
-        'sent': ana.sent,
-        'recv': ana.recv,
+        'stage': ana.stage
     }
-    table = Table(title="Fuzzer Info", show_header=False, box=None)
+    table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
     table.add_column(justify='left')
     table.add_column(justify='right')
 
@@ -117,32 +115,26 @@ def make_info_table():
     return Panel(
             table,
             title="[bold cyan]Fuzzer Infor",
-            title_align="left",
+            title_align="center",
             # style="white on dark_blue",
             expand=True
         )
 
 def make_progress_panel():
     if analyzer.show_progress:
-        progress = Progress(
-            TextColumn("[bold green]{task.description}", justify="left"),
-            BarColumn(bar_width=None, style="green", complete_style="bright_green"),
-            TextColumn("[progress.percentage]{task.percentage:>3.0%}", justify="left"),
-            TimeElapsedColumn(),
-            expand=True
-        )
+        data = {
+            'sent': analyzer.sent,
+            'recv': analyzer.recv,
+        }
+        table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
+        table.add_column(justify='left')
+        table.add_column(justify='right')
         
-        # 添加任务（关联 analyzer 的总任务数和已完成任务数）
-        task_id = progress.add_task(
-            description=analyzer.desc,
-            total=analyzer.total_tasks,
-            completed=analyzer.completed_tasks
-        )
-        
-        # 封装进度条为 Panel（保持与整体 UI 风格一致）
+        for k, v in data.items():
+            table.add_row(k, str(v))
         
         progress_panel = Panel(
-            progress,
+            table,
             title="[bold cyan]Task Progress",
             title_align="left",
             # style="white on dark_blue",
@@ -155,7 +147,7 @@ def make_progress_panel():
         return Panel(
             txt,
             title="[bold cyan]Task Progress",
-            title_align="left",
+            title_align="center",
             # style="white on dark_blue",
             expand=True
         )
@@ -169,8 +161,8 @@ def ui_loop(
         logger.debug('UI: setup')
         while not stop_event.is_set():
             with ana.lock:
-                layout["runtime"].update(make_info_table())
-                layout["algo"].update(make_runtime_table())
+                layout["algo"].update(make_info_table())
                 layout["progress"].update(make_progress_panel())
+                layout["runtime"].update(make_runtime_table())
 
             time.sleep(1)
