@@ -86,17 +86,19 @@ class Fuzzer:
         self.rfcparser = AsyncRFCParser(
             chater=self.chater
         )
+        self.rfcparser.run()
         print('RFCParser: setup')
 
         # handler init
-        self.handler = AsyncProducer(
+        self.producer = AsyncProducer(
             chater=self.chater,
             rfcp=self.rfcparser
         )
+        self.producer.run()
         print('Producer: equipment setup')
         
         # scheduler init
-        self.mapper = Mapper(self.handler)
+        self.mapper = Mapper(self.producer)
         
         self.stop_event = threading.Event()
         # setup executor

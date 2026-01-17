@@ -28,9 +28,11 @@ class Analyzer:
         self.start_time: float
         self.strategy = ''
         self.stage = ''
-        self.prefix = ''
-        self.suffix = ''
-        self.out = ''
+        # self.prefix = ''
+        # self.suffix = ''
+        # self.out = ''
+        self.sent = ''
+        self.recv = ''
 
         self.autamata = None
         self.lock: threading.Lock = threading.Lock()
@@ -39,6 +41,12 @@ class Analyzer:
         
         self.last_generator: Generator | None = None # last executed generator
         self.last_parser: Parser | None = None # last executed parser
+        
+        # UI progress
+        self.total_tasks: int = 0
+        self.completed_tasks: int = 0
+        self.desc: str = ''
+        self.show_progress: bool = False
 
     def collect_results(
             self

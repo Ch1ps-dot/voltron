@@ -80,10 +80,13 @@ class AsyncProducer:
 
         self.chater = chater
         self.rfcp = rfcp
-
+            
+    def run(
+        self
+    ):
         # types of symbols
-        self.req_types: list[str] = rfcp.req_types
-        self.res_types: list[str] = rfcp.res_types
+        self.req_types: list[str] = self.rfcp.req_types
+        self.res_types: list[str] = self.rfcp.res_types
         
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
@@ -111,7 +114,7 @@ class AsyncProducer:
             except Exception as e:
                 logger.debug(f'Producer: parser load error {e}')
         else:
-            self.parser_gen()      
+            self.parser_gen()
 
     async def _generator_gen_one(
             self,

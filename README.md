@@ -40,8 +40,8 @@ uv pip install requirements
 - [x] basic workflow
 - [x] data model
 - [ ] code mutate
-- [ ] state model
-- [ ] real scene experiments
+- [x] state model
+- [x] real scene experiments
 
 ## Project Log
 

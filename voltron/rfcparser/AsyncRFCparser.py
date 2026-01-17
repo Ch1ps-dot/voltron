@@ -57,6 +57,10 @@ class AsyncRFCParser:
         if (not self.ir_path.is_dir()):
             self.ir_path.mkdir()
 
+       
+    def run(
+        self
+    ):
         # sectiontree parse pass
         fn = self.ir_path / "section_tree.pkl"
         if(fn.is_file()):
@@ -75,6 +79,7 @@ class AsyncRFCParser:
 
         # ir generation
         self.ir_generation()
+        
     def spe_parse(
             self
     ):

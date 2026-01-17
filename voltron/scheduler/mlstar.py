@@ -28,19 +28,24 @@ class ObTable:
         self.stop_event = stop_event
         
         with analyzer.lock:
-            analyzer.stage = f'init obtable'
+            analyzer.stage = f'init model learning'
         self._fill_table()
 
     def _fill_table(self):
-        iter_s = 0
+        # iter_s = 0
         
         logger.debug('Ob: fill table')
+        with analyzer.lock:
+            analyzer.show_progress = True
+            analyzer.desc = 'fill s table'
+            analyzer.total_tasks = len(self.S)
+            analyzer.completed_tasks = 0
         for s in self.S:
-            iter_s += 1
-            with analyzer.lock:
-                analyzer.prefix = f'({iter_s}/{len(self.S)}) {'/'.join(s)}'
-                
-            iter_e = 0
+            # iter_s += 1
+            # with analyzer.lock:
+                # analyzer.prefix = f'({iter_s}/{len(self.S)}) {'/'.join(s)}'
+            
+            # iter_e = 0
             for e in self.E:
                 if s not in self.T.keys():
                     self.T[s] = {}
@@ -48,36 +53,38 @@ class ObTable:
                     
                     if self.stop_event.is_set(): sys.exit(0)
                     
-                    iter_e += 1
-                    with analyzer.lock:
-                        analyzer.suffix = f'({iter_e}/{len(self.E)}) {'/'.join(e)}'
-                    # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
-                    #     f.write(f'--Query--\ns: {s}\ne: {e}\n')
+                    # iter_e += 1                   
                     out = self.mq.query(s + e)
                     if (out):
                         with analyzer.lock:
-                            analyzer.out = f'{'/'.join(out)}'
+                            analyzer.sent = f'{'/'.join(s + e)}'
+                            analyzer.recv = f'{'/'.join(out)}'
                         self.T[s][e] = tuple(out[-len(e):])
+            with analyzer.lock:
+                analyzer.completed_tasks += 1
                        
-        iter_s = 0
-                       
+        # iter_s = 0
+        with analyzer.lock:
+            analyzer.show_progress = True
+            analyzer.desc = 'fill sxi table'
+            analyzer.total_tasks = len(self.S) * len(self.alphabet)
+            analyzer.completed_tasks = 0               
         for s in self.S:
             for a in self.alphabet:
-                iter_s += 1
+                # iter_s += 1
                 si = s + (a,) # S + i (element in alphabet)
-                with analyzer.lock:
-                    analyzer.prefix = f'({iter_s}/{len(self.S) * len(self.alphabet)}) {'/'.join(s)}'
+                # with analyzer.lock:
+                #     analyzer.prefix = f'({iter_s}/{len(self.S) * len(self.alphabet)}) {'/'.join(s)}'
                 if si not in self.T.keys():
                     self.T[si] = {}
                     
-                iter_e = 0
+                # iter_e = 0
                 for e in self.E:
                     
                     if self.stop_event.is_set(): sys.exit(0)
                     
-                    iter_e += 1
-                    with analyzer.lock:
-                        analyzer.suffix = f'({iter_e}/{len(self.E)}) {'/'.join(e)}'
+                    # iter_e += 1
+                        
                     # connection was closed before sending suffix request
                     # in this situation, there is no more response and destroy the evaluation
                     # so we consider they are same state and jump the query
@@ -86,15 +93,18 @@ class ObTable:
                         continue
                     
                     if e not in self.T[si].keys():
-                        # with open(configs.results_path / 'ml', 'a', encoding='utf-8') as f:
-                        #     f.write(f'--Query--\ns: {si} e: {e}\n')
                     
                         out = self.mq.query(si + e)
                         if (out):
                             with analyzer.lock:
-                                analyzer.out = f'{'/'.join(out)}'
+                                analyzer.sent = f'{'/'.join(si + e)}'
+                                analyzer.recv = f'{'/'.join(out)}'
                             self.T[si][e] = tuple(out[-len(e):])
                             logger.debug(f'Ob: {si} + {e} = {tuple(out[-len(e):])} ')
+            with analyzer.lock:
+                analyzer.completed_tasks += 1
+        with analyzer.lock:
+            analyzer.show_progress = False
 
     def row(
         self, 
@@ -174,7 +184,7 @@ class ObTable:
             for a in self.alphabet:
                 r2 = self.row(s + (a,))
                 delta[(state_id, a)] = states[r2]
-                output[(state_id, a)] = str(self.T[s][(a,)])
+                output[(state_id, a)] = ''.join(self.T[s][(a,)])
 
         start = states[self.row(('-',))]
         return MealyMachine(
