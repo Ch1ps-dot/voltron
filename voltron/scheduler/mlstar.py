@@ -178,7 +178,7 @@ class ObTable:
                 delta[(state_id, a)] = states[r2]
                 output[(state_id, a)] = str(self.T[s][(a,)])
 
-        start = states[self.row(('',))]
+        start = states[self.row(('-',))]
         return MealyMachine(
             states=set(states.values()),
             alphabet=set(self.alphabet),
