@@ -156,23 +156,21 @@ class ObTable:
 
     # ---------- Hypothesis ----------
     def build_hypothesis(self):
-        states = {}
+        states: dict = {}
         sid = 1
 
         for s in self.S:
             r = self.row(s)
             if r not in states:
                 logger.debug(f'unique state: {s}')
-                states[r] = (sid, s)
+                states[r] = sid
                 sid += 1
 
         delta: dict[tuple[int, str], int] = {}
         output: dict[tuple[int, str], str] = {}
 
-        for r, id in states.items():
-            state_id = id[0]
-            s = id[1]
-            # s = next(x for x in self.S if self.row(x) == r)
+        for r, state_id in states.items():
+            s = next(x for x in self.S if self.row(x) == r)
             for a in self.alphabet:
                 r2 = self.row(s + (a,))
                 delta[(state_id, a)] = states[r2]
