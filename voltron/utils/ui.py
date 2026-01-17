@@ -89,7 +89,13 @@ def make_runtime_table():
     for k, v in data.items():
         table.add_row(k, str(v))
 
-    return table
+    return Panel(
+            table,
+            title="[bold cyan]Fuzz Metric",
+            title_align="left",
+            # style="white on dark_blue",
+            expand=True
+        )
 
 def make_info_table():
     ana = analyzer
@@ -108,7 +114,13 @@ def make_info_table():
     for k, v in data.items():
         table.add_row(k, str(v))
 
-    return table
+    return Panel(
+            table,
+            title="[bold cyan]Fuzzer Infor",
+            title_align="left",
+            # style="white on dark_blue",
+            expand=True
+        )
 
 def make_progress_panel():
     if analyzer.show_progress:
@@ -133,7 +145,7 @@ def make_progress_panel():
             progress,
             title="[bold cyan]Task Progress",
             title_align="left",
-            style="white on dark_blue",
+            # style="white on dark_blue",
             expand=True
         )
     
@@ -144,7 +156,7 @@ def make_progress_panel():
             txt,
             title="[bold cyan]Task Progress",
             title_align="left",
-            style="white on dark_blue",
+            # style="white on dark_blue",
             expand=True
         )
 
@@ -157,7 +169,7 @@ def ui_loop(
         logger.debug('UI: setup')
         while not stop_event.is_set():
             with ana.lock:
-                layout["info"].update(make_info_table())
+                layout["runtime"].update(make_info_table())
                 layout["algo"].update(make_runtime_table())
                 layout["progress"].update(make_progress_panel())
 
