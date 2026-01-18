@@ -29,7 +29,7 @@ class Mapper:
         self.cur_parser: Parser
         self.equip_parser(self.parsers[-1])
         
-        self.message_pool: dict[str, list[bytes]]
+        self.message_pool: dict[str, list[bytes]] = {}
         
         logger.debug('Mapper: finish init')
     
