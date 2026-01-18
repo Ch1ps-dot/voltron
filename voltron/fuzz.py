@@ -188,7 +188,7 @@ class Fuzzer:
                     stop_event.set()
                     logger.debug('Fuzzer: timeout')
         except Exception as e:
-            logger.debug(f'Fuzzer: exit {e}')
+            logger.debug(f'Fuzzer: exit {e}') 
             logger.debug(traceback.format_exc())
             stop_event.set()
 
