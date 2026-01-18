@@ -178,6 +178,8 @@ class Fuzzer:
             while not stop_event.is_set():
                 try:
                     h = ml.run()
+                    self.producer.generator_evo(h)
+                    stop_event.set()
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')
                     logger.debug(traceback.format_exc())

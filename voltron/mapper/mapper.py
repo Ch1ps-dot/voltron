@@ -28,6 +28,8 @@ class Mapper:
         # self.cur_suite: Suite = Suite(producer.generators)
         self.parsers: list[Parser] = producer.parsers
         
+        self.suits = Suite(self.generators)
+        
         self.cur_parser: Parser
         self.equip_parser(self.parsers[-1])
         
@@ -56,7 +58,8 @@ class Mapper:
     def select_generators(
         self,
         req_seq: list[str],
-        cache_mode: bool = False
+        cache_mode: bool = False,
+        mode: str = 'default'
     ) -> list[tuple[str, bytes]]:
         """Select and execute message generator based on the list of message type
         
@@ -71,7 +74,7 @@ class Mapper:
             if req == '-':
                 continue
             elif req in self.generators.keys():
-                g = self.select_generator(req)
+                g = self.select_generator(req, mode)
                 if cache_mode and g.was_used != 0:
                     msg = self.message_pool[g.msg_type][g.name]
                 else:
@@ -89,9 +92,13 @@ class Mapper:
     
     def select_generator(
         self,
-        req_type
+        req_type,
+        mode
     ) -> Generator:
-        return self.generators[req_type][0]
+        if mode == 'new':
+            return self.generators[req_type][-1]
+        else:
+            return self.generators[req_type][0]
     
     def exe_generator(
         self,
