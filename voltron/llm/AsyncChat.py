@@ -130,7 +130,8 @@ class AsyncChater:
             pro_name: str,
             msg_type: str,
             code: str,
-            info: str
+            info: str,
+            trace: str
     ) -> str:
         """Repair teh python code
 
@@ -142,7 +143,7 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_generator_evolve
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code)
+        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, trace=trace)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_evolve"
@@ -221,8 +222,8 @@ class AsyncChater:
     async def llm_infer_dependency(
             self,
             pro_name: str,
+            last_request: str,
             current_request: str,
-            last_response: str,
             response_types: str,
             rfc_content: str
     ) -> str:
@@ -230,7 +231,7 @@ class AsyncChater:
         pmp = tmp.substitute(
             pro_name=pro_name, 
             current_request=current_request, 
-            last_response=last_response, 
+            last_request=last_request, 
             response_types=response_types, 
             rfc_content=rfc_content
         )

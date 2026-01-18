@@ -96,14 +96,20 @@ class Executor:
 
         # wait for server setup
         time.sleep(self.setup_time_s)
-        while(True):
+        i = 0
+        while(i < 500):
             sock = self.setup_socket()
             if sock == None:
+                i += 1
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
                 break
-        
+            
+        if sock == None:
+            self.stop_event.set()
+            sys.exit(0)
+            
         # keep request and response in Conversation
         cons: Conversation = Conversation()
         resp_code, resp_data = self.net_recv(sock=sock)

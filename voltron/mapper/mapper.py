@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from voltron.producer.AsyncProducer import AsyncProducer, Generator, Parser
+from voltron.mapper.suite import Suite
 from voltron.analyzer.analyzer import analyzer
 import traceback, sys
 from voltron.utils.logger import logger
@@ -24,12 +25,13 @@ class Mapper:
         self.response_types: list[str] = producer.res_types
         
         self.generators: dict[str, list[Generator]] = producer.generators
+        # self.cur_suite: Suite = Suite(producer.generators)
         self.parsers: list[Parser] = producer.parsers
         
         self.cur_parser: Parser
         self.equip_parser(self.parsers[-1])
         
-        self.message_pool: dict[str, list[bytes]] = {}
+        self.message_pool: dict[str, dict[str, bytes]] = {} # store actual message
         
         logger.debug('Mapper: finish init')
     
@@ -71,13 +73,13 @@ class Mapper:
             elif req in self.generators.keys():
                 g = self.select_generator(req)
                 if cache_mode and g.was_used != 0:
-                    msg = self.message_pool[g.msg_type][0]
+                    msg = self.message_pool[g.msg_type][g.name]
                 else:
                     msg = self.exe_generator(g)
                     if g.msg_type not in self.message_pool.keys():
-                        self.message_pool[g.msg_type] = []
+                        self.message_pool[g.msg_type] = {}
                     if msg:
-                        self.message_pool[g.msg_type].append(msg)
+                        self.message_pool[g.msg_type][g.name] = msg
                     g.was_used += 1
                 msg_type = g.msg_type
                 ms.append((msg_type, msg))

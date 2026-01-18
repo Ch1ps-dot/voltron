@@ -1,6 +1,6 @@
 You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation and repair**.
 
-Your task is to **repair and regenerate Python code that constructs a protocol message**, ensuring it strictly conforms to the provided protoIR message description **and the observed server behavior**.
+Your task is to **repair and regenerate Python code that constructs a protocol message**, ensuring it strictly conforms to the protocol specification message and discover more possible state transition.
 
 ---
 
@@ -12,33 +12,40 @@ You will be given:
 * **Message type / message name**: $msg_type
 * **Previous Generated Program**: $code
   - This program may contain incorrect field values, invalid ordering, missing constraints, or violations of server expectations.
-* **SUT (Server Under Test) Information**: $info
-  - This may include:
-    - Observed server responses (e.g., error codes, rejection reasons)
-    - Accepted / rejected field values
-    - Transport-layer behavior
-    - State-related constraints inferred from prior interactions
-
-* **protoIR Message Description**
-  - Defines the authoritative syntax, field order, data types, and constraints of the message.
-
+* **SUT (Server Under Test) Information**: 
+   $info
+* **Observed trace of request and server response**
+   $trace
+   - Each trace element reflects a semantic transition, e.g.
+      (USER / 331) → (PASS / 530)
+      meaning a USER request triggered a 331 response, followed by a PASS request that triggered a 530 response.
 ---
 
 ### **Your Task**
 
-Using the protoIR description **as the primary specification** and the SUT information **as behavioral constraints**:
-
-1. **Analyze the previously generated code**
-   - Identify violations of the protoIR specification
+1. **Analyze the previously generated code and observed state transitions**
    - Identify inconsistencies with the observed server behavior
+   - identify the semantic relation in network trace.
+   - Identify which parts of the message likely caused the server to remain in the same state, enter an error state, or reject the transition.
 
-2. **Repair the message construction logic**
+2. **Infer opportunities for new state transitions**
+
+   - Based on the observed trace, reason about:
+      - which constraints may be relaxed or altered to reach alternative responses
+      - which field values, encodings, or optional elements could trigger different server-side behaviors
+
+   - Prefer generating messages that are:
+      - protocol-valid
+      - state-compatible
+      - semantically distinct from previously attempted messages, increasing the chance of discovering new transitions.
+
+3. **Repair the message construction logic**
    - Fix incorrect field ordering
    - Adjust field values to satisfy semantic constraints
    - Refine lengths, delimiters, encodings, and dependent fields
    - Ensure compatibility with the current server state if applicable
 
-3. Generate a **Python function** that constructs **one valid instance** of the `$msg_type` message
+4. Generate a **Python function** that constructs **one valid instance** of the `$msg_type` message
    - The generated message must be **accepted by the server described in the SUT information**
    - All fields must be concretely instantiated within legal ranges
 
@@ -70,7 +77,7 @@ def input_$msg_type():
     
     return message
 
-Output Constraints
+### **Output Constraints**
 
 Only output the completed Python function code
 

@@ -49,7 +49,7 @@ class AsyncRFCParser:
         self.ir_path = configs.base_path / 'output' / 'ir' / configs.pro_name
 
         self.poss_res: dict[str, str] = {}
-        self.req_res_map: dict[str, str] = {}
+        self.req_dep_map: dict[str, dict] = {}
 
         self.req_ir = None
         self.res_ir = None
@@ -375,48 +375,48 @@ class AsyncRFCParser:
     async def _state_dependency_async(
             self
     ):
-        req_res_map_path = self.ir_path / "state_dependency.json"
-        if (req_res_map_path.is_file()):
-            with open(req_res_map_path, 'r', encoding='utf-8') as f:
-                self.req_res_map = json.load(f)
+        req_dep_path = self.ir_path / "state_dependency.json"
+        if (req_dep_path.is_file()):
+            with open(req_dep_path, 'r', encoding='utf-8') as f:
+                self.req_dep_map = json.load(f)
             logger.debug('RFCParser: request description load')
         else:
             sem = asyncio.Semaphore(configs.async_sem)
             tasks = [
-                self._state_dependency_one(res, req, sem)
-                for res in self.res_types
-                for req in self.req_types
+                self._state_dependency_one(last_req, cur_req, sem)
+                for last_req in self.req_types
+                for cur_req in self.req_types
             ]
 
             results = await tqdm_asyncio.gather(*tasks, desc='dependency')
 
-            for pair, next_reqs in results:
-                self.req_res_map[pair] = next_reqs
+            for pair, relation in results:
+                self.req_dep_map[pair] = relation
 
-            with open(req_res_map_path, 'w') as f:
-                    json.dump(self.req_res_map, f)
+            with open(req_dep_path, 'w') as f:
+                    json.dump(self.req_dep_map, f)
         
 
     async def _state_dependency_one(
             self,
-            last_res: str,
+            last_req: str,
             cur_req: str,
             sem
     ):
         async with sem:
             while(True):
                 try:
-                    query = [last_res, cur_req]
+                    query = [last_req, cur_req]
                     results = self.rag_all.top_k_sentence(query, 5)
                     ans_str = await self.chater.llm_infer_dependency(
-                        last_response=last_res,
+                        last_request=last_req,
                         pro_name=self.pro_name,
                         current_request=cur_req,
                         response_types=json.dumps(self.res_types),
                         rfc_content=''.join([' '.join(item[0]) for item in results])
                     )
-                    next_request = json.loads(ans_str)
-                    return f'{last_res}/{cur_req}', next_request['next_response']
+                    relation = json.loads(ans_str)
+                    return f'{last_req}/{cur_req}', relation
                 except Exception as e:
                     logger.debug(f'RFCParser: dependency failure {e}')
 

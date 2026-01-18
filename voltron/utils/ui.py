@@ -119,10 +119,29 @@ def make_info_table():
         )
 
 def make_progress_panel():
-    if analyzer.show_progress:
+    if analyzer.stage == 'Obtable':
         data = {
             'sent': analyzer.sent,
             'recv': analyzer.recv,
+        }
+        table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
+        table.add_column(justify='left')
+        table.add_column(justify='right')
+        
+        for k, v in data.items():
+            table.add_row(k, str(v))
+        
+        progress_panel = Panel(
+            table,
+            title="[bold cyan]Task Progress",
+            title_align="left",
+            expand=True
+        )
+    
+        return progress_panel
+    elif analyzer.stage == 'evolve':
+        data = {
+            f'{analyzer.progress_desc}': f'{analyzer.finished}/{analyzer.total}'
         }
         table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
         table.add_column(justify='left')

@@ -39,11 +39,11 @@ class Analyzer:
         self.last_sent = '-'
         self.last_recv = '-'
         
-        self.last_generator: Generator | None = None # last executed generator
-        self.last_parser: Parser | None = None # last executed parser
-        
         # UI progress
-        self.show_progress: bool = False
+        self.show_progress: str = ''
+        self.progress_desc = ''
+        self.total: int = 0
+        self.finished: int = 0
 
     def collect_results(
             self
@@ -145,6 +145,19 @@ class Analyzer:
             return f"{hours:02d}:{minutes:02d}:{secs + remaining_seconds:.1f}"
         else:
             return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        
+    def clean_progress(self):
+        self.finished = 0
+        self.total = 0
+        self.show_progress =''
+        
+    def set_progress(
+        self,
+        desc: str,
+        total: int
+    ):
+        self.progress_desc = desc
+        self.total = total
         
 analyzer = Analyzer()
     

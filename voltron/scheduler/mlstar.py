@@ -28,51 +28,47 @@ class ObTable:
         self.stop_event = stop_event
         
         with analyzer.lock:
-            analyzer.stage = f'init model learning'
+            analyzer.stage = f'init ObTable'
         self._fill_table()
 
     def _fill_table(self):
+        
         iter_s = 0
         logger.debug('Ob: fill table')
         with analyzer.lock:
-            analyzer.show_progress = True
+            analyzer.show_progress = 'Obtable'
 
         for s in self.S:
             iter_s += 1
-            # with analyzer.lock:
-                # analyzer.prefix = f'({iter_s}/{len(self.S)}) {'/'.join(s)}'
             
-            # iter_e = 0
             for e in self.E:
                 if s not in self.T.keys():
                     self.T[s] = {}
                 if e not in self.T[s].keys():
                     
-                    if self.stop_event.is_set(): sys.exit(0)
-                    
-                    # iter_e += 1                   
+                    if self.stop_event.is_set(): 
+                        sys.exit(0)
+                                    
                     out = self.mq.query(s + e)
                     if (out):
                         with analyzer.lock:
-                            analyzer.sent = f'{'/'.join(s)}:{'/'.join(s)} ({iter_s}/{len(self.S)})'
+                            analyzer.sent = f'{'/'.join(s)}:{'/'.join(e)} ({iter_s}/{len(self.S)})'
                             analyzer.recv = f'{'/'.join(out)}'
                         self.T[s][e] = tuple(out[-len(e):])
 
-        iter_s = 0
-        with analyzer.lock:
-            analyzer.show_progress = True         
+        iter_si = 0    
         for s in self.S:
             for a in self.alphabet:
-                iter_s += 1
+                iter_si += 1
                 si = s + (a,) # S + i (element in alphabet)
-                # with analyzer.lock:
-                #     analyzer.prefix = f'({iter_s}/{len(self.S) * len(self.alphabet)}) {'/'.join(s)}'
+                
                 if si not in self.T.keys():
                     self.T[si] = {}
                     
                 for e in self.E:
                     
-                    if self.stop_event.is_set(): sys.exit(0)
+                    if self.stop_event.is_set(): 
+                        sys.exit(0)
                             
                     # connection was closed before sending suffix request
                     # in this situation, there is no more response and destroy the evaluation
@@ -86,12 +82,11 @@ class ObTable:
                         out = self.mq.query(si + e)
                         if (out):
                             with analyzer.lock:
-                                analyzer.sent = f'{'/'.join(si)}:{'/'.join(e)} ({iter_s}/{len(self.S)})'
+                                analyzer.sent = f'{'/'.join(si)}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet)})'
                                 analyzer.recv = f'{'/'.join(out)}'
                             self.T[si][e] = tuple(out[-len(e):])
-                            # logger.debug(f'Ob: {si} + {e} = {tuple(out[-len(e):])} ')
         with analyzer.lock:
-            analyzer.show_progress = False
+            analyzer.show_progress = ''
 
     def row(
         self, 
