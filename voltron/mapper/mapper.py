@@ -29,6 +29,8 @@ class Mapper:
         self.cur_parser: Parser
         self.equip_parser(self.parsers[-1])
         
+        self.message_pool: dict[str, list[bytes]]
+        
         logger.debug('Mapper: finish init')
     
     def g_path(
@@ -43,21 +45,6 @@ class Mapper:
     ) -> Path:
         return self.ps_path / f'{p.name}.py'
         
-    # def generate(
-    #     self,
-    #     g: Generator
-    # ) -> bytes | None:
-    #     name_space = {}
-    #     try:
-    #         with open(self.g_path(g), 'r', encoding='utf-8') as f:
-    #             code = f.read()
-    #             exec(code, name_space)
-    #             obj = name_space[f'generated_{g.msg_type}']
-    #             return obj()
-    #     except Exception as e:
-    #         logger.debug(f'Mapper: generated failure {e}')
-    #         logger.debug(traceback.extract_stack())
-    #         return None
     def equip_parser(
         self,
         p: Parser
@@ -66,23 +53,59 @@ class Mapper:
         
     def select_generators(
         self,
-        req_seq: list[str]
-    ) -> list[Generator]:
-        gs: list[Generator] = []
+        req_seq: list[str],
+        cache_mode: bool = False
+    ) -> list[tuple[str, bytes]]:
+        """Select and execute message generator based on the list of message type
+        
+        req_seq: message type list
+        cached_mode: cache the generated message and get message from cache (for automata learning)
+        
+        Return:
+            generated message
+        """
+        ms = []
         for req in req_seq:
             if req == '-':
                 continue
             elif req in self.generators.keys():
-                gs.append(self.generators[req][0])
+                g = self.select_generator(req)
+                if cache_mode and g.was_used != 0:
+                    msg = self.message_pool[g.msg_type][0]
+                else:
+                    msg = self.exe_generator(g)
+                    if g.msg_type not in self.message_pool.keys():
+                        self.message_pool[g.msg_type] = []
+                    if msg:
+                        self.message_pool[g.msg_type].append(msg)
+                    g.was_used += 1
+                msg_type = g.msg_type
+                ms.append((msg_type, msg))
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
-        return gs
+        return ms
     
     def select_generator(
         self,
         req_type
     ) -> Generator:
         return self.generators[req_type][0]
+    
+    def exe_generator(
+        self,
+        g: Generator
+    ) -> bytes | None:
+        name_space = {}
+        try:
+            with open(self.g_path(g), 'r', encoding='utf-8') as f:
+                code = f.read()
+                exec(code, name_space)
+                obj = name_space[f'generate_{g.msg_type}']
+                return obj()
+        except Exception as e:
+            logger.debug(f'Executor: generated failure {e}')
+            logger.debug(traceback.format_exc())
+            return None
             
     # def parse_msg(
     #     self,

@@ -79,7 +79,7 @@ class Executor:
 
     def interact(
         self,
-        generator_seq: list[Generator]
+        msg_seq: list[tuple[str, bytes]]
     ) -> Tuple[bool, Conversation | None]:  
         """
         TODO: Deal with interaction
@@ -119,7 +119,7 @@ class Executor:
                 self.analyzer.resp_trans_update(f'-/{resp_code}')
 
         # send the message path
-        for g in generator_seq:
+        for msg_type, msg in msg_seq:
             
             if self.stop_event.is_set():
                 sock.close()
@@ -127,7 +127,6 @@ class Executor:
                     proc.terminate()
                 sys.exit(0)
             # send message and parse response
-            msg = self.exe_generator(g)
             if msg == None:
                 return False, None
             
@@ -135,30 +134,29 @@ class Executor:
             if(flag):
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
-                    self.analyzer.req_types_update(g.msg_type)
-                    self.analyzer.last_generator = g
+                    self.analyzer.req_types_update(msg_type)
                 resp_code, resp_data = self.net_recv(sock=sock)
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
                     if return_code:
-                        cons.add_state(g.msg_type, 'CRASH')
+                        cons.add_state(msg_type, 'CRASH')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                     else:
-                        cons.add_state(g.msg_type, 'POLLERR')
+                        cons.add_state(msg_type, 'POLLERR')
                         with self.analyzer.lock:
                             self.analyzer.pollerr_num += 1
                     break
                 
                 elif resp_code == 'TIMEOUT':
-                    cons.add_state(g.msg_type, 'TIMEOUT')
+                    cons.add_state(msg_type, 'TIMEOUT')
                     with self.analyzer.lock:
                         self.analyzer.timeout_num += 1
                     break
                 
                 elif resp_code == 'RCLOSED':
-                    cons.add_state(g.msg_type, 'RCLOSED')
+                    cons.add_state(msg_type, 'RCLOSED')
                     with self.analyzer.lock:
                         self.analyzer.rclose_num += 1
                     break
@@ -175,7 +173,7 @@ class Executor:
                     # record conversation data
                     if(req_data and resp_data):
                         cons.add_data(req_data, resp_data)
-                    cons.add_state(g.msg_type, resp_code)
+                    cons.add_state(msg_type, resp_code)
             
             # If socket closed, stop sending
             else:
@@ -353,22 +351,6 @@ class Executor:
             poller.unregister(sock)
     
         return None, None
-    
-    def exe_generator(
-        self,
-        g: Generator
-    ) -> bytes | None:
-        name_space = {}
-        try:
-            with open(self.mapper.g_path(g), 'r', encoding='utf-8') as f:
-                code = f.read()
-                exec(code, name_space)
-                obj = name_space[f'generate_{g.msg_type}']
-                return obj()
-        except Exception as e:
-            logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.format_exc())
-            return None
     
     def load_parser(
         self,

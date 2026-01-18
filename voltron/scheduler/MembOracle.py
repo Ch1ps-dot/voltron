@@ -20,8 +20,8 @@ class MembershipOracle:
         word: tuple[str,...]
     ) -> list[str] | None:
         
-        generators = self.mapper.select_generators(list(word))
-        flag, cons = self.executor.interact(generators)
+        msg_seq = self.mapper.select_generators(list(word), True)
+        flag, cons = self.executor.interact(msg_seq)
         if (flag and cons):
             return cons.res_seq
         return None

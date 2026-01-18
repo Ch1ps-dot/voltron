@@ -93,7 +93,6 @@ def make_runtime_table():
             table,
             title="[bold cyan]Fuzz Metric",
             title_align="left",
-            # style="white on dark_blue",
             expand=True
         )
 
@@ -116,7 +115,6 @@ def make_info_table():
             table,
             title="[bold cyan]Fuzzer Infor",
             title_align="center",
-            # style="white on dark_blue",
             expand=True
         )
 
@@ -137,7 +135,6 @@ def make_progress_panel():
             table,
             title="[bold cyan]Task Progress",
             title_align="left",
-            # style="white on dark_blue",
             expand=True
         )
     
@@ -148,7 +145,6 @@ def make_progress_panel():
             txt,
             title="[bold cyan]Task Progress",
             title_align="center",
-            # style="white on dark_blue",
             expand=True
         )
 
