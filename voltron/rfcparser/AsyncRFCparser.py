@@ -49,7 +49,7 @@ class AsyncRFCParser:
         self.ir_path = configs.base_path / 'output' / 'ir' / configs.pro_name
 
         self.poss_res: dict[str, str] = {}
-        self.req_dep_map: dict[str, dict] = {}
+        self.req_dep_map: dict[str, dict] = {} # dependency between requests
 
         self.req_ir = None
         self.res_ir = None

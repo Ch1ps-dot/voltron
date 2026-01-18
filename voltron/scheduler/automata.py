@@ -1,6 +1,7 @@
 from voltron.analyzer.analyzer import Analyzer
 from voltron.mapper.mapper import Mapper
-from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.producer.generator import Generator
+from voltron.producer.parser import Parser
 from voltron.executor.executor import Executor
 from voltron.configs import configs
 from graphviz import Digraph
@@ -44,3 +45,17 @@ class MealyMachine:
             filename='model',
             directory=configs.results_path
         )
+        
+    def get_relation(
+        self,
+        last_request,
+        current_request
+    ):
+        ans = []
+        for s1 in self.states:
+            s2 = self.delta[(s1, last_request)]
+            out1 = self.output[(s1, last_request)]
+            out2 = self.output[(s2, current_request)]
+            ans.append(f'( {last_request} / {out1} )->( {current_request} / {out2} )')
+        return '\n'.join(ans)
+            

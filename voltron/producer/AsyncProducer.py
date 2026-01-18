@@ -4,49 +4,18 @@ from tqdm import tqdm
 import json, asyncio
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
-from dataclasses import dataclass, asdict, field
 
+from voltron.producer.generator import Generator
+from voltron.producer.parser import Parser
 from voltron.rfcparser.AsyncRFCparser import AsyncRFCParser
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 from voltron.llm.AsyncChat import AsyncChater
-
-@dataclass
-class Generator:
-    """Generator of request message
-
-    msg_type: message type
-    """
-    msg_type: str
-    name: str
-    evolved_from: str
-    cur_res: list[str] = field(default_factory=list)
-    pre_res: list[str] = field(default_factory=list)
-    fut_res: list[str] = field(default_factory=list)
-    was_used: int = 0
+from voltron.scheduler.automata import MealyMachine
+from dataclasses import dataclass, asdict, field
     
-    # def __post_init__(self):
-    #     if self.cur_res is None:
-    #         self.cur_res = []
-    #     if self.pre_res is None:
-    #         self.pre_res = []
-    #     if self.fut_res is None:
-    #         self.fut_res = []
-    
-@dataclass
-class Parser:
-    """Generator of request message
 
-    msg_type: message type
-    """
-    evolved_from: str
-    name: str
-    parsed_res: list[str] = field(default_factory=list)
-    
-    # def __post_init__(self):
-    #     if self.cur_res is None:
-    #         self.cur_res = []
 
 class AsyncProducer:
     """Prepare message Producer (input generator and packet parser).
@@ -85,6 +54,7 @@ class AsyncProducer:
         # types of symbols
         self.req_types: list[str] = self.rfcp.req_types
         self.res_types: list[str] = self.rfcp.res_types
+        self.req_dep = self.rfcp.req_dep_map
         
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
@@ -182,26 +152,28 @@ class AsyncProducer:
             self,
             msg_type: str,
             gs: list[Generator],
-            trace: str,
+            doc_info:str,
+            machine: MealyMachine,
             sem
     ):
         async with sem:
             while(True):
                 try:
-                    info = ''
                     code = ''
                     g_path = self.generator_path / msg_type / f'{gs[-1].name}.py'
-                    with open(self.info_path, 'r', encoding='utf-8') as f:
-                        info = f.read()
                     with open(g_path, 'r', encoding='utf-8') as f:
                         code = f.read()
+                    trace_list = []
+                    for pair in self.req_dep.keys():
+                        if msg_type == pair.split('/')[0] and self.req_dep[pair]['request_dependency'] == 'dependent':
+                            trace_list.append(machine.get_relation(msg_type, pair.split('/')[1]))
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_evolve(
                         code=code,
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
-                        trace=trace,
-                        info=info
+                        trace= ' '.join(trace_list),
+                        info=doc_info
                     )
                     compile(input_code, '<string>', "exec")
                     with analyzer.lock:
@@ -211,12 +183,13 @@ class AsyncProducer:
                     logger.debug(f'Producer :generate error {e}')
 
     async def _generator_evo_async(
-            self,
-            trace: str
+        self,
+        doc_info: str,
+        machine: MealyMachine
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._generator_evo_one(msg_type, gs, trace, sem)
+            self._generator_evo_one(msg_type, gs, doc_info, machine, sem)
             for msg_type, gs in self.generators.items()
         ]
         results = await asyncio.gather(*tasks)
@@ -224,14 +197,19 @@ class AsyncProducer:
 
     def generator_evo(
             self,
-            trace: str
+            machine: MealyMachine
     ) -> None:
         """Generate and save input generator
         """
         with analyzer.lock:
             analyzer.set_progress('evolve', len(self.req_types))
             analyzer.stage = 'fuzzer evolve'
-        results = asyncio.run(self._generator_evo_async(trace))
+            
+        doc_info = ''
+        with open(self.info_path, 'r', encoding='utf-8') as f:
+            doc_info = f.read()
+            
+        results = asyncio.run(self._generator_evo_async(doc_info, machine))
         for msg_type, input_code in results:
             msg_dir = self.generator_path / f'{msg_type}'
             if not msg_dir.is_dir():

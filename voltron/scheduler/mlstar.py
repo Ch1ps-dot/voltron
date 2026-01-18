@@ -197,7 +197,7 @@ class MealyLstar:
             with open(configs.results_path / 'model.pkl', 'wb') as f:
                 pickle.dump(h, f)
             h.graph()
-            self.stop_event.set()
+            # self.stop_event.set()
         except Exception as e:
             logger.debug(f'LM: {e}')
             logger.debug(f'{traceback.format_exc()}')
