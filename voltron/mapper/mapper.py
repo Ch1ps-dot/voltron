@@ -1,5 +1,7 @@
 from collections.abc import Callable
-from voltron.producer.AsyncProducer import AsyncProducer, Generator, Parser
+from voltron.producer.AsyncProducer import AsyncProducer
+from voltron.producer.generator import Generator
+from voltron.producer.parser import Parser
 from voltron.mapper.suite import Suite
 from voltron.analyzer.analyzer import analyzer
 import traceback, sys
