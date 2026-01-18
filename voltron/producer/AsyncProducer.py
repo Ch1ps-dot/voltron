@@ -163,10 +163,13 @@ class AsyncProducer:
                     g_path = self.generator_path / msg_type / f'{gs[-1].name}.py'
                     with open(g_path, 'r', encoding='utf-8') as f:
                         code = f.read()
+                        
+                    # extract state trace of request pair which has dependency
                     trace_list = []
                     for pair in self.req_dep.keys():
                         if msg_type == pair.split('/')[0] and self.req_dep[pair]['request_dependency'] == 'dependent':
                             trace_list.append(machine.get_relation(msg_type, pair.split('/')[1]))
+                            
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_evolve(
                         code=code,

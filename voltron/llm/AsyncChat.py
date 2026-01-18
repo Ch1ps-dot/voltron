@@ -143,6 +143,7 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_generator_evolve
+        logger.debug(trace)
         pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, trace=trace)
         ans = await self.chat_llm(
             prompt=pmp,
