@@ -176,7 +176,7 @@ class Fuzzer:
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
             ml = MealyLstar(mq, eq, self.stop_event)
             h_lsit = []
-            analyzer.iter = 1
+            analyzer.iter = 0
             while not stop_event.is_set():
                 try:
                     h = ml.run(iter)

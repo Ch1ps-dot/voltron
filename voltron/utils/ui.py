@@ -120,7 +120,7 @@ def make_info_table():
         )
 
 def make_progress_panel():
-    if analyzer.stage == 'Obtable':
+    if analyzer.show_progress == 'Obtable':
         data = {
             'sent': analyzer.sent,
             'recv': analyzer.recv,
@@ -140,7 +140,7 @@ def make_progress_panel():
         )
     
         return progress_panel
-    elif analyzer.stage == 'evolve':
+    elif analyzer.show_progress == 'evolve':
         data = {
             f'{analyzer.progress_desc}': f'{analyzer.finished}/{analyzer.total}'
         }
