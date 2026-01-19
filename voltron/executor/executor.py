@@ -184,10 +184,13 @@ class Executor:
             # If socket closed, stop sending
             else:
                 return_code = proc.poll()
-                if return_code:
+                
+                # program exited unexpectly
+                if return_code and return_code != 0:
                     cons.merge_extra_state('CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
+                    cons.save_cons()
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
                 break
@@ -266,8 +269,13 @@ class Executor:
                 # send message
                 if event & select.POLLOUT:
                     
-                    sock.sendall(msg)
-                    # logger.debug(f'net_send: {msg}')
+                    try:
+                        sock.sendall(msg)
+                    
+                    except Exception as err:
+                        # socket break when sending
+                        logger.debug(f'net_send: socket broken {msg}')
+                        return False, None
                     return True, msg
             
             # TODO: support udp
