@@ -22,3 +22,9 @@ class Conversation:
     ):
         self.req_seq.append(req_code)
         self.res_seq.append(res_code)
+        
+    def merge_extra_state(
+        self,
+        extra_res: str
+    ):
+        self.res_seq[-1] = f'{self.res_seq[-1]}/{extra_res}'

@@ -76,6 +76,15 @@ class ObTable:
                     if(self.T[s][(a,)] == ('POLLERR',)):
                         self.T[si][e] = ('POLLERR',)
                         continue
+                    if(self.T[s][(a,)] == ('CRASH',)):
+                        self.T[si][e] = ('CRASH',)
+                        continue
+                    if(self.T[s][(a,)] == ('TIMEOUT',)):
+                        self.T[si][e] = ('TIMEOUT',)
+                        continue
+                    if(self.T[s][(a,)] == ('RCLODED',)):
+                        self.T[si][e] = ('RCLOSED',)
+                        continue
                     
                     if e not in self.T[si].keys():
                     

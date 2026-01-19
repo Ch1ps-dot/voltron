@@ -185,11 +185,11 @@ class Executor:
             else:
                 return_code = proc.poll()
                 if return_code:
-                    cons.add_state(msg_type, 'CRASH')
+                    cons.merge_extra_state('CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
-                logger.debug(f'Executor: socket closed because of {seq}')
+                logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
                 break
 
         with self.analyzer.lock:
@@ -255,8 +255,12 @@ class Executor:
                 fd, event = events[0]
 
                 # handler poll error and hup
-                if event & (select.POLLERR | select.POLLHUP):
-                    logger.debug("net_send: poll error / hup")
+                if event & (select.POLLERR):
+                    logger.debug("net_send: poll err")
+                    return False, None
+                
+                if event & select.POLLHUP:
+                    logger.debug("net_send: poll hup")
                     return False, None
 
                 # send message
