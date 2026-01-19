@@ -96,15 +96,18 @@ class ObTable:
             self.T[s][e]
             for e in self.E
         )
+            
 
     # ---------- Closed ----------
     def is_closed(self):
         rows = {self.row(s) for s in self.S}
+
         for s in self.S:
             for a in self.alphabet:
                 sa = s + (a,)
                 if self.row(sa) not in rows:
                     return False, sa
+       
         return True, None
 
     def make_close(self):
@@ -116,7 +119,7 @@ class ObTable:
             closed, sa = self.is_closed()
             if closed or sa == None:
                 return
-            logger.debug(f'add new suffix: {sa}')
+            logger.debug(f'add new prefix: {sa}')
             self.S.add(sa)
             self._fill_table()
 

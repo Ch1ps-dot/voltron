@@ -183,7 +183,13 @@ class Executor:
             
             # If socket closed, stop sending
             else:
-                logger.debug('Executor: socket closed')
+                return_code = proc.poll()
+                if return_code:
+                    cons.add_state(msg_type, 'CRASH')
+                    with self.analyzer.lock:
+                        self.analyzer.crash_num += 1
+                seq = '/'.join([msg_type for msg_type, data in msg_seq])
+                logger.debug(f'Executor: socket closed because of {seq}')
                 break
 
         with self.analyzer.lock:
@@ -239,6 +245,7 @@ class Executor:
         
         try:
             if (self.trans_layer == 'tcp'):
+                
                 # handler poll timeout
                 events = poller.poll(self.send_time_ms)
                 if not events:
