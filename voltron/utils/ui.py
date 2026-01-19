@@ -75,6 +75,7 @@ def make_runtime_table():
     table.add_column(justify='right')
     data = {
         'run time': format_duration(elapsed),
+        'synthesis iter': ana.iter,
         'request num': ana.req_num,
         'response num': ana.res_num,
         'query num': ana.path_num,

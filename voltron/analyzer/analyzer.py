@@ -44,6 +44,8 @@ class Analyzer:
         self.progress_desc = ''
         self.total: int = 0
         self.finished: int = 0
+        
+        self.iter = 0
 
     def collect_results(
             self
