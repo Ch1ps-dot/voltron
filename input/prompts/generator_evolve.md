@@ -64,7 +64,7 @@ You will be given:
 
 ### **Function Prototype (Must Match Exactly)**
 
-def input_$msg_type():
+def input_${msg_type}():
     """Generate one $msg_type message for the $pro_name protocol.
     - Input: none
     - Output: bytes
