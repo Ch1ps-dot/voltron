@@ -197,7 +197,7 @@ class MealyLstar:
             h = self.table.build_hypothesis()
             with open(configs.results_path / f'model_{name}.pkl', 'wb') as f:
                 pickle.dump(h, f)
-            h.graph()
+            h.graph(name)
             # self.stop_event.set()
         except Exception as e:
             logger.debug(f'LM: {e}')

@@ -28,7 +28,8 @@ class MealyMachine:
         return outputs
     
     def graph(
-        self
+        self,
+        name
     ):
         g = Digraph(comment='automata')
         for sid in self.states:
@@ -37,7 +38,7 @@ class MealyMachine:
             g.edge(str(k[0]), str(v), label=f'{k[1]}/{self.output[k]}')
                      
         g.save(
-            filename='model',
+            filename=f'model_{name}',
             directory=configs.results_path
         )
         
