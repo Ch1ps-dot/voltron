@@ -159,20 +159,23 @@ class AsyncProducer:
         async with sem:
             while(True):
                 try:
-                    code = ''
-                    g_path = self.generator_path / msg_type / f'{gs[-1].name}.py'
-                    with open(g_path, 'r', encoding='utf-8') as f:
-                        code = f.read()
+                    old_code = ''
+                    old_g_name = f'{gs[-1].name}.py'
+                    old_g_path = self.generator_path / msg_type / old_g_name
+                    with open(old_g_path, 'r', encoding='utf-8') as f:
+                        old_code = f.read()
                         
                     # extract state trace of request pair which has dependency
                     trace_list = []
                     for pair in self.req_dep.keys():
-                        if msg_type == pair.split('/')[0] and self.req_dep[pair]['request_dependency'] == 'dependent':
-                            trace_list.append(machine.get_relation(msg_type, pair.split('/')[1]))
+                        last_request = pair.split('/')[0]
+                        current_request = pair.split('/')[1]
+                        if msg_type == last_request and self.req_dep[pair]['request_dependency'] == 'dependent':
+                            trace_list.append(machine.get_relation(last_request, current_request))
                             
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_evolve(
-                        code=code,
+                        code=old_code,
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
                         trace= ' '.join(trace_list),
@@ -223,11 +226,14 @@ class AsyncProducer:
                 f.write(input_code)
                 
                 # construct and save information for new generator
-                info: dict = {'msg_type': msg_type, 'evolved_from': f'id{len(self.generators[msg_type])-1}', 'name': f'id{len(self.generators[msg_type])}'}
+                old_name = f'id{len(self.generators[msg_type])-1}'
+                new_name = f'id{len(self.generators[msg_type])}'
+                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name}
                 self.generators.setdefault(msg_type, [])
                 self.generators[msg_type].append(Generator(**info))
             
         with open(self.generator_info_path, 'w', encoding='utf-8') as f:
+            # save the information of new generator to file
             json.dump(self.generator_info(), f)
         
         with analyzer.lock:

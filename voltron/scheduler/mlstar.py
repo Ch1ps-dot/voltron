@@ -188,13 +188,14 @@ class MealyLstar:
         self.stop_event = stop_event
     
     def run(
-        self
+        self,
+        name
     ):
         try:
             self.table.make_close()
             self.table.make_consistent()
             h = self.table.build_hypothesis()
-            with open(configs.results_path / 'model.pkl', 'wb') as f:
+            with open(configs.results_path / f'model_{name}.pkl', 'wb') as f:
                 pickle.dump(h, f)
             h.graph()
             # self.stop_event.set()

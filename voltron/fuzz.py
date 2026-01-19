@@ -175,11 +175,15 @@ class Fuzzer:
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
             ml = MealyLstar(mq, eq, self.stop_event)
+            h_lsit = []
+            iter = 1
             while not stop_event.is_set():
                 try:
-                    h = ml.run()
+                    h = ml.run(iter)
                     self.producer.generator_evo(h)
-                    stop_event.set()
+                    h_lsit.append(h)
+                    iter += 1
+                    # stop_event.set()
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')
                     logger.debug(traceback.format_exc())
