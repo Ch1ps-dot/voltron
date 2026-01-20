@@ -9,7 +9,7 @@ from voltron.mapper.mapper import Mapper
 from voltron.producer.AsyncProducer import Generator, Parser
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
-import math, statistics, threading, traceback, sys
+import math, statistics, threading, traceback, sys, os, signal
 
 class Executor:
     def __init__(
@@ -71,6 +71,7 @@ class Executor:
                     [self.pre_script],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
+                    preexec_fn=os.setsid
                 )
                 return proc
             except Exception as e:
@@ -87,6 +88,7 @@ class Executor:
         # prepare some settings and setup SUT
         clean = self.post_exe()
         proc = self.pre_exe()
+        
         if proc is None or clean is None:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
@@ -94,11 +96,18 @@ class Executor:
             out, err = proc.communicate()
             logger.debug(f'Executor: SUT Setup Failure: {err} {out}')
             return False, None
-
+        
+        # j = 0
+        # while( j < 10):
+        #     time.sleep(self.setup_time_s)
+        #     if proc.poll is not None:
+        #         logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
+        #     else:
+        #         break
+                
         # wait for server setup
         i = 0
         while(i < 100):
-            time.sleep(self.setup_time_s)
             sock = self.setup_socket()
             if sock == None:
                 i += 1
@@ -206,14 +215,14 @@ class Executor:
         if sock.fileno() < 0:
             sock.close()
         if proc.poll() is None:
-            proc.terminate()
+            os.killpg(proc.pid, signal.SIGTERM)
             try:
                 # wait for termination
                 exit_code = proc.wait(timeout=0.1)
                 logger.debug(f"Executor: exit with {exit_code}")
             except subprocess.TimeoutExpired:
                 # if timeout, just kill 
-                proc.kill()
+                os.killpg(proc.pid, signal.SIGKILL)
                 logger.debug("Executor: force to kill the process")
 
         # self.post_exe()
