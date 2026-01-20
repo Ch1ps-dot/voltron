@@ -97,14 +97,14 @@ class AsyncProducer:
             msg,
             sem
     ):
+        msg_ir = etree.tostring(msg, encoding="utf-8", pretty_print=True).decode("utf-8")
+        msg_type = msg.get('name')
+        info = ''
+        with open(self.info_path, 'r', encoding='utf-8') as f:
+            info = f.read()
         async with sem:
             while(True):
                 try:
-                    msg_ir = etree.tostring(msg, encoding="utf-8", pretty_print=True).decode("utf-8")
-                    msg_type = msg.get('name')
-                    info = ''
-                    with open(self.info_path, 'r', encoding='utf-8') as f:
-                        info = f.read()
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_gen(
                         pro_name=self.rfcp.pro_name,
@@ -160,23 +160,23 @@ class AsyncProducer:
             machine: MealyMachine,
             sem
     ):
+        old_code = ''
+        old_g_name = f'{gs[-1].name}.py'
+        old_g_path = self.generator_path / msg_type / old_g_name
+        with open(old_g_path, 'r', encoding='utf-8') as f:
+            old_code = f.read()
+            
+        # extract state trace of request pair which has dependency
+        trace_list = []
+        for pair in self.req_dep.keys():
+            last_request = pair.split('/')[0]
+            current_request = pair.split('/')[1]
+            if msg_type == last_request and self.req_dep[pair]['request_dependency'] == 'dependent':
+                trace_list.append(machine.get_relation(last_request, current_request))
+                
         async with sem:
             while(True):
                 try:
-                    old_code = ''
-                    old_g_name = f'{gs[-1].name}.py'
-                    old_g_path = self.generator_path / msg_type / old_g_name
-                    with open(old_g_path, 'r', encoding='utf-8') as f:
-                        old_code = f.read()
-                        
-                    # extract state trace of request pair which has dependency
-                    trace_list = []
-                    for pair in self.req_dep.keys():
-                        last_request = pair.split('/')[0]
-                        current_request = pair.split('/')[1]
-                        if msg_type == last_request and self.req_dep[pair]['request_dependency'] == 'dependent':
-                            trace_list.append(machine.get_relation(last_request, current_request))
-                            
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_evolve(
                         code=old_code,

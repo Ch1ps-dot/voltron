@@ -268,9 +268,9 @@ class AsyncRFCParser:
             msg_type: str,
             sem: asyncio.Semaphore
     ):
-        async with sem:
-            query = [msg_type]
-            topk = self.rag_all.top_k_sentence(query, 5)
+        query = [msg_type]
+        topk = self.rag_all.top_k_sentence(query, 5)
+        async with sem:    
             msg_ir = await self.chater.llm_ir_generation(
                             pro_name=self.pro_name,
                             message_name=msg_type,
@@ -403,11 +403,11 @@ class AsyncRFCParser:
             cur_req: str,
             sem
     ):
+        query = [last_req, cur_req]
+        results = self.rag_all.top_k_sentence(query, 5)
         async with sem:
             while(True):
                 try:
-                    query = [last_req, cur_req]
-                    results = self.rag_all.top_k_sentence(query, 5)
                     ans_str = await self.chater.llm_infer_dependency(
                         last_request=last_req,
                         pro_name=self.pro_name,
