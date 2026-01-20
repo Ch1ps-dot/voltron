@@ -200,7 +200,8 @@ class MealyLstar:
         eq,
         stop_event: threading.Event
     ) -> None:
-        self.table = ObTable(mq, eq, stop_event)
+        self.mq = mq
+        self.eq = eq
         self.stop_event = stop_event
     
     def run(
@@ -208,6 +209,7 @@ class MealyLstar:
         name: int
     ):
         try:
+            self.table = ObTable(self.mq, self.eq, self.stop_event)
             self.table.make_close()
             self.table.make_consistent()
             h = self.table.build_hypothesis()

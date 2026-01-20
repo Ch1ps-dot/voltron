@@ -199,7 +199,7 @@ class AsyncProducer:
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._generator_evo_one(msg_type, gs, doc_info, machine, sem)
+            self._generator_evo_one(msg_type=msg_type, gs=gs, doc_info=doc_info, machine=machine, sem=sem)
             for msg_type, gs in self.generators.items()
         ]
         results = await asyncio.gather(*tasks)
