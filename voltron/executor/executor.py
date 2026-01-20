@@ -199,12 +199,15 @@ class Executor:
             self.analyzer.path_num = self.analyzer.path_num + 1
 
         # close socket and SUT
+        exit_code = 3838
         if sock.fileno() < 0:
             sock.close()
         if proc.poll() is None:
             proc.terminate()
             try:
-                proc.wait(timeout=0.1)
+                # wait for termination
+                exit_code = proc.wait(timeout=0.1)
+                logger.debug(f"Executor: exit with {exit_code}")
             except subprocess.TimeoutExpired:
                 proc.kill()
                 logger.debug("Executor: force to kill the process")
