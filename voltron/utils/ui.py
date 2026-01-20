@@ -126,7 +126,7 @@ def make_progress_panel():
             'sent': analyzer.sent,
             'recv': analyzer.recv,
         }
-        table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
+        table = Table(title="Progress", show_header=False, box=None, expand= True)
         table.add_column(justify='left')
         table.add_column(justify='right')
         
@@ -147,7 +147,7 @@ def make_progress_panel():
         data = {
             key: v
         }
-        table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
+        table = Table(title="Progress", show_header=False, box=None, expand= True)
         table.add_column(justify='left')
         table.add_column(justify='right')
         

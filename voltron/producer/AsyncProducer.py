@@ -225,8 +225,8 @@ class AsyncProducer:
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
             
-            init_gen_path = msg_dir / f'id{len(self.generators[msg_type])}.py'
-            with open(init_gen_path, 'w', encoding='utf-8') as f:
+            gen_path = msg_dir / f'id{len(self.generators[msg_type])}.py'
+            with open(gen_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
                 
                 # construct and save information for new generator
