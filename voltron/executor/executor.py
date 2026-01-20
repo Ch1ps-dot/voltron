@@ -216,6 +216,7 @@ class Executor:
                 socket for sending and receiving
             """
             sock: socket.socket
+            
             try:
                 if (self.trans_layer == 'tcp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -225,7 +226,7 @@ class Executor:
                 else:
                     return None
             except Exception as e:
-                logger.debug(f"Setup Socket Failure {e}")
+                logger.debug(f"Setup Socket Failure {e}. Listen tp {self.host}:{self.port}")
                 return None
             sock.setblocking(False)
             return sock

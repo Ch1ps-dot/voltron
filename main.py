@@ -1,3 +1,5 @@
+#!/bin/python3
+
 from voltron.fuzz import Fuzzer
 import click
 
