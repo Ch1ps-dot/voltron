@@ -64,7 +64,7 @@ class Fuzzer:
         
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
-        results_dir = Path.cwd() / f'results-{self.target_name}-voltron-{formatted_time}'
+        results_dir = configs.base_path / f'results-{self.target_name}-voltron-{formatted_time}'
         if not results_dir.is_dir():
             results_dir.mkdir()
         

@@ -1,6 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import os, time
+from pathlib import Path
 
 def get_logger(
         mode, 
@@ -14,6 +15,7 @@ def get_logger(
     returns:
         created logger
     """
+    base_path = Path(__file__).resolve().parents[2]
     logger = logging.getLogger(name)
     if logger.handlers:  
         return logger
@@ -22,7 +24,7 @@ def get_logger(
     logger.propagate = False
 
     # create logs file
-    log_dir = "fuzz_logs"
+    log_dir = base_path / "fuzz_logs"
     log_file = None
     mode = 'a'
     if not os.path.exists(log_dir):
