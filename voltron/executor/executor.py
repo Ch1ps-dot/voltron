@@ -203,6 +203,11 @@ class Executor:
             sock.close()
         if proc.poll() is None:
             proc.terminate()
+            try:
+                proc.wait(timeout=0.1)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                logger.debug("Executor: force to kill the process")
 
         # self.post_exe()
         return True, cons
@@ -226,7 +231,7 @@ class Executor:
                 else:
                     return None
             except Exception as e:
-                logger.debug(f"Setup Socket Failure {e}. Listen tp {self.host}:{self.port}")
+                logger.debug(f"Setup Socket Failure {e}. Connect to {self.host}:{self.port}")
                 return None
             sock.setblocking(False)
             return sock
