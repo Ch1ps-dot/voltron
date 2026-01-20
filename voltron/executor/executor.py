@@ -85,8 +85,9 @@ class Executor:
         TODO: Deal with interaction
         """
         # prepare some settings and setup SUT
+        clean = self.post_exe()
         proc = self.pre_exe()
-        if proc is None:
+        if proc is None or clean is None:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
         if proc.poll() is not None: 
