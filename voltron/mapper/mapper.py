@@ -6,6 +6,7 @@ from voltron.mapper.suite import Suite
 from voltron.analyzer.analyzer import analyzer
 import traceback, sys
 from voltron.utils.logger import logger
+from dataclasses import asdict
 
 from pathlib import Path
 
@@ -66,7 +67,7 @@ class Mapper:
         """Select and execute message generator based on the list of message type
         
         req_seq: message type list
-        cached_mode: cache the generated message and get message from cache (for automata learning)
+        cache_mode: cache the generated message and get message from cache (for automata learning)
         
         Return:
             generated message
@@ -77,25 +78,28 @@ class Mapper:
                 continue
             elif req in self.generators.keys():
                 g = self.select_generator(req, mode)
-                if cache_mode and g.was_used != 0:
-                    msg = self.message_pool[g.msg_type][g.name]
-                else:
-                    msg = self.exe_generator(g)
-                    if g.msg_type not in self.message_pool.keys():
-                        self.message_pool[g.msg_type] = {}
-                    if msg:
-                        self.message_pool[g.msg_type][g.name] = msg
-                    g.was_used += 1
-                msg_type = g.msg_type
-                ms.append((msg_type, msg))
+                if g.msg_type not in self.message_pool.keys():
+                    self.message_pool[g.msg_type] = {}
+                try:
+                    if cache_mode and g.was_used != 0:
+                        msg = self.message_pool[g.msg_type][g.name]
+                    else:
+                        msg = self.exe_generator(g)
+                        if msg:
+                            self.message_pool[g.msg_type][g.name] = msg
+                        g.was_used += 1
+                    msg_type = g.msg_type
+                    ms.append((msg_type, msg))
+                except Exception as e:
+                    logger.debug(asdict(g))
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
     
     def select_generator(
         self,
-        req_type,
-        mode
+        req_type: str,
+        mode: str
     ) -> Generator:
         if mode == 'new':
             return self.generators[req_type][-1]
