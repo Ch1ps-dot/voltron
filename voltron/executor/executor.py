@@ -163,6 +163,7 @@ class Executor:
             
             # success to send
             if(flag):
+                logger.debug(f'sent: {req_data}')
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)

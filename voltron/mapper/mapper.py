@@ -73,6 +73,7 @@ class Mapper:
             generated message
         """
         ms = []
+        
         for req in req_seq:
             if req == '-':
                 continue
@@ -91,6 +92,7 @@ class Mapper:
                             g.was_used += 1
                         else:
                             g.broken = False
+                            
                     if msg:
                         msg_type = g.msg_type
                         ms.append((msg_type, msg))
