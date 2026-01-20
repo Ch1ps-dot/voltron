@@ -142,8 +142,10 @@ def make_progress_panel():
     
         return progress_panel
     elif analyzer.show_progress == 'evolve':
+        key = f'{analyzer.progress_desc}'
+        v = f'{analyzer.finished}/{analyzer.total}'
         data = {
-            f'{analyzer.progress_desc}': f'{analyzer.finished}/{analyzer.total}'
+            key: v
         }
         table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
         table.add_column(justify='left')

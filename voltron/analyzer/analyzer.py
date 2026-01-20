@@ -155,10 +155,12 @@ class Analyzer:
         
     def set_progress(
         self,
+        progress: str,
         desc: str,
         total: int
     ):
-        self.show_progress = desc
+        self.show_progress = progress
+        self.progress_desc = desc
         self.total = total
         
 analyzer = Analyzer()

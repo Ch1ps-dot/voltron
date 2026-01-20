@@ -212,7 +212,7 @@ class AsyncProducer:
         """Generate and save input generator
         """
         with analyzer.lock:
-            analyzer.set_progress('evolve', len(self.req_types))
+            analyzer.set_progress('evolve', 'evolve', len(self.req_types))
             analyzer.stage = 'fuzzer evolve'
             
         doc_info = ''
