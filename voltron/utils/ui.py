@@ -82,9 +82,10 @@ def make_runtime_table():
         'response types': ana.res_types_num(),
         'response transitions': ana.resp_trans_num(),
         'CRASH num': ana.crash_num,
-        'PULLERR num': ana.pollerr_num,
-        'TIMEOUT num': ana.timeout_num,
-        'RCLOSE num': ana.rclose_num
+        'CLOSED num': ana.pollerr_num + ana.timeout_num + ana.rclose_num
+        # 'PULLERR num': ana.pollerr_num,
+        # 'TIMEOUT num': ana.timeout_num,
+        # 'RCLOSE num': ana.rclose_num
     }
 
     for k, v in data.items():

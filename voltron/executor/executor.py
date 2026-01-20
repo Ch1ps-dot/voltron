@@ -91,7 +91,7 @@ class Executor:
             return False, None
         if proc.poll() is not None: 
             out, err = proc.communicate()
-            logger.debug(f'Executor: SUT Setup Failure:{err}')
+            logger.debug(f'Executor: SUT Setup Failure: {err} {out}')
             return False, None
 
         # wait for server setup
@@ -101,6 +101,8 @@ class Executor:
             sock = self.setup_socket()
             if sock == None:
                 i += 1
+                if proc.poll is not None:
+                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
