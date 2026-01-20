@@ -158,7 +158,7 @@ class Analyzer:
         desc: str,
         total: int
     ):
-        self.progress_desc = desc
+        self.show_progress = desc
         self.total = total
         
 analyzer = Analyzer()

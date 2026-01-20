@@ -175,11 +175,11 @@ class Fuzzer:
             from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
-            ml = MealyLstar(mq, eq, self.stop_event)
             h_lsit = []
             analyzer.iter = 0
             while not stop_event.is_set():
                 try:
+                    ml = MealyLstar(mq, eq, self.stop_event)
                     h = ml.run(analyzer.iter)
                     self.producer.generator_evo(h)
                     h_lsit.append(h)
