@@ -230,12 +230,17 @@ class Executor:
             try:
                 if (self.trans_layer == 'tcp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.settimeout(0.5)
                     sock.connect((self.host, self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 else:
                     return None
+            except ConnectionRefusedError as e:
+                logger.debug(f"ConnectionRefusedError {e}. Connect to {self.host}:{self.port}")
+                return None
+            except PermissionError as e:
+                logger.debug(f"PermissionError {e}. Connect to {self.host}:{self.port}")
+                return None
             except Exception as e:
                 logger.debug(f"Setup Socket Failure {e}. Connect to {self.host}:{self.port}")
                 return None
