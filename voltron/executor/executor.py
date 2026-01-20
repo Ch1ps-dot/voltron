@@ -97,24 +97,31 @@ class Executor:
             logger.debug(f'Executor: SUT Setup Failure: {err} {out}')
             return False, None
         
-        # j = 0
-        # while( j < 10):
-        #     time.sleep(self.setup_time_s)
-        #     if proc.poll is not None:
-        #         logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
-        #     else:
-        #         break
-                
+        # avoid unexceptional crash of target
+        i = 0
+        while(i < 10):
+            time.sleep(self.setup_time_s)
+            if proc is not None and proc.poll() is not None:
+                logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
+                proc = self.pre_exe()
+            else:
+                break
+            i += 1
+        if proc is None:
+            return False, None
+        if proc.poll() is not None:
+            return False, None
+        
         # wait for server setup
         i = 0
         while(i < 100):
-            time.sleep(self.setup_time_s)
             sock = self.setup_socket()
             if sock == None:
                 i += 1
                 if proc.poll() is not None:
                     logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
                 logger.debug('Executor: Socket Setup Failure' )
+                time.sleep(self.setup_time_s)
                 continue
             else:
                 break
