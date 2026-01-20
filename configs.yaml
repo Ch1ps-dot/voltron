@@ -12,6 +12,13 @@ lightftp:
   rfc_name: rfc959
   trans_layer: tcp
 
+pureftpd:
+  protocol: ftp
+  host: 127.0.0.1
+  port: 2200
+  rfc_name: rfc959
+  trans_layer: tcp
+
 llm:
   base_url: https://xiaoai.plus/v1
   api_key: sk-3aNTqYiVNoiOsKXJMUsfmpTEEIdVbS4YXrHhheHRYTsNbMD9
