@@ -209,6 +209,7 @@ class Executor:
                 exit_code = proc.wait(timeout=0.1)
                 logger.debug(f"Executor: exit with {exit_code}")
             except subprocess.TimeoutExpired:
+                # if timeout, just kill 
                 proc.kill()
                 logger.debug("Executor: force to kill the process")
 
@@ -228,6 +229,7 @@ class Executor:
             try:
                 if (self.trans_layer == 'tcp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(0.5)
                     sock.connect((self.host, self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
