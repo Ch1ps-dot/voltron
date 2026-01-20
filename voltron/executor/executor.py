@@ -150,13 +150,18 @@ class Executor:
             if self.stop_event.is_set():
                 sock.close()
                 break
-            if proc.poll() is None:
+            
+            # the target is running
+            if proc.poll() is not None:
                 break
+            
             # send message and parse response
             if msg == None:
                 return False, None
             
             flag, req_data = self.net_send(msg, sock)
+            
+            # success to send
             if(flag):
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
@@ -195,6 +200,7 @@ class Executor:
                         self.analyzer.res_types_update(resp_code)
                         self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
                     last_recv = resp_code
+                    logger.debug(f'recv: {resp_data}')
                     
                     # record conversation data
                     if(req_data and resp_data):
@@ -227,7 +233,7 @@ class Executor:
             try:
                 # wait for termination
                 exit_code = proc.wait(timeout=0.1)
-                logger.debug(f"Executor: exit with {exit_code}")
+                # logger.debug(f"Executor: exit with {exit_code}")
             except subprocess.TimeoutExpired:
                 # if timeout, just kill 
                 os.killpg(proc.pid, signal.SIGKILL)
