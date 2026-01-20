@@ -38,9 +38,6 @@ class AsyncProducer:
         
         self.generator_info_path = self.generator_path / 'generator_info.json'
         self.parser_info_path = self.parser_path / 'parser_info.json'
-
-        if not self.producer_path.is_dir():
-            self.producer_path
             
         if (not self.producer_path.is_dir()):
             self.producer_path.mkdir()
