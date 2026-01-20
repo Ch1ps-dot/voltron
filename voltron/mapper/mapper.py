@@ -92,6 +92,8 @@ class Mapper:
                     ms.append((msg_type, msg))
                 except Exception as e:
                     logger.debug(asdict(g))
+                    logger.debug(self.message_pool)
+                    logger.debug(traceback.format_exc())
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
