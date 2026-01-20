@@ -71,6 +71,10 @@ class ObTable:
                     
                 for e in self.E:
                     
+                    if (configs.time_limit_s < time.time() - analyzer.start_time):
+                        self.stop_event.set()
+                        logger.debug('Fuzzer: timeout')
+                        
                     if self.stop_event.is_set(): 
                         sys.exit(0)
                             

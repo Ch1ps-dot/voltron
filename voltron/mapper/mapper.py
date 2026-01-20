@@ -81,6 +81,7 @@ class Mapper:
                 if g.msg_type not in self.message_pool.keys():
                     self.message_pool[g.msg_type] = {}
                 try:
+                    msg = None
                     if cache_mode and g.was_used != 0:
                         msg = self.message_pool[g.msg_type][g.name]
                     else:
@@ -90,8 +91,11 @@ class Mapper:
                             g.was_used += 1
                         else:
                             g.broken = False
-                    msg_type = g.msg_type
-                    ms.append((msg_type, msg))
+                    if msg:
+                        msg_type = g.msg_type
+                        ms.append((msg_type, msg))
+                    else:
+                        raise Exception
                 except Exception as e:
                     logger.debug(asdict(g))
                     logger.debug(self.message_pool)

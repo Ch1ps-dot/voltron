@@ -24,7 +24,7 @@ def test_lightftp():
 def test_pureftpd():
     fuzzer = Fuzzer(
         target_name='pureftpd',
-        time_limit_min=10
+        time_limit_min=1440
     )
     fuzzer.fuzz(
         algo='state'

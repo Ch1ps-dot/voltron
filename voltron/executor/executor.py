@@ -100,10 +100,10 @@ class Executor:
         # avoid unexceptional crash of target
         i = 0
         while(i < 10):
-            time.sleep(self.setup_time_s)
             if proc is not None and proc.poll() is not None:
                 logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
                 proc = self.pre_exe()
+                time.sleep(self.setup_time_s)
             else:
                 break
             i += 1
