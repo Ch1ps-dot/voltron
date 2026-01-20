@@ -31,20 +31,20 @@ class AsyncProducer:
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.producer_path = configs.base_path / 'output' / 'equipment' 
-        self.target_p_path = configs.base_path / configs.target_name
+        self.equipment_path = configs.base_path / 'output' / 'equipment' 
+        self.producer_path = configs.base_path / configs.target_name
         self.generator_path = self.producer_path / 'generators'
         self.parser_path = self.producer_path / 'parsers'
         self.info_path = configs.info_path
         
         self.generator_info_path = self.generator_path / 'generator_info.json'
         self.parser_info_path = self.parser_path / 'parser_info.json'
+        
+        if (not self.equipment_path.is_dir()):
+            self.equipment_path.mkdir()
             
         if (not self.producer_path.is_dir()):
             self.producer_path.mkdir()
-            
-        if (not self.target_p_path.is_dir()):
-            self.target_p_path.mkdir()
 
         if not self.generator_path.is_dir():
             self.generator_path.mkdir()
