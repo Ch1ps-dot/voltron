@@ -95,9 +95,10 @@ class Executor:
             return False, None
 
         # wait for server setup
-        time.sleep(self.setup_time_s)
+       
         i = 0
-        while(i < 500):
+        while(i < 100):
+            time.sleep(self.setup_time_s)
             sock = self.setup_socket()
             if sock == None:
                 i += 1
