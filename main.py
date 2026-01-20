@@ -1,6 +1,7 @@
 from voltron.fuzz import Fuzzer
+import click
 
-def test_lightftp():
+def test_rand():
     fuzzer = Fuzzer(
         target_name='lightftp',
         time_limit_min=10
@@ -9,7 +10,7 @@ def test_lightftp():
         algo='rand'
     )
     
-def test_state():
+def test_lightftp():
     fuzzer = Fuzzer(
         target_name='lightftp',
         time_limit_min=10
@@ -17,9 +18,23 @@ def test_state():
     fuzzer.fuzz(
         algo='state'
     )
+    
+def test_pureftpd():
+    fuzzer = Fuzzer(
+        target_name='pureftpd',
+        time_limit_min=10
+    )
+    fuzzer.fuzz(
+        algo='state'
+    )
 
-def main():
-    test_state()
+@click.command(help='fuzzer')
+@click.option("-t", "--target", type=str, required=True, help="fuzzing target")
+def main(target):
+    if target == 'lightftp':
+        test_lightftp()
+    elif target == 'pureftpd':
+        test_pureftpd()
 
 if __name__ == '__main__':
     main()

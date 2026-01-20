@@ -6,7 +6,7 @@ from voltron.scheduler.MembOracle import MembershipOracle
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint, pickle, threading, sys, traceback
+import pprint, pickle, threading, sys, traceback, time
 
 
 class ObTable:
@@ -39,6 +39,7 @@ class ObTable:
             analyzer.show_progress = 'Obtable'
 
         for s in self.S:
+            
             iter_s += 1
             
             for e in self.E:
@@ -46,6 +47,9 @@ class ObTable:
                     self.T[s] = {}
                 if e not in self.T[s].keys():
                     
+                    if (configs.time_limit_s < time.time() - analyzer.start_time):
+                        self.stop_event.set()
+                        logger.debug('Fuzzer: timeout')
                     if self.stop_event.is_set(): 
                         sys.exit(0)
                                     

@@ -60,6 +60,8 @@ class Fuzzer:
         configs.model = configs_yaml['llm']['model']
         configs.async_sem = configs_yaml['llm']['async_sem']
         
+        configs.time_limit_s = self.time_limit_s
+        
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
         results_dir = Path.cwd() / f'results-{self.target_name}-voltron-{formatted_time}'
@@ -162,7 +164,7 @@ class Fuzzer:
                 logger.debug(f'Fuzzer: exit {e}')
                 logger.debug(traceback.format_exc())
                 stop_event.set()
-            if (self.time_limit_s < time.time() - analyzer.start_time):
+            if (configs.time_limit_s < time.time() - analyzer.start_time):
                 stop_event.set()
                 logger.debug('Fuzzer: timeout')
                 
@@ -189,7 +191,7 @@ class Fuzzer:
                     logger.debug(f'Fuzzer: exit {e}')
                     logger.debug(traceback.format_exc())
                     stop_event.set()
-                if (self.time_limit_s < time.time() - analyzer.start_time):
+                if (configs.time_limit_s < time.time() - analyzer.start_time):
                     stop_event.set()
                     logger.debug('Fuzzer: timeout')
         except Exception as e:

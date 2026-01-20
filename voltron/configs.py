@@ -24,6 +24,8 @@ class Config:
         self.api_key: str
         self.model: str
         self.async_sem: int
+        
+        self.time_limit_s: int
 
 configs = Config()
 configs.base_path = Path(__file__).resolve().parents[1]
