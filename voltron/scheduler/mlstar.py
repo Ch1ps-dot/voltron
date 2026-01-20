@@ -205,7 +205,7 @@ class MealyLstar:
     
     def run(
         self,
-        name
+        name: int
     ):
         try:
             self.table.make_close()

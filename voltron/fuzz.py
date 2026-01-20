@@ -180,7 +180,7 @@ class Fuzzer:
             analyzer.iter = 0
             while not stop_event.is_set():
                 try:
-                    h = ml.run(iter)
+                    h = ml.run(analyzer.iter)
                     self.producer.generator_evo(h)
                     h_lsit.append(h)
                     analyzer.iter += 1
