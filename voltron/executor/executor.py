@@ -150,19 +150,19 @@ class Executor:
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                     else:
-                        cons.add_state(msg_type, 'POLLERR')
+                        cons.add_state(msg_type, 'CLOSED')
                         with self.analyzer.lock:
                             self.analyzer.pollerr_num += 1
                     break
                 
                 elif resp_code == 'TIMEOUT':
-                    cons.add_state(msg_type, 'TIMEOUT')
+                    cons.add_state(msg_type, 'CLOSED')
                     with self.analyzer.lock:
                         self.analyzer.timeout_num += 1
                     break
                 
                 elif resp_code == 'RCLOSED':
-                    cons.add_state(msg_type, 'RCLOSED')
+                    cons.add_state(msg_type, 'CLOSED')
                     with self.analyzer.lock:
                         self.analyzer.rclose_num += 1
                     break

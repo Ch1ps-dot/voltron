@@ -77,18 +77,18 @@ class ObTable:
                     # connection was closed before sending suffix request
                     # in this situation, there is no more response and destroy the evaluation
                     # so we consider they are same state and jump the query
-                    if(self.T[s][(a,)] == ('POLLERR',)):
-                        self.T[si][e] = ('POLLERR',)
+                    if(self.T[s][(a,)] == ('CLOSED',)):
+                        self.T[si][e] = ('CLOSED',)
                         continue
                     if(self.T[s][(a,)] == ('CRASH',)):
                         self.T[si][e] = ('CRASH',)
                         continue
-                    if(self.T[s][(a,)] == ('TIMEOUT',)):
-                        self.T[si][e] = ('TIMEOUT',)
-                        continue
-                    if(self.T[s][(a,)] == ('RCLODED',)):
-                        self.T[si][e] = ('RCLOSED',)
-                        continue
+                    # if(self.T[s][(a,)] == ('TIMEOUT',)):
+                    #     self.T[si][e] = ('TIMEOUT',)
+                    #     continue
+                    # if(self.T[s][(a,)] == ('RCLODED',)):
+                    #     self.T[si][e] = ('RCLOSED',)
+                    #     continue
                     
                     if e not in self.T[si].keys():
                     
