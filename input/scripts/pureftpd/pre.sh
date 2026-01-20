@@ -1,2 +1,2 @@
 #!/bin/bash
-src/pure-ftpd -A
+src/pure-ftpd -A -p 2200

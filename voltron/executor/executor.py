@@ -95,7 +95,6 @@ class Executor:
             return False, None
 
         # wait for server setup
-       
         i = 0
         while(i < 100):
             time.sleep(self.setup_time_s)
