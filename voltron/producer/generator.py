@@ -12,6 +12,7 @@ class Generator:
     pre_res: list[str] = field(default_factory=list)
     fut_res: list[str] = field(default_factory=list)
     was_used: int = 0
+    broken: bool = True
     
     # def __post_init__(self):
     #     if self.cur_res is None:

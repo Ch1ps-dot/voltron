@@ -185,7 +185,10 @@ class AsyncProducer:
                         trace= ' '.join(trace_list),
                         info=doc_info
                     )
-                    compile(input_code, '<string>', "exec")
+                    name_space = {}
+                    exec(input_code, name_space)
+                    obj = name_space[f'generate_{msg_type}']
+                    obj()
                     with analyzer.lock:
                         analyzer.finished += 1
                     return msg_type, input_code

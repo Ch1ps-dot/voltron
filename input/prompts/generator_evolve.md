@@ -85,4 +85,6 @@ Do NOT include explanations, markdown, or comments outside the function
 
 The function must be directly executable
 
+The function takes no arguments.
+
 The generated message must be protocol-valid and server-compatible

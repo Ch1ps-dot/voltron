@@ -87,7 +87,9 @@ class Mapper:
                         msg = self.exe_generator(g)
                         if msg:
                             self.message_pool[g.msg_type][g.name] = msg
-                        g.was_used += 1
+                            g.was_used += 1
+                        else:
+                            g.broken = False
                     msg_type = g.msg_type
                     ms.append((msg_type, msg))
                 except Exception as e:
