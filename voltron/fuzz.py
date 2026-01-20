@@ -119,12 +119,11 @@ class Fuzzer:
         """
         fuzz_loop = None
         
-        match algo:
-            case 'rand':
-                fuzz_loop = self.rand_fuzz
-            case 'state':
-                fuzz_loop = self.state_fuzz
-        if fuzz_loop == None:
+        if algo == 'rand':
+            fuzz_loop = self.rand_fuzz
+        elif algo == 'state':
+            fuzz_loop = self.state_fuzz
+        else:
             logger.debug('Fuzzer: no algorithm') 
             return
         
