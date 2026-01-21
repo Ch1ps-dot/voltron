@@ -20,7 +20,7 @@ class MembershipOracle:
         word: tuple[str,...]
     ) -> list[str] | None:
         
-        msg_seq = self.mapper.select_generators(list(word), True, 'new')
+        msg_seq = self.mapper.select_generators(list(word), cache_mode=True, select_mode='new')
         flag, cons = self.executor.interact(msg_seq)
         if (flag and cons):
             return cons.res_seq

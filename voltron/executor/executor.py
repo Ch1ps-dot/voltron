@@ -69,8 +69,8 @@ class Executor:
             try:
                 proc = subprocess.Popen(
                     [self.pre_script],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     preexec_fn=os.setsid
                 )
                 return proc
@@ -163,7 +163,7 @@ class Executor:
             
             # success to send
             if(flag):
-                # logger.debug(f'sent: {req_data}')
+                logger.debug(f'sent: {req_data}')
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
@@ -201,7 +201,7 @@ class Executor:
                         self.analyzer.res_types_update(resp_code)
                         self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
                     last_recv = resp_code
-                    # logger.debug(f'recv: {resp_data}')
+                    logger.debug(f'recv: {resp_data}')
                     
                     # record conversation data
                     if(req_data and resp_data):
@@ -229,18 +229,20 @@ class Executor:
         exit_code = 3838
         if sock.fileno() < 0:
             sock.close()
-        if proc.poll() is None:
-            os.killpg(proc.pid, signal.SIGTERM)
-            try:
-                # wait for termination
-                exit_code = proc.wait(timeout=0.1)
-                # logger.debug(f"Executor: exit with {exit_code}")
-            except subprocess.TimeoutExpired:
-                # if timeout, just kill 
-                os.killpg(proc.pid, signal.SIGKILL)
-                logger.debug("Executor: force to kill the process")
+            
+        # if proc.poll() is None:
+        os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            # wait for termination
+            exit_code = proc.wait(timeout=0.1)
+            # logger.debug(f"Executor: exit with {exit_code}")
+        except subprocess.TimeoutExpired:
+            # if timeout, just kill 
+            os.killpg(proc.pid, signal.SIGKILL)
+            logger.debug("Executor: force to kill the process")
 
         # self.post_exe()
+        logger.debug("Executor: query done")
         return True, cons
     
     def setup_socket(

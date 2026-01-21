@@ -62,7 +62,7 @@ class Mapper:
         self,
         req_seq: list[str],
         cache_mode: bool = False,
-        mode: str = 'default'
+        select_mode: str = 'default'
     ) -> list[tuple[str, bytes]]:
         """Select and execute message generator based on the list of message type
         
@@ -76,16 +76,22 @@ class Mapper:
         
         for req in req_seq:
             if req == '-':
+                # ignore empty symbol
                 continue
             elif req in self.generators.keys():
-                g = self.select_generator(req, mode)
+                # get generator of according message type
+                g = self.select_generator(req, select_mode)
+                
                 if g.msg_type not in self.message_pool.keys():
                     self.message_pool[g.msg_type] = {}
+                    
                 try:
                     msg = None
                     if cache_mode and g.was_used != 0:
+                        # cache mode to avoid randomness in model learning
                         msg = self.message_pool[g.msg_type][g.name]
                     else:
+                        # run generator at first time
                         msg = self.exe_generator(g)
                         if msg:
                             self.message_pool[g.msg_type][g.name] = msg
