@@ -112,7 +112,13 @@ class AsyncProducer:
                         msg_ir=msg_ir,
                         info=info
                     )
-                    compile(input_code, '<string>', "exec")
+                    
+                    # test generated code
+                    name_space = {}
+                    exec(input_code, name_space)
+                    obj = name_space[f'generate_{msg_type}']
+                    obj()
+                    
                     return msg_type, input_code
                 except Exception as e:
                     logger.debug(f'Producer :generate error {e}')
@@ -185,6 +191,8 @@ class AsyncProducer:
                         trace= ' '.join(trace_list),
                         info=doc_info
                     )
+                    
+                    # test generated code
                     name_space = {}
                     exec(input_code, name_space)
                     obj = name_space[f'generate_{msg_type}']
@@ -268,7 +276,7 @@ class AsyncProducer:
     ) -> None:
         """Generate and save packet parser
         """
-        with tqdm(desc='Parser Gen') as pbar:
+        with tqdm(desc='Parser Gen', total=1) as pbar:
             result = asyncio.run(self._parser_gen_async())
             pbar.update(1)
         init_p_path = self.parser_path / 'id0.py'

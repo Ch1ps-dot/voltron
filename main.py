@@ -37,6 +37,8 @@ def main(target):
         test_lightftp()
     elif target == 'pureftpd':
         test_pureftpd()
+    else:
+        print('Unkown Target')
 
 if __name__ == '__main__':
     main()

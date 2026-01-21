@@ -115,13 +115,13 @@ class Executor:
         # wait for server setup
         i = 0
         while(i < 100):
+            time.sleep(self.setup_time_s)
             sock = self.setup_socket()
             if sock == None:
                 i += 1
                 if proc.poll() is not None:
                     logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
                 logger.debug('Executor: Socket Setup Failure' )
-                time.sleep(self.setup_time_s)
                 continue
             else:
                 break
@@ -163,7 +163,7 @@ class Executor:
             
             # success to send
             if(flag):
-                logger.debug(f'sent: {req_data}')
+                logger.debug(f'sent -> {req_data}')
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
@@ -201,7 +201,7 @@ class Executor:
                         self.analyzer.res_types_update(resp_code)
                         self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
                     last_recv = resp_code
-                    logger.debug(f'recv: {resp_data}')
+                    logger.debug(f'recv <- {resp_data}')
                     
                     # record conversation data
                     if(req_data and resp_data):
