@@ -230,16 +230,16 @@ class Executor:
         if sock.fileno() < 0:
             sock.close()
             
-        # if proc.poll() is None:
-        os.killpg(proc.pid, signal.SIGTERM)
-        try:
-            # wait for termination
-            exit_code = proc.wait(timeout=0.1)
-            # logger.debug(f"Executor: exit with {exit_code}")
-        except subprocess.TimeoutExpired:
-            # if timeout, just kill 
-            os.killpg(proc.pid, signal.SIGKILL)
-            logger.debug("Executor: force to kill the process")
+        if proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+                # wait for termination
+                exit_code = proc.wait(timeout=0.1)
+                # logger.debug(f"Executor: exit with {exit_code}")
+            except subprocess.TimeoutExpired:
+                # if timeout, just kill 
+                os.killpg(proc.pid, signal.SIGKILL)
+                logger.debug("Executor: force to kill the process")
 
         # self.post_exe()
         logger.debug("Executor: query done")
