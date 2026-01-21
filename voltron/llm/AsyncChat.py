@@ -1,5 +1,5 @@
 from pathlib import Path
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI, OpenAIError
 import time, re
 from re import Match
 from string import Template
@@ -37,20 +37,24 @@ class AsyncChater:
         Returns:
             response of llm
         """
-        start = time.perf_counter()
-        completion = await self.clt.chat.completions.create(
-            model=configs.model,
-            messages=[
-                {"role": "system", "content": "You are a protocol analyzer."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        if completion == None:
-            logger.debug("Chat Error")
-        end = time.perf_counter()
-        
-        response = completion.choices[0].message.content
-        logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
+        response = ''
+        try:
+            start = time.perf_counter()
+            completion = await self.clt.chat.completions.create(
+                model=configs.model,
+                messages=[
+                    {"role": "system", "content": "You are a protocol analyzer."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            if completion == None:
+                logger.debug("Chat Error")
+            end = time.perf_counter()
+            
+            response = completion.choices[0].message.content
+            logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
+        except OpenAIError as e:
+            logger.debug(f'Chat: API problem {e}')
         return response
 
     def llm_query_rfc(
