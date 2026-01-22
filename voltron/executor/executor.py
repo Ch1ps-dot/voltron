@@ -32,7 +32,7 @@ class Executor:
         self.setup_time_s = setup_time_s
         self.recv_time_ms = -1
         self.send_time_ms = send_time_ms
-        self.max_timeout_ms = 5000
+        self.max_timeout_ms = 500
         self.probe_times = 5 # for estimating suitable response time
         self.probe_recv_time_s = []
        
@@ -192,9 +192,10 @@ class Executor:
                 
                 else:
                     if(resp_code == None):
-                            logger.debug('Executor: Parser error')
-                            continue
+                        logger.debug('Executor: Parser error')
+                        continue
                     with self.analyzer.lock:
+                        self.analyzer.res_num += 1
                         self.analyzer.res_types_update(resp_code)
                         self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
                     last_recv = resp_code
@@ -418,8 +419,7 @@ class Executor:
                         resp_code: str = self.parser_func(buf)
                         
                         # update some analysis data
-                        with self.analyzer.lock:
-                            self.analyzer.res_num += 1
+                        
                             # self.analyzer.last_parser = self.mapper.cur_parser
                             # if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
                             #     self.analyzer.last_generator.cur_res.append(resp_code)
