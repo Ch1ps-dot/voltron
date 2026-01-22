@@ -326,7 +326,20 @@ class Executor:
             
             # TODO: support udp
             elif (self.trans_layer == 'udp'):
-                sock.sendto(msg, (self.host, self.port))
+                events = poller.poll(self.send_time_ms)
+                if not events:
+                    logger.debug("net_send: poll timeout")
+                    return False, None
+
+                fd, event = events[0]
+                if event & select.POLLOUT:
+                    try:
+                        sock.sendto(msg, (self.host, self.port))
+                    except Exception as err:
+                        # socket break when sending
+                        logger.debug(f'net_send: socket broken {msg}')
+                        return False, None
+                    return True, msg
         finally:
             poller.unregister(sock)
 
@@ -415,6 +428,8 @@ class Executor:
                 
             elif (self.trans_layer == 'udp'):
                 buf, _ = sock.recvfrom(1024)
+                if len(buf) == 0:
+                    return 'RCLOSED', None
                 resp_code = self.parser_func(buf)
                 return resp_code, buf
             

@@ -103,7 +103,7 @@ class AsyncRFCParser:
         2. message ir generation for request and response.
         3. state ir generation for state model
         """
-        with tqdm(desc='state code', total=1) as pbar:
+        with tqdm(desc='key field extraction', total=1) as pbar:
             asyncio.run(self.key_field_extract())
             pbar.update(1)
         self.message_model_generation()
@@ -230,20 +230,20 @@ class AsyncRFCParser:
                         rfc_doc = ''.join([s for s in self.req_doc])
                     )
                     
-                    req_json = await self.chater.llm_try_again(
-                        last_question=pmp,
-                        last_answer=req_json,
-                        current_question=pmp
-                    )
+                    # req_json = await self.chater.llm_try_again(
+                    #     last_question=pmp,
+                    #     last_answer=req_json,
+                    #     current_question=pmp
+                    # )
                     
-                    if req_json == None:
-                        continue
+                    # if req_json == None:
+                    #     continue
                     
-                    req_json = await self.chater.llm_try_again(
-                        last_question=pmp,
-                        last_answer=req_json,
-                        current_question=pmp
-                    )
+                    # req_json = await self.chater.llm_try_again(
+                    #     last_question=pmp,
+                    #     last_answer=req_json,
+                    #     current_question=pmp
+                    # )
 
                     if (req_json != None):
                         req_json = json.loads(req_json)
@@ -273,20 +273,20 @@ class AsyncRFCParser:
                         rfc_doc = ''.join([s for s in self.res_doc])
                     )
                     
-                    res_json = await self.chater.llm_try_again(
-                        last_question=pmp,
-                        last_answer=res_json,
-                        current_question=pmp
-                    )
+                    # res_json = await self.chater.llm_try_again(
+                    #     last_question=pmp,
+                    #     last_answer=res_json,
+                    #     current_question=pmp
+                    # )
                     
-                    if res_json == None:
-                        continue
+                    # if res_json == None:
+                    #     continue
                     
-                    res_json = await self.chater.llm_try_again(
-                        last_question=pmp,
-                        last_answer=res_json,
-                        current_question=pmp
-                    )
+                    # res_json = await self.chater.llm_try_again(
+                    #     last_question=pmp,
+                    #     last_answer=res_json,
+                    #     current_question=pmp
+                    # )
 
                     if (res_json != None):
                         res_json = json.loads(res_json)
