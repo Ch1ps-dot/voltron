@@ -427,11 +427,17 @@ class Executor:
                         return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):
-                buf, _ = sock.recvfrom(1024)
-                if len(buf) == 0:
-                    return 'RCLOSED', None
-                resp_code = self.parser_func(buf)
-                return resp_code, buf
+                events = poller.poll(self.max_timeout_ms)
+                fd, event = events[0]
+                
+                if event & select.POLLIN:
+                    buf, _ = sock.recvfrom(1024)
+                    if len(buf) == 0:
+                        return 'RCLOSED', None
+                    resp_code = self.parser_func(buf)
+                    return resp_code, buf
+                else:
+                    logger.debug('Executor: no data')
             
         finally:
             poller.unregister(sock)
