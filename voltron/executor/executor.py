@@ -93,8 +93,8 @@ class Executor:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
         if proc.poll() is not None: 
-            out, err = proc.communicate()
-            logger.debug(f'Executor: SUT Setup Failure: {err} {out}')
+            # out, err = proc.communicate()
+            # logger.debug(f'Executor: SUT Setup Failure: {err} {out}')
             return False, None
         
         # avoid unexceptional crash of target
