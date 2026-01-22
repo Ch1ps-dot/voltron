@@ -237,6 +237,7 @@ class AsyncRFCParser:
                     )
                     
                     if req_json == None:
+                        logger.debug('empty json')
                         continue
                     
                     req_json = await self.chater.llm_try_again(
@@ -280,6 +281,7 @@ class AsyncRFCParser:
                     )
                     
                     if res_json == None:
+                        logger.debug('empty json')
                         continue
                     
                     res_json = await self.chater.llm_try_again(
@@ -470,6 +472,7 @@ class AsyncRFCParser:
         """
         for key in data:
             if key not in ['field', 'position', 'explanation', 'value']:
+                logger.debug('bad json')
                 return False
         return True
     
