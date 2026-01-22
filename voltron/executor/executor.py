@@ -98,27 +98,24 @@ class Executor:
             return False, None
         
         # avoid unexceptional crash of target
-        i = 0
-        while(i < 10):
+        for _ in range(100):
             if proc is not None and proc.poll() is not None:
                 logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
                 proc = self.pre_exe()
                 time.sleep(self.setup_time_s)
             else:
                 break
-            i += 1
+
         if proc is None:
             return False, None
         if proc.poll() is not None:
             return False, None
         
         # wait for server setup
-        i = 0
-        while(i < 100):
+        for _ in range(100):
             time.sleep(self.setup_time_s)
             sock = self.setup_socket()
             if sock == None:
-                i += 1
                 if proc.poll() is not None:
                     logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
                 logger.debug('Executor: Socket Setup Failure' )
@@ -225,21 +222,24 @@ class Executor:
         with self.analyzer.lock:
             self.analyzer.path_num = self.analyzer.path_num + 1
 
-        # close socket and SUT
-        exit_code = 3838
+        # close socket
         if sock.fileno() < 0:
             sock.close()
-            
-        if proc.poll() is None:
+        
+        # close process
+        if proc.poll is None:
+            os.killpg(proc.pid, signal.SIGTERM)
+        
+        # ensure sub-subprocess die
+        for _ in range(50):
             try:
-                os.killpg(proc.pid, signal.SIGTERM)
-                # wait for termination
-                exit_code = proc.wait(timeout=0.1)
-                # logger.debug(f"Executor: exit with {exit_code}")
-            except subprocess.TimeoutExpired:
-                # if timeout, just kill 
-                os.killpg(proc.pid, signal.SIGKILL)
-                logger.debug("Executor: force to kill the process")
+                os.killpg(proc.pid, 0)
+                time.sleep(0.1)
+                logger.debug(f"Executor: process alive")
+            except Exception as e:
+                # sub-subprocess die out
+                break
+                
 
         # self.post_exe()
         logger.debug("Executor: query done")
