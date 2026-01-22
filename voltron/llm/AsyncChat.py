@@ -103,6 +103,7 @@ class AsyncChater:
     ):
         tmp = self.pmp._tem_ir_repair
         pmp = tmp.substitute(ir=ir, error=error)
+        logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "ir_repair"

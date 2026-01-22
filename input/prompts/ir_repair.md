@@ -5,7 +5,9 @@ Validate and repair a protoIR XML message description for a specified network pr
 
 ## Input You Will Receive
 1. Source protoIR XML: [The original protoIR XML with syntactic/format errors but valid semantic content]
+```
 ${ir}
+```
 2. Error Analysis: [List of syntactic/format errors in the source XML (e.g., "Missing 'length' attribute for field 'call_id'"; "Invalid unit 'bytes' used instead of 'B' for field 'version'"; "Field 'cseq' marked as 'const' (typo) instead of 'constant'")]
 ${error}
 
