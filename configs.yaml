@@ -23,7 +23,7 @@ kamailio:
   protocol: sip
   host: 127.0.0.1
   port: 5060
-  rfc_name: rfc3966
+  rfc_name: rfc3261
   trans_layer: tcp 
 
 llm:

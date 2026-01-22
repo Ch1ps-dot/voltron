@@ -1,4 +1,4 @@
-import pickle, json, re, asyncio
+import pickle, json, re, asyncio, sys
 from pathlib import Path
 from typing import Tuple
 from lxml import etree # type: ignore
@@ -168,7 +168,11 @@ class AsyncRFCParser:
                 case "none":
                     pass
                 case _:
-                    logger.debug("[Section type]: unexpected type {_}")
+                    logger.debug(f"[Section type]: unexpected type")
+        if len(self.req_doc) == 0 or len(self.res_doc) == 0:
+            logger.debug('RFCParser: bad documents, lack of request and response information')
+            sys.exit(1)
+            
         logger.debug('[RFCParser]: query prepare')
 
     async def _spe_parse_aync(
