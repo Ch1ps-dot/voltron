@@ -20,10 +20,10 @@ pureftpd:
   trans_layer: tcp
 
 kamailio:
-  protocol: ftp
+  protocol: sip
   host: 127.0.0.1
-  port: 2121
-  rfc_name: rfc959
+  port: 5060
+  rfc_name: rfc3966
   trans_layer: tcp 
 
 llm:
