@@ -3,6 +3,7 @@ from openai import AsyncOpenAI, OpenAIError
 import time, re
 from re import Match
 from string import Template
+import asyncio
 
 from voltron.llm.prompt import Prompter
 from voltron.utils.logger import logger
@@ -58,6 +59,7 @@ class AsyncChater:
                 logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
                 break
             except OpenAIError as e:
+                await asyncio.sleep(1)
                 logger.debug(f'Chat: API problem {e}')
         return response
 
