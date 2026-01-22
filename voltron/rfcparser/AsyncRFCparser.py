@@ -103,8 +103,9 @@ class AsyncRFCParser:
         2. message ir generation for request and response.
         3. state ir generation for state model
         """
-        
-        asyncio.run(self.key_field_extract())
+        with tqdm(desc='state code', total=1) as pbar:
+            asyncio.run(self.key_field_extract())
+            pbar.update(1)
         self.message_model_generation()
         self.state_model_generation()
 
@@ -282,16 +283,16 @@ class AsyncRFCParser:
                         )
             while(True):
                 if msg_ir == None:
+                    logger.debug('RFCParser: empty IR')
                     raise Exception
                 try:
                     ir_xml = etree.fromstring(msg_ir)
                     return ir_xml
-                except Exception as e:
+                except etree.XMLSyntaxError as e:
                     logger.debug(f'RFCParser: [bad xml format] {msg_type} err: {e}')
                     fix_ir = await self.chater.llm_ir_repair(
-                                pro_name=self.pro_name,
-                                message_name=msg_type,
-                                ir=msg_ir
+                                ir=msg_ir,
+                                error=e.msg
                             )
                     if (fix_ir != None):
                         msg_ir = fix_ir

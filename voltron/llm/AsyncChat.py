@@ -41,7 +41,7 @@ class AsyncChater:
         response = ''
         
         # try many time to avoid api error
-        for _ in range(10):
+        for _ in range(50):
             try:
                 start = time.perf_counter()
                 completion = await self.clt.chat.completions.create(
@@ -98,12 +98,11 @@ class AsyncChater:
     
     async def llm_ir_repair(
             self,
-            pro_name: str,
-            message_name: str,
-            ir: str
+            ir: str,
+            error: str
     ):
         tmp = self.pmp._tem_ir_repair
-        pmp = tmp.substitute(pro_name=pro_name, message_name=message_name, ir=ir)
+        pmp = tmp.substitute(ir=ir, error=error)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "ir_repair"
