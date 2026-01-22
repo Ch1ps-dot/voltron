@@ -247,7 +247,7 @@ class AsyncRFCParser:
 
                     if (req_json != None):
                         req_json = json.loads(req_json)
-                        if self._field_check(req_json[0]): 
+                        if self._field_check(req_json): 
                             continue
                         with open(req_path, 'w', encoding="utf-8") as f:
                             json.dump(req_json, f)
@@ -290,7 +290,7 @@ class AsyncRFCParser:
 
                     if (res_json != None):
                         res_json = json.loads(res_json)
-                        if self._field_check(res_json[0]): 
+                        if self._field_check(res_json): 
                             continue
                         with open(res_path, 'w', encoding="utf-8") as f:
                             json.dump(res_json, f)
