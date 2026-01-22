@@ -38,23 +38,27 @@ class AsyncChater:
             response of llm
         """
         response = ''
-        try:
-            start = time.perf_counter()
-            completion = await self.clt.chat.completions.create(
-                model=configs.model,
-                messages=[
-                    {"role": "system", "content": "You are a protocol analyzer."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            if completion == None:
-                logger.debug("Chat Error")
-            end = time.perf_counter()
-            
-            response = completion.choices[0].message.content
-            logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
-        except OpenAIError as e:
-            logger.debug(f'Chat: API problem {e}')
+        
+        # try many time to avoid api error
+        for _ in range(10):
+            try:
+                start = time.perf_counter()
+                completion = await self.clt.chat.completions.create(
+                    model=configs.model,
+                    messages=[
+                        {"role": "system", "content": "You are a protocol analyzer."},
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                if completion == None:
+                    logger.debug("Chat Error")
+                end = time.perf_counter()
+                
+                response = completion.choices[0].message.content
+                logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
+                break
+            except OpenAIError as e:
+                logger.debug(f'Chat: API problem {e}')
         return response
 
     def llm_query_rfc(
