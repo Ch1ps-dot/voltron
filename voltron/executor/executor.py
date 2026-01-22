@@ -231,15 +231,15 @@ class Executor:
             os.killpg(proc.pid, signal.SIGTERM)
         
         # ensure sub-subprocess die
-        for _ in range(50):
-            try:
-                os.killpg(proc.pid, 0)
-                time.sleep(0.1)
-                os.killpg(proc.pid, signal.SIGKILL)
-                logger.debug(f"Executor: process alive")
-            except Exception as e:
-                # sub-subprocess die out
-                break
+        
+        try:
+            os.killpg(proc.pid, 0)
+            time.sleep(0.1)
+            os.killpg(proc.pid, signal.SIGKILL)
+            logger.debug(f"Executor: process alive")
+        except Exception as e:
+            # sub-subprocess die out
+            logger.debug(f'Executor: {e}')
                 
 
         # self.post_exe()
