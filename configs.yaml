@@ -19,8 +19,15 @@ pureftpd:
   rfc_name: rfc959
   trans_layer: tcp
 
+kamailio:
+  protocol: ftp
+  host: 127.0.0.1
+  port: 2121
+  rfc_name: rfc959
+  trans_layer: tcp 
+
 llm:
   base_url: https://xiaoai.plus/v1
   api_key: sk-3aNTqYiVNoiOsKXJMUsfmpTEEIdVbS4YXrHhheHRYTsNbMD9
-  model: gpt-5-mini-2025-08-07
+  model: gpt-4-turbo
   async_sem: 8
