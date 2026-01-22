@@ -60,7 +60,7 @@ class AsyncChater:
                 logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
                 break
             except OpenAIError as e:
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)
                 logger.debug(f'Chat: API problem {e}')
         return response
 
