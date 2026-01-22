@@ -32,7 +32,7 @@ class Executor:
         self.setup_time_s = setup_time_s
         self.recv_time_ms = -1
         self.send_time_ms = send_time_ms
-        self.max_timeout_ms = 500
+        self.max_timeout_ms = 3000
         self.probe_times = 5 # for estimating suitable response time
         self.probe_recv_time_s = []
        
@@ -54,8 +54,8 @@ class Executor:
             try:
                 proc = subprocess.Popen(
                     [self.post_script],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 return proc
             except Exception as e:
