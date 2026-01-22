@@ -70,7 +70,7 @@ def format_duration(
 def make_runtime_table():
     ana = analyzer
     elapsed = int(time.time() - ana.start_time)
-    table = Table(title="Runtime Metric", show_header=False, box=None, expand=True)
+    table = Table(title="Runtime Metric", show_header=False, box=None, expand=True, show_lines=True)
     table.add_column(justify='left')
     table.add_column(justify='right')
     data = {
@@ -106,7 +106,7 @@ def make_info_table():
         'strategy': ana.strategy,
         'stage': ana.stage
     }
-    table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True)
+    table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True, show_lines=True)
     table.add_column(justify='left')
     table.add_column(justify='right')
 
@@ -126,7 +126,7 @@ def make_progress_panel():
             'sent': analyzer.sent,
             'recv': analyzer.recv,
         }
-        table = Table(title="Progress", show_header=False, box=None, expand= True)
+        table = Table(title="Progress", show_header=False, box=None, expand= True, show_lines=True)
         table.add_column(justify='left')
         table.add_column(justify='right')
         
@@ -147,7 +147,7 @@ def make_progress_panel():
         data = {
             key: v
         }
-        table = Table(title="Progress", show_header=False, box=None, expand=True)
+        table = Table(title="Progress", show_header=False, box=None, expand=True, show_lines=True)
         table.add_column(justify='left')
         table.add_column(justify='right')
         
