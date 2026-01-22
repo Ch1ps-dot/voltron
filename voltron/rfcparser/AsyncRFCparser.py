@@ -279,6 +279,7 @@ class AsyncRFCParser:
                         last_answer=res_json,
                         current_question=pmp
                     )
+                    logger.debug('loop')
                     
                     if res_json == None:
                         logger.debug('empty json')

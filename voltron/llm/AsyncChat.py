@@ -95,7 +95,6 @@ class AsyncChater:
             prompt=pmp,
             usage="try again"
         )
-        logger.debug('try')
         return ans
     
     async def llm_ir_generation(
