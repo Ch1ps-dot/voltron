@@ -123,8 +123,8 @@ class AsyncRFCParser:
         res_json = await res_task
         req_json = await req_task
 
-        self.req_types = req_json[0]['value']
-        self.res_types = res_json[0]['value']
+        self.req_types = req_json['value']
+        self.res_types = res_json['value']
 
         logger.debug('RFCParser: finish key field extraction')
     
@@ -215,7 +215,7 @@ class AsyncRFCParser:
     async def _req_field(
             self,
             req_path: Path
-    ) -> list:
+    ) -> dict:
         # request field extraction
         if(req_path.is_file()):
             with open(req_path, 'r', encoding='utf-8') as f:
@@ -259,7 +259,7 @@ class AsyncRFCParser:
     async def _res_field(
             self,
             res_path: Path
-    ) -> list:
+    ) -> dict:
         # response field extraction
         if(res_path.is_file()):
             with open(res_path, 'r', encoding='utf-8') as f:
@@ -279,7 +279,6 @@ class AsyncRFCParser:
                         last_answer=res_json,
                         current_question=pmp
                     )
-                    logger.debug('loop')
                     
                     if res_json == None:
                         logger.debug('empty json')
