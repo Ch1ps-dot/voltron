@@ -78,7 +78,7 @@ def make_runtime_table():
         'synthesis iter': ana.iter,
         'request num': ana.req_num,
         'response num': ana.res_num,
-        'query num': ana.path_num,
+        'query num': f'{ana.path_num}({ana.path_num / (time.time() - analyzer.start_time)})',
         'response types': ana.res_types_num(),
         'response transitions': ana.resp_trans_num(),
         'CRASH num': ana.crash_num,
