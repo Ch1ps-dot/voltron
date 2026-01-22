@@ -31,7 +31,7 @@ Using the protoIR description:
 1. Generate a **Python function** that constructs **semantically valid but state-exploratory instances** of the $msg_type message.
 2. The generated message must:
    - Strictly respect the field order, data types, length constraints, and semantics defined in the IR.
-   - Cover both normal-case and edge-case values (within legal constraints) to trigger different program states of the SUT (e.g., minimum/maximum allowed lengths, boundary numeric values, valid but uncommon character sets).
+   - Cover both normal-case to trigger common program states of the SUT.
    - Maintain protocol semantic correctness (e.g., length fields must accurately reflect payload size, mandatory fields are never empty, enum values match protocol definitions).
 3. The function must synthesize **concrete field values** for all variable fields that balance validity and state exploration.
 
@@ -53,19 +53,17 @@ For each `<field>` in `$msg_ir`:
 
 3. **Variable Fields (Enhanced for State Exploration)**
    * If field has semantic meaning (e.g., "session ID", "command code", 'user name', 'password'):
-     * Use values provided in information if provied.
-     * Use values that map to different SUT states (e.g., valid but unused session IDs, all supported command codes).
+     * Use values in server information if it provided.
 
-   * If field has no semantic meaning, generate a **random but valid value** that prioritizes edge cases (within legal constraints) to explore SUT states:
-     * Numeric ranges → randomly select from: minimum value, maximum value, mid-range value, common edge values (e.g., 0, 1, 255, 65535).
-     * Character sets → include both common (alphanumeric) and valid but less common (special chars like `!@#` within allowed set) values.
-     * Fixed length → generate exactly that many bytes (include edge-case character combinations).
-     * `undefined` length → choose from: minimum reasonable length, maximum typical length (per protocol conventions), common intermediate length (to explore buffer handling).
+   * If field has no semantic meaning, generate a **random but valid value** explore normal SUT states:
+     * Numeric ranges → randomly select from: minimum value, maximum value, mid-range value.
+     * Character sets → include both common (alphanumeric) and valid.
+     * Fixed length → generate exactly that many bytes.
+     * `undefined` length → choose a common intermediate length.
    
 4. **Length Dependencies**
    * If a field’s semantic comment indicates that its value depends on another field (e.g., payload length):
      * Compute the dependent value **accurately** before serialization (critical for protocol validity).
-     * For state exploration: pair length fields with payloads of edge-case lengths (min/max allowed) to test SUT length validation logic.
 
 5. **Encoding Rules**
    * All fields must be concatenated into a single **bytes** object.
@@ -80,7 +78,7 @@ For each `<field>` in `$msg_ir`:
 * No third-party packages
 * No input parameters
 * Output must be a **bytes object**
-* The function must include logic to generate diverse valid values (not just single fixed valid value) to explore SUT states.
+* The function must include logic to generate just single fixed valid value.
 
 ---
 
@@ -109,6 +107,6 @@ def generate_${msg_type}():
 * The function must be directly executable
 * The function takes no arguments
 * Use generate_${msg_type} as function name
-* Ensure the code generates diverse valid values (not static) to explore different SUT states
+* Ensure the code generates static valid values
 
 ---

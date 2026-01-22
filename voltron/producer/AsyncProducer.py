@@ -188,7 +188,7 @@ class AsyncProducer:
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
-                        trace= ' '.join(trace_list),
+                        trace= '\n'.join(trace_list),
                         info=doc_info
                     )
                     

@@ -17,8 +17,8 @@ You will be given:
 * **Observed trace of request and server response**
    $trace
    - Each trace element reflects a semantic transition, e.g.
-      (USER / 331) → (PASS / 530)
-      meaning a USER request triggered a 331 response, followed by a PASS request that triggered a 530 response.
+      (AAA / 888) → (BBB / 666)
+      meaning a AAA request triggered a 888 response, followed by a PASS request that triggered a 666 response.
 ---
 
 ### **Your Task**
