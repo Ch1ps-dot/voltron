@@ -3,7 +3,29 @@ name = "voltron"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
+    "aalpy>=1.5.3",
+    "click>=8.3.1",
+    "fastbm25>=0.0.2",
+    "graphviz>=0.21",
+    "lxml>=6.0.2",
+    "numpy>=2.4.0",
     "openai>=2.7.1",
+    "pytest>=9.0.2",
+    "pyyaml>=6.0.3",
+    "rich>=14.2.0",
+    "six>=1.17.0",
 ]
+
+[[tool.uv.index]]
+name = "tencent"
+url = "https://mirrors.cloud.tencent.com/pypi/simple/"
+
+[[tool.uv.index]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+
+[[tool.uv.index]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"

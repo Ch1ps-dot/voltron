@@ -1,0 +1,592 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="USER">
+    <!-- FTP USER command: supplies the username (Telnet string) to identify the user to the server for access control/login. -->
+    
+    <field name="CommandCode" type="constant" length="4B" value="USER"/>
+    <!-- The 4-octet ASCII command verb "USER" as defined by FTP grammar. Indicates this is a username submission. -->
+    
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP, 0x20) separating the command code from its argument as required by the FTP syntax "USER <SP> <username> <CRLF>". -->
+    
+    <field name="Username" type="variable" length="undefined" value="Telnet string (printable ASCII, excluding CR and LF)"/>
+    <!-- Argument field containing the user's identifier required by the server's access-control. 
+         Defined as a Telnet string: printable ASCII characters (spaces allowed) but must not include CR (0x0D) or LF (0x0A).
+         RFC 959 does not impose a fixed maximum length; length is therefore 'undefined'. 
+         Note: servers may interpret this string per local policy (case-sensitivity, account mapping, etc.). -->
+    
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command line (Carriage Return + Line Feed) as required by the FTP command syntax. -->
+</message>
+  <message name="PASS">
+    <!-- Command to transmit the user's password to the FTP server (PASS &lt;SP&gt; &lt;password&gt; &lt;CRLF&gt;) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="PASS"/>
+    <!-- The ASCII command verb identifying the PASS command (fixed, case-insensitive by convention). -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP, 0x20) separating the command verb and the password argument. -->
+
+    <field name="Password" type="variable" length="undefined" value="Printable NVT-ASCII characters excluding CR (0x0D) and LF (0x0A); may be empty"/>
+    <!-- User's password string. Contains characters from the FTP NVT-ASCII set (printable characters). The field ends where the EndOfLine field begins (i.e., password length is the number of octets between the SP and the terminating CRLF). The exact allowed characters and maximum length are implementation-dependent; servers may permit an empty (zero-length) password. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Telnet NVT end-of-line sequence (CR LF) terminating the command line. -->
+</message>
+  <message name="ACCT">
+    <!-- FTP ACCT command: provides account-information to the server (syntax: "ACCT <SP> <account-information> <CRLF>") -->
+
+    <field name="CommandCode" type="constant" length="4B" value="ACCT"/>
+    <!-- The 4-octet ASCII command verb identifying the ACCT command -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (SP, 0x20) separating the command verb from the account-information argument -->
+
+    <field name="AccountInformation" type="variable" length="undefined" value="Printable US-ASCII excluding CR (0x0D) and LF (0x0A); typical range 0x20-0x7E"/>
+    <!--
+        Account identifier string supplied by the user.
+        - Variable-length, terminated by the CRLF field.
+        - Character set: printable US-ASCII (0x20-0x7E); CR and LF are not allowed within the field.
+        - Presence/semantics: required when server requests account info (e.g., after PASS); may be interpreted by server as an account name or supplemental authentication token.
+    -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence (Carriage Return 0x0D followed by Line Feed 0x0A) marking the end of the command line -->
+</message>
+  <message name="CWD">
+    <!-- FTP CWD command: requests the server to change the current working directory to the given pathname -->
+
+    <field name="CommandCode" type="constant" length="3B" value="CWD"/>
+    <!-- Command code (ASCII letters). Indicates the "Change Working Directory" FTP command.
+         Per RFC 959 command tokens are ASCII and typically case-insensitive; implementation may accept lower/upper case. -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (SP) separating the command code from the pathname argument. ASCII 0x20. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="Printable ASCII and permitted path characters excluding CR and LF"/>
+    <!-- Pathname argument identifying the target directory.
+         Consumes all characters from after the separating SP up to (but not including) the terminating CRLF.
+         May include spaces and other printable characters; CR (0x0D) and LF (0x0A) are not allowed inside.
+         This field is required for CWD and its length depends on the command line (until CRLF). -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the FTP command line (Carriage Return 0x0D followed by Line Feed 0x0A). -->
+</message>
+  <message name="CDUP">
+    <!-- Change to Parent Directory (CDUP) command: requests the FTP server to change the current working directory to the parent directory of the current working directory. Sent by the client as a single-line command; server replies with the appropriate FTP reply code. -->
+
+    <field name="CommandCode" type="constant" length="4B" value="CDUP"/>
+    <!-- The literal command verb "CDUP" (4 ASCII characters). Semantically indicates the change-to-parent-directory operation. RFC 959 presents commands in uppercase, but implementations commonly accept commands case-insensitively. No argument or separating space is defined for this command. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Mandatory CRLF sequence terminating the command line (CR = 0x0D, LF = 0x0A) as required by the FTP command syntax. -->
+</message>
+  <message name="SMNT">
+    <!-- SMNT (Structure Mount) command: request to mount the specified pathname as a structure on the FTP server -->
+
+    <field name="CommandCode" type="constant" length="4B" value="SMNT"/>
+    <!-- Command mnemonic identifying the Structure Mount operation. Per RFC 959 commands are traditionally ASCII letters (usually sent uppercase); this field is exactly the 4-character command token. -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command token from the pathname argument as specified by the FTP command syntax. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Pathname argument identifying the structure to be mounted. Length is implementation-dependent and therefore unspecified here. Characters are from the FTP command-line (printable US-ASCII) excluding CR and LF; exact semantics and allowed characters are server-specific. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Command terminator: CR LF sequence marking the end of the command line per FTP protocol. -->
+</message>
+  <message name="QUIT">
+    <!-- FTP QUIT command: requests orderly shutdown of the user session; server responds (typically 221) and closes control connection -->
+
+    <field name="CommandCode" type="constant" length="4B" value="QUIT"/>
+    <!-- The ASCII command verb identifying the QUIT operation. Fixed 4 octet text "QUIT" as per RFC 959. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command (CR = 0x0D, LF = 0x0A). Indicates end of command line to the server. -->
+</message>
+  <message name="REIN">
+    <!-- REIN (Reinitialize): terminates a USER session's I/O and account information, resets all parameters to defaults while leaving the control connection open. This command carries no arguments and is sent as a single command line terminated by CRLF. -->
+
+    <field name="CommandCode" type="constant" length="4B" value="REIN"/>
+    <!-- The 4-byte ASCII command verb 'REIN'. Indicates the reinitialize command; must appear exactly as these four characters (uppercase as per FTP command conventions). No argument field follows this verb for REIN. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CR LF sequence terminating the command line (Carriage Return 0x0D, Line Feed 0x0A) as specified by RFC 959 for FTP command termination. -->
+</message>
+  <message name="PORT">
+    <!-- PORT command: specifies the user's host IP address and TCP port (host-port) for the data connection -->
+
+    <field name="CommandCode" type="constant" length="4B" value="PORT"/>
+    <!-- 4-character command token identifying the PORT command -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command code and the argument -->
+
+    <field name="h1" type="variable" length="undefined" value="ASCII decimal 0-255 (1-3 bytes)"/>
+    <!-- First octet (high-order 8 bits) of the 32-bit Internet host address, sent as ASCII decimal digits -->
+
+    <field name="Comma1" type="constant" length="1B" value="0x2C"/>
+    <!-- Comma separator (',') between address octets -->
+
+    <field name="h2" type="variable" length="undefined" value="ASCII decimal 0-255 (1-3 bytes)"/>
+    <!-- Second octet of the host IP address, ASCII decimal -->
+
+    <field name="Comma2" type="constant" length="1B" value="0x2C"/>
+    <!-- Comma separator -->
+
+    <field name="h3" type="variable" length="undefined" value="ASCII decimal 0-255 (1-3 bytes)"/>
+    <!-- Third octet of the host IP address, ASCII decimal -->
+
+    <field name="Comma3" type="constant" length="1B" value="0x2C"/>
+    <!-- Comma separator -->
+
+    <field name="h4" type="variable" length="undefined" value="ASCII decimal 0-255 (1-3 bytes)"/>
+    <!-- Fourth (low-order) octet of the host IP address, ASCII decimal -->
+
+    <field name="Comma4" type="constant" length="1B" value="0x2C"/>
+    <!-- Comma separator -->
+
+    <field name="p1" type="variable" length="undefined" value="ASCII decimal 0-255 (1-3 bytes)"/>
+    <!-- High-order byte of the 16-bit TCP port number, sent as ASCII decimal digits. Combined port = (p1 * 256) + p2 -->
+
+    <field name="Comma5" type="constant" length="1B" value="0x2C"/>
+    <!-- Comma separator -->
+
+    <field name="p2" type="variable" length="undefined" value="ASCII decimal 0-255 (1-3 bytes)"/>
+    <!-- Low-order byte of the 16-bit TCP port number, ASCII decimal digits. Combined port = (p1 * 256) + p2 -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Command terminator: CR (0x0D) followed by LF (0x0A) -->
+
+</message>
+  <message name="PASV">
+    <!-- Client command requesting the server enter passive (listen) mode.
+         Server responds with a 227 reply containing the listening host and port tuple (h1,h2,h3,h4,p1,p2). -->
+
+    <field name="CommandCode" type="constant" length="4B" value="PASV"/>
+    <!-- Command token that requests the server to enter passive mode (no arguments). ASCII letters, exactly "PASV". -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command line as specified by FTP. -->
+
+</message>
+  <message name="TYPE">
+    <!-- FTP TYPE command: selects the representation type and optional parameters (e.g., ASCII, EBCDIC, Image, Local byte size) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="TYPE"/>
+    <!-- Command code identifying the TYPE command -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating command code and first parameter -->
+
+    <field name="TypeCode" type="variable" length="1B" value="one of 'A','E','I','L'"/>
+    <!--
+        Representation type code:
+        'A' = ASCII (may take a format-control parameter such as 'N' for Non-print),
+        'E' = EBCDIC,
+        'I' = Image (binary),
+        'L' = Local byte (requires an obligatory ByteSize parameter).
+        Single-letter token encoded as ASCII.
+    -->
+
+    <field name="WhitespaceParam" type="constant" length="1B" value="0x20"/>
+    <!--
+        Space separating TypeCode and next parameter.
+        Present only if a parameter follows (e.g., "A N" or "L 36"). Conditional based on TypeCode.
+    -->
+
+    <field name="FormatControl" type="variable" length="1B" value="one of 'N','T','C' or other ASCII format-control letters"/>
+    <!--
+        Optional format/control parameter used primarily with ASCII (Type 'A') or EBCDIC (Type 'E'):
+        'N' = Non-print (standard default for ASCII in many implementations),
+        'T' = Telnet format-control,
+        'C' = Carriage-control.
+        Present only when applicable; single-letter ASCII token.
+    -->
+
+    <field name="WhitespaceBeforeByteSize" type="constant" length="1B" value="0x20"/>
+    <!--
+        Space separating a preceding parameter and the ByteSize numeric token.
+        Present only when a ByteSize parameter is supplied (i.e., when TypeCode == 'L').
+    -->
+
+    <field name="ByteSize" type="variable" length="undefined" value="decimal integer (positive), no default"/>
+    <!--
+        Obligatory second parameter when TypeCode == 'L' (Local byte):
+        specifies the logical byte size in decimal digits (e.g., "36" for 36-bit logical bytes).
+        There is no default; value must be a decimal integer. Logical byte size is distinct from transfer byte size (always 8 bits).
+    -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the command line as per FTP command syntax -->
+</message>
+  <message name="STRU">
+    <!-- Command to specify the file transfer structure (STRUCTURE) used for subsequent data transfers -->
+
+    <field name="CommandCode" type="constant" length="4B" value="STRU"/>
+    <!-- Command verb 'STRU' indicating a request to set the file structure for data transfer -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command verb and the structure-code (ASCII 0x20) -->
+
+    <field name="StructureCode" type="variable" length="1B" value="'F'|'R'|'P'"/>
+    <!-- One-byte ASCII structure code:
+         'F' = File (default structure per RFC959),
+         'R' = Record,
+         'P' = Page.
+         Must be an uppercase ASCII letter; server default is 'F' if not otherwise specified.
+         This field length is fixed at 1 byte. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Mandatory CRLF terminating the command (Carriage Return + Line Feed) -->
+</message>
+  <message name="MODE">
+    <!-- Selects the data transfer mode for subsequent data connections (e.g., Stream, Block, Compressed) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="MODE"/>
+    <!-- Command verb "MODE" identifying the FTP MODE command (ASCII letters). -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP, 0x20) separating the command verb and the argument. -->
+
+    <field name="ModeCode" type="variable" length="1B" value="one of 'S','B','C' (ASCII)"/>
+    <!--
+        Single ASCII letter indicating the transfer mode:
+        - 'S' = Stream mode (see RFC 959 §3.4.1)
+        - 'B' = Block mode (block-structured transfer)
+        - 'C' = Compressed mode (see RFC 959 §3.4.3)
+        The code is a single byte. RFC examples use uppercase letters; implementations should accept the specified letter (case-insensitive behavior may be encountered in practice).
+    -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command line (Carriage Return + Line Feed). -->
+</message>
+  <message name="RETR">
+    <!-- FTP RETR command: request the server to retrieve (send) the contents of the specified pathname over the data connection -->
+
+    <field name="CommandCode" type="constant" length="4B" value="RETR"/>
+    <!-- Four-letter command code identifying the retrieve command. FTP command codes are alphabetic and case-insensitive (e.g., "RETR", "retr", "ReTr" are equivalent). -->
+
+    <field name="Whitespace" type="variable" length="undefined" value="0x20 (one or more)"/>
+    <!-- Separator between command code and argument: one or more SP (ASCII 0x20). RFC allows one or more spaces; this field represents that required separator. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="Printable NVT-ASCII characters (0x20-0x7E) excluding CR (0x0D) and LF (0x0A)"/>
+    <!-- Pathname argument identifying the file to retrieve. Variable-length ASCII string in NVT-ASCII representation. May include spaces (bytes 0x20) after the separating SP(s); terminates at the CRLF sequence. If empty pathname is not valid for RETR, server will respond with appropriate error. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return (CR) and Line Feed (LF) sequence terminating the command. Server takes no action until this end-of-line is received. -->
+</message>
+  <message name="STOR">
+    <!-- FTP STOR command: request the server to accept data and store it as the given pathname on the server (STOR <SP> <pathname> <CRLF>) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="STOR"/>
+    <!-- Four ASCII characters identifying the command (STOR). This is the literal command token sent on the control connection. -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (SP, 0x20) separating the command token from the pathname argument as specified by the FTP grammar. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="printable ASCII (0x20-0x7E) excluding CR (0x0D) and LF (0x0A); may include spaces; encoding is control-connection language (default ASCII)"/>
+    <!-- Target pathname on the server where the uploaded data is to be stored. Length is until CRLF terminator. May contain printable characters (including spaces); exact interpretation (e.g., filesystem encoding) is server-dependent. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CR LF sequence terminating the command line as required by FTP (Carriage Return + Line Feed). -->
+</message>
+  <message name="STOU">
+    <!-- Store Unique: client requests the server store the incoming file using a server-unique filename (no pathname argument in RFC 959) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="STOU"/>
+    <!-- ASCII command verb identifying the Store Unique operation. Sent by the client as the complete command (no argument in the RFC). -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the FTP command. Indicates end of the STOU command line as specified by the protocol. -->
+</message>
+  <message name="APPE">
+    <!-- FTP APPE command: append data to the file identified by <pathname> on the server -->
+
+    <field name="CommandCode" type="constant" length="4B" value="APPE"/>
+    <!-- Four-character command verb identifying the append-file operation -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) character separating the command from its argument -->
+
+    <field name="Pathname" type="variable" length="undefined" value="US-ASCII excluding CR, LF"/>
+    <!--
+        Pathname of the file to which data is to be appended on the server.
+        Treated as an opaque pathname string in the server's filesystem syntax.
+        Length is undefined: it extends from after the separating SP up to but not including the terminating CRLF.
+        May include spaces and other printable US-ASCII characters except CR (0x0D) and LF (0x0A).
+    -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command line (Carriage Return + Line Feed) -->
+</message>
+  <message name="ALLO">
+    <!-- ALLO command: request server to allocate/reserve storage for an upcoming file transfer.
+         Syntax: "ALLO <SP> <decimal-integer> [<SP> R <SP> <decimal-integer>] <CRLF>" 
+         First integer = number of logical bytes to reserve.
+         Optional second integer = maximum record/page size (present for record/page structures). -->
+
+    <field name="CommandCode" type="constant" length="4B" value="ALLO"/>
+    <!-- Command code identifying the Allocate (ALLO) FTP command (ASCII letters, case-sensitive as protocol text). -->
+
+    <field name="Separator1_Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (0x20) separating command code and first argument (required). -->
+
+    <field name="AllocateSize" type="variable" length="undefined" value="ASCII digits '0'-'9' representing a non-negative decimal integer"/>
+    <!-- Decimal integer (ASCII digits) giving the number of logical bytes to reserve for the file.
+         No fixed field length in protocol; semantic range is non-negative integers (implementation-dependent maximum).
+         This value is in logical bytes as described by the FTP specification. -->
+
+    <field name="Optional_SP_before_R" type="constant" length="1B" value="0x20"/>
+    <!-- OPTIONAL: If present, a single SP (0x20) before the literal 'R' indicates a second argument follows.
+         This field appears only when the optional record/page-size argument is supplied. -->
+
+    <field name="Literal_R" type="constant" length="1B" value="R"/>
+    <!-- OPTIONAL: Literal ASCII 'R' character used as separator between the allocate size and the maximum record/page size.
+         Present only when specifying record/page maximum size as the second argument. -->
+
+    <field name="Optional_SP_after_R" type="constant" length="1B" value="0x20"/>
+    <!-- OPTIONAL: Single SP (0x20) separating the 'R' and the second decimal-integer argument.
+         Present only when the second argument is supplied. -->
+
+    <field name="MaxRecordOrPageSize" type="variable" length="undefined" value="ASCII digits '0'-'9' representing a non-negative decimal integer"/>
+    <!-- OPTIONAL: Decimal integer (ASCII digits) giving the maximum record or page size (in logical bytes).
+         This argument is meaningful when transferring files with record or page structure.
+         Servers that do not require this may accept a dummy value or ignore it. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Telnet end-of-line code (CRLF) terminating the command on the control connection. -->
+</message>
+  <message name="REST">
+    <!-- FTP REST command: specifies a restart marker (byte offset) for subsequent file transfer commands (e.g., RETR, STOR, APPE) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="REST"/>
+    <!-- ASCII command token "REST" identifying the restart command -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command token and the argument -->
+
+    <field name="Marker" type="variable" length="undefined" value="decimal-integer (ASCII digits '0'-'9'), &gt;= 0"/>
+    <!-- Restart marker: a decimal integer in ASCII representing the byte-offset in the file where transfer should resume.
+         Length is protocol-variable (undefined) and consists only of digits. Semantically used by the server to set restart point;
+         typical server reply on success is 350. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminator marking end of the command line -->
+</message>
+  <message name="RNFR">
+    <!-- RNFR command: specify the pathname of a file to be renamed (first step of RNFR/RNTO sequence) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="RNFR"/>
+    <!-- Command code identifying the rename-from operation (ASCII characters 'R','N','F','R', 4 bytes) -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (SP) separating the command code and the pathname (ASCII 0x20) -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR and LF (may include SP)">
+    </field>
+    <!--
+        Pathname argument identifying the file to be renamed.
+        - Variable length: terminates at the following CRLF.
+        - Legal character set: ASCII bytes except CR (0x0D) and LF (0x0A); spaces are allowed within the pathname.
+        - Semantics: server interprets pathname according to its file system rules; if empty or invalid, server returns error (e.g., 450/550).
+        - Dependency: actual byte length is determined by position of the EndOfLine field (Pathname length = total command length - fixed fields).
+    -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the FTP command (Carriage Return 0x0D followed by Line Feed 0x0A) -->
+</message>
+  <message name="RNTO">
+    <!-- RNTO command: specifies the new pathname for a rename operation.
+         Sent by the client as the second command in the RNFR -> RNTO rename sequence.
+         Must be terminated by CRLF. -->
+
+    <field name="CommandCode" type="constant" length="4B" value="RNTO"/>
+    <!-- Command code identifying the RNTO (rename to) FTP command (ASCII 'R','N','T','O'). -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) separating the command code and the pathname argument. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="Printable-ASCII 0x20-0x7E excluding CR(0x0D) and LF(0x0A)"/>
+    <!-- Target pathname for the rename operation.
+         Variable-length text (server-dependent maximum). Must not contain CR or LF.
+         Note: RNTO is meaningful only if a preceding successful RNFR has been issued. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the command (Telnet end-of-line). -->
+</message>
+  <message name="ABOR">
+    <!-- FTP ABOR command: client requests immediate termination/abortion of the previous FTP service command (commonly used to abort an active data transfer). Sent on the control connection as the 4-letter command followed by CRLF. Server returns primary/secondary replies (e.g., 225, 226) per RFC 959. -->
+
+    <field name="CommandCode" type="constant" length="4B" value="ABOR"/>
+    <!-- ASCII command token 'ABOR' identifying the abort request. Fixed 4 bytes. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed (CRLF) sequence terminating the command as required by the FTP protocol. -->
+</message>
+  <message name="DELE">
+    <!-- FTP DELE command: request the server to delete the file identified by the pathname -->
+
+    <field name="CommandCode" type="constant" length="4B" value="DELE"/>
+    <!-- 4-character ASCII command verb identifying the delete-file command -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command verb and the pathname argument -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Filesystem pathname identifying the file to be deleted on the server.
+         The pathname is a sequence of ASCII characters excluding CR (0x0D) and LF (0x0A).
+         Its interpretation (absolute vs. relative, allowed characters) is server-dependent. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CR LF sequence terminating the command line -->
+</message>
+  <message name="RMD">
+    <!-- Remove Directory command: requests the FTP server to remove the directory named by the pathname argument -->
+
+    <field name="CommandCode" type="constant" length="3B" value="RMD"/>
+    <!-- Command code identifying the Remove Directory command (ASCII letters 'R','M','D') -->
+
+    <field name="Separator" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (SP) character separating the command code and the pathname argument -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Pathname of the directory to be removed. Contains server-defined pathname characters; may include spaces.
+         Must not contain CR or LF. Length and exact character semantics are server-dependent. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Command terminator: Carriage Return and Line Feed (CRLF) as defined by the FTP command syntax -->
+</message>
+  <message name="MKD">
+    <!-- Make Directory command: instructs the FTP server to create a directory with the given pathname -->
+
+    <field name="CommandCode" type="constant" length="3B" value="MKD"/>
+    <!-- The three-letter FTP command token identifying the operation (conventional ASCII uppercase letters). -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) separating the command token and the pathname argument. Must be 0x20. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Directory pathname to be created on the server. Represented as an ASCII string excluding CR and LF; exact allowed characters and maximum length are implementation-dependent. The pathname terminates at the following CRLF. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command (Carriage Return 0x0D followed by Line Feed 0x0A). -->
+</message>
+  <message name="PWD">
+    <!-- PWD command: client request to the FTP server to return the current working directory (Print Working Directory) -->
+
+    <field name="CommandCode" type="constant" length="3B" value="PWD"/>
+    <!-- ASCII command token "PWD" identifying the Print Working Directory operation.
+         Per RFC 959 the PWD command carries no arguments and must be sent exactly as the three-letter token. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command line (Carriage Return 0x0D followed by Line Feed 0x0A).
+         Indicates end of the command; the server will respond (typically with a 257 reply). -->
+</message>
+  <message name="LIST">
+    <!-- FTP LIST command: request a directory listing or file information. Syntax: LIST [<SP> <pathname>] <CRLF>. Data for the listing is transferred over the data connection; the control connection carries this command as a Telnet string. -->
+
+    <field name="CommandCode" type="constant" length="4B" value="LIST"/>
+    <!-- Command code: ASCII characters "LIST" identifying the LIST command. -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Optional SPACE (0x20). Present only if a pathname argument follows. If no pathname is supplied this field is omitted and EndOfLine follows directly. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Optional pathname argument (directory or file). A null argument implies the user's current working/default directory. Content is a Telnet string in the negotiated Telnet language (typically NVT-ASCII). Must not contain CR (0x0D) or LF (0x0A). Length is variable and depends on presence and value of the argument. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Telnet end-of-line sequence CR LF terminating the command. Always present. -->
+</message>
+  <message name="NLST">
+    <!-- NLST command: request a directory listing of file names (name list) from the FTP server. Sent on control connection; may trigger data connection for returned listing. -->
+
+    <field name="CommandCode" type="constant" length="4B" value="NLST"/>
+    <!-- Command token identifying the NLST command (ASCII "N","L","S","T"). -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating command and argument. This field is OPTIONAL: present only if a <pathname> argument follows. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Optional pathname argument specifying directory or file pattern for which names are requested. May be omitted; permitted characters are US-ASCII characters except CR (0x0D) and LF (0x0A). Length is protocol-dependent (variable). If present, it follows the Whitespace field. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command on the control connection. -->
+</message>
+  <message name="SITE">
+    <!-- FTP SITE command: carries site-specific parameters or subcommands from client to server -->
+
+    <field name="CommandCode" type="constant" length="4B" value="SITE"/>
+    <!-- Command code indicating a SITE request (ASCII characters 'S' 'I' 'T' 'E') -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) separating the command code and the argument per FTP syntax -->
+
+    <field name="Arguments" type="variable" length="undefined" value="NVT-ASCII characters excluding CR (0x0D) and LF (0x0A)"/>
+    <!--
+        Site-specific parameter string. Syntax and semantics are server-dependent (see HELP SITE).
+        May contain spaces and other printable NVT-ASCII characters; terminated only by CRLF.
+        Length is not fixed and depends on the specific SITE subcommand; if length constraints exist,
+        they are defined by the server and should be noted in server-specific documentation.
+    -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Telnet end-of-line sequence (CR LF) terminating the FTP command -->
+</message>
+  <message name="SYST">
+    <!-- Request for the server's system type. The SYST command is an informational FTP command with no arguments; the server responds with a 215 reply containing system identification. -->
+
+    <field name="CommandCode" type="constant" length="4B" value="SYST"/>
+    <!-- The ASCII command token "SYST" (4 bytes) identifying the System command. Sent by the client; no arguments are defined for this command in RFC 959. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed (CRLF) terminating the command as specified by the FTP command grammar. -->
+</message>
+  <message name="STAT">
+    <!-- STAT command: request server status or status of a specific pathname (client -> server) -->
+
+    <field name="CommandCode" type="constant" length="4B" value="STAT"/>
+    <!-- Command code identifying the STAT command (ASCII uppercase 'S','T','A','T') -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Optional single SP (0x20) separating command and argument.
+         This field is present only if a pathname argument follows. -->
+
+    <field name="Pathname" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Optional pathname argument whose presence makes the Whitespace field mandatory.
+         Contains the filesystem path whose status is requested.
+         Length is protocol-dependent/implementation-dependent; CR (0x0D) and LF (0x0A) are not allowed. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Required CRLF sequence terminating the command on the control connection -->
+</message>
+  <message name="HELP">
+    <!-- The FTP HELP command: requests human-readable or command-specific help text from the server over the control (Telnet) connection. Syntax: "HELP [ SP <string> ] CRLF" (RFC 959). -->
+
+    <field name="CommandCode" type="constant" length="4B" value="HELP"/>
+    <!-- The 4-byte ASCII command code identifying the HELP command. Sent as uppercase alphabetic characters per FTP command syntax (Telnet string). -->
+
+    <field name="SpaceIfArgument" type="constant" length="1B" value="0x20"/>
+    <!-- Optional single space (SP, 0x20) that separates the command code from an argument.
+         This field is present only if an argument is supplied; otherwise the CommandCode is terminated directly by CRLF.
+         Note: modeled as a constant byte when present. -->
+
+    <field name="ArgumentString" type="variable" length="undefined" value="NVT-ASCII printable characters (0x20-0x7E), excluding CR and LF; may be empty/absent"/>
+    <!-- Optional argument identifying the subject of HELP (e.g., "SITE" or another command name) encoded in the Telnet language (NVT-ASCII).
+         If present, it follows a single SP and may contain printable characters; must not contain CR (0x0D) or LF (0x0A).
+         Length is implementation-dependent (undefined here); when absent, this field is omitted. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Telnet end-of-line sequence CRLF (Carriage Return 0x0D followed by Line Feed 0x0A) terminating the FTP command line. -->
+</message>
+  <message name="NOOP">
+    <!-- NOOP command: a no-operation FTP command that elicits an OK reply from the server without changing any server state -->
+
+    <field name="CommandCode" type="constant" length="4B" value="NOOP"/>
+    <!-- Four-character command code 'NOOP' (ASCII letters). Per RFC 959 command codes are alphabetic and here indicate the NOOP operation. No argument or trailing space is present for this command. -->
+
+    <field name="TelnetEndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Telnet end-of-line code (CRLF) terminating the FTP command on the control connection (NVT-ASCII representation). -->
+</message>
+</ir>

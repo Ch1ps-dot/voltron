@@ -1,0 +1,289 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="GET">
+    <!-- HTTP GET request message to retrieve a representation of the specified resource -->
+
+    <field name="Method" type="constant" length="3B" value="GET"/>
+    <!-- HTTP method indicating a GET request -->
+
+    <field name="Whitespace1" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the method and request-target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="[URI Path]"/>
+    <!-- Path of the resource to be fetched, defined by the request URI -->
+
+    <field name="Whitespace2" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating request-target and HTTP version -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- HTTP version used by the request follows the request-target -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed signaling the end of the request line -->
+
+    <field name="HostHeader" type="variable" length="undefined" value="[ 'Host:' SP hostname [ ':' port ] CRLF ]"/>
+    <!-- Host header indicating the host and optional port number, mandatory for HTTP/1.1 -->
+
+    <field name="UserAgentHeader" type="variable" length="undefined" value="[ 'User-Agent:' SP user-agent-string CRLF ]"/>
+    <!-- User-Agent header providing information about the client making the request -->
+
+    <field name="AcceptLanguageHeader" type="variable" length="undefined" value="[ 'Accept-Language:' SP language-tags CRLF ]"/>
+    <!-- Accept-Language header listing preferred languages for the response -->
+
+    <field name="OptionalHeaders" type="variable" length="undefined" value="[ HeaderName ':' field-value CRLF ]*"/>
+    <!-- Additional HTTP headers and their values, variable in number and content -->
+
+    <field name="FinalCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating the end of the header section -->
+</message>
+  <message name="POST">
+    <!-- HTTP POST request message used to send data to a server for processing -->
+
+    <field name="Method" type="constant" length="4B" value="POST"/>
+    <!-- HTTP method indicating that the action to be performed is to send data to the server -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the method and request-target -->
+
+    <field name="Request-Target" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- The target URL or URI where the POST request is directed -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the request-target and HTTP version -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- HTTP version indicating the protocol version in use -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating end of the request line -->
+
+    <field name="Header-Fields" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Various header fields providing metadata about the request or client capabilities -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating the end of the header section -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT"/>
+    <!-- Indicates the number of octets in the request body. The value is dependent on actual body content size -->
+
+    <field name="Body" type="variable" length="undefined" value="octets"/>
+    <!-- The body of the POST request carries the data to be processed by the server. Its format is determined by related headers -->
+</message>
+  <message name="PUT">
+    <!-- HTTP PUT request replaces all current representations of the target resource with the request content -->
+
+    <field name="Method" type="constant" length="3B" value="PUT"/>
+    <!-- HTTP method specifying this request is a PUT operation -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the method from the request target -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="URL encoded ASCII excluding space"/>
+    <!-- Specifies the target URI for the resource whose representations will be replaced -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the request target from the HTTP version -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Specifies the HTTP version used in the request -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating the end of the request line -->
+
+    <field name="Host" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Host header specifying the host and port information derived from the target URI -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating the end of the Host header -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT"/>
+    <!-- Indicates the number of bytes in the request body -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating the end of the Content-Length header -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="MIME type"/>
+    <!-- Specifies the media type of the request body data -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating the end of the Content-Type header -->
+
+    <field name="Body" type="variable" length="undefined" value="Depends on Content-Type"/>
+    <!-- Contains the data sent to replace the current representations of the target resource -->
+
+    <field name="EndOfMessage" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating the end of the entire message -->
+</message>
+  <message name="DELETE">
+    <!-- Purpose: Remove all current representations of the target resource specified in the request -->
+
+    <field name="Method" type="constant" length="6B" value="DELETE"/>
+    <!-- The HTTP method indicating a request to delete the specified resource -->
+
+    <field name="Whitespace1" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the HTTP method and the request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- The target resource's URI on which to perform the delete operation -->
+
+    <field name="Whitespace2" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the request target and protocol version -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- The version of the HTTP protocol being used for the request -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating the end of the request line -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Various HTTP header fields that can include Host, Content-Length, and other metadata -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating the end of the header section -->
+</message>
+  <message name="HEAD">
+    <!-- HTTP HEAD request to retrieve header information for a resource without the body content -->
+
+    <field name="Method" type="constant" length="4B" value="HEAD"/>
+    <!-- Request method to retrieve headers only. The HEAD method is similar to GET but does not return the response body. -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the method and the request target -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- The identifier for the resource which the request is aimed at, must exclude fragment identifiers -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the request URI and the HTTP version -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Indicates the version of the HTTP protocol used in the request. HTTP/1.1 is standard for HTTP requests. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating end of the request line -->
+
+    <field name="Host" type="variable" length="undefined" value="[a-zA-Z0-9.-]+(:[0-9]+)?"/>
+    <!-- Host header specifying the domain name and optional port number for the request -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating end of the Host header -->
+
+    <field name="User-Agent" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- User-Agent header identifying the client software initiating the request -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating end of the User-Agent header -->
+
+    <field name="Accept-Language" type="variable" length="undefined" value="(language-tag)*(;q=quality-value)?"/>
+    <!-- Accept-Language header indicating preferred languages for the response -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed indicating end of the Accept-Language header -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Final CRLF indicating the end of headers if no body is included -->
+</message>
+  <message name="OPTIONS">
+    <!-- OPTIONS request message for HTTP. It is used to request information about the communication options available on the target resource or server-wide options. -->
+
+    <field name="CommandCode" type="constant" length="7B" value="OPTIONS"/>
+    <!-- Command code indicating the OPTIONS method in HTTP -->
+
+    <field name="Whitespace1" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating command code and request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="ASCII excluding CR, LF"/>
+    <!-- Request target which can be a specific URI or a single asterisk ("*") representing server-wide options. The syntax for the request target can vary but must be valid according to HTTP URI standards. -->
+
+    <field name="Whitespace2" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating request target and HTTP version -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- HTTP version being used in the request, fixed for HTTP/1.1 compliance -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating end of the command line -->
+
+    <field name="Host" type="variable" length="undefined" value="uri-host [ ':' port ]"/>
+    <!-- Host header field identifying the host and port information from the target URI. Required in HTTP/1.1 requests. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="1*DIGIT"/>
+    <!-- Max-Forwards header providing the mechanism to limit the number of times the request is forwarded by proxies. Optional field. -->
+
+    <field name="User-Agent" type="variable" length="undefined" value="product *( RWS ( product / comment ) )"/>
+    <!-- User-Agent header providing information about the user agent originating the request. Helpful for server-side logging and analytics. Optional field. -->
+
+    <field name="Accept-Language" type="variable" length="undefined" value="#( language-range [ weight ] )"/>
+    <!-- Accept-Language header indicating the preferred natural languages for the response. Optional field. -->
+</message>
+  <message name="CONNECT">
+    <!-- CONNECT method establishes a tunnel to a specified server, often used for SSL tunneling through an HTTP proxy -->
+
+    <field name="Method" type="constant" length="7B" value="CONNECT"/>
+    <!-- HTTP method for requesting the establishment of a tunnel -->
+
+    <field name="Whitespace1" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the method from the request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="hostname:port (ASCII)"/>
+    <!-- Host name and port number of the tunnel destination, separated by a colon -->
+
+    <field name="Whitespace2" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the request target from the HTTP version -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- HTTP version indicating the protocol version, must be HTTP/1.1 in this context -->
+
+    <field name="EndOfLine1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating end of the request line -->
+
+    <field name="HostHeader" type="constant" length="undefined" value="Host: hostname[:port] (ASCII)"/>
+    <!-- Host header field indicating the host and optional port, crucial for routing -->
+
+    <field name="EndOfLine2" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating end of the host header line -->
+
+    <field name="ProxyAuthorizationHeader" type="variable" length="undefined" value="Proxy-Authorization: credentials (ASCII)"/>
+    <!-- Optional header for authorization information if tunneling through a proxy -->
+
+    <field name="EndOfLine3" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating end of the proxy authorization header line, if present -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Double CRLF indicating the end of the header section, following RFC 2616 -->
+</message>
+  <message name="TRACE">
+    <!-- TRACE is an HTTP method used for diagnostic purposes. It performs a message loop-back test along the path to the target resource, providing a useful debugging mechanism. -->
+
+    <field name="Method" type="constant" length="5B" value="TRACE"/>
+    <!-- HTTP method indicating a message loop-back test -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the method and request-target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="URI excluding fragment"/>
+    <!-- The target resource URI being traced -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating the request-target and protocol version -->
+
+    <field name="Protocol" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- HTTP protocol version specification -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating the end of the request line -->
+
+    <!-- Start of optional headers section -->
+    <field name="Max-Forwards" type="variable" length="undefined" value="DIGIT"/>
+    <!-- Limits the number of times the request can be forwarded by proxies -->
+
+    <field name="Via" type="variable" length="undefined" value="pseudonym [ ':' port ]"/>
+    <!-- Indicator of intermediate recipients between user agent and server -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="Field-Name: Field-Value..."/>
+    <!-- Additional headers providing context, optional. Comprises fields like Host, User-Agent, etc. -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed indicating the end of the header section -->
+</message>
+</ir>

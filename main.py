@@ -1,10 +1,44 @@
-from voltron import fuzz
-import sys
+#!/bin/python3
 
-def main():
-    ans = fuzz.fuzz_one()
-    print(f"answer: {ans}")
+from voltron.fuzz import Fuzzer
+import click
 
+def test_rand():
+    fuzzer = Fuzzer(
+        target_name='lightftp',
+        time_limit_min=10
+    )
+    fuzzer.fuzz(
+        algo='rand'
+    )
+    
+def test_lightftp():
+    fuzzer = Fuzzer(
+        target_name='lightftp',
+        time_limit_min=10
+    )
+    fuzzer.fuzz(
+        algo='state'
+    )
+    
+def test_pureftpd():
+    fuzzer = Fuzzer(
+        target_name='pureftpd',
+        time_limit_min=1440
+    )
+    fuzzer.fuzz(
+        algo='state'
+    )
 
-if __name__ == "__main__":
+@click.command(help='fuzzer')
+@click.option("-t", "--target", type=str, required=True, help="fuzzing target")
+def main(target):
+    if target == 'lightftp':
+        test_lightftp()
+    elif target == 'pureftpd':
+        test_pureftpd()
+    else:
+        print('Unkown Target')
+
+if __name__ == '__main__':
     main()
