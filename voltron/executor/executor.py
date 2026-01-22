@@ -428,6 +428,8 @@ class Executor:
                 
             elif (self.trans_layer == 'udp'):
                 events = poller.poll(self.max_timeout_ms)
+                if not events:
+                    return 'TIMEOUT', None
                 fd, event = events[0]
                 
                 if event & select.POLLIN:
