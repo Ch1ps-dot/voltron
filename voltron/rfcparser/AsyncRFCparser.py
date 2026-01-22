@@ -224,10 +224,25 @@ class AsyncRFCParser:
         else:
             while(True):
                 try:
-                    req_json = await self.chater.llm_request_query(
+                    pmp, req_json = await self.chater.llm_request_query(
                         rfc_num = self.rfc_name,
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.req_doc])
+                    )
+                    
+                    req_json = await self.chater.llm_try_again(
+                        last_question=pmp,
+                        last_answer=req_json,
+                        current_question=pmp
+                    )
+                    
+                    if req_json == None:
+                        continue
+                    
+                    req_json = await self.chater.llm_try_again(
+                        last_question=pmp,
+                        last_answer=req_json,
+                        current_question=pmp
                     )
 
                     if (req_json != None):
@@ -252,10 +267,25 @@ class AsyncRFCParser:
         else:
             while(True):
                 try:
-                    res_json = await self.chater.llm_response_query(
+                    pmp, res_json = await self.chater.llm_response_query(
                         rfc_num = self.rfc_name,
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.res_doc])
+                    )
+                    
+                    res_json = await self.chater.llm_try_again(
+                        last_question=pmp,
+                        last_answer=res_json,
+                        current_question=pmp
+                    )
+                    
+                    if res_json == None:
+                        continue
+                    
+                    res_json = await self.chater.llm_try_again(
+                        last_question=pmp,
+                        last_answer=res_json,
+                        current_question=pmp
                     )
 
                     if (res_json != None):
