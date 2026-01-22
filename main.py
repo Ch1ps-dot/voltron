@@ -29,6 +29,15 @@ def test_pureftpd():
     fuzzer.fuzz(
         algo='state'
     )
+    
+def test_kamailio():
+    fuzzer = Fuzzer(
+        target_name='kamailio',
+        time_limit_min=1440
+    )
+    fuzzer.fuzz(
+        algo='state'
+    )
 
 @click.command(help='fuzzer')
 @click.option("-t", "--target", type=str, required=True, help="fuzzing target")
@@ -37,6 +46,8 @@ def main(target):
         test_lightftp()
     elif target == 'pureftpd':
         test_pureftpd()
+    elif target == 'kamailio':
+        test_kamailio()
     else:
         print('Unkown Target')
 
