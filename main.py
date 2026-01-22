@@ -42,12 +42,15 @@ def test_kamailio():
 @click.command(help='fuzzer')
 @click.option("-t", "--target", type=str, required=True, help="fuzzing target")
 def main(target):
-    if target == 'lightftp':
-        test_lightftp()
-    elif target == 'pureftpd':
-        test_pureftpd()
-    elif target == 'kamailio':
-        test_kamailio()
+    supported_set = {'lightftp','pureftpd','kamailio'}
+    if target in supported_set:
+        fuzzer = Fuzzer(
+            target_name=target,
+            time_limit_min=1440
+        )
+        fuzzer.fuzz(
+            algo='state'
+        )
     else:
         print('Unkown Target')
 
