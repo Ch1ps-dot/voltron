@@ -108,7 +108,8 @@ class ObTable:
                                 # because of the random timeout of server
                                 # when output is inconsistent with prvious results, just try again
                                 if len(si) > 0:
-                                    if 'TIMEOUT' == out[-1] and len(out) <= len(si):
+                                    if 'TIMEOUT' == out[-1] and len(out) < len(si):
+                                        logger.debug('fill table: try again')
                                         continue
                                 
                                 with analyzer.lock:
