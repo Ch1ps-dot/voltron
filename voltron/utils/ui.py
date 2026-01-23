@@ -123,6 +123,7 @@ def make_info_table():
 def make_progress_panel():
     if analyzer.show_progress == 'Obtable':
         data = {
+            'desc': analyzer.progress_desc,
             'sent': analyzer.sent,
             'recv': analyzer.recv,
         }

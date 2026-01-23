@@ -101,7 +101,7 @@ class ObTable:
                         out = self.mq.query(si + e)
                         if (out):
                             with analyzer.lock:
-                                analyzer.sent = f'{'/'.join(si)}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet)})'
+                                analyzer.sent = f'{'/'.join(s)}:{'/'.join(a)}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet)})'
                                 analyzer.recv = f'{'/'.join(out)}'
                             self.T[si][e] = tuple(out[-len(e):])
         with analyzer.lock:
