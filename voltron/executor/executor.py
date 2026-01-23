@@ -166,7 +166,7 @@ class Executor:
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
-                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=500)
+                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=1000)
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
@@ -406,6 +406,7 @@ class Executor:
 
                 # handler recv timeout
                 if not events:
+                    logger.debug('recv: poll timeout')
                     return 'TIMEOUT', None
                 
                 fd, event = events[0]
@@ -438,6 +439,7 @@ class Executor:
             elif (self.trans_layer == 'udp'):
                 events = poller.poll(time_out_ms)
                 if not events:
+                    logger.debug('recv: poll timeout')
                     return 'TIMEOUT', None
                 fd, event = events[0]
                 
@@ -448,7 +450,7 @@ class Executor:
                     resp_code = self.parser_func(buf)
                     return resp_code, buf
                 else:
-                    logger.debug('Executor: no data')
+                    logger.debug('recv: no data')
             
         finally:
             poller.unregister(sock)
