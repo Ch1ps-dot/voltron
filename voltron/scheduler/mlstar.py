@@ -89,6 +89,9 @@ class ObTable:
                     if(self.T[s][(a,)] == ('CRASH',)):
                         self.T[si][e] = ('CRASH',)
                         continue
+                    if(self.T[s][(a,)] == ('TIMEOUT',)):
+                        self.T[si][e] = ('TIMEOUT',)
+                        continue
                     # if(self.T[s][(a,)] == ('TIMEOUT',)):
                     #     self.T[si][e] = ('TIMEOUT',)
                     #     continue
