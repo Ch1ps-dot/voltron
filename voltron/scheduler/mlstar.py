@@ -36,7 +36,7 @@ class ObTable:
         iter_s = 0
         logger.debug('Ob: fill table')
         with analyzer.lock:
-            analyzer.show_progress = 'Obtable'
+            analyzer.set_progress('Obtable', desc='fill s table', total=1)
 
         for s in self.S:
             
@@ -60,6 +60,8 @@ class ObTable:
                             analyzer.recv = f'{'/'.join(out)}'
                         self.T[s][e] = tuple(out[-len(e):])
 
+        with analyzer.lock:
+            analyzer.set_progress('Obtable', desc='fill si table', total=1)
         iter_si = 0    
         for s in self.S:
             for a in self.alphabet:
@@ -103,7 +105,7 @@ class ObTable:
                                 analyzer.recv = f'{'/'.join(out)}'
                             self.T[si][e] = tuple(out[-len(e):])
         with analyzer.lock:
-            analyzer.show_progress = ''
+            analyzer.clean_progress()
 
     def row(
         self, 

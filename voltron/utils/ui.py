@@ -141,6 +141,7 @@ def make_progress_panel():
         )
     
         return progress_panel
+    
     elif analyzer.show_progress == 'evolve':
         key = f'{analyzer.progress_desc}'
         v = f'{analyzer.finished}/{analyzer.total}'
@@ -162,6 +163,7 @@ def make_progress_panel():
         )
     
         return progress_panel
+    
     else:
         txt = Text('NO PROGRESS', justify='center')
         return Panel(

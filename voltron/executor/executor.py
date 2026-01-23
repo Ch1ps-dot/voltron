@@ -134,7 +134,7 @@ class Executor:
         cons: Conversation = Conversation()
         
         # maybe recv initialize message
-        resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=10)
+        resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
         last_recv = '-'
         if(resp_code and resp_data):
             cons.add_state('-', resp_code)
@@ -238,12 +238,24 @@ class Executor:
             os.killpg(clean.pid, signal.SIGTERM)
         
         # ensure sub-subprocess die
-        
         try:
             os.killpg(proc.pid, 0)
             time.sleep(0.1)
+            
+            # no die, just kill
             os.killpg(proc.pid, signal.SIGKILL)
-            logger.debug(f"Executor: process alive")
+            logger.debug(f"Executor: target process alive")
+        except Exception as e:
+            # sub-subprocess die out
+            logger.debug(f'Executor: {e}')
+            
+        try:
+            os.killpg(clean.pid, 0)
+            time.sleep(0.1)
+            
+            # no die, just kill
+            os.killpg(clean.pid, signal.SIGKILL)
+            logger.debug(f"Executor: clean process alive")
         except Exception as e:
             # sub-subprocess die out
             logger.debug(f'Executor: {e}')
