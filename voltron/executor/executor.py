@@ -167,7 +167,7 @@ class Executor:
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
-                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=1000)
+                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=5000)
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
