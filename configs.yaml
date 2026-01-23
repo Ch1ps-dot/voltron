@@ -28,6 +28,6 @@ kamailio:
 
 llm:
   base_url: https://xiaoai.plus/v1
-  api_key: sk-3aNTqYiVNoiOsKXJMUsfmpTEEIdVbS4YXrHhheHRYTsNbMD9
+  api_key: sk-JkrKujmSQfYTAkmSJesJJiM88GkuYz5InmL3rdaObbGP4gRS
   model: gpt-4-turbo
   async_sem: 8

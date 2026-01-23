@@ -21,7 +21,7 @@ The msg_ir describes the **exact message format**, including field order, field 
   - The SUT information above may include:
     - configuration file of SUT
     - real request messages capured in communication.
-
+    - settings of client or server
 ---
 
 ### **Your Task**

@@ -14,6 +14,11 @@ You will be given:
   - This program may contain incorrect field values, invalid ordering, missing constraints, or violations of server expectations.
 * **SUT (Server Under Test) Information**: 
    $info
+
+   - The SUT information above may include:
+    - configuration file of SUT
+    - real request messages capured in communication.
+    - settings of client or server
 * **Observed trace of request and server response**
    $trace
    - Each trace element reflects a semantic transition, e.g.

@@ -1,73 +1,7 @@
-**Collected Request Message Example**
-
-```
-REGISTER sip:127.0.0.1 SIP/2.0
-Via: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-0
-From: <sip:30@127.0.0.1>;tag=1
-To: <sip:30@127.0.0.1>
-Call-ID: 1-670@127.0.0.1
-CSeq: 1 REGISTER
-Contact: sip:30@127.0.0.1:5061
-Max-Forwards: 100
-Expires: 120
-User-Agent: SIPp/Win32
-Content-Length: 0
-```
-
-```
-INVITE sip:33@127.0.0.1:5060 SIP/2.0
-Via: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-2
-From: sipp <sip:30@127.0.0.1>;tag=1
-To: <sip:33@127.0.0.1:5060>
-Call-ID: 1-670@127.0.0.1
-CSeq: 2 INVITE
-Contact: sip:30@127.0.0.1:5061
-Max-Forwards: 100
-Content-Type: application/sdp
-Content-Length:   129
-
-v=0
-o=user1 53655765 2353687637 IN IP4 127.0.0.1
-s=-
-c=IN IP4 127.0.0.1
-t=0 0
-m=audio 6000 RTP/AVP 8
-a=rtpmap:8 PCMA/8000
-ACK sip:33@127.0.0.1:5068;ob SIP/2.0
-Via: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-7
-From: <sip:30@127.0.0.1>;tag=1
-To: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV
-Route: <sip:127.0.0.1;lr>
-Call-ID: 1-670@127.0.0.1
-CSeq: 2 ACK
-Contact: sip:30@127.0.0.1:5061
-Max-Forwards: 100
-Content-Length: 0
-```
-
-```
-BYE sip:33@127.0.0.1:5068;ob SIP/2.0
-Via: SIP/2.0/UDP 127.0.0.1:5061;branch=z9hG4bK-670-1-9
-From: <sip:30@127.0.0.1>;tag=1
-To: <sip:33@127.0.0.1>;tag=02cV-oIOVhYnZS3wEzeDPLO.u9i61mwV
-Route: <sip:127.0.0.1;lr>
-Call-ID: 1-670@127.0.0.1
-CSeq: 3 BYE
-Contact: sip:sipp@127.0.0.1:5061
-Max-Forwards: 100
-Content-Length: 0
-```
+**SIP User information**
+Act as user 30 on 127.0.0.1:5061 to send request messages, enabling communication with user 33 on 127.0.0.1:5068.
 
 **Configuration File of Kamailio Server**
-
-command line to set up pjsip program
-```
-$WORKDIR/pjproject/pjsip-apps/bin/pjsua-x86_64-unknown-linux-gnu --local-port=5068 \
-	        --id sip:33@127.0.0.1 --registrar sip:127.0.0.1 \
-		--proxy sip:127.0.0.1 --realm '*' --username 33 --password 33 \
-		--auto-answer 200 --auto-play --play-file $WORKDIR/StarWars3.wav --auto-play-hangup \
-		--duration=10 --use-cli --no-cli-console --cli-telnet-port=34254 >/dev/null 2>&1 &
-```
 
 kamailio server configs:
 ```
