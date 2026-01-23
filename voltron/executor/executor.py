@@ -56,6 +56,7 @@ class Executor:
                     [self.post_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
+                    preexec_fn=os.setsid
                 )
                 return proc
             except Exception as e:
@@ -230,8 +231,11 @@ class Executor:
             sock.close()
         
         # close process
-        if proc.poll is None:
+        if proc.poll() is None:
             os.killpg(proc.pid, signal.SIGTERM)
+            
+        if clean.poll() is None:
+            os.killpg(clean.pid, signal.SIGTERM)
         
         # ensure sub-subprocess die
         
