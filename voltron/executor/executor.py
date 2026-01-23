@@ -172,17 +172,17 @@ class Executor:
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
                     if return_code:
-                        cons.add_state(msg_type, 'CRASH')
+                        cons.add_state(msg_type, 'SOCKETERR')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                     else:
-                        cons.add_state(msg_type, 'CLOSED')
+                        cons.add_state(msg_type, 'SOCKETERR')
                         with self.analyzer.lock:
                             self.analyzer.pollerr_num += 1
                     break
                 
                 elif resp_code == 'TIMEOUT':
-                    cons.add_state(msg_type, 'CLOSED')
+                    cons.add_state(msg_type, 'TIMEOUT')
                     with self.analyzer.lock:
                         self.analyzer.timeout_num += 1
                     break
