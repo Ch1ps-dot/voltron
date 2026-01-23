@@ -133,7 +133,7 @@ class Executor:
         cons: Conversation = Conversation()
         
         # maybe recv initialize message
-        resp_code, resp_data = self.net_recv(sock=sock, poll_timeout=100)
+        resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=10)
         last_recv = '-'
         if(resp_code and resp_data):
             cons.add_state('-', resp_code)
@@ -351,7 +351,7 @@ class Executor:
     def net_recv(
             self, 
             sock: socket.socket,
-            poll_timeout = 0
+            poll_timeout_ms = 0
     ) -> Tuple[str | None, bytes | None]:
         """Recv message over network
 
@@ -370,15 +370,15 @@ class Executor:
         poller = select.poll()
         poller.register(sock, select.POLLIN | select.POLLERR)
         
-        time_out = 0
-        if poll_timeout != 0:
-            time_out = poll_timeout
+        time_out_ms = 0
+        if poll_timeout_ms != 0:
+            time_out_ms = poll_timeout_ms
         else:
-            time_out = self.max_timeout_ms
+            time_out_ms = self.max_timeout_ms
         
         try:
             if (self.trans_layer == 'tcp'):
-                events = poller.poll(time_out)
+                events = poller.poll(time_out_ms)
 
                 # # estimate the suitable timeout for recv
                 # if (self.probe_times > 0):
@@ -436,7 +436,7 @@ class Executor:
                         return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):
-                events = poller.poll(time_out)
+                events = poller.poll(time_out_ms)
                 if not events:
                     return 'TIMEOUT', None
                 fd, event = events[0]
