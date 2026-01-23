@@ -23,5 +23,7 @@ class MembershipOracle:
         msg_seq = self.mapper.select_generators(list(word), cache_mode=True, select_mode='new')
         flag, cons = self.executor.interact(msg_seq)
         if (flag and cons):
+            logger.debug(f'sent seq -> {cons.req_seq}')
+            logger.debug(f'recv seq <- {cons.res_seq}')
             return cons.res_seq
         return None
