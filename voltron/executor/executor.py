@@ -143,6 +143,8 @@ class Executor:
             with self.analyzer.lock:
                 self.analyzer.res_types_update(resp_code)
                 self.analyzer.resp_trans_update(f'-/{resp_code}')
+        else:
+            cons.add_state('-', '-')
 
         # send the message path
         for msg_type, msg in msg_seq:

@@ -108,7 +108,7 @@ class ObTable:
                                 # because of the random timeout of server
                                 # when output is inconsistent with prvious results, just try again
                                 if len(si) > 0:
-                                    if(out[-2] != self.T[s][e][0]):
+                                    if 'TIMEOUT' == out[-1] and len(out) <= len(si):
                                         continue
                                 
                                 with analyzer.lock:
