@@ -62,17 +62,17 @@ class ObTable:
 
         with analyzer.lock:
             analyzer.set_progress('Obtable', desc='fill si table', total=1)
-        iter_si = 0    
+        iter_si = 0
         for s in self.S:
             for a in self.alphabet:
-                iter_si += 1
+                
                 si = s + (a,) # S + i (element in alphabet)
                 
                 if si not in self.T.keys():
                     self.T[si] = {}
                     
                 for e in self.E:
-                    
+                    iter_si += 1
                     if (configs.time_limit_s < time.time() - analyzer.start_time):
                         self.stop_event.set()
                         logger.debug('Fuzzer: timeout')
@@ -101,12 +101,21 @@ class ObTable:
                         if(self.T[s][(a,)] == ('TIMEOUT',)):
                             self.T[si][e] = ('TIMEOUT',)
                             continue
-                        out = self.mq.query(si + e)
-                        if (out):
-                            with analyzer.lock:
-                                analyzer.sent = f'{'/'.join(s)}:{a}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet)})'
-                                analyzer.recv = f'{'/'.join(out)}'
-                            self.T[si][e] = tuple(out[-len(e):])
+                        
+                        while(True):
+                            out = self.mq.query(si + e)
+                            if (out):
+                                # because of the random timeout of server
+                                # when output is inconsistent with prvious results, just try again
+                                if len(si) > 0:
+                                    if(out[-2] != self.T[s][e][0]):
+                                        continue
+                                
+                                with analyzer.lock:
+                                    analyzer.sent = f'{'/'.join(s)}:{a}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet) * len(self.E)})'
+                                    analyzer.recv = f'{'/'.join(out)}'
+                                self.T[si][e] = tuple(out[-len(e):])
+                                break
         with analyzer.lock:
             analyzer.clean_progress()
 

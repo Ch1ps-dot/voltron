@@ -26,6 +26,13 @@ kamailio:
   rfc_name: rfc3261
   trans_layer: udp
 
+live555:
+  protocol: rtsp
+  host: 127.0.0.1
+  port: 8554
+  rfc_name: rfc3261
+  trans_layer: udp
+
 llm:
   base_url: https://xiaoai.plus/v1
   api_key: sk-JkrKujmSQfYTAkmSJesJJiM88GkuYz5InmL3rdaObbGP4gRS

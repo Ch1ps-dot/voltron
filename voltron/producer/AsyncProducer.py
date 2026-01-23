@@ -256,6 +256,105 @@ class AsyncProducer:
         with analyzer.lock:
             analyzer.clean_progress()
         logger.debug("[Producer]: finish generator generation")
+                
+    async def _generator_mutate_one(
+            self,
+            msg_type: str,
+            gs: list[Generator],
+            doc_info:str,
+            machine: MealyMachine,
+            sem
+    ):
+        old_code = ''
+        old_g_name = f'{gs[-1].name}.py'
+        old_g_path = self.generator_path / msg_type / old_g_name
+        with open(old_g_path, 'r', encoding='utf-8') as f:
+            old_code = f.read()
+            
+        # extract state trace of request pair which has dependency
+        trace_list = []
+        for pair in self.req_dep.keys():
+            last_request = pair.split('/')[0]
+            current_request = pair.split('/')[1]
+            if msg_type == last_request and self.req_dep[pair]['request_dependency'] == 'dependent':
+                trace_list.append(machine.get_relation(last_request, current_request))
+                
+        async with sem:
+            while(True):
+                try:
+                    # generate input generator and save it
+                    input_code = await self.chater.llm_generator_evolve(
+                        code=old_code,
+                        pro_name=self.rfcp.pro_name,
+                        msg_type=msg_type,
+                        trace= '\n'.join(trace_list),
+                        info=doc_info
+                    )
+                    
+                    # test generated code
+                    name_space = {}
+                    exec(input_code, name_space)
+                    obj = name_space[f'generate_{msg_type}']
+                    obj()
+                    with analyzer.lock:
+                        analyzer.finished += 1
+                    return msg_type, input_code
+                except Exception as e:
+                    logger.debug(f'Producer :generate error {e}')
+
+    async def _generator_mutate_async(
+        self,
+        doc_info: str,
+        machine: MealyMachine
+    ):
+        sem = asyncio.Semaphore(configs.async_sem)
+        tasks = [
+            self._generator_evo_one(msg_type=msg_type, gs=gs, doc_info=doc_info, machine=machine, sem=sem)
+            for msg_type, gs in self.generators.items()
+        ]
+        results = await asyncio.gather(*tasks)
+        return results
+
+    def generator_mutate(
+            self,
+            machine: MealyMachine
+    ) -> None:
+        """Generate and save input generator
+        """
+        with analyzer.lock:
+            analyzer.set_progress('evolve', 'evolve', len(self.req_types))
+            analyzer.stage = 'fuzzer evolve'
+            
+        doc_info = ''
+        with open(self.info_path, 'r', encoding='utf-8') as f:
+            doc_info = f.read()
+        
+        # produce new generator
+        results = asyncio.run(self._generator_evo_async(doc_info, machine))
+        for msg_type, input_code in results:
+            msg_dir = self.generator_path / f'{msg_type}'
+            if not msg_dir.is_dir():
+                msg_dir.mkdir()
+            
+            # save generator
+            gen_path = msg_dir / f'id{len(self.generators[msg_type])}.py'
+            with open(gen_path, 'w', encoding='utf-8') as f:
+                f.write(input_code)
+                
+                # construct and save information for new generator
+                old_name = f'id{len(self.generators[msg_type])-1}'
+                new_name = f'id{len(self.generators[msg_type])}'
+                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name}
+                self.generators.setdefault(msg_type, [])
+                self.generators[msg_type].append(Generator(**info))
+                
+        # save the information of new generator to file   
+        with open(self.generator_info_path, 'w', encoding='utf-8') as f:
+            json.dump(self.generator_info(), f)
+        
+        with analyzer.lock:
+            analyzer.clean_progress()
+        logger.debug("[Producer]: finish generator generation")
 
     async def _parser_gen_async(
             self
@@ -272,7 +371,7 @@ class AsyncProducer:
                 return pkt_parser_code
             except Exception as e:
                 logger.debug(f'[Parser Generation]: syntax error {e}')
-
+                
     def parser_gen(
             self
     ) -> None:
