@@ -35,6 +35,7 @@ class Analyzer:
         self.recv = ''
 
         self.autamata = None
+        self.state = 0
         self.lock: threading.Lock = threading.Lock()
         self.last_sent = '-'
         self.last_recv = '-'

@@ -432,7 +432,7 @@ class Executor:
                 # response can be read
 
                 if event & select.POLLIN:
-                    buf = sock.recv(1024)
+                    buf = sock.recv(2048)
                     # logger.debug(f'net_recv: {buf}')
                     
                     #TODO: handle invalid response
@@ -460,7 +460,7 @@ class Executor:
                 fd, event = events[0]
                 
                 if event & select.POLLIN:
-                    buf, _ = sock.recvfrom(1024)
+                    buf, _ = sock.recvfrom(2048)
                     if len(buf) == 0:
                         return 'RCLOSED', None
                     resp_code = self.parser_func(buf)

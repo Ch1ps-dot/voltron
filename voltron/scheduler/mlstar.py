@@ -143,6 +143,8 @@ class ObTable:
                 return
             logger.debug(f'add new prefix: {sa}')
             self.S.add(sa)
+            with analyzer.lock:
+                analyzer.state += 1
             self._fill_table()
 
     # ---------- Consistent ----------

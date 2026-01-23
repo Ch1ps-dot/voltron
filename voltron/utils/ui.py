@@ -81,6 +81,7 @@ def make_runtime_table():
         'query num': f'{ana.path_num}({ana.path_num/(time.time() - analyzer.start_time):.2f})',
         'response types': ana.res_types_num(),
         'response transitions': ana.resp_trans_num(),
+        'state num': ana.state,
         'CRASH num': ana.crash_num,
         'CLOSED num': ana.rclose_num,
         'TIMEOUT num': ana.timeout_num
