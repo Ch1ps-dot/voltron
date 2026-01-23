@@ -110,9 +110,9 @@ class Executor:
                 break
 
         if proc is None:
-            return False, None
+            raise Exception('Execute: process bad')
         if proc.poll() is not None:
-            return False, None
+            raise Exception('Execute: process bad')
         
         # wait for server setup
         for _ in range(100):
