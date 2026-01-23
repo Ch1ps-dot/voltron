@@ -85,11 +85,11 @@ class Executor:
         """
         TODO: Deal with interaction
         """
-        logger.debug('exe: begin inter')
+        # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
         clean = self.post_exe()
         proc = self.pre_exe()
-        logger.debug('exe: after setup')
+        # logger.debug('exe: after setup')
         
         if proc is None or clean is None:
             logger.debug(f'Executor: SUT Setup Failure')
@@ -131,10 +131,10 @@ class Executor:
             
         # keep request and response in Conversation
         cons: Conversation = Conversation()
-        resp_code, resp_data = self.net_recv(sock=sock)
         
-        last_recv = '-'
         # maybe recv initialize message
+        resp_code, resp_data = self.net_recv(sock=sock, poll_timeout=100)
+        last_recv = '-'
         if(resp_code and resp_data):
             cons.add_state('-', resp_code)
             cons.add_data(bytes(), resp_data)
@@ -350,7 +350,8 @@ class Executor:
     
     def net_recv(
             self, 
-            sock: socket.socket
+            sock: socket.socket,
+            poll_timeout = 0
     ) -> Tuple[str | None, bytes | None]:
         """Recv message over network
 
@@ -369,9 +370,15 @@ class Executor:
         poller = select.poll()
         poller.register(sock, select.POLLIN | select.POLLERR)
         
+        time_out = 0
+        if poll_timeout != 0:
+            time_out = poll_timeout
+        else:
+            time_out = self.max_timeout_ms
+        
         try:
             if (self.trans_layer == 'tcp'):
-                events = poller.poll(self.max_timeout_ms)
+                events = poller.poll(time_out)
 
                 # # estimate the suitable timeout for recv
                 # if (self.probe_times > 0):
@@ -429,7 +436,7 @@ class Executor:
                         return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):
-                events = poller.poll(self.max_timeout_ms)
+                events = poller.poll(time_out)
                 if not events:
                     return 'TIMEOUT', None
                 fd, event = events[0]
