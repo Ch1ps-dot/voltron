@@ -5,7 +5,7 @@ from graphviz import Digraph
 class MealyMachine:
     def __init__(
         self,
-        id: int,
+        id: str,
         states: set[int],
         alphabet: set[str],
         delta: dict[tuple[int, str], int],

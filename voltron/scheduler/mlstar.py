@@ -27,6 +27,7 @@ class ObTable:
         self.eq = eq
         self.stop_event = stop_event
         
+    def table_init(self):
         with analyzer.lock:
             analyzer.stage = f'init ObTable'
         self._fill_table()
@@ -183,7 +184,7 @@ class ObTable:
 
     def build_hypothesis(
         self,
-        id: int
+        id: str
     ):
         """ Construct hypothesis for mealy machine
         """
@@ -227,16 +228,24 @@ class MealyLstar:
         self,
         mq,
         eq,
-        stop_event: threading.Event
+        stop_event: threading.Event,
+        table: tuple | None = None
     ) -> None:
         self.mq = mq
         self.eq = eq
         self.stop_event = stop_event
-        self.table = ObTable(self.mq, self.eq, self.stop_event)
+        if table is None:
+            self.table = ObTable(self.mq, self.eq, self.stop_event)
+            self.table.table_init()
+        else:
+            self.table = ObTable(self.mq, self.eq, self.stop_event)
+            self.table.S = table[0]
+            self.table.E = table[1]
+            self.table.T = table[2]
     
     def run(
         self,
-        id: int
+        id: str
     ):
         try:
             with analyzer.lock:
@@ -253,7 +262,7 @@ class MealyLstar:
     
     def havoc_run(
         self,
-        id: int
+        id: str
     ):
         try:
             # extend mutated alphabet

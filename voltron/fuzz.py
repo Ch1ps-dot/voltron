@@ -18,7 +18,7 @@ from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
 
-from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
+from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
 from voltron.scheduler.automata import MealyMachine
 
 
@@ -179,7 +179,7 @@ class Fuzzer:
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
             h_lsit: list[MealyMachine] = []
-            marked_table: MealyLstar # final learned model
+            marked_table: ObTable # final learned model
             analyzer.iter = 0
             
             """--- model learning ---"""
@@ -187,9 +187,9 @@ class Fuzzer:
                 try:
                     # run model learning
                     ml = MealyLstar(mq, eq, self.stop_event)
-                    h = ml.run(analyzer.iter)
+                    h = ml.run(str(analyzer.iter))
                     h.set_mapper(self.mapper)
-                    marked_table = ml
+                    marked_table = ml.table
                     
                     # save and evaluate the automata
                     with open(configs.results_path / f'model_{analyzer.iter}.pkl', 'wb') as f:
@@ -234,14 +234,19 @@ class Fuzzer:
             with analyzer.lock:   
                 analyzer.iter = 0
             mh_list: list[MealyMachine] = [h_lsit[-1]]
+            S = marked_table.S
+            E = marked_table.E
+            T = marked_table.T
             
             while not stop_event.is_set():
                 try:
+                    # mutate generator
                     if analyzer.iter == 0:
                         self.producer.generator_mutate(mh_list[0])
-                        
-                    havoc_ml = copy.deepcopy(marked_table)
-                    h = havoc_ml.havoc_run(analyzer.iter)
+
+                    # init new learning process with previous model
+                    havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
+                    havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
                     with analyzer.lock:   
                         analyzer.iter += 1
                     
