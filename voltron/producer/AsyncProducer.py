@@ -167,7 +167,7 @@ class AsyncProducer:
             sem
     ):
         old_code = ''
-        old_g_name = f'{gs[-1].name}.py'
+        old_g_name = f'id{machine.id}.py'
         old_g_path = self.generator_path / msg_type / old_g_name
         with open(old_g_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
@@ -201,7 +201,7 @@ class AsyncProducer:
                         analyzer.finished += 1
                     return msg_type, input_code
                 except Exception as e:
-                    logger.debug(f'Producer :generate error {e}')
+                    logger.debug(f'Producer: generate error {e}')
 
     async def _generator_evo_async(
         self,
@@ -238,13 +238,13 @@ class AsyncProducer:
                 msg_dir.mkdir()
             
             # save generator
-            gen_path = msg_dir / f'id{len(self.generators[msg_type])}.py'
+            gen_path = msg_dir / f'id{machine.id + 1}.py'
             with open(gen_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
                 
                 # construct and save information for new generator
-                old_name = f'id{len(self.generators[msg_type])-1}'
-                new_name = f'id{len(self.generators[msg_type])}'
+                old_name = f'id{machine.id}'
+                new_name = f'id{machine.id + 1}'
                 info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name}
                 self.generators.setdefault(msg_type, [])
                 self.generators[msg_type].append(Generator(**info))

@@ -62,7 +62,7 @@ class Mapper:
         self,
         req_seq: list[str],
         cache_mode: bool = False,
-        select_mode: str = 'default'
+        select_mode: str = 'new'
     ) -> list[tuple[str, bytes]]:
         """Select and execute message generator based on the list of message type
         
@@ -115,7 +115,7 @@ class Mapper:
     def select_generator(
         self,
         req_type: str,
-        mode: str
+        mode: str = 'new'
     ) -> Generator:
         if mode == 'new':
             return self.generators[req_type][-1]

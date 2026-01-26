@@ -1,20 +1,26 @@
 from voltron.configs import configs
+from voltron.mapper.mapper import Mapper
 from graphviz import Digraph
 
 class MealyMachine:
     def __init__(
         self,
+        id: int,
         states: set[int],
-        alphabet,
+        alphabet: set[str],
         delta: dict[tuple[int, str], int],
         output: dict[tuple[int, str], str],
-        start: int
+        start: int,
     ) -> None:
+        self.id = id
         self.states: set[int] = states
         self.alphabet: set[str] = alphabet
         self.delta: dict[tuple[int, str], int] = delta
         self.output: dict[tuple[int, str], str] = output
         self.start: int = start
+        self.map: dict[str, bytes]
+        self.res_types: dict[str, int]
+        self.res_trans_types: dict[str, int]
     
     def run(
         self, 
@@ -54,4 +60,12 @@ class MealyMachine:
             out2 = self.output[(s2, current_request)]
             ans.append(f'( {last_request} / {out1} )->( {current_request} / {out2} )')
         return '\n'.join(ans)
-            
+    
+    def set_mapper(
+        self,
+        mapper: Mapper
+    ):
+        for a in self.alphabet:
+            g = mapper.select_generator(a)
+            data = mapper.message_pool[a][g.name]
+            self.map[a] = data

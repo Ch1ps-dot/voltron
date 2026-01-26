@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys, traceback
+import yaml, time, threading, signal, sys, traceback, pickle
 
 from voltron.utils.logger import logger
 
@@ -173,19 +173,55 @@ class Fuzzer:
     ):
         try:
             from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
+            from voltron.scheduler.automata import MealyMachine
+            
+            # set membership query and equivelence query method.
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
-            h_lsit = []
+            h_lsit: list[MealyMachine] = []
             analyzer.iter = 0
             while not stop_event.is_set():
                 try:
+                    # run model learning
                     ml = MealyLstar(mq, eq, self.stop_event)
                     h = ml.run(analyzer.iter)
-                    self.producer.generator_evo(h)
-                    h_lsit.append(h)
-                    analyzer.iter += 1
-                    if analyzer.iter == 5:
-                        stop_event.set()
+                    h.set_mapper(self.mapper)
+                    
+                    # save and evaluate the automata
+                    with open(configs.results_path / f'model_{analyzer.iter}.pkl', 'wb') as f:
+                        pickle.dump(h, f)
+                    h.graph(analyzer.iter)
+                    h.res_types = analyzer.cur_res_types_cnt
+                    h.res_trans_types = analyzer.cur_resp_trans_cnt
+                    
+                    with analyzer.lock:
+                        analyzer.iter += 1
+                        analyzer.cur_res_types_cnt = {}
+                        analyzer.cur_resp_trans_cnt = {}
+                    
+                    # select a better generator to evolve
+                    # the more states transitions the better the generator
+                    last_states_num = len(h_lsit[-1].res_trans_types.keys())
+                    cur_states_num = len(h.res_trans_types.keys())
+
+                    if len(h_lsit) == 0:
+                        h_lsit.append(h)
+                        self.producer.generator_evo(h)
+                        continue
+                    
+                    if last_states_num > cur_states_num:
+                        self.producer.generator_evo(h_lsit[-1])
+                        continue
+                    
+                    elif last_states_num < cur_states_num:
+                        h_lsit.append(h)
+                        self.producer.generator_evo(h)
+                        continue
+                    
+                    # begin mutate
+                    self.producer.generator_mutate(h)
+                        
+                
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')
                     logger.debug(traceback.format_exc())

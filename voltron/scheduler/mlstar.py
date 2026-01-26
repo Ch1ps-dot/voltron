@@ -38,6 +38,7 @@ class ObTable:
         with analyzer.lock:
             analyzer.set_progress('Obtable', desc='fill s table', total=1)
 
+        # fill (s, e) table entry
         for s in self.S:
             
             iter_s += 1
@@ -63,6 +64,8 @@ class ObTable:
         with analyzer.lock:
             analyzer.set_progress('Obtable', desc='fill si table', total=1)
         iter_si = 0
+        
+        # fill (s+a, e) entry
         for s in self.S:
             for a in self.alphabet:
                 
@@ -79,18 +82,10 @@ class ObTable:
                         
                     if self.stop_event.is_set(): 
                         sys.exit(0)
-                            
+                    
                     # connection was closed before sending suffix request
                     # in this situation, there is no more response and destroy the evaluation
-                    # so we consider they are same state and jump the query
-                    
-                    # if(self.T[s][(a,)] == ('TIMEOUT',)):
-                    #     self.T[si][e] = ('TIMEOUT',)
-                    #     continue
-                    # if(self.T[s][(a,)] == ('RCLODED',)):
-                    #     self.T[si][e] = ('RCLOSED',)
-                    #     continue
-                    
+                    # so we just consider they are transfering to same state and jump the query
                     if e not in self.T[si].keys():
                         if(self.T[s][(a,)] == ('CLOSED',)):
                             self.T[si][e] = ('CLOSED',)
@@ -105,8 +100,8 @@ class ObTable:
                         while(True):
                             out = self.mq.query(si + e)
                             if (out):
-                                # because of the random timeout of server
-                                # when output is inconsistent with prvious results, just try again
+                                # sometimes the randomness of server will cause timeout
+                                # when output is inconsistent with previous results, just try again
                                 if len(si) > 0:
                                     if 'TIMEOUT' == out[-1] and len(out) < len(si):
                                         logger.debug('fill table: try again')
@@ -124,14 +119,16 @@ class ObTable:
         self, 
         s: tuple[str, ...]
     ):
+        """Query row(s)
+        """
         return tuple(
             self.T[s][e]
             for e in self.E
         )
             
-
-    # ---------- Closed ----------
     def is_closed(self):
+        """Check closeness of table
+        """
         rows = {self.row(s) for s in self.S}
 
         for s in self.S:
@@ -143,6 +140,8 @@ class ObTable:
         return True, None
 
     def make_close(self):
+        """Make table close
+        """
         with analyzer.lock:
             analyzer.stage = f'make close'
         logger.debug('Ob: make close')
@@ -157,8 +156,9 @@ class ObTable:
                 analyzer.state += 1
             self._fill_table()
 
-    # ---------- Consistent ----------
     def is_consistent(self):
+        """Check consistent of table
+        """
         for s1 in self.S:
             for s2 in self.S:
                 if self.row(s1) == self.row(s2):
@@ -170,6 +170,8 @@ class ObTable:
         return True, None
 
     def make_consistent(self):
+        """Make table consistence
+        """
         with analyzer.lock:
             analyzer.stage = f'make consistent'
         logger.debug('Ob: make consistent')
@@ -183,11 +185,16 @@ class ObTable:
             self.E.add((a,) + e)
             self._fill_table()
 
-    # ---------- Hypothesis ----------
-    def build_hypothesis(self):
+    def build_hypothesis(
+        self,
+        id: int
+    ):
+        """ Construct hypothesis for mealy machine
+        """
         states: dict = {}
         sid = 1
 
+        # record unique state and corresponding row in ObTable
         for s in self.S:
             r = self.row(s)
             if r not in states:
@@ -195,9 +202,13 @@ class ObTable:
                 states[r] = sid
                 sid += 1
 
+        # state transition function (cur_state, input) -> next_state
         delta: dict[tuple[int, str], int] = {}
+        
+        # output function (cur_state, input) -> output
         output: dict[tuple[int, str], str] = {}
 
+        # construct transitions
         for r, state_id in states.items():
             s = next(x for x in self.S if self.row(x) == r)
             for a in self.alphabet:
@@ -207,6 +218,7 @@ class ObTable:
 
         start = states[self.row(('-',))]
         return MealyMachine(
+            id,
             states=set(states.values()),
             alphabet=set(self.alphabet),
             delta=delta,
@@ -227,16 +239,14 @@ class MealyLstar:
     
     def run(
         self,
-        name: int
+        id: int
     ):
         try:
             self.table = ObTable(self.mq, self.eq, self.stop_event)
             self.table.make_close()
             self.table.make_consistent()
-            h = self.table.build_hypothesis()
-            with open(configs.results_path / f'model_{name}.pkl', 'wb') as f:
-                pickle.dump(h, f)
-            h.graph(name)
+            h = self.table.build_hypothesis(id)        
+            
             # self.stop_event.set()
         except Exception as e:
             logger.debug(f'LM: {e}')

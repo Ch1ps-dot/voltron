@@ -12,7 +12,9 @@ class Analyzer:
         # counters for metric
         self.req_types_cnt: dict[str, int] = {}
         self.res_types_cnt: dict[str, int] = {}
+        self.cur_res_types_cnt: dict[str, int] = {}
         self.resp_trans_cnt: dict[str, int] = {}
+        self.cur_resp_trans_cnt: dict[str, int] = {}
         self.req_num = 0
         self.res_num = 0
         self.path_num = 0
@@ -101,6 +103,11 @@ class Analyzer:
         else:
             self.res_types_cnt[res_code] = 1
             logger.debug(f'Analyzer: new reply {res_code}')
+            
+        if res_code in self.cur_res_types_cnt.keys():
+            self.cur_res_types_cnt[res_code] += self.cur_res_types_cnt[res_code] + 1
+        else:
+            self.cur_res_types_cnt[res_code] = 1
 
     def resp_trans_update(
             self,
@@ -111,6 +118,11 @@ class Analyzer:
         else:
             self.resp_trans_cnt[trans] = 1
             logger.debug(f'Analyzer: new transition {trans}')
+            
+        if trans in self.cur_resp_trans_cnt.keys():
+            self.cur_resp_trans_cnt[trans] += self.cur_resp_trans_cnt[trans] + 1
+        else:
+            self.cur_resp_trans_cnt[trans] = 1
 
     
     def req_types_num(

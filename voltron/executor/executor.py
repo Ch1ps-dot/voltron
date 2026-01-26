@@ -197,7 +197,7 @@ class Executor:
                 
                 else:
                     if(resp_code == None):
-                        logger.debug('Executor: Parser error')
+                        logger.debug('Executor: parse error')
                         continue
                     with self.analyzer.lock:
                         self.analyzer.res_num += 1
@@ -246,21 +246,22 @@ class Executor:
             
             # no die, just kill
             os.killpg(proc.pid, signal.SIGKILL)
-            logger.debug(f"Executor: target process alive")
+            logger.debug(f"target process: target process alive")
         except Exception as e:
             # sub-subprocess die out
-            logger.debug(f'Executor: {e}')
-            
+            logger.debug(f'target process: {e}')
+        
+        # kill clean script
         try:
             os.killpg(clean.pid, 0)
             time.sleep(0.1)
             
             # no die, just kill
             os.killpg(clean.pid, signal.SIGKILL)
-            logger.debug(f"Executor: clean process alive")
+            logger.debug(f"clean process: clean process alive")
         except Exception as e:
             # sub-subprocess die out
-            logger.debug(f'Executor: {e}')
+            logger.debug(f'clean process: {e}')
                 
 
         # self.post_exe()
