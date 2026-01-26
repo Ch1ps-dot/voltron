@@ -142,8 +142,6 @@ class ObTable:
     def make_close(self):
         """Make table close
         """
-        with analyzer.lock:
-            analyzer.stage = f'make close'
         logger.debug('Ob: make close')
         while True:
             if self.stop_event.is_set(): return
@@ -172,8 +170,6 @@ class ObTable:
     def make_consistent(self):
         """Make table consistence
         """
-        with analyzer.lock:
-            analyzer.stage = f'make consistent'
         logger.debug('Ob: make consistent')
         while True:
             if self.stop_event.is_set(): 
@@ -236,19 +232,41 @@ class MealyLstar:
         self.mq = mq
         self.eq = eq
         self.stop_event = stop_event
+        self.table = ObTable(self.mq, self.eq, self.stop_event)
     
     def run(
         self,
         id: int
     ):
         try:
-            self.table = ObTable(self.mq, self.eq, self.stop_event)
+            with analyzer.lock:
+                analyzer.stage = f'make close'
             self.table.make_close()
+            with analyzer.lock:
+                analyzer.stage = f'make consistent'
             self.table.make_consistent()
-            h = self.table.build_hypothesis(id)        
-            
-            # self.stop_event.set()
+            h = self.table.build_hypothesis(id)
         except Exception as e:
             logger.debug(f'LM: {e}')
             logger.debug(f'{traceback.format_exc()}')
         return h
+    
+    def havoc_run(
+        self,
+        id: int
+    ):
+        try:
+            # extend mutated alphabet
+            self.table.alphabet
+            with analyzer.lock:
+                analyzer.stage = f'[havoc] make close'
+            self.table.make_close()
+            with analyzer.lock:
+                analyzer.stage = f'[havoc] make consistent'
+            self.table.make_consistent()
+            h = self.table.build_hypothesis(id)
+        except Exception as e:
+            logger.debug(f'LM: {e}')
+            logger.debug(f'{traceback.format_exc()}')
+        return h
+    

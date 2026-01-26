@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys, traceback, pickle
+import yaml, time, threading, signal, sys, traceback, pickle, copy
 
 from voltron.utils.logger import logger
 
@@ -17,6 +17,9 @@ from voltron.scheduler.rands import Rands
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
+
+from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
+from voltron.scheduler.automata import MealyMachine
 
 
 class Fuzzer:
@@ -172,20 +175,21 @@ class Fuzzer:
         stop_event: threading.Event
     ):
         try:
-            from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle
-            from voltron.scheduler.automata import MealyMachine
-            
             # set membership query and equivelence query method.
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
             h_lsit: list[MealyMachine] = []
+            marked_table: MealyLstar # final learned model
             analyzer.iter = 0
+            
+            """--- model learning ---"""
             while not stop_event.is_set():
                 try:
                     # run model learning
                     ml = MealyLstar(mq, eq, self.stop_event)
                     h = ml.run(analyzer.iter)
                     h.set_mapper(self.mapper)
+                    marked_table = ml
                     
                     # save and evaluate the automata
                     with open(configs.results_path / f'model_{analyzer.iter}.pkl', 'wb') as f:
@@ -217,11 +221,7 @@ class Fuzzer:
                         h_lsit.append(h)
                         self.producer.generator_evo(h)
                         continue
-                    
-                    # begin mutate
-                    self.producer.generator_mutate(h)
-                        
-                
+
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')
                     logger.debug(traceback.format_exc())
@@ -229,6 +229,30 @@ class Fuzzer:
                 if (configs.time_limit_s < time.time() - analyzer.start_time):
                     stop_event.set()
                     logger.debug('Fuzzer: timeout')
+            
+            """--- havoc mutate ---"""
+            with analyzer.lock:   
+                analyzer.iter = 0
+            mh_list: list[MealyMachine] = [h_lsit[-1]]
+            
+            while not stop_event.is_set():
+                try:
+                    if analyzer.iter == 0:
+                        self.producer.generator_mutate(mh_list[0])
+                        
+                    havoc_ml = copy.deepcopy(marked_table)
+                    h = havoc_ml.havoc_run(analyzer.iter)
+                    with analyzer.lock:   
+                        analyzer.iter += 1
+                    
+                except Exception as e:
+                    logger.debug(f'Fuzzer: exit {e}')
+                    logger.debug(traceback.format_exc())
+                    stop_event.set()
+                if (configs.time_limit_s < time.time() - analyzer.start_time):
+                    stop_event.set()
+                    logger.debug('Fuzzer: timeout')
+                
         except Exception as e:
             logger.debug(f'Fuzzer: exit {e}') 
             logger.debug(traceback.format_exc())

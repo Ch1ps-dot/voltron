@@ -63,6 +63,10 @@ class Prompter:
             with self._path_try_again.open('r+') as f:
                 self._tem_try_again = Template(f.read())
                 
+            self._path_mutator_evolve = dir / 'mutator_evolve.md'
+            with self._path_mutator_evolve.open('r+') as f:
+                self._tem_mutator_evolve = Template(f.read())
+                
         except Exception as e:
             logger.error(f'Prompter Init Error: {e}')
             exit(0)
