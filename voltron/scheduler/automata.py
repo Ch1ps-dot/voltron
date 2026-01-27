@@ -61,11 +61,4 @@ class MealyMachine:
             ans.append(f'( {last_request} / {out1} )->( {current_request} / {out2} )')
         return '\n'.join(ans)
     
-    def set_mapper(
-        self,
-        mapper: Mapper
-    ):
-        for a in self.alphabet:
-            g = mapper.select_generator(a)
-            data = mapper.message_pool[a][g.name]
-            self.map[a] = data
+    

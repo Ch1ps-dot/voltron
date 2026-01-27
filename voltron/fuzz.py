@@ -195,7 +195,7 @@ class Fuzzer:
                     # run model learning
                     ml = MealyLstar(mq, eq, self.stop_event)
                     h = ml.run(id)
-                    h.set_mapper(self.mapper)
+                    self.mapper.register_mapper(h)
                     marked_table = ml.table
                     
                     # save and evaluate the automata
@@ -253,11 +253,12 @@ class Fuzzer:
                     
                     # run fuzzer
                     mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
+                    self.mapper.register_mapper(mh)
                     with analyzer.lock:   
                         analyzer.iter += 1
                     
                     # save the results
-                    with open(configs.results_path / f'model_{analyzer.iter}.pkl', 'wb') as f:
+                    with open(configs.results_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
                         pickle.dump(mh, f)
                     mh.graph(id)
                     mh.res_types = analyzer.cur_res_types_cnt

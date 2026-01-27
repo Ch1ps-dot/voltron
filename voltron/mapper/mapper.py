@@ -3,6 +3,7 @@ from voltron.producer.AsyncProducer import AsyncProducer
 from voltron.producer.generator import Generator
 from voltron.producer.parser import Parser
 from voltron.mapper.suite import Suite
+from voltron.scheduler.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 import traceback, sys
 from voltron.utils.logger import logger
@@ -183,26 +184,11 @@ class Mapper:
             logger.debug(traceback.format_exc())
             return None
             
-    # def parse_msg(
-    #     self,
-    #     msg: bytes
-    # ) -> str:
-    #     try:
-    #         resp_code = self.parser(msg)
-    #         with self.analyzer.lock:
-    #             self.analyzer.res_types_update(self.analyzer.last_recv)
-    #             self.analyzer.trans_types_update(f'{self.analyzer.last_sent}/{self.analyzer.last_recv}')
-    #         return resp_code
-    #     except Exception as e:
-    #         logger.error(f'Mapper: parse failure {e}')
-    #         exit(0)
-    #     return str(resp_code)
-    
-    # def parse_exception(
-    #     self,
-    #     status: str
-    # ) -> str:
-    #     with self.analyzer.lock:
-    #         self.analyzer.res_types_update(self.analyzer.last_recv)
-    #         self.analyzer.trans_types_update(f'{self.analyzer.last_sent}/{self.analyzer.last_recv}')
-    #     return status
+    def register_mapper(
+        self,
+        h: MealyMachine
+    ):
+        for a in h.alphabet:
+            g = self.select_generator(a)
+            data = self.message_pool[a][g.name]
+            h.map[a] = data
