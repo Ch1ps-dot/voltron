@@ -17,9 +17,9 @@ class MealyMachine:
         self.delta: dict[tuple[int, str], int] = delta
         self.output: dict[tuple[int, str], str] = output
         self.start: int = start
-        self.map: dict[str, bytes]
-        self.res_types: dict[str, int]
-        self.res_trans_types: dict[str, int]
+        self.map: dict[str, bytes] = {}
+        self.res_types: dict[str, int] = {}
+        self.res_trans_types: dict[str, int] = {}
     
     def run(
         self, 

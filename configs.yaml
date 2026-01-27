@@ -35,6 +35,6 @@ live555:
 
 llm:
   base_url: https://xiaoai.plus/v1
-  api_key: sk-JkrKujmSQfYTAkmSJesJJiM88GkuYz5InmL3rdaObbGP4gRS
+  api_key: sk-vUIK7aS2md6wOsKyEsEEDzzDYNu5BwwaQ9UofpG9N7XB6egQ
   model: gpt-4-turbo
   async_sem: 8
