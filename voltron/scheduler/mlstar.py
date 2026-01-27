@@ -271,6 +271,7 @@ class MealyLstar:
             self.table.alphabet += additional_symbol
             
             # run model learning
+            self.table.table_init()
             self.table.make_close()
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)

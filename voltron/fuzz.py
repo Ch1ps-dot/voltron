@@ -55,7 +55,7 @@ class Fuzzer:
         # some file path 
         configs.pre_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'pre.sh'
         configs.post_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
-        configs.models_path = configs.base_path / 'input' / 'models' / configs.target_name
+        configs.models_path = configs.base_path / 'output' / 'models' / configs.target_name
         configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.md'
         configs.doc_path = configs.base_path / 'input' / 'rfcs' / f'{configs.rfc_name}.txt'
         configs.pmp_path = configs.base_path / 'input' / 'prompts'
