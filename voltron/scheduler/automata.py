@@ -1,5 +1,4 @@
 from voltron.configs import configs
-from voltron.mapper.mapper import Mapper
 from graphviz import Digraph
 
 class MealyMachine:
