@@ -337,8 +337,10 @@ class AsyncProducer:
         with open(self.info_path, 'r', encoding='utf-8') as f:
             doc_info = f.read()
         
-        # produce new generator
+        # produce new mutator
         results = asyncio.run(self._generator_mutate_async(doc_info, machine))
+        
+        # resolve mutator
         for msg_type, input_code in results:
             msg_dir = self.mutator_path / f'{msg_type}'
             if not msg_dir.is_dir():

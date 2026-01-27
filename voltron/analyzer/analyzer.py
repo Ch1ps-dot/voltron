@@ -175,6 +175,7 @@ class Analyzer:
         self.show_progress = progress
         self.progress_desc = desc
         self.total = total
+        self.finished = 0
         
 analyzer = Analyzer()
     
