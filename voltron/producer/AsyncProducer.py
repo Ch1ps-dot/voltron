@@ -277,14 +277,6 @@ class AsyncProducer:
         old_m_path = self.mutator_path / msg_type / old_m_name
         with open(old_m_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
-            
-        # extract state trace of request pair which has dependency
-        trace_list = []
-        for pair in self.req_dep.keys():
-            last_request = pair.split('/')[0]
-            current_request = pair.split('/')[1]
-            if msg_type == last_request and self.req_dep[pair]['request_dependency'] == 'dependent':
-                trace_list.append(machine.get_relation(last_request, current_request))
                 
         async with sem:
             while(True):
@@ -294,7 +286,6 @@ class AsyncProducer:
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
-                        trace= '\n'.join(trace_list),
                         info=doc_info
                     )
                     
