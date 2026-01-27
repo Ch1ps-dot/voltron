@@ -185,8 +185,15 @@ class Fuzzer:
                 analyzer.iter = 0
                 analyzer.stage = 'model learning'
             
+            # load previous automata model if it existed
+            hypothesis = None
+            h_path = configs.results_path / 'evolved_hypothesis.pkl'
+            if h_path.is_file():
+                with open(h_path, 'rb') as f:
+                    hypothesis = pickle.load(f)
+            
             """--- model learning ---"""
-            while not stop_event.is_set():
+            while not stop_event.is_set() and hypothesis is None:
                 try:
                     cur_id = str(analyzer.iter)
                     with analyzer.lock:
@@ -205,9 +212,6 @@ class Fuzzer:
                     marked_table = ml.table
                     h.res_types = analyzer.cur_res_types_cnt
                     h.res_trans_types = analyzer.cur_resp_trans_cnt
-                    with open(configs.results_path / f'hypothesis_{analyzer.iter}.pkl', 'wb') as f:
-                        pickle.dump(h, f)
-                    h.graph(analyzer.iter)
 
                     # select a better generator to evolve
                     # the more states transitions the better the generator
@@ -222,6 +226,9 @@ class Fuzzer:
                     
                     if last_trans_num >= cur_trans_num:
                         # self.producer.generator_evo(h_lsit[-1], next_id)
+                        with open(h_path, 'wb') as f:
+                            pickle.dump(h, f)
+                        h.graph('evolved')
                         break
                     
                     elif last_trans_num < cur_trans_num:
@@ -241,7 +248,10 @@ class Fuzzer:
             """--- havoc fuzzing ---"""
             with analyzer.lock:   
                 analyzer.iter = 0
-            mh_list: list[MealyMachine] = [h_lsit[-1]]
+            if hypothesis:
+                acc_h = hypothesis
+            else:
+                acc_h = h_lsit[-1]
             S = marked_table.S
             E = marked_table.E
             T = marked_table.T
@@ -251,7 +261,7 @@ class Fuzzer:
                     # mutate generator
                     with analyzer.lock:   
                         analyzer.stage = 'fuzzer mutate'
-                    self.producer.generator_mutate(mh_list[0], f'{analyzer.iter}[m]')
+                    self.producer.generator_mutate(acc_h, f'{analyzer.iter}[m]')
 
                     # init new learning process with previous model and run fuzzer
                     with analyzer.lock:   
