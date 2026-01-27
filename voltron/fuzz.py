@@ -185,29 +185,29 @@ class Fuzzer:
             """--- model learning ---"""
             while not stop_event.is_set():
                 try:
-                    
+                    cur_id = str(analyzer.iter)
                     with analyzer.lock:
                         analyzer.iter += 1
                         analyzer.cur_res_types_cnt = {}
                         analyzer.cur_resp_trans_cnt = {}
-                    id = str(analyzer.iter)
+                    next_id = str(analyzer.iter)
                     
                     # run model learning
                     ml = MealyLstar(mq, eq, self.stop_event)
-                    h = ml.run(id)
+                    h = ml.run(cur_id)
                     self.mapper.register_mapper(h)
                     marked_table = ml.table
                     
                     # save and evaluate the automata
+                    h.res_types = analyzer.cur_res_types_cnt
+                    h.res_trans_types = analyzer.cur_resp_trans_cnt
                     with open(configs.results_path / f'model_{analyzer.iter}.pkl', 'wb') as f:
                         pickle.dump(h, f)
                     h.graph(id)
-                    h.res_types = analyzer.cur_res_types_cnt
-                    h.res_trans_types = analyzer.cur_resp_trans_cnt
 
                     if len(h_lsit) == 0:
                         h_lsit.append(h)
-                        self.producer.generator_evo(h, id)
+                        self.producer.generator_evo(h, next_id)
                         continue
                     # select a better generator to evolve
                     # the more states transitions the better the generator
@@ -215,12 +215,12 @@ class Fuzzer:
                     cur_states_num = len(h.res_trans_types.keys())
                     
                     if last_states_num > cur_states_num:
-                        self.producer.generator_evo(h_lsit[-1], id)
+                        self.producer.generator_evo(h_lsit[-1], next_id)
                         continue
                     
                     elif last_states_num < cur_states_num:
                         h_lsit.append(h)
-                        self.producer.generator_evo(h, id)
+                        self.producer.generator_evo(h, next_id)
                         continue
 
                 except Exception as e:
@@ -242,8 +242,7 @@ class Fuzzer:
             while not stop_event.is_set():
                 try:
                     # mutate generator
-                    if analyzer.iter == 0:
-                        self.producer.generator_mutate(mh_list[0], f'{analyzer.iter}-havoc')
+                    self.producer.generator_mutate(mh_list[0], f'{analyzer.iter}-havoc')
 
                     # init new learning process with previous model
                     havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
@@ -251,15 +250,17 @@ class Fuzzer:
                     # run fuzzer
                     mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
                     self.mapper.register_mapper(mh)
-                    with analyzer.lock:   
-                        analyzer.iter += 1
                     
                     # save the results
+                    mh.res_types = analyzer.cur_res_types_cnt
+                    mh.res_trans_types = analyzer.cur_resp_trans_cnt
                     with open(configs.results_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
                         pickle.dump(mh, f)
                     mh.graph(id)
-                    mh.res_types = analyzer.cur_res_types_cnt
-                    mh.res_trans_types = analyzer.cur_resp_trans_cnt
+                    
+                    
+                    with analyzer.lock:   
+                        analyzer.iter += 1
                     
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')
