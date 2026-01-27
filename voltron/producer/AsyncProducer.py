@@ -4,6 +4,7 @@ from tqdm import tqdm
 import json, asyncio
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
+import random
 
 from voltron.producer.generator import Generator
 from voltron.producer.parser import Parser
@@ -280,12 +281,21 @@ class AsyncProducer:
             while(True):
                 try:
                     # generate input generator and save it
-                    input_code = await self.chater.llm_mutator_evolve(
-                        code=old_code,
-                        pro_name=self.rfcp.pro_name,
-                        msg_type=msg_type,
-                        info=doc_info
-                    )
+                    input_code = ''
+                    if (random.random() > 0.5):
+                        input_code = await self.chater.llm_mutator_evolve(
+                            code=old_code,
+                            pro_name=self.rfcp.pro_name,
+                            msg_type=msg_type,
+                            info=doc_info
+                        )
+                    else:
+                        input_code = await self.chater.llm_mutator_havoc(
+                            code=old_code,
+                            pro_name=self.rfcp.pro_name,
+                            msg_type=msg_type,
+                            info=doc_info
+                        )
                     
                     # test generated code
                     name_space = {}
