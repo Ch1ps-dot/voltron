@@ -264,14 +264,23 @@ class MealyLstar:
         self,
         id: str
     ):
+        """Run mutator to cover edge case and unexpectional condition
+        
+        id: name of hypothesis
+        """
         try:
             # extend mutated alphabet
-            self.table.alphabet
+            additional_symbol = []
+            for a in self.table.alphabet:
+                additional_symbol.append(f'{a}[m]')
+            self.table.alphabet += additional_symbol
+            
+            # run model learning
             with analyzer.lock:
-                analyzer.stage = f'[havoc] make close'
+                analyzer.stage = f'[havoc]make close'
             self.table.make_close()
             with analyzer.lock:
-                analyzer.stage = f'[havoc] make consistent'
+                analyzer.stage = f'[havoc]make consistent'
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)
         except Exception as e:

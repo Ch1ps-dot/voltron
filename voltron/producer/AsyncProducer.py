@@ -224,7 +224,8 @@ class AsyncProducer:
 
     def generator_evo(
             self,
-            machine: MealyMachine
+            machine: MealyMachine,
+            id: str
     ) -> None:
         """Generate and save input generator
         """
@@ -244,13 +245,13 @@ class AsyncProducer:
                 msg_dir.mkdir()
             
             # save generator
-            gen_path = msg_dir / f'id{machine.id + 1}.py'
+            gen_path = msg_dir / f'id{int(machine.id) + 1}.py'
             with open(gen_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
                 
                 # construct and save information for new generator
                 old_name = f'id{machine.id}'
-                new_name = f'id{machine.id + 1}'
+                new_name = f'id{id}'
                 info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name}
                 self.generators.setdefault(msg_type, [])
                 self.generators[msg_type].append(Generator(**info))
@@ -323,7 +324,8 @@ class AsyncProducer:
 
     def generator_mutate(
             self,
-            machine: MealyMachine
+            machine: MealyMachine,
+            id: str
     ) -> None:
         """Generate and save input generator
         """
@@ -348,11 +350,13 @@ class AsyncProducer:
                 f.write(input_code)
                 
                 # construct and save information for new generator
-                old_name = f'id{len(self.mutators[msg_type])-1}'
-                new_name = f'id{len(self.mutators[msg_type])}'
+                old_name = f'id{machine.id}'
+                new_name = f'id{id}'
                 info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name}
-                self.mutators.setdefault(msg_type, [])
-                self.mutators[msg_type].append(Generator(**info))
+                
+                # set mutator name as {msg_type}[m]
+                self.mutators.setdefault(f'{msg_type}[m]', [])
+                self.mutators[f'{msg_type}[m]'].append(Generator(**info))
                 
         # save the information of new generator to file   
         with open(self.generator_info_path, 'w', encoding='utf-8') as f:

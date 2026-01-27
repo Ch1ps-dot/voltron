@@ -13,7 +13,7 @@ from pathlib import Path
 class Mapper:
     """Mapper between actual messages and abstract symbols.
     
-    Select generator and parser
+    Select generator, mutator and parser for symbols
     """
     def __init__(
         self,
@@ -28,6 +28,7 @@ class Mapper:
         self.response_types: list[str] = producer.res_types
         
         self.generators: dict[str, list[Generator]] = producer.generators
+        self.mutators: dict[str, list[Generator]] = producer.mutators
         # self.cur_suite: Suite = Suite(producer.generators)
         self.parsers: list[Parser] = producer.parsers
         
@@ -78,7 +79,9 @@ class Mapper:
             if req == '-':
                 # ignore empty symbol
                 continue
-            elif req in self.generators.keys():
+            
+            # select normal generator
+            elif req in self.generators.keys(): 
                 # get generator of according message type
                 g = self.select_generator(req, select_mode)
                 
@@ -108,6 +111,38 @@ class Mapper:
                     logger.debug(asdict(g))
                     logger.debug(self.message_pool)
                     logger.debug(traceback.format_exc())
+                    
+            # select mutators
+            elif req in self.mutators:
+                # get generator of according message type
+                m = self.select_mutator(req, select_mode)
+                
+                if m.msg_type not in self.message_pool.keys():
+                    self.message_pool[m.msg_type] = {}
+                    
+                try:
+                    msg = None
+                    if cache_mode and m.was_used != 0:
+                        # cache mode to avoid randomness in model learning
+                        msg = self.message_pool[m.msg_type][m.name]
+                    else:
+                        # run generator at first time
+                        msg = self.exe_generator(m)
+                        if msg:
+                            self.message_pool[m.msg_type][m.name] = msg
+                            m.was_used += 1
+                        else:
+                            m.broken = False
+                            
+                    if msg:
+                        msg_type = m.msg_type
+                        ms.append((msg_type, msg))
+                    else:
+                        raise Exception
+                except Exception as e:
+                    logger.debug(asdict(m))
+                    logger.debug(self.message_pool)
+                    logger.debug(traceback.format_exc())
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
@@ -121,6 +156,16 @@ class Mapper:
             return self.generators[req_type][-1]
         else:
             return self.generators[req_type][0]
+        
+    def select_mutator(
+        self,
+        req_type: str,
+        mode: str = 'new'
+    ) -> Generator:
+        if mode == 'new':
+            return self.mutators[req_type][-1]
+        else:
+            return self.mutators[req_type][0]
     
     def exe_generator(
         self,
