@@ -166,6 +166,11 @@ class Analyzer:
         self.total = 0
         self.show_progress =''
         
+    def reset_automata_cnt(self):
+        self.state = 0
+        self.cur_res_types_cnt = {}
+        self.cur_resp_trans_cnt = {}
+        
     def set_progress(
         self,
         progress: str,

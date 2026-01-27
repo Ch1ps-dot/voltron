@@ -188,8 +188,7 @@ class Fuzzer:
                     cur_id = str(analyzer.iter)
                     with analyzer.lock:
                         analyzer.iter += 1
-                        analyzer.cur_res_types_cnt = {}
-                        analyzer.cur_resp_trans_cnt = {}
+                        analyzer.reset_automata_cnt()
                     next_id = str(analyzer.iter)
                     
                     # run model learning
@@ -211,18 +210,18 @@ class Fuzzer:
                         continue
                     # select a better generator to evolve
                     # the more states transitions the better the generator
-                    last_states_num = len(h_lsit[-1].res_trans_types.keys())
-                    cur_states_num = len(h.res_trans_types.keys())
+                    last_trans_num = len(h_lsit[-1].res_trans_types.keys())
+                    cur_trans_num = len(h.res_trans_types.keys())
                     
-                    if last_states_num > cur_states_num:
-                        self.producer.generator_evo(h_lsit[-1], next_id)
-                        continue
+                    if last_trans_num >= cur_trans_num:
+                        # self.producer.generator_evo(h_lsit[-1], next_id)
+                        break
                     
-                    elif last_states_num < cur_states_num:
+                    elif last_trans_num < cur_trans_num:
                         h_lsit.append(h)
                         self.producer.generator_evo(h, next_id)
                         continue
-
+                    
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')
                     logger.debug(traceback.format_exc())
@@ -261,6 +260,7 @@ class Fuzzer:
                     
                     with analyzer.lock:   
                         analyzer.iter += 1
+                        analyzer.reset_automata_cnt()
                     
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')

@@ -117,7 +117,7 @@ def make_info_table():
 
     return Panel(
             table,
-            title="[bold cyan]Fuzzer Infor",
+            title="[bold cyan]Fuzzer Info",
             title_align="center",
             expand=True
         )
@@ -160,8 +160,8 @@ def make_progress_panel():
         
         progress_panel = Panel(
             table,
-            title="[bold cyan]Task Progress",
-            title_align="left",
+            title="[bold cyan]Fuzzing Progress",
+            title_align="center",
             expand=True
         )
     
