@@ -231,7 +231,6 @@ class AsyncProducer:
         """
         with analyzer.lock:
             analyzer.set_progress('evolve', 'evolve', len(self.req_types))
-            analyzer.stage = 'fuzzer evolve'
             
         doc_info = ''
         with open(self.info_path, 'r', encoding='utf-8') as f:
@@ -345,7 +344,7 @@ class AsyncProducer:
                 msg_dir.mkdir()
             
             # save mutator
-            mut_path = msg_dir / f'id{len(self.mutators[msg_type])}.py'
+            mut_path = msg_dir / f'id{id}.py'
             with open(mut_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
                 
@@ -355,12 +354,12 @@ class AsyncProducer:
                 info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
                 # set mutator name as {msg_type}[m]
-                self.mutators.setdefault(f'{msg_type}[m]', [])
-                self.mutators[f'{msg_type}[m]'].append(Generator(**info))
+                self.mutators.setdefault(msg_type, [])
+                self.mutators[msg_type].append(Generator(**info))
                 
         # save the information of new generator to file   
-        with open(self.generator_info_path, 'w', encoding='utf-8') as f:
-            json.dump(self.generator_info(), f)
+        with open(self.mutator_info_path, 'w', encoding='utf-8') as f:
+            json.dump(self.mutator_info(), f)
         
         with analyzer.lock:
             analyzer.clean_progress()
@@ -410,6 +409,19 @@ class AsyncProducer:
             for g in self.generators[msg_type]:
                 info.setdefault(msg_type, [])
                 info[msg_type].append(asdict(g))
+        return info
+    
+    def mutator_info(
+        self
+    ) -> dict:
+        """The information of mutators
+        Contains a dict to map msg_type and corresponded generator
+        """
+        info: dict[str, list[dict]]= {}
+        for msg_type, ms in self.mutators.items():
+            for m in ms:
+                info.setdefault(msg_type, [])
+                info[msg_type].append(asdict(m))
         return info
     
     def parser_info(

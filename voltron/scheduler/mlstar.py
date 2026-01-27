@@ -106,10 +106,11 @@ class ObTable:
                                         logger.debug('fill table: try again')
                                         continue
                                 
+                                self.T[si][e] = tuple(out[-len(e):])
+                                
                                 with analyzer.lock:
                                     analyzer.sent = f'{'/'.join(s)}:{a}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet) * len(self.E)})'
                                     analyzer.recv = f'{'/'.join(out)}'
-                                self.T[si][e] = tuple(out[-len(e):])
                                 break
         with analyzer.lock:
             analyzer.clean_progress()

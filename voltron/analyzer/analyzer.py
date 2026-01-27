@@ -30,25 +30,24 @@ class Analyzer:
         self.start_time: float
         self.strategy = ''
         self.stage = ''
-        # self.prefix = ''
-        # self.suffix = ''
-        # self.out = ''
+        
+        # communication info
         self.sent = ''
         self.recv = ''
+        self.last_sent = '-'
+        self.last_recv = '-'
 
         self.autamata = None
         self.state = 0
         self.lock: threading.Lock = threading.Lock()
-        self.last_sent = '-'
-        self.last_recv = '-'
-        
+
         # UI progress
         self.show_progress: str = ''
         self.progress_desc = ''
         self.total: int = 0
         self.finished: int = 0
         
-        self.iter = 0
+        self.iter = 0 # fuzzer generation iteration
 
     def collect_results(
             self
@@ -165,6 +164,8 @@ class Analyzer:
         self.finished = 0
         self.total = 0
         self.show_progress =''
+        self.sent = ''
+        self.recv = ''
         
     def reset_automata_cnt(self):
         self.state = 0

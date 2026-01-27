@@ -43,7 +43,7 @@ class MealyMachine:
             g.edge(str(k[0]), str(v), label=f'{k[1]}/{self.output[k]}')
                      
         g.save(
-            filename=f'model_{name}',
+            filename=f'automata_{name}',
             directory=configs.results_path
         )
         

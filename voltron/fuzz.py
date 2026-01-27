@@ -195,24 +195,28 @@ class Fuzzer:
                     next_id = str(analyzer.iter)
                     
                     # run model learning
+                    with analyzer.lock:   
+                        analyzer.stage = 'model learning'
                     ml = MealyLstar(mq, eq, self.stop_event)
                     h = ml.run(cur_id)
+                   
+                    # save and evaluate the automata
                     self.mapper.register_mapper(h)
                     marked_table = ml.table
-                    
-                    # save and evaluate the automata
                     h.res_types = analyzer.cur_res_types_cnt
                     h.res_trans_types = analyzer.cur_resp_trans_cnt
-                    with open(configs.results_path / f'model_{analyzer.iter}.pkl', 'wb') as f:
+                    with open(configs.results_path / f'hypothesis_{analyzer.iter}.pkl', 'wb') as f:
                         pickle.dump(h, f)
-                    h.graph(id)
+                    h.graph(analyzer.iter)
 
+                    # select a better generator to evolve
+                    # the more states transitions the better the generator
+                    with analyzer.lock:   
+                        analyzer.stage = 'fuzzer evolve'
                     if len(h_lsit) == 0:
                         h_lsit.append(h)
                         self.producer.generator_evo(h, next_id)
                         continue
-                    # select a better generator to evolve
-                    # the more states transitions the better the generator
                     last_trans_num = len(h_lsit[-1].res_trans_types.keys())
                     cur_trans_num = len(h.res_trans_types.keys())
                     
@@ -234,10 +238,9 @@ class Fuzzer:
                     stop_event.set()
                     logger.debug('Fuzzer: timeout')
             
-            """--- havoc mutate ---"""
+            """--- havoc fuzzing ---"""
             with analyzer.lock:   
                 analyzer.iter = 0
-                analyzer.stage = 'havoc fuzz'
             mh_list: list[MealyMachine] = [h_lsit[-1]]
             S = marked_table.S
             E = marked_table.E
@@ -246,12 +249,14 @@ class Fuzzer:
             while not stop_event.is_set():
                 try:
                     # mutate generator
-                    self.producer.generator_mutate(mh_list[0], f'{analyzer.iter}-havoc')
+                    with analyzer.lock:   
+                        analyzer.stage = 'fuzzer mutate'
+                    self.producer.generator_mutate(mh_list[0], f'{analyzer.iter}[m]')
 
-                    # init new learning process with previous model
+                    # init new learning process with previous model and run fuzzer
+                    with analyzer.lock:   
+                        analyzer.stage = 'havoc fuzzing'
                     havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
-                    
-                    # run fuzzer
                     mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
                     self.mapper.register_mapper(mh)
                     
@@ -261,7 +266,6 @@ class Fuzzer:
                     with open(configs.results_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
                         pickle.dump(mh, f)
                     mh.graph(id)
-                    
                     
                     with analyzer.lock:   
                         analyzer.iter += 1
@@ -279,7 +283,7 @@ class Fuzzer:
             logger.debug(f'Fuzzer: exit {e}') 
             logger.debug(traceback.format_exc())
             stop_event.set()
-
+        
     def handle_normal_fuzzer_exit(
             self,
             signal_num, 
