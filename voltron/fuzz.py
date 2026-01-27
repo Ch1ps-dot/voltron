@@ -54,7 +54,8 @@ class Fuzzer:
 
         # some file path 
         configs.pre_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'pre.sh'
-        configs.post_script =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
+        configs.post_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
+        configs.models_path = configs.base_path / 'input' / 'models' / configs.target_name
         configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.md'
         configs.doc_path = configs.base_path / 'input' / 'rfcs' / f'{configs.rfc_name}.txt'
         configs.pmp_path = configs.base_path / 'input' / 'prompts'
@@ -178,121 +179,241 @@ class Fuzzer:
             # set membership query and equivelence query method.
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
-            h_lsit: list[MealyMachine] = []
             marked_table: ObTable # final learned model
             
             with analyzer.lock:   
                 analyzer.iter = 0
                 analyzer.stage = 'model learning'
+                
+            if not configs.models_path.is_dir():
+                configs.models_path.mkdir()
             
             # load previous automata model if it existed
             hypothesis = None
-            h_path = configs.results_path / 'evolved_hypothesis.pkl'
+            h_path = configs.models_path / 'evolved_hypothesis.pkl'
             if h_path.is_file():
                 with open(h_path, 'rb') as f:
                     hypothesis = pickle.load(f)
             
             """--- model learning ---"""
-            while not stop_event.is_set() and hypothesis is None:
-                try:
-                    cur_id = str(analyzer.iter)
-                    with analyzer.lock:
-                        analyzer.iter += 1
-                        analyzer.reset_automata_cnt()
-                    next_id = str(analyzer.iter)
+            if hypothesis is None:
+                hypothesis, marked_table = self.model_learning(mq, eq, stop_event)
+                
+            self.havoc_fuzz(mq, eq, hypothesis, marked_table, stop_event)
+            # while not stop_event.is_set() and hypothesis is None:
+            #     try:
+            #         cur_id = str(analyzer.iter)
+            #         with analyzer.lock:
+            #             analyzer.iter += 1
+            #             analyzer.reset_automata_cnt()
+            #         next_id = str(analyzer.iter)
                     
-                    # run model learning
-                    with analyzer.lock:   
-                        analyzer.stage = 'model learning'
-                    ml = MealyLstar(mq, eq, self.stop_event)
-                    h = ml.run(cur_id)
+            #         # run model learning
+            #         with analyzer.lock:   
+            #             analyzer.stage = 'model learning'
+            #         ml = MealyLstar(mq, eq, self.stop_event)
+            #         h = ml.run(cur_id)
                    
-                    # save and evaluate the automata
-                    self.mapper.register_mapper(h)
-                    marked_table = ml.table
-                    h.res_types = analyzer.cur_res_types_cnt
-                    h.res_trans_types = analyzer.cur_resp_trans_cnt
+            #         # save and evaluate the automata
+            #         self.mapper.register_mapper(h)
+            #         marked_table = ml.table
+            #         h.res_types = analyzer.cur_res_types_cnt
+            #         h.res_trans_types = analyzer.cur_resp_trans_cnt
 
-                    # select a better generator to evolve
-                    # the more states transitions the better the generator
-                    with analyzer.lock:   
-                        analyzer.stage = 'fuzzer evolve'
-                    if len(h_lsit) == 0:
-                        h_lsit.append(h)
-                        self.producer.generator_evo(h, next_id)
-                        continue
-                    last_trans_num = len(h_lsit[-1].res_trans_types.keys())
-                    cur_trans_num = len(h.res_trans_types.keys())
+            #         # select a better generator to evolve
+            #         # the more states transitions the better the generator
+            #         with analyzer.lock:   
+            #             analyzer.stage = 'fuzzer evolve'
+            #         if len(h_lsit) == 0:
+            #             h_lsit.append(h)
+            #             self.producer.generator_evo(h, next_id)
+            #             continue
+            #         last_trans_num = len(h_lsit[-1].res_trans_types.keys())
+            #         cur_trans_num = len(h.res_trans_types.keys())
                     
-                    if last_trans_num >= cur_trans_num:
-                        # self.producer.generator_evo(h_lsit[-1], next_id)
-                        with open(h_path, 'wb') as f:
-                            pickle.dump(h, f)
-                        h.graph('evolved')
-                        break
+            #         if last_trans_num >= cur_trans_num:
+            #             # self.producer.generator_evo(h_lsit[-1], next_id)
+            #             with open(h_path, 'wb') as f:
+            #                 pickle.dump(h, f)
+            #             h.graph('evolved')
+            #             break
                     
-                    elif last_trans_num < cur_trans_num:
-                        h_lsit.append(h)
-                        self.producer.generator_evo(h, next_id)
-                        continue
+            #         elif last_trans_num < cur_trans_num:
+            #             h_lsit.append(h)
+            #             self.producer.generator_evo(h, next_id)
+            #             continue
                     
 
-                except Exception as e:
-                    logger.debug(f'Fuzzer: exit {e}')
-                    logger.debug(traceback.format_exc())
-                    stop_event.set()
-                if (configs.time_limit_s < time.time() - analyzer.start_time):
-                    stop_event.set()
-                    logger.debug('Fuzzer: timeout')
+            #     except Exception as e:
+            #         logger.debug(f'Fuzzer: exit {e}')
+            #         logger.debug(traceback.format_exc())
+            #         stop_event.set()
+            #     if (configs.time_limit_s < time.time() - analyzer.start_time):
+            #         stop_event.set()
+            #         logger.debug('Fuzzer: timeout')
             
-            """--- havoc fuzzing ---"""
-            with analyzer.lock:   
-                analyzer.iter = 0
-            if hypothesis:
-                acc_h = hypothesis
-            else:
-                acc_h = h_lsit[-1]
-            S = marked_table.S
-            E = marked_table.E
-            T = marked_table.T
+            # """--- havoc fuzzing ---"""
+            # with analyzer.lock:   
+            #     analyzer.iter = 0
+            # if hypothesis:
+            #     acc_h = hypothesis
+            # else:
+            #     acc_h = h_lsit[-1]
+            # S = marked_table.S
+            # E = marked_table.E
+            # T = marked_table.T
             
-            while not stop_event.is_set():
-                try:
-                    # mutate generator
-                    with analyzer.lock:   
-                        analyzer.stage = 'fuzzer mutate'
-                    self.producer.generator_mutate(acc_h, f'{analyzer.iter}[m]')
+            # while not stop_event.is_set():
+            #     try:
+            #         # mutate generator
+            #         with analyzer.lock:   
+            #             analyzer.stage = 'fuzzer mutate'
+            #         self.producer.generator_mutate(acc_h, f'{analyzer.iter}[m]')
 
-                    # init new learning process with previous model and run fuzzer
-                    with analyzer.lock:   
-                        analyzer.stage = 'havoc fuzzing'
-                    havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
-                    mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
-                    self.mapper.register_mapper(mh)
+            #         # init new learning process with previous model and run fuzzer
+            #         with analyzer.lock:   
+            #             analyzer.stage = 'havoc fuzzing'
+            #         havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
+            #         mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
+            #         self.mapper.register_mapper(mh)
                     
-                    # save the results
-                    mh.res_types = analyzer.cur_res_types_cnt
-                    mh.res_trans_types = analyzer.cur_resp_trans_cnt
-                    with open(configs.results_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
-                        pickle.dump(mh, f)
-                    mh.graph(id)
+            #         # save the results
+            #         mh.res_types = analyzer.cur_res_types_cnt
+            #         mh.res_trans_types = analyzer.cur_resp_trans_cnt
+            #         with open(configs.results_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
+            #             pickle.dump(mh, f)
+            #         mh.graph(id)
                     
-                    with analyzer.lock:   
-                        analyzer.iter += 1
-                        analyzer.reset_automata_cnt()
+            #         with analyzer.lock:   
+            #             analyzer.iter += 1
+            #             analyzer.reset_automata_cnt()
                     
-                except Exception as e:
-                    logger.debug(f'Fuzzer: exit {e}')
-                    logger.debug(traceback.format_exc())
-                    stop_event.set()
-                if (configs.time_limit_s < time.time() - analyzer.start_time):
-                    stop_event.set()
-                    logger.debug('Fuzzer: timeout')
+            #     except Exception as e:
+            #         logger.debug(f'Fuzzer: exit {e}')
+            #         logger.debug(traceback.format_exc())
+            #         stop_event.set()
+            #     if (configs.time_limit_s < time.time() - analyzer.start_time):
+            #         stop_event.set()
+            #         logger.debug('Fuzzer: timeout')
                 
         except Exception as e:
             logger.debug(f'Fuzzer: exit {e}') 
             logger.debug(traceback.format_exc())
             stop_event.set()
+            
+    def model_learning(
+        self,
+        mq,
+        eq,
+        stop_event
+    ) -> tuple[MealyMachine, ObTable]:
+        """--- model learning ---"""
+        h_lsit: list[MealyMachine] = []
+        marked_table: ObTable # final learned model
+        h_path = configs.results_path / 'evolved_hypothesis.pkl'
+        while not stop_event.is_set():
+            try:
+                cur_id = str(analyzer.iter)
+                with analyzer.lock:
+                    analyzer.iter += 1
+                    analyzer.reset_automata_cnt()
+                next_id = str(analyzer.iter)
+                
+                # run model learning
+                with analyzer.lock:   
+                    analyzer.stage = 'model learning'
+                ml = MealyLstar(mq, eq, self.stop_event)
+                h = ml.run(cur_id)
+                
+                # save and evaluate the automata
+                self.mapper.register_mapper(h)
+                marked_table = ml.table
+                h.res_types = analyzer.cur_res_types_cnt
+                h.res_trans_types = analyzer.cur_resp_trans_cnt
+
+                # select a better generator to evolve
+                # the more states transitions the better the generator
+                with analyzer.lock:   
+                    analyzer.stage = 'fuzzer evolve'
+                if len(h_lsit) == 0:
+                    h_lsit.append(h)
+                    self.producer.generator_evo(h, next_id)
+                    continue
+                last_trans_num = len(h_lsit[-1].res_trans_types.keys())
+                cur_trans_num = len(h.res_trans_types.keys())
+                
+                if last_trans_num >= cur_trans_num:
+                    # self.producer.generator_evo(h_lsit[-1], next_id)
+                    with open(h_path, 'wb') as f:
+                        pickle.dump(h, f)
+                    h.graph('evolved')
+                    break
+                
+                elif last_trans_num < cur_trans_num:
+                    h_lsit.append(h)
+                    self.producer.generator_evo(h, next_id)
+                    continue
+                
+
+            except Exception as e:
+                logger.debug(f'Fuzzer: exit {e}')
+                logger.debug(traceback.format_exc())
+                stop_event.set()
+            if (configs.time_limit_s < time.time() - analyzer.start_time):
+                stop_event.set()
+                logger.debug('Fuzzer: timeout')
+                
+        return h_lsit[-1], marked_table
+    
+    def havoc_fuzz(
+        self,
+        mq,
+        eq,
+        hypothesis: MealyMachine,
+        marked_table: ObTable,
+        stop_event
+    ):
+        """--- havoc fuzzing ---"""
+        with analyzer.lock:   
+            analyzer.iter = 0
+        
+        S = marked_table.S
+        E = marked_table.E
+        T = marked_table.T
+        
+        while not stop_event.is_set():
+            try:
+                # mutate generator
+                with analyzer.lock:   
+                    analyzer.stage = 'fuzzer mutate'
+                self.producer.generator_mutate(hypothesis, f'{analyzer.iter}[m]')
+
+                # init new learning process with previous model and run fuzzer
+                with analyzer.lock:   
+                    analyzer.stage = 'havoc fuzzing'
+                havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
+                mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
+                self.mapper.register_mapper(mh)
+                
+                # save the results
+                mh.res_types = analyzer.cur_res_types_cnt
+                mh.res_trans_types = analyzer.cur_resp_trans_cnt
+                with open(configs.results_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
+                    pickle.dump(mh, f)
+                mh.graph(id)
+                
+                with analyzer.lock:   
+                    analyzer.iter += 1
+                    analyzer.reset_automata_cnt()
+                
+            except Exception as e:
+                logger.debug(f'Fuzzer: exit {e}')
+                logger.debug(traceback.format_exc())
+                stop_event.set()
+            if (configs.time_limit_s < time.time() - analyzer.start_time):
+                stop_event.set()
+                logger.debug('Fuzzer: timeout')
+                
         
     def handle_normal_fuzzer_exit(
             self,

@@ -9,6 +9,7 @@ class Config:
         self.doc_path: Path
         self.pre_script: Path
         self.post_script: Path
+        self.models_path: Path
         self.doc_path: Path
         self.pmp_path: Path
         self.results_path: Path
