@@ -204,18 +204,15 @@ class Fuzzer:
                     h.graph(id)
                     h.res_types = analyzer.cur_res_types_cnt
                     h.res_trans_types = analyzer.cur_resp_trans_cnt
-                    
-                    
-                    
-                    # select a better generator to evolve
-                    # the more states transitions the better the generator
-                    last_states_num = len(h_lsit[-1].res_trans_types.keys())
-                    cur_states_num = len(h.res_trans_types.keys())
 
                     if len(h_lsit) == 0:
                         h_lsit.append(h)
                         self.producer.generator_evo(h, id)
                         continue
+                    # select a better generator to evolve
+                    # the more states transitions the better the generator
+                    last_states_num = len(h_lsit[-1].res_trans_types.keys())
+                    cur_states_num = len(h.res_trans_types.keys())
                     
                     if last_states_num > cur_states_num:
                         self.producer.generator_evo(h_lsit[-1], id)
