@@ -28,8 +28,6 @@ class ObTable:
         self.stop_event = stop_event
         
     def table_init(self):
-        with analyzer.lock:
-            analyzer.stage = f'init ObTable'
         self._fill_table()
 
     def _fill_table(self):
@@ -248,11 +246,7 @@ class MealyLstar:
         id: str
     ):
         try:
-            with analyzer.lock:
-                analyzer.stage = f'make close'
             self.table.make_close()
-            with analyzer.lock:
-                analyzer.stage = f'make consistent'
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)
         except Exception as e:
@@ -276,11 +270,7 @@ class MealyLstar:
             self.table.alphabet += additional_symbol
             
             # run model learning
-            with analyzer.lock:
-                analyzer.stage = f'[havoc]make close'
             self.table.make_close()
-            with analyzer.lock:
-                analyzer.stage = f'[havoc]make consistent'
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)
         except Exception as e:

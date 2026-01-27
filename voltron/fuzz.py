@@ -180,7 +180,10 @@ class Fuzzer:
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
             h_lsit: list[MealyMachine] = []
             marked_table: ObTable # final learned model
-            analyzer.iter = 0
+            
+            with analyzer.lock:   
+                analyzer.iter = 0
+                analyzer.stage = 'model learning'
             
             """--- model learning ---"""
             while not stop_event.is_set():
@@ -222,6 +225,7 @@ class Fuzzer:
                         self.producer.generator_evo(h, next_id)
                         continue
                     
+
                 except Exception as e:
                     logger.debug(f'Fuzzer: exit {e}')
                     logger.debug(traceback.format_exc())
@@ -233,6 +237,7 @@ class Fuzzer:
             """--- havoc mutate ---"""
             with analyzer.lock:   
                 analyzer.iter = 0
+                analyzer.stage = 'havoc fuzz'
             mh_list: list[MealyMachine] = [h_lsit[-1]]
             S = marked_table.S
             E = marked_table.E

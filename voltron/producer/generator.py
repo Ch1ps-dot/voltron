@@ -8,6 +8,7 @@ class Generator:
     msg_type: str
     name: str
     evolved_from: str
+    path: str
     cur_res: list[str] = field(default_factory=list)
     pre_res: list[str] = field(default_factory=list)
     fut_res: list[str] = field(default_factory=list)

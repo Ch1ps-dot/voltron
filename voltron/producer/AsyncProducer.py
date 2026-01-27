@@ -155,7 +155,7 @@ class AsyncProducer:
             init_gen_path = msg_dir / 'id0.py'
             with open(init_gen_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
-                info: dict = {'msg_type': msg_type, 'evolved_from': 'init', 'name': 'id0'}
+                info: dict = {'msg_type': msg_type, 'evolved_from': 'init', 'name': 'id0', 'path': str(init_gen_path.resolve())}
                 self.generators.setdefault(msg_type, [])
                 self.generators[msg_type].append(Generator(**info))
             
@@ -167,7 +167,6 @@ class AsyncProducer:
     async def _generator_evo_one(
             self,
             msg_type: str,
-            gs: list[Generator],
             doc_info:str,
             machine: MealyMachine,
             sem
@@ -216,7 +215,7 @@ class AsyncProducer:
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._generator_evo_one(msg_type=msg_type, gs=gs, doc_info=doc_info, machine=machine, sem=sem)
+            self._generator_evo_one(msg_type=msg_type, doc_info=doc_info, machine=machine, sem=sem)
             for msg_type, gs in self.generators.items()
         ]
         results = await asyncio.gather(*tasks)
@@ -252,7 +251,7 @@ class AsyncProducer:
                 # construct and save information for new generator
                 old_name = f'id{machine.id}'
                 new_name = f'id{id}'
-                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name}
+                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(gen_path.resolve())}
                 self.generators.setdefault(msg_type, [])
                 self.generators[msg_type].append(Generator(**info))
                 
@@ -267,15 +266,14 @@ class AsyncProducer:
     async def _generator_mutate_one(
             self,
             msg_type: str,
-            gs: list[Generator],
             doc_info:str,
             machine: MealyMachine,
             sem
     ):
         old_code = ''
-        old_m_name = f'id{machine.id}.py'
-        old_m_path = self.mutator_path / msg_type / old_m_name
-        with open(old_m_path, 'r', encoding='utf-8') as f:
+        old_g_name = f'id{machine.id}.py'
+        old_g_path = self.generator_path / msg_type / old_g_name
+        with open(old_g_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
                 
         async with sem:
@@ -307,7 +305,7 @@ class AsyncProducer:
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._generator_mutate_one(msg_type=msg_type, gs=gs, doc_info=doc_info, machine=machine, sem=sem)
+            self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, machine=machine, sem=sem)
             for msg_type, gs in self.generators.items()
         ]
         results = await asyncio.gather(*tasks)
@@ -322,8 +320,7 @@ class AsyncProducer:
         """
         with analyzer.lock:
             analyzer.set_progress('evolve', 'mutate', len(self.req_types))
-            analyzer.stage = 'fuzzer mutate'
-            
+           
         doc_info = ''
         with open(self.info_path, 'r', encoding='utf-8') as f:
             doc_info = f.read()
@@ -345,7 +342,7 @@ class AsyncProducer:
                 # construct and save information for new generator
                 old_name = f'id{machine.id}'
                 new_name = f'id{id}'
-                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name}
+                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
                 # set mutator name as {msg_type}[m]
                 self.mutators.setdefault(f'{msg_type}[m]', [])
