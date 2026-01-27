@@ -38,7 +38,6 @@ You will be given:
       - Repetitive patterns (long sequences of identical bytes to trigger memory exhaustion)
 
    - Prefer generating messages that are:
-      - **syntactically protocol-valid** (to pass initial parsing)
       - **semantically invalid** (to trigger unexpected behavior)
       - Distinct from standard messages to maximize fault exposure
 
@@ -48,8 +47,7 @@ You will be given:
    - Introduce intentional inconsistencies between dependent fields (e.g., length vs payload size)
    - Use valid encodings for malicious content (e.g., null bytes in string fields, oversized payloads)
 
-4. Generate a **Python function** that constructs **one fault-inducing instance** of the `$msg_type` message
-   - The generated message must be **syntactically protocol-compliant** (to reach deep SUT logic)
+4. Generate a **Python function** that constructs **fault-inducing instance** of the `$msg_type` message
    - The message must contain **semantic anomalies** designed to trigger unexpected behavior (crashes, hangs, invalid state transitions)
    - All fields are concretely instantiated with values chosen to maximize fault exposure
 
