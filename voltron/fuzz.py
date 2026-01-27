@@ -309,7 +309,6 @@ class Fuzzer:
     ) -> MealyMachine:
         """--- model learning ---"""
         h_lsit: list[MealyMachine] = []
-        marked_table: ObTable # final learned model
         h_path = configs.results_path / 'evolved_hypothesis.pkl'
         while not stop_event.is_set():
             try:
