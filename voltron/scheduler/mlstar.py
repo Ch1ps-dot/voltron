@@ -219,7 +219,8 @@ class ObTable:
             alphabet=set(self.alphabet),
             delta=delta,
             output=output,
-            start=start
+            start=start,
+            table=(self.S, self.E, self.T)
         )
         
 class MealyLstar:

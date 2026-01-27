@@ -10,6 +10,7 @@ class MealyMachine:
         delta: dict[tuple[int, str], int],
         output: dict[tuple[int, str], str],
         start: int,
+        table: tuple
     ) -> None:
         self.id = id
         self.states: set[int] = states
@@ -20,6 +21,7 @@ class MealyMachine:
         self.map: dict[str, bytes] = {}
         self.res_types: dict[str, int] = {}
         self.res_trans_types: dict[str, int] = {}
+        self.table = table
     
     def run(
         self, 

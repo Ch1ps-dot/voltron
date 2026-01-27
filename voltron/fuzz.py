@@ -197,9 +197,9 @@ class Fuzzer:
             
             """--- model learning ---"""
             if hypothesis is None:
-                hypothesis, marked_table = self.model_learning(mq, eq, stop_event)
+                hypothesis = self.model_learning(mq, eq, stop_event)
                 
-            self.havoc_fuzz(mq, eq, hypothesis, marked_table, stop_event)
+            self.havoc_fuzz(mq, eq, hypothesis, stop_event)
             # while not stop_event.is_set() and hypothesis is None:
             #     try:
             #         cur_id = str(analyzer.iter)
@@ -306,7 +306,7 @@ class Fuzzer:
         mq,
         eq,
         stop_event
-    ) -> tuple[MealyMachine, ObTable]:
+    ) -> MealyMachine:
         """--- model learning ---"""
         h_lsit: list[MealyMachine] = []
         marked_table: ObTable # final learned model
@@ -363,23 +363,22 @@ class Fuzzer:
                 stop_event.set()
                 logger.debug('Fuzzer: timeout')
                 
-        return h_lsit[-1], marked_table
+        return h_lsit[-1]
     
     def havoc_fuzz(
         self,
         mq,
         eq,
         hypothesis: MealyMachine,
-        marked_table: ObTable,
         stop_event
     ):
         """--- havoc fuzzing ---"""
         with analyzer.lock:   
             analyzer.iter = 0
         
-        S = marked_table.S
-        E = marked_table.E
-        T = marked_table.T
+        S = hypothesis.table[0]
+        E = hypothesis.table[1]
+        T = hypothesis.table[2]
         
         while not stop_event.is_set():
             try:
