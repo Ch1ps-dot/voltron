@@ -57,13 +57,13 @@ class ObTable:
                     if self.stop_event.is_set(): 
                         sys.exit(0)
                         
-                    if(self.T[s[:-1]][s[-1:]] == ('CLOSED',)):
+                    if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('CLOSED',)):
                         self.T[s][e] = ('CLOSED',)
                         continue
-                    if(self.T[s[:-1]][s[-1:]] == ('CRASH',)):
+                    if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('CRASH',)):
                         self.T[s][e] = ('CRASH',)
                         continue
-                    if(self.T[s[:-1]][s[-1:]] == ('TIMEOUT',)):
+                    if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('TIMEOUT',)):
                         self.T[s][e] = ('TIMEOUT',)
                         continue
                                     
