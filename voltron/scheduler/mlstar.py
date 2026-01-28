@@ -46,7 +46,7 @@ class ObTable:
                     self.T[s] = {}
                 
                 if e in self.T[s].keys():
-                    logger.debug(f'table entry: {s}:{e} => {self.T[s][e]}')
+                    logger.debug(f'existed entry: {s}:{e} => {self.T[s][e]}')
                     continue    
                 
                 else:
@@ -68,6 +68,7 @@ class ObTable:
                         continue
                                     
                     out = self.mq.query(s + e)
+                    
                     if (out):
                         if len(s) > 0:
                             if 'TIMEOUT' == out[-1] and len(out) < len(s):
@@ -78,6 +79,7 @@ class ObTable:
                             analyzer.recv = f'{'/'.join(out)}'
                             
                         self.T[s][e] = tuple(out[-len(e):])
+                        logger.debug(f'query entry: {s}:{e} => {self.T[s][e]}')
                     else:
                         logger.debug('fill table: no out')
 
