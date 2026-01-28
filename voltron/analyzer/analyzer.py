@@ -3,6 +3,7 @@ from pathlib import Path
 from voltron.utils.logger import logger
 from voltron.producer.AsyncProducer import Generator, Parser
 from voltron.configs import configs
+import threading
 
 class Analyzer:
     def __init__(
@@ -48,6 +49,8 @@ class Analyzer:
         self.finished: int = 0
         
         self.iter = 0 # fuzzer generation iteration
+        
+        self.stop_event: threading.Event
 
     def collect_results(
             self

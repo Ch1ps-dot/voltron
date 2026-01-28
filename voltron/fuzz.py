@@ -107,6 +107,7 @@ class Fuzzer:
         self.mapper = Mapper(self.producer)
         
         self.stop_event = threading.Event()
+        analyzer.stop_event = self.stop_event
         # setup executor
         self.exe = Executor(
             mapper=self.mapper,

@@ -135,7 +135,7 @@ class Mapper:
                         msg = self.message_pool[m.msg_type][m.name]
                     else:
                         # run generator at first time
-                        msg = self.exe_generator(m)
+                        msg = self.exe_mutator(m)
                         if msg:
                             self.message_pool[m.msg_type][m.name] = msg
                             m.was_used += 1
@@ -187,11 +187,12 @@ class Mapper:
                 obj = name_space[f'generate_{g.msg_type}']
                 return obj()
         except Exception as e:
+            analyzer.stop_event.set()
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
             return None
         
-    def mutator(
+    def exe_mutator(
         self,
         m: Generator
     ) -> bytes | None:
@@ -203,6 +204,7 @@ class Mapper:
                 obj = name_space[f'generate_{m.msg_type}']
                 return obj()
         except Exception as e:
+            analyzer.stop_event.set()
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
             return None
