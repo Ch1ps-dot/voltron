@@ -71,6 +71,11 @@ class Fuzzer:
         results_dir = configs.base_path / f'results-{self.target_name}-voltron-{formatted_time}'
         if not results_dir.is_dir():
             results_dir.mkdir()
+            
+        models_dir = configs.base_path / 'output' / 'models'
+        if not models_dir.is_dir():
+            models_dir.mkdir()
+            configs.models_path.mkdir()
         
         configs.results_path = results_dir
         
