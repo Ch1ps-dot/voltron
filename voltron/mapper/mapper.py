@@ -144,7 +144,7 @@ class Mapper:
                             
                     if msg:
                         msg_type = m.msg_type
-                        ms.append((msg_type, msg))
+                        ms.append((f'{msg_type}[m]', msg))
                     else:
                         raise Exception
                 except Exception as e:
