@@ -106,7 +106,7 @@ class ObTable:
                         sys.exit(0)
                         
                     if e in self.T[si].keys():
-                        logger.debug(f'table entry: {si}:{e} => {self.T[si][e]}')
+                        logger.debug(f'existed entry: {si}:{e} => {self.T[si][e]}')
                         continue
                     
                     # connection was closed before sending suffix request
@@ -138,6 +138,7 @@ class ObTable:
                                 with analyzer.lock:
                                     analyzer.sent = f'{'/'.join(s)}:{a}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet) * len(self.E)})'
                                     analyzer.recv = f'{'/'.join(out)}'
+                                logger.debug(f'query entry: {s}:{a}:{e} => {self.T[si][e]}')
                                 break
                             else:
                                 logger.debug('fill table: no out')
