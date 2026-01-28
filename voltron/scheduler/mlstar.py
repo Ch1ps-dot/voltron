@@ -39,10 +39,9 @@ class ObTable:
 
         # fill (s, e) table entry
         for s in self.S:
-            
-            iter_s += 1
-            
+
             for e in self.E:
+                iter_s += 1
                 if s not in self.T.keys():
                     self.T[s] = {}
                 
@@ -60,9 +59,11 @@ class ObTable:
                     out = self.mq.query(s + e)
                     if (out):
                         with analyzer.lock:
-                            analyzer.sent = f'{'/'.join(s)}:{'/'.join(e)} ({iter_s}/{len(self.S)})'
+                            analyzer.sent = f'{'/'.join(s)}:{'/'.join(e)} ({iter_s}/{len(self.S) * len(self.E)})'
                             analyzer.recv = f'{'/'.join(out)}'
                         self.T[s][e] = tuple(out[-len(e):])
+                    else:
+                        logger.debug('fill table: no out')
 
         with analyzer.lock:
             analyzer.set_progress('Obtable', desc='fill si table', total=1)
@@ -119,6 +120,8 @@ class ObTable:
                                     analyzer.sent = f'{'/'.join(s)}:{a}:{'/'.join(e)} ({iter_si}/{len(self.S) * len(self.alphabet) * len(self.E)})'
                                     analyzer.recv = f'{'/'.join(out)}'
                                 break
+                            else:
+                                logger.debug('fill table: no out')
         with analyzer.lock:
             analyzer.clean_progress()
 
