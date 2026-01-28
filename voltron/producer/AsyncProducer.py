@@ -98,6 +98,15 @@ class AsyncProducer:
                 logger.debug(f'Producer: parser load error {e}')
         else:
             self.parser_gen()
+            
+        if (self.mutator_info_path.is_file()):
+            try:
+                with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
+                    mutator_info = json.load(f)
+                    self.mutators_info_load(mutator_info)
+                logger.debug("Mutator: load mutator info")
+            except Exception as e:
+                logger.debug(f'Mutator: load error {e}')
 
     async def _generator_gen_one(
             self,
@@ -344,7 +353,11 @@ class AsyncProducer:
                 msg_dir.mkdir()
             
             # save mutator
-            cur_id = len(self.mutators[msg_type])
+            cur_id = None
+            if msg_type in self.mutators.keys():
+                cur_id = len(self.mutators[msg_type])
+            else:
+                cur_id = 0
             mut_path = msg_dir / f'id{cur_id}.py'
             with open(mut_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
@@ -442,6 +455,18 @@ class AsyncProducer:
                 for g in info[msg_type]:
                     self.generators.setdefault(msg_type, [])
                     self.generators[msg_type].append(Generator(**g))
+        except Exception as e:
+            logger.debug(f'Producer: load error {e}')
+    
+    def mutators_info_load(
+        self,
+        info: dict
+    ):
+        try:
+            for msg_type in info:
+                for g in info[msg_type]:
+                    self.mutators.setdefault(msg_type, [])
+                    self.mutators[msg_type].append(Generator(**g))
         except Exception as e:
             logger.debug(f'Producer: load error {e}')
         
