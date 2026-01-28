@@ -127,6 +127,7 @@ class Executor:
                 break
             
         if sock == None:
+            logger.debug('socket: setup failure')
             self.stop_event.set()
             sys.exit(0)
             

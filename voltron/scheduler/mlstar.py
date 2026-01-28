@@ -6,7 +6,7 @@ from voltron.scheduler.MembOracle import MembershipOracle
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint, pickle, threading, sys, traceback, time
+import pprint, pickle, threading, sys, traceback, time, copy
 
 
 class ObTable:
@@ -249,7 +249,7 @@ class ObTable:
             delta=delta,
             output=output,
             start=start,
-            table=(self.S, self.E, self.T)
+            table=(copy.deepcopy(self.S), copy.deepcopy(self.E), copy.deepcopy(self.T))
         )
         
 class MealyLstar:
