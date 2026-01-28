@@ -270,6 +270,8 @@ class MealyLstar:
             for a in self.table.alphabet:
                 additional_symbol.append(f'{a}[m]')
             self.table.alphabet += additional_symbol
+            for a in additional_symbol:
+                self.table.E.add((a,))
             
             # run model learning
             self.table.table_init()
