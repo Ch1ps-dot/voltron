@@ -45,7 +45,11 @@ class ObTable:
             for e in self.E:
                 if s not in self.T.keys():
                     self.T[s] = {}
-                if e not in self.T[s].keys():
+                
+                if e in self.T[s].keys():
+                    continue    
+                
+                else:
                     
                     if (configs.time_limit_s < time.time() - analyzer.start_time):
                         self.stop_event.set()
@@ -81,11 +85,14 @@ class ObTable:
                         
                     if self.stop_event.is_set(): 
                         sys.exit(0)
+                        
+                    if e in self.T[si].keys():
+                        continue
                     
                     # connection was closed before sending suffix request
                     # in this situation, there is no more response and destroy the evaluation
                     # so we just consider they are transfering to same state and jump the query
-                    if e not in self.T[si].keys():
+                    else:
                         if(self.T[s][(a,)] == ('CLOSED',)):
                             self.T[si][e] = ('CLOSED',)
                             continue
@@ -269,6 +276,7 @@ class MealyLstar:
             additional_symbol = []
             for a in self.table.alphabet:
                 additional_symbol.append(f'{a}[m]')
+                
             self.table.alphabet += additional_symbol
             for a in additional_symbol:
                 self.table.E.add((a,))
