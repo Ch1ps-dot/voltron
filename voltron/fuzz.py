@@ -309,7 +309,7 @@ class Fuzzer:
     ) -> MealyMachine:
         """--- model learning ---"""
         h_lsit: list[MealyMachine] = []
-        h_path = configs.results_path / 'evolved_hypothesis.pkl'
+        h_path = configs.models_path / 'evolved_hypothesis.pkl'
         while not stop_event.is_set():
             try:
                 cur_id = str(analyzer.iter)
@@ -396,9 +396,9 @@ class Fuzzer:
                 # save the results
                 mh.res_types = analyzer.cur_res_types_cnt
                 mh.res_trans_types = analyzer.cur_resp_trans_cnt
-                with open(configs.results_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
+                with open(configs.models_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
                     pickle.dump(mh, f)
-                mh.graph(id)
+                mh.graph('mutate')
                 
                 with analyzer.lock:   
                     analyzer.iter += 1
