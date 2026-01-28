@@ -343,7 +343,7 @@ class Executor:
                     
                     except Exception as err:
                         # socket break when sending
-                        logger.debug(f'net_send: socket broken {msg}')
+                        logger.debug(f'net_send: socket broken {err} {msg}')
                         return False, None
                     return True, msg
             

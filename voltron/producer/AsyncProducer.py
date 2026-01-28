@@ -224,11 +224,11 @@ class AsyncProducer:
 
     def generator_evo(
             self,
-            machine: MealyMachine,
-            id: str
+            machine: MealyMachine
     ) -> None:
         """Generate and save input generator
         """
+        
         with analyzer.lock:
             analyzer.set_progress('evolve', 'evolve', len(self.req_types))
             
@@ -244,13 +244,14 @@ class AsyncProducer:
                 msg_dir.mkdir()
             
             # save generator
-            gen_path = msg_dir / f'id{int(machine.id) + 1}.py'
+            cur_id = len(self.generators[msg_type])
+            gen_path = msg_dir / f'id{cur_id}.py'
             with open(gen_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
-                
                 # construct and save information for new generator
+                
                 old_name = f'id{machine.id}'
-                new_name = f'id{id}'
+                new_name = f'id{cur_id}'
                 info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(gen_path.resolve())}
                 self.generators.setdefault(msg_type, [])
                 self.generators[msg_type].append(Generator(**info))
@@ -322,8 +323,7 @@ class AsyncProducer:
 
     def generator_mutate(
             self,
-            machine: MealyMachine,
-            id: str
+            machine: MealyMachine
     ) -> None:
         """Generate and save input generator
         """
@@ -344,13 +344,14 @@ class AsyncProducer:
                 msg_dir.mkdir()
             
             # save mutator
-            mut_path = msg_dir / f'id{id}.py'
+            cur_id = len(self.mutators[msg_type])
+            mut_path = msg_dir / f'id{cur_id}.py'
             with open(mut_path, 'w', encoding='utf-8') as f:
                 f.write(input_code)
                 
                 # construct and save information for new generator
                 old_name = f'id{machine.id}'
-                new_name = f'id{id}'
+                new_name = f'id{cur_id}'
                 info: dict = {'msg_type': f'{msg_type}', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
                 # set mutator name as {msg_type}[m]

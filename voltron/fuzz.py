@@ -333,7 +333,6 @@ class Fuzzer:
                 
                 # save and evaluate the automata
                 self.mapper.register_mapper(h)
-                marked_table = ml.table
                 h.res_types = analyzer.cur_res_types_cnt
                 h.res_trans_types = analyzer.cur_resp_trans_cnt
 
@@ -343,7 +342,7 @@ class Fuzzer:
                     analyzer.stage = 'fuzzer evolve'
                 if len(h_lsit) == 0:
                     h_lsit.append(h)
-                    self.producer.generator_evo(h, next_id)
+                    self.producer.generator_evo(h)
                     continue
                 last_trans_num = len(h_lsit[-1].res_trans_types.keys())
                 cur_trans_num = len(h.res_trans_types.keys())
@@ -353,11 +352,12 @@ class Fuzzer:
                     with open(h_path, 'wb') as f:
                         pickle.dump(h, f)
                     h.graph('evolved')
+                    logger.debug('ml: save evolved model')
                     break
                 
                 elif last_trans_num < cur_trans_num:
                     h_lsit.append(h)
-                    self.producer.generator_evo(h, next_id)
+                    self.producer.generator_evo(h)
                     continue
                 
 
@@ -391,7 +391,7 @@ class Fuzzer:
                 # mutate generator
                 with analyzer.lock:   
                     analyzer.stage = 'fuzzer mutate'
-                self.producer.generator_mutate(hypothesis, f'{analyzer.iter}')
+                self.producer.generator_mutate(hypothesis)
 
                 # init new learning process with previous model and run fuzzer
                 with analyzer.lock:   
