@@ -46,6 +46,7 @@ class ObTable:
                     self.T[s] = {}
                 
                 if e in self.T[s].keys():
+                    logger.debug(f'table entry: {s}:{e} => {self.T[s][e]}')
                     continue    
                 
                 else:
@@ -103,6 +104,7 @@ class ObTable:
                         sys.exit(0)
                         
                     if e in self.T[si].keys():
+                        logger.debug(f'table entry: {si}:{e} => {self.T[si][e]}')
                         continue
                     
                     # connection was closed before sending suffix request

@@ -190,7 +190,7 @@ class Fuzzer:
                 configs.models_path.mkdir()
             
             # load previous automata model if it existed
-            hypothesis = None
+            hypothesis: MealyMachine | None = None
             h_path = configs.models_path / 'evolved_hypothesis.pkl'
             if h_path.is_file():
                 with open(h_path, 'rb') as f:
@@ -199,8 +199,9 @@ class Fuzzer:
             """--- model learning ---"""
             if hypothesis is None:
                 hypothesis = self.model_learning(mq, eq, stop_event)
-                
-            self.havoc_fuzz(mq, eq, hypothesis, stop_event)
+            else:
+                self.mapper.message_pool = hypothesis.map
+                self.havoc_fuzz(mq, eq, hypothesis, stop_event)
             # while not stop_event.is_set() and hypothesis is None:
             #     try:
             #         cur_id = str(analyzer.iter)

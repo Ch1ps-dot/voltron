@@ -213,7 +213,4 @@ class Mapper:
         self,
         h: MealyMachine
     ):
-        for a in h.alphabet:
-            g = self.select_generator(a)
-            data = self.message_pool[a][g.name]
-            h.map[a] = data
+        h.map = self.message_pool

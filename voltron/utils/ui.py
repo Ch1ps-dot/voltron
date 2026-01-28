@@ -138,8 +138,8 @@ def make_progress_panel():
         
         progress_panel = Panel(
             table,
-            title="[bold cyan]Task Progress",
-            title_align="left",
+            title="[bold cyan]Fuzzing Progress",
+            title_align="center",
             expand=True
         )
     
