@@ -276,14 +276,15 @@ class AsyncProducer:
     async def _generator_mutate_one(
             self,
             msg_type: str,
-            doc_info:str,
-            machine: MealyMachine,
+            doc_info: str,
+            ms: list[Generator],
             sem
     ):
+        old_m_name = ms[-1].name
         old_code = ''
-        old_g_name = f'id{machine.id}.py'
-        old_g_path = self.generator_path / msg_type / old_g_name
-        with open(old_g_path, 'r', encoding='utf-8') as f:
+        old_m_name = f'{old_m_name}.py'
+        old_m_path = self.generator_path / msg_type / old_m_name
+        with open(old_m_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
                 
         async with sem:
@@ -319,20 +320,18 @@ class AsyncProducer:
 
     async def _generator_mutate_async(
         self,
-        doc_info: str,
-        machine: MealyMachine
+        doc_info: str
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, machine=machine, sem=sem)
-            for msg_type, gs in self.generators.items()
+            self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, ms=ms, sem=sem)
+            for msg_type, ms in self.mutators.items()
         ]
         results = await asyncio.gather(*tasks)
         return results
 
     def generator_mutate(
-            self,
-            machine: MealyMachine
+            self
     ) -> None:
         """Generate and save input generator
         """
@@ -344,7 +343,7 @@ class AsyncProducer:
             doc_info = f.read()
         
         # produce new mutator
-        results = asyncio.run(self._generator_mutate_async(doc_info, machine))
+        results = asyncio.run(self._generator_mutate_async(doc_info))
         
         # resolve mutator
         for msg_type, input_code in results:
@@ -363,7 +362,7 @@ class AsyncProducer:
                 f.write(input_code)
                 
                 # construct and save information for new generator
-                old_name = f'id{machine.id}'
+                old_name = self.mutators[msg_type][-1].name
                 new_name = f'id{cur_id}'
                 info: dict = {'msg_type': f'{msg_type}', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 

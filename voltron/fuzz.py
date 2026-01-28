@@ -14,6 +14,7 @@ from voltron.analyzer.analyzer import analyzer
 
 from voltron.mapper.mapper import Mapper
 from voltron.scheduler.rands import Rands
+from voltron.scheduler.havoc import Havoc
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
@@ -206,7 +207,7 @@ class Fuzzer:
                 hypothesis = self.model_learning(mq, eq, stop_event)
             else:
                 self.mapper.message_pool = hypothesis.map
-                self.havoc_fuzz(mq, eq, hypothesis, stop_event)
+                self.havoc_fuzz(hypothesis, stop_event)
             # while not stop_event.is_set() and hypothesis is None:
             #     try:
             #         cur_id = str(analyzer.iter)
@@ -373,8 +374,6 @@ class Fuzzer:
     
     def havoc_fuzz(
         self,
-        mq,
-        eq,
         hypothesis: MealyMachine,
         stop_event
     ):
@@ -391,22 +390,15 @@ class Fuzzer:
                 # mutate generator
                 with analyzer.lock:   
                     analyzer.stage = 'fuzzer mutate'
-                self.producer.generator_mutate(hypothesis)
+                self.producer.generator_mutate()
 
                 # init new learning process with previous model and run fuzzer
                 with analyzer.lock:   
                     analyzer.stage = 'havoc fuzzing'
-                havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
-                mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
-                self.mapper.register_mapper(mh)
+                havoc = Havoc(self.mapper, self.exe, hypothesis)
+                havoc.run(1000)
                 
                 # save the results
-                mh.res_types = analyzer.cur_res_types_cnt
-                mh.res_trans_types = analyzer.cur_resp_trans_cnt
-                with open(configs.models_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
-                    pickle.dump(mh, f)
-                mh.graph('mutate')
-                
                 with analyzer.lock:   
                     analyzer.iter += 1
                     analyzer.reset_automata_cnt()
@@ -418,6 +410,54 @@ class Fuzzer:
             if (configs.time_limit_s < time.time() - analyzer.start_time):
                 stop_event.set()
                 logger.debug('Fuzzer: timeout')
+    
+    # def havoc_fuzz(
+    #     self,
+    #     mq,
+    #     eq,
+    #     hypothesis: MealyMachine,
+    #     stop_event
+    # ):
+    #     """--- havoc fuzzing ---"""
+    #     with analyzer.lock:   
+    #         analyzer.iter = 0
+        
+    #     S = hypothesis.table[0]
+    #     E = hypothesis.table[1]
+    #     T = hypothesis.table[2]
+        
+    #     while not stop_event.is_set():
+    #         try:
+    #             # mutate generator
+    #             with analyzer.lock:   
+    #                 analyzer.stage = 'fuzzer mutate'
+    #             self.producer.generator_mutate(hypothesis)
+
+    #             # init new learning process with previous model and run fuzzer
+    #             with analyzer.lock:   
+    #                 analyzer.stage = 'havoc fuzzing'
+    #             havoc_ml = MealyLstar(mq=mq, eq=eq, stop_event=self.stop_event, table=(S, E, T))
+    #             mh = havoc_ml.havoc_run(f'{analyzer.iter}-havoc')
+    #             self.mapper.register_mapper(mh)
+                
+    #             # save the results
+    #             mh.res_types = analyzer.cur_res_types_cnt
+    #             mh.res_trans_types = analyzer.cur_resp_trans_cnt
+    #             with open(configs.models_path / f'model_{analyzer.iter}[m].pkl', 'wb') as f:
+    #                 pickle.dump(mh, f)
+    #             mh.graph('mutate')
+                
+    #             with analyzer.lock:   
+    #                 analyzer.iter += 1
+    #                 analyzer.reset_automata_cnt()
+                
+    #         except Exception as e:
+    #             logger.debug(f'Fuzzer: exit {e}')
+    #             logger.debug(traceback.format_exc())
+    #             stop_event.set()
+    #         if (configs.time_limit_s < time.time() - analyzer.start_time):
+    #             stop_event.set()
+    #             logger.debug('Fuzzer: timeout')
                 
         
     def handle_normal_fuzzer_exit(
