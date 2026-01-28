@@ -24,6 +24,7 @@ class Mapper:
         self.analyzer = analyzer
         self.gs_path = producer.generator_path
         self.ps_path = producer.parser_path
+        self.ms_path = producer.mutator_path
         
         self.request_types: list[str] = producer.req_types
         self.response_types: list[str] = producer.res_types
@@ -53,6 +54,12 @@ class Mapper:
         p: Parser
     ) -> Path:
         return self.ps_path / f'{p.name}.py'
+    
+    def m_path(
+        self,
+        m: Generator
+    ) -> Path:
+        return self.ms_path / m.msg_type / f'{m.name}.py'
         
     def equip_parser(
         self,

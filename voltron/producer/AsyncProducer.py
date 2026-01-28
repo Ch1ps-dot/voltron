@@ -339,7 +339,7 @@ class AsyncProducer:
         
         # resolve mutator
         for msg_type, input_code in results:
-            msg_dir = self.mutator_path / f'{msg_type}'
+            msg_dir = self.mutator_path / f'{msg_type}[m]'
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
             
