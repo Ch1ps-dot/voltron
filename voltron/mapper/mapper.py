@@ -190,6 +190,22 @@ class Mapper:
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
             return None
+        
+    def mutator(
+        self,
+        m: Generator
+    ) -> bytes | None:
+        name_space = {}
+        try:
+            with open(self.m_path(m), 'r', encoding='utf-8') as f:
+                code = f.read()
+                exec(code, name_space)
+                obj = name_space[f'generate_{m.msg_type}']
+                return obj()
+        except Exception as e:
+            logger.debug(f'Executor: generated failure {e}')
+            logger.debug(traceback.format_exc())
+            return None
             
     def register_mapper(
         self,

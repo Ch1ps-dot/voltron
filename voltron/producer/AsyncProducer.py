@@ -339,7 +339,7 @@ class AsyncProducer:
         
         # resolve mutator
         for msg_type, input_code in results:
-            msg_dir = self.mutator_path / f'{msg_type}[m]'
+            msg_dir = self.mutator_path / f'{msg_type}'
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
             
@@ -351,7 +351,7 @@ class AsyncProducer:
                 # construct and save information for new generator
                 old_name = f'id{machine.id}'
                 new_name = f'id{id}'
-                info: dict = {'msg_type': f'{msg_type}[m]', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
+                info: dict = {'msg_type': f'{msg_type}', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
                 # set mutator name as {msg_type}[m]
                 self.mutators.setdefault(f'{msg_type}[m]', [])

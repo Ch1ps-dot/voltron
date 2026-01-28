@@ -384,7 +384,7 @@ class Fuzzer:
                 # mutate generator
                 with analyzer.lock:   
                     analyzer.stage = 'fuzzer mutate'
-                self.producer.generator_mutate(hypothesis, f'{analyzer.iter}[m]')
+                self.producer.generator_mutate(hypothesis, f'{analyzer.iter}')
 
                 # init new learning process with previous model and run fuzzer
                 with analyzer.lock:   
