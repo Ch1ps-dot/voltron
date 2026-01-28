@@ -351,11 +351,11 @@ class AsyncProducer:
                 # construct and save information for new generator
                 old_name = f'id{machine.id}'
                 new_name = f'id{id}'
-                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
+                info: dict = {'msg_type': f'{msg_type}[m]', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
                 # set mutator name as {msg_type}[m]
-                self.mutators.setdefault(msg_type, [])
-                self.mutators[msg_type].append(Generator(**info))
+                self.mutators.setdefault(f'{msg_type}[m]', [])
+                self.mutators[f'{msg_type}[m]'].append(Generator(**info))
                 
         # save the information of new generator to file   
         with open(self.mutator_info_path, 'w', encoding='utf-8') as f:

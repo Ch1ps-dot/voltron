@@ -58,9 +58,14 @@ class ObTable:
                                     
                     out = self.mq.query(s + e)
                     if (out):
+                        if len(s) > 0:
+                            if 'TIMEOUT' == out[-1] and len(out) < len(s):
+                                logger.debug('fill table: try again')
+                                continue
                         with analyzer.lock:
                             analyzer.sent = f'{'/'.join(s)}:{'/'.join(e)} ({iter_s}/{len(self.S) * len(self.E)})'
                             analyzer.recv = f'{'/'.join(out)}'
+                            
                         self.T[s][e] = tuple(out[-len(e):])
                     else:
                         logger.debug('fill table: no out')
