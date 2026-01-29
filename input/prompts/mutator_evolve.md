@@ -23,13 +23,12 @@ You will be given:
 ### **Your Task**
 
 1. **Analyze the previously generated code and protocol structure**
-   - Identify syntactically valid but semantically non-compliant field values that strictly follow the protocol's defined error trigger conditions (e.g., missing user part in SIP URI → 484, invalid CSeq format → 400)
+   - Identify syntactically valid but semantically non-compliant field values in previous generated code that strictly follow the protocol's defined error trigger conditions (e.g., missing user part in SIP URI → 484, invalid CSeq format → 400)
    - Pinpoint protocol fields that map directly to standard error response codes (no exploitation of unhandled exceptions or memory issues)
-   - Calculate the maximum safe message length for socket transmission (≤ 1400 bytes, compatible with UDP MTU and TCP socket send limits)
 
 2. **Infer error response triggers**
-   - Based on the protocol structure and SUT information, prioritize generating messages that intentionally violate protocol SEMANTIC rules (but not syntactic rules) to trigger SPECIFIC, defined error responses:
-      - Valid protocol violations (e.g., incomplete URI, invalid method, missing fields) that map to documented error codes
+   - Based on the previous generated program, changing the key field value in the program, prioritize generating messages to trigger SPECIFIC, defined error responses:
+      - protocol violations (e.g., incomplete URI, invalid method, missing fields) that map to documented error codes
       - Semantic inconsistencies (e.g., length field matching protocol-defined invalid ranges, valid but non-existent resource identifiers) that elicit standard error responses
       - Protocol-specified invalid values (e.g., expired nonce for authentication errors, invalid content type for unsupported media errors)
       - Short, valid payloads with semantic violations (keep total length ≤ 1400 bytes) to ensure the SUT returns a standard error response
@@ -65,7 +64,7 @@ def mutate_${msg_type}():
     - Input: none
     - Output: bytes
     - Total message length ≤ 1400 bytes (compliant with socket send limits)
-    - Designed to elicit standard protocol-defined error responses (no program exceptions)
+    - Designed to elicit error responses (no program exceptions)
     """
     
     message = b''

@@ -48,7 +48,7 @@ class Havoc:
         for i in range(scope):
             req_seq.append(random.choice(self.alphabet))
         ms = self.mapper.select_mutators(req_seq)
-        ms = [(f'{msg_type}-m', data) for msg_type, data in ms]
+        ms = [(f'{msg_type}[m]', data) for msg_type, data in ms]
         return ms
     
     def run(
