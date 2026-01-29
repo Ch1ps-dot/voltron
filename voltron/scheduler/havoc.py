@@ -3,6 +3,7 @@ from voltron.producer.AsyncProducer import Generator
 from voltron.executor.executor import Executor, Conversation
 from voltron.analyzer.analyzer import analyzer
 from voltron.scheduler.automata import MealyMachine
+from voltron.utils.logger import logger
 import random, time
 
 class Havoc:
@@ -47,13 +48,15 @@ class Havoc:
         for i in range(scope):
             req_seq.append(random.choice(self.alphabet))
         ms = self.mapper.select_mutators(req_seq)
-        ms = [(f'{msg_type}[m]', data) for msg_type, data in ms]
+        ms = [(f'{msg_type}-m', data) for msg_type, data in ms]
         return ms
     
     def run(
         self,
         times: int
     ):
+        logger.debug(self.S)
+        logger.debug(self.alphabet)
         analyzer.set_progress('havoc', 'havoc fuzz', times)
         for i in range(times):
             
