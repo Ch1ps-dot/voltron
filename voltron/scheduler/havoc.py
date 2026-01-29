@@ -50,6 +50,7 @@ class Havoc:
         self,
         times: int
     ):
+        analyzer.set_progress('havoc', 'havoc fuzz', times)
         for i in range(times):
             
             last_resp_num = analyzer.res_types_num()
@@ -59,7 +60,7 @@ class Havoc:
             ms = self.select_mutators()
             req_seq = ms + prefix
             
-            analyzer.set_progress('havoc', 'havoc fuzz', 1000)
+           
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=1000)
             if cons != None:
                 analyzer.sent = '/'.join(cons.req_seq)

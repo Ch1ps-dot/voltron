@@ -319,7 +319,7 @@ class AsyncProducer:
     async def _generator_mutate_async(
         self,
         doc_info: str
-    ):
+    ) -> list[tuple[str, str]]:
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
             self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, sem=sem)
@@ -364,7 +364,7 @@ class AsyncProducer:
                 new_name = f'id{cur_id}'
                 info: dict = {'msg_type': f'{msg_type}', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
-                # set mutator name as {msg_type}[m]
+                # set mutator name as {msg_type}
                 self.mutators.setdefault(msg_type, [])
                 self.mutators[msg_type].append(Generator(**info))
                 
