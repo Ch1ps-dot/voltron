@@ -20,7 +20,6 @@ class MealyMachine:
         self.start: int = start
         self.map: dict[str, dict[str, bytes]] = {}
         self.res_types: dict[str, int] = {}
-        self.res_trans_types: dict[str, int] = {}
         self.table = table
     
     def run(

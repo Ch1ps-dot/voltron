@@ -14,6 +14,7 @@ class Havoc:
         exe: Executor,
         machine: MealyMachine
     ) -> None:
+        self.res_trans_types: dict[str, int] = {}
         self.mapper = mapper
         self.exe = exe
         self.alphabet = []
@@ -21,16 +22,26 @@ class Havoc:
             self.alphabet.append(msg_type)
         if machine:
             self.machine = machine
+            self.table = machine.table
+            self.S = self.table[0]
+            self.E = self.table[1]
         else:
             self.machine = None
 
-    def select(
+    def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
-        ms = []
+        p = random.choice(self.S)
+        w = list(p)
+        gs = self.mapper.select_generators(w)
+        return gs
+    
+    def select_mutators(
+        self
+    ) -> list[tuple[str, bytes]]:
         scope = random.randint(1, 10)
         for i in range(scope):
-            req_type =random.choice(self.alphabet)
+            req_type = random.choice(self.alphabet)
         ms = self.mapper.select_generators(req_type)
         return ms
     
@@ -39,10 +50,10 @@ class Havoc:
         times: int
     ):
         for i in range(times):
-            ms = self.select()
+            ms = self.select_mutators()
             flag, cons = self.exe.interact(ms)
-            res_types = analyzer.cur_res_types_cnt
-            res_trans_types = analyzer.cur_resp_trans_cnt
+            res_types = analyzer.res_types_num()
+            res_trans_types = analyzer.resp_trans_num()
             if flag and self.is_interesting(cons) and cons != None:
                 cons.save_cons()
         

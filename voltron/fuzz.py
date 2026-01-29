@@ -381,9 +381,7 @@ class Fuzzer:
         with analyzer.lock:   
             analyzer.iter = 0
         
-        S = hypothesis.table[0]
-        E = hypothesis.table[1]
-        T = hypothesis.table[2]
+        havoc = Havoc(self.mapper, self.exe, hypothesis)
         
         while not stop_event.is_set():
             try:
@@ -391,11 +389,10 @@ class Fuzzer:
                 with analyzer.lock:   
                     analyzer.stage = 'fuzzer mutate'
                 self.producer.generator_mutate()
-
                 # init new learning process with previous model and run fuzzer
                 with analyzer.lock:   
                     analyzer.stage = 'havoc fuzzing'
-                havoc = Havoc(self.mapper, self.exe, hypothesis)
+                
                 havoc.run(1000)
                 
                 # save the results

@@ -55,8 +55,6 @@ class Analyzer:
     def collect_results(
             self
     ):  
-        
-
         status_file = configs.results_path / f'fuzzer_status'
         try:
             with status_file.open(mode='w', encoding='utf-8') as f:
@@ -92,7 +90,7 @@ class Analyzer:
             req_code: str
     ):
         if req_code in self.req_types_cnt.keys():
-            self.req_types_cnt[req_code] += self.req_types_cnt[req_code] + 1
+            self.req_types_cnt[req_code] += 1
         else:
             self.req_types_cnt[req_code] = 1
 
@@ -101,13 +99,13 @@ class Analyzer:
             res_code: str
     ):
         if res_code in self.res_types_cnt.keys():
-            self.res_types_cnt[res_code] += self.res_types_cnt[res_code] + 1
+            self.res_types_cnt[res_code] +=  1
         else:
             self.res_types_cnt[res_code] = 1
             logger.debug(f'Analyzer: new reply {res_code}')
             
         if res_code in self.cur_res_types_cnt.keys():
-            self.cur_res_types_cnt[res_code] += self.cur_res_types_cnt[res_code] + 1
+            self.cur_res_types_cnt[res_code] +=  1
         else:
             self.cur_res_types_cnt[res_code] = 1
 
@@ -116,13 +114,13 @@ class Analyzer:
             trans: str
     ):
         if trans in self.resp_trans_cnt.keys():
-            self.resp_trans_cnt[trans] += self.resp_trans_cnt[trans] + 1
+            self.resp_trans_cnt[trans] += 1
         else:
             self.resp_trans_cnt[trans] = 1
             logger.debug(f'Analyzer: new transition {trans}')
             
         if trans in self.cur_resp_trans_cnt.keys():
-            self.cur_resp_trans_cnt[trans] += self.cur_resp_trans_cnt[trans] + 1
+            self.cur_resp_trans_cnt[trans] +=  1
         else:
             self.cur_resp_trans_cnt[trans] = 1
 
