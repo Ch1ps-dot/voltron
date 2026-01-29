@@ -360,7 +360,7 @@ class AsyncProducer:
                 f.write(input_code)
                 
                 # construct and save information for new generator
-                old_name = self.mutators[msg_type][-1].name
+                old_name = self.generators[msg_type][0].name
                 new_name = f'id{cur_id}'
                 info: dict = {'msg_type': f'{msg_type}', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
