@@ -206,7 +206,8 @@ class Fuzzer:
                 hypothesis = self.model_learning(mq, eq, stop_event)
             else:
                 self.mapper.message_pool = hypothesis.map
-                self.havoc_fuzz(hypothesis, stop_event)
+                
+            self.havoc_fuzz(hypothesis, stop_event)
                 
             self.stop_event.set()
                 

@@ -226,7 +226,7 @@ class AsyncProducer:
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
             self._generator_evo_one(msg_type=msg_type, doc_info=doc_info, machine=machine, sem=sem)
-            for msg_type, gs in self.generators.items()
+            for msg_type in self.req_types
         ]
         results = await asyncio.gather(*tasks)
         return results
@@ -277,10 +277,9 @@ class AsyncProducer:
             self,
             msg_type: str,
             doc_info: str,
-            ms: list[Generator],
             sem
     ):
-        old_m_name = ms[-1].name
+        old_m_name = self.generators[msg_type][-1]
         old_code = ''
         old_m_name = f'{old_m_name}.py'
         old_m_path = self.mutator_path / msg_type / old_m_name
@@ -324,8 +323,8 @@ class AsyncProducer:
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, ms=ms, sem=sem)
-            for msg_type, ms in self.mutators.items()
+            self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, sem=sem)
+            for msg_type in self.req_types
         ]
         results = await asyncio.gather(*tasks)
         return results
@@ -376,7 +375,7 @@ class AsyncProducer:
         
         with analyzer.lock:
             analyzer.clean_progress()
-        logger.debug("[Producer]: finish generator generation")
+        logger.debug("[Producer]: finish mutator generation")
 
     async def _parser_gen_async(
             self
