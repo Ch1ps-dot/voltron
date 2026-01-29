@@ -58,12 +58,19 @@ class Havoc:
             prefix = self.select_prefix()
             ms = self.select_mutators()
             req_seq = ms + prefix
+            
+            analyzer.set_progress('havoc', 'havoc fuzz', 1000)
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=1000)
+            if cons != None:
+                analyzer.sent = '/'.join(cons.req_seq)
+                analyzer.recv = '/'.join(cons.res_seq)
+            analyzer.finished += 1
             
             cur_trans_nums = analyzer.resp_trans_num()
             cur_resp_num = analyzer.res_types_num()
             if flag and self.is_interesting(cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num) and cons != None:
                 cons.save_cons()
+        analyzer.clean_progress()
         
     def is_interesting(
         self,

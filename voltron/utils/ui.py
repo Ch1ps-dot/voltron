@@ -167,6 +167,28 @@ def make_progress_panel():
     
         return progress_panel
     
+    elif analyzer.show_progress == 'havoc':
+        data = {
+            'desc': analyzer.progress_desc,
+            'sent': analyzer.sent,
+            'recv': analyzer.recv,
+        }
+        table = Table(title="Progress", show_header=False, box=None, expand=True, show_lines=True)
+        table.add_column(justify='left')
+        table.add_column(justify='right')
+        
+        for k, v in data.items():
+            table.add_row(k, str(v))
+        
+        progress_panel = Panel(
+            table,
+            title="[bold cyan]Fuzzing Progress",
+            title_align="center",
+            expand=True
+        )
+    
+        return progress_panel
+    
     else:
         txt = Text('NO PROGRESS', justify='center')
         return Panel(
