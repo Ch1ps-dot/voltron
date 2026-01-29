@@ -32,7 +32,7 @@ class Havoc:
         p = tuple()
         while(True):
             p = random.choice(self.S)
-            if self.T[p][self.E[0]] == 'TIMEOUT' or self.T[p][self.E[0]] == 'CRASH':
+            if len(p) > 1 and (self.T[p][self.E[0]] == 'TIMEOUT' or self.T[p][self.E[0]] == 'CRASH' or self.T[p[:-1]][p[-1:]]):
                 continue
             else:
                 break
