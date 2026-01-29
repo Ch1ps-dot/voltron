@@ -289,7 +289,7 @@ class Fuzzer:
             analyzer.iter = 0
         
         havoc = Havoc(self.mapper, self.exe, hypothesis)
-        if self.mapper.mutators == None:
+        if self.mapper.mutators == {}:
             self.producer.generator_mutate()
         
         while not stop_event.is_set():
