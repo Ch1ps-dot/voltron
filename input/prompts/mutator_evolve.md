@@ -1,6 +1,6 @@
-You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for fault injection**.
+You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for error response triggering**.
 
-Your task is to **generate Python code that constructs a protocol message specifically designed to trigger edge cases, invalid states, and unexpected program behaviors** in the Server Under Test (SUT), while adhering to the syntactic structure of the protocol (to bypass basic validation and reach deeper logic). The message must be short enough to comply with socket send limits (≤ 1400 bytes) to ensure successful transmission.
+Your task is to **generate Python code that constructs a protocol message specifically designed to elicit valid, protocol-defined error response messages (e.g., 4xx/5xx for SIP, standard error codes for other protocols) from the Server Under Test (SUT) or client** — NOT to cause program exceptions, crashes, hangs, or memory corruption. The message must be syntactically compliant with the protocol structure (to bypass basic validation and be processed by the SUT) and short enough to comply with socket send limits (≤ 1400 bytes) to ensure successful transmission.
 
 ---
 
@@ -16,7 +16,6 @@ You will be given:
 
    - The SUT information above may include:
     - configuration file of SUT
-    - real request messages captured in communication.
     - settings of client or server
 
 ---
@@ -24,34 +23,33 @@ You will be given:
 ### **Your Task**
 
 1. **Analyze the previously generated code and protocol structure**
-   - Identify syntactically valid but semantically dangerous field values, lengths, and encodings
-   - Pinpoint protocol fields that are likely to trigger unhandled exceptions (e.g., length fields, checksum fields, string delimiters, numeric boundaries)
-   - Identify which parts of the message can be manipulated to cause buffer overflows, integer overflows, null pointer dereferences, or logic errors in the SUT
+   - Identify syntactically valid but semantically non-compliant field values that strictly follow the protocol's defined error trigger conditions (e.g., missing user part in SIP URI → 484, invalid CSeq format → 400)
+   - Pinpoint protocol fields that map directly to standard error response codes (no exploitation of unhandled exceptions or memory issues)
    - Calculate the maximum safe message length for socket transmission (≤ 1400 bytes, compatible with UDP MTU and TCP socket send limits)
 
-2. **Infer fault injection opportunities**
-   - Based on the protocol structure and SUT information, reason about:
-      - Boundary values (maximum/minimum allowed values + 1/-1, zero, negative values for unsigned fields)
-      - Inconsistent field dependencies (e.g., length field mismatching actual payload length)
-      - Invalid encodings (non-UTF8 bytes in string fields, malformed checksum/hash values)
-      - Unexpected optional fields (adding/removing optional fields not handled by the SUT)
-      - Repetitive patterns (short but dense sequences of identical bytes to trigger memory exhaustion, keep total length ≤ 1400 bytes)
+2. **Infer error response triggers**
+   - Based on the protocol structure and SUT information, prioritize generating messages that intentionally violate protocol SEMANTIC rules (but not syntactic rules) to trigger SPECIFIC, defined error responses:
+      - Valid protocol violations (e.g., incomplete SIP URI, invalid method in CSeq, missing mandatory URI components) that map to documented error codes
+      - Semantic inconsistencies (e.g., length field matching protocol-defined invalid ranges, valid but non-existent resource identifiers) that elicit standard error responses
+      - Protocol-specified invalid values (e.g., expired nonce for authentication errors, invalid content type for unsupported media errors)
+      - Short, valid payloads with semantic violations (keep total length ≤ 1400 bytes) to ensure the SUT returns a standard error response
 
    - Prefer generating messages that are:
-      - **semantically invalid** (to trigger unexpected behavior)
-      - Distinct from standard messages to maximize fault exposure
+      - **semantically invalid (per protocol specs)** to trigger defined error responses
+      - Syntactically valid (to ensure processing by the SUT)
       - **Total length ≤ 1400 bytes** (critical for socket transmission success)
+      - Tailored to trigger KNOWN, documented error response codes for the protocol
 
-3. **Construct fault-inducing message logic**
-   - Preserve protocol-mandated field ordering (to avoid immediate rejection)
-   - Inject edge-case/invalid values into critical fields
-   - Introduce intentional inconsistencies between dependent fields (e.g., length vs payload size)
-   - Use valid encodings for malicious content (e.g., null bytes in string fields, small but extreme payloads)
-   - **Strictly limit the total length of the final message to ≤ 1400 bytes** (ensure compliance with socket send limits; avoid oversized payloads)
+3. **Construct error-triggering message logic**
+   - Preserve full protocol-mandated syntactic structure (field ordering, header formats, byte encoding rules) to avoid immediate rejection
+   - Inject ONLY semantic violations that directly map to standard error responses (no buffer overflows, integer overflows, or garbled bytes that cause program exceptions)
+   - Use valid encodings and valid byte ranges (no non-UTF8 bytes, null bytes, or control characters that cause parsing crashes)
+   - **Strictly limit the total length of the final message to ≤ 1400 bytes** (ensure compliance with socket send limits)
+   - Ensure the message is processed by the SUT and elicits a standard, protocol-defined error response (not silent failure or program crash)
 
-4. Generate a **Python function** that constructs **fault-inducing instance** of the `$msg_type` message
-   - The message must contain **semantic anomalies** designed to trigger unexpected behavior (crashes, hangs, invalid state transitions)
-   - All fields are concretely instantiated with values chosen to maximize fault exposure
+4. Generate a **Python function** that constructs **error-triggering instance** of the `$msg_type` message
+   - The message must contain semantic violations designed to trigger VALID, protocol-defined error responses from the server/client (no program exceptions)
+   - All fields are concretely instantiated with values chosen to target specific error response codes
    - **The final returned bytes object must have a total length ≤ 1400 bytes** (non-negotiable constraint for socket compatibility)
 
 ---
@@ -71,16 +69,17 @@ You will be given:
 ### **Function Prototype (Must Match Exactly)**
 
 def generate_${msg_type}():
-    """Generate one fault-inducing $msg_type message for the $pro_name protocol.
+    """Generate one error-triggering $msg_type message for the $pro_name protocol.
     - Input: none
     - Output: bytes
     - Total message length ≤ 1400 bytes (compliant with socket send limits)
+    - Designed to elicit standard protocol-defined error responses (no program exceptions)
     """
     
     message = b''
     
-    # Construct syntactically valid but semantically dangerous message
-    # to trigger unexpected behavior in the SUT
+    # Construct syntactically valid but semantically non-compliant message
+    # to trigger standard protocol-defined error responses from SUT
     # Ensure total length ≤ 1400 bytes to comply with socket send limits
     
     return message
@@ -98,6 +97,8 @@ The function must be directly executable
 The function takes no arguments.
 
 The generated message must:
-1. Be syntactically protocol-valid (to bypass basic validation)
-2. Be designed to trigger unexpected SUT behavior (crashes, hangs, logic errors)
+1. Be fully syntactically protocol-valid (to ensure processing by SUT)
+2. Be designed to elicit ONLY standard, protocol-defined error responses (no program crashes/exceptions/hangs)
 3. Have a total length ≤ 1400 bytes (to comply with socket send limits)
+4. Target specific, documented error response codes (e.g., SIP 400, 484, 500) via semantic protocol violations
+5. Contain no malicious bytes (non-UTF8, null, control characters) that cause program-level exceptions

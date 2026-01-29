@@ -81,7 +81,8 @@ class Executor:
 
     def interact(
         self,
-        msg_seq: list[tuple[str, bytes]]
+        msg_seq: list[tuple[str, bytes]],
+        poll_wait_ms: int = 5000
     ) -> Tuple[bool, Conversation | None]:  
         """
         TODO: Deal with interaction
@@ -170,7 +171,7 @@ class Executor:
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
-                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=5000)
+                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms)
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()

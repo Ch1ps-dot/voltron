@@ -40,9 +40,10 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         scope = random.randint(1, 10)
+        req_types = []
         for i in range(scope):
-            req_type = random.choice(self.alphabet)
-        ms = self.mapper.select_generators(req_type)
+            req_types.append(random.choice(self.alphabet))
+        ms = self.mapper.select_generators(req_types)
         return ms
     
     def run(
@@ -50,18 +51,26 @@ class Havoc:
         times: int
     ):
         for i in range(times):
+            
+            last_resp_num = analyzer.res_types_num()
+            last_trans_nums = analyzer.resp_trans_num()
+            
+            prefix = self.select_prefix()
             ms = self.select_mutators()
-            flag, cons = self.exe.interact(ms)
-            res_types = analyzer.res_types_num()
-            res_trans_types = analyzer.resp_trans_num()
-            if flag and self.is_interesting(cons) and cons != None:
+            req_seq = ms + prefix
+            flag, cons = self.exe.interact(req_seq, poll_wait_ms=1000)
+            
+            cur_trans_nums = analyzer.resp_trans_num()
+            cur_resp_num = analyzer.res_types_num()
+            if flag and self.is_interesting(cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num) and cons != None:
                 cons.save_cons()
         
     def is_interesting(
         self,
-        cons: Conversation | None
+        trans_inc: int,
+        type_inc: int
     ) -> bool:
-        if (cons):
+        if trans_inc > 0 or type_inc > 0:
             return True
         else:
             return False
