@@ -23,8 +23,8 @@ class Havoc:
         if machine:
             self.machine = machine
             self.table = machine.table
-            self.S = self.table[0]
-            self.E = self.table[1]
+            self.S = list(self.table[0])
+            self.E = list(self.table[1])
         else:
             self.machine = None
 
