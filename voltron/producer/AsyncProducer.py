@@ -367,8 +367,8 @@ class AsyncProducer:
                 info: dict = {'msg_type': f'{msg_type}', 'evolved_from': old_name, 'name': new_name, 'path': str(mut_path.resolve())}
                 
                 # set mutator name as {msg_type}[m]
-                self.mutators.setdefault(f'{msg_type}[m]', [])
-                self.mutators[f'{msg_type}[m]'].append(Generator(**info))
+                self.mutators.setdefault(msg_type, [])
+                self.mutators[msg_type].append(Generator(**info))
                 
         # save the information of new generator to file   
         with open(self.mutator_info_path, 'w', encoding='utf-8') as f:
