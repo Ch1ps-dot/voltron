@@ -332,7 +332,7 @@ class AsyncProducer:
         return results
 
     def generator_mutate(
-            self
+        self
     ) -> None:
         """Generate and save input generator
         """
