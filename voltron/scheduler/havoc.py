@@ -21,13 +21,20 @@ class Havoc:
             self.table = machine.table
             self.S = list(self.table[0])
             self.E = list(self.table[1])
+            self.T = self.table[2]
         else:
             self.machine = None
 
     def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
-        p = random.choice(self.S)
+        p = tuple()
+        while(True):
+            p = random.choice(self.S)
+            if self.T[p][self.E[0]] == 'TIMEOUT' or self.T[p][self.E[0]] == 'CRASH':
+                continue
+            else:
+                break
         w = list(p)
         gs = self.mapper.select_generators(w)
         return gs

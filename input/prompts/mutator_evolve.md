@@ -1,6 +1,6 @@
 You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for error response triggering**.
 
-Your task is to **generate Python code that constructs a protocol message specifically designed to elicit valid, protocol-defined error response messages (e.g., 4xx/5xx for SIP, standard error codes for other protocols) from the Server Under Test (SUT) or client** — NOT to cause program exceptions, crashes, hangs, or memory corruption. The message must be syntactically compliant with the protocol structure (to bypass basic validation and be processed by the SUT) and short enough to comply with socket send limits (≤ 1400 bytes) to ensure successful transmission.
+Your task is to **generate Python code that constructs a protocol message specifically designed to elicit error response messages (e.g., 4xx/5xx for SIP, standard error codes for other protocols) from the Server Under Test (SUT) or client** 
 
 ---
 
@@ -29,26 +29,18 @@ You will be given:
 
 2. **Infer error response triggers**
    - Based on the protocol structure and SUT information, prioritize generating messages that intentionally violate protocol SEMANTIC rules (but not syntactic rules) to trigger SPECIFIC, defined error responses:
-      - Valid protocol violations (e.g., incomplete SIP URI, invalid method in CSeq, missing mandatory URI components) that map to documented error codes
+      - Valid protocol violations (e.g., incomplete URI, invalid method, missing fields) that map to documented error codes
       - Semantic inconsistencies (e.g., length field matching protocol-defined invalid ranges, valid but non-existent resource identifiers) that elicit standard error responses
       - Protocol-specified invalid values (e.g., expired nonce for authentication errors, invalid content type for unsupported media errors)
       - Short, valid payloads with semantic violations (keep total length ≤ 1400 bytes) to ensure the SUT returns a standard error response
 
    - Prefer generating messages that are:
       - **semantically invalid (per protocol specs)** to trigger defined error responses
-      - Syntactically valid (to ensure processing by the SUT)
       - **Total length ≤ 1400 bytes** (critical for socket transmission success)
       - Tailored to trigger KNOWN, documented error response codes for the protocol
 
-3. **Construct error-triggering message logic**
-   - Preserve full protocol-mandated syntactic structure (field ordering, header formats, byte encoding rules) to avoid immediate rejection
-   - Inject ONLY semantic violations that directly map to standard error responses (no buffer overflows, integer overflows, or garbled bytes that cause program exceptions)
-   - Use valid encodings and valid byte ranges (no non-UTF8 bytes, null bytes, or control characters that cause parsing crashes)
-   - **Strictly limit the total length of the final message to ≤ 1400 bytes** (ensure compliance with socket send limits)
-   - Ensure the message is processed by the SUT and elicits a standard, protocol-defined error response (not silent failure or program crash)
-
-4. Generate a **Python function** that constructs **error-triggering instance** of the `$msg_type` message
-   - The message must contain semantic violations designed to trigger VALID, protocol-defined error responses from the server/client (no program exceptions)
+3. Generate a **Python function** that constructs **error-triggering instance**
+   - The message must contain semantic violations designed to trigger protocol-defined error responses from the server/client 
    - All fields are concretely instantiated with values chosen to target specific error response codes
    - **The final returned bytes object must have a total length ≤ 1400 bytes** (non-negotiable constraint for socket compatibility)
 
@@ -96,9 +88,3 @@ The function must be directly executable
 
 The function takes no arguments.
 
-The generated message must:
-1. Be fully syntactically protocol-valid (to ensure processing by SUT)
-2. Be designed to elicit ONLY standard, protocol-defined error responses (no program crashes/exceptions/hangs)
-3. Have a total length ≤ 1400 bytes (to comply with socket send limits)
-4. Target specific, documented error response codes (e.g., SIP 400, 484, 500) via semantic protocol violations
-5. Contain no malicious bytes (non-UTF8, null, control characters) that cause program-level exceptions
