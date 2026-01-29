@@ -44,6 +44,7 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         scope = random.randint(1, 10)
+        logger.debug(scope)
         req_seq = []
         for i in range(scope):
             req_seq.append(random.choice(self.alphabet))
