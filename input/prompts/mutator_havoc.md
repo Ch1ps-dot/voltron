@@ -69,7 +69,7 @@ You will be given:
 
 ### **Function Prototype (Must Match Exactly)**
 
-def generate_${msg_type}():
+def havoc_${msg_type}():
     """Generate one extremely chaotic, fault-inducing $msg_type message for the $pro_name protocol.
     - Contains garbled characters, tampered message type, and extreme boundary values
     - Total message length ≤ 1400 bytes (compliant with socket send limits)

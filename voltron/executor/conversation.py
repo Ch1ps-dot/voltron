@@ -44,15 +44,4 @@ class Conversation:
                 if request:
                     f.write(request)
                     
-        target_folder = configs.results_path / 'testcases'
-        file_count = 0
-        for item in target_folder.iterdir():
-            if item.is_file():
-                file_count += 1
-            
-        with open(target_folder / f'cons_{file_count}', 'ab') as f:
-            for request, _ in self.content:
-                if request:
-                    f.write(request)
-                    f.write(b'\n')
                 

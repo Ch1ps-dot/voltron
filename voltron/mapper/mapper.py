@@ -136,15 +136,44 @@ class Mapper:
                     else:
                         # run generator at first time
                         msg = self.exe_mutator(m)
-                        if msg:
-                            self.message_pool[m.msg_type][m.name] = msg
-                            m.was_used += 1
-                        else:
-                            m.broken = False
+                        # if msg:
+                        #     self.message_pool[m.msg_type][m.name] = msg
+                        #     m.was_used += 1
+                        # else:
+                        #     m.broken = False
                             
                     if msg:
                         msg_type = m.msg_type
-                        ms.append((f'{msg_type}[m]', msg))
+                        ms.append((msg_type, msg))
+                    else:
+                        raise Exception
+                except Exception as e:
+                    logger.debug(asdict(m))
+                    logger.debug(self.message_pool)
+                    logger.debug(traceback.format_exc())
+            else:
+                logger.debug(f'Mapper: unexpected type {req}')
+        return ms
+    
+    def select_mutators(
+        self,
+        req_seq: list[str],
+        select_mode = 'new'
+    ) -> list[tuple[str, bytes]]:
+        ms = []
+        for req in req_seq:
+            if req in self.mutators:
+                # get generator of according message type
+                m = self.select_mutator(req, select_mode)
+                
+                if m.msg_type not in self.message_pool.keys():
+                    self.message_pool[m.msg_type] = {}
+                    
+                try:
+                    muta, havo = self.exe_mutator(m)
+                    if muta and havo:
+                        msg_type = m.msg_type
+                        ms.append((msg_type, muta))
                     else:
                         raise Exception
                 except Exception as e:
@@ -195,19 +224,20 @@ class Mapper:
     def exe_mutator(
         self,
         m: Generator
-    ) -> bytes | None:
+    ) -> tuple[bytes | None, bytes | None]:
         name_space = {}
         try:
             with open(self.m_path(m), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
-                obj = name_space[f'generate_{m.msg_type}']
-                return obj()
+                mutate = name_space[f'mutate_{m.msg_type}']
+                havoc = name_space[f'havoc_{m.msg_type}']
+                return mutate(), havoc()
         except Exception as e:
             analyzer.stop_event.set()
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
-            return None
+            return None, None
             
     def register_mapper(
         self,

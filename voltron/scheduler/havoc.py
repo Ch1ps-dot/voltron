@@ -40,10 +40,10 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         scope = random.randint(1, 10)
-        req_types = []
+        req_seq = []
         for i in range(scope):
-            req_types.append(random.choice(self.alphabet))
-        ms = self.mapper.select_generators(req_types)
+            req_seq.append(random.choice(self.alphabet))
+        ms = self.mapper.select_mutators(req_seq)
         return ms
     
     def run(
