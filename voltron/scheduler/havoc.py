@@ -17,9 +17,7 @@ class Havoc:
         self.res_trans_types: dict[str, int] = {}
         self.mapper = mapper
         self.exe = exe
-        self.alphabet = []
-        for msg_type in mapper.mutators.keys():
-            self.alphabet.append(msg_type)
+        self.alphabet = mapper.request_types
         if machine:
             self.machine = machine
             self.table = machine.table
