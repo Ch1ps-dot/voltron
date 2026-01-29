@@ -47,7 +47,9 @@ class Havoc:
         logger.debug(scope)
         req_seq = []
         for i in range(scope):
-            req_seq.append(random.choice(self.alphabet))
+            a = random.choice(self.alphabet)
+            logger.debug(a)
+            req_seq.append(a)
         logger.debug(f'mutators: {req_seq}')
         ms = self.mapper.select_mutators(req_seq)
         ms = [(f'{msg_type}*', data) for msg_type, data in ms]
