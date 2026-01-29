@@ -56,13 +56,16 @@ class Havoc:
             
             prefix = self.select_prefix()
             ms = self.select_mutators()
-            req_seq = ms + prefix
+            req_seq = prefix + ms
             
            
-            flag, cons = self.exe.interact(req_seq, poll_wait_ms=1000)
+            flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:
                 analyzer.sent = '/'.join(cons.req_seq)
                 analyzer.recv = '/'.join(cons.res_seq)
+            else:
+                analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
+                analyzer.recv = 'None'
             analyzer.finished += 1
             
             cur_trans_nums = analyzer.resp_trans_num()
