@@ -5,8 +5,6 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.scheduler.automata import MealyMachine
 import random, time
 
-random.seed(time.time())
-
 class Havoc:
     def __init__(
         self,
@@ -42,6 +40,7 @@ class Havoc:
         for i in range(scope):
             req_seq.append(random.choice(self.alphabet))
         ms = self.mapper.select_mutators(req_seq)
+        ms = [(f'{msg_type}[m]', data) for msg_type, data in ms]
         return ms
     
     def run(
@@ -57,8 +56,7 @@ class Havoc:
             prefix = self.select_prefix()
             ms = self.select_mutators()
             req_seq = prefix + ms
-            
-           
+
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:
                 analyzer.sent = '/'.join(cons.req_seq)

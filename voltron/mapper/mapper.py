@@ -119,38 +119,6 @@ class Mapper:
                     logger.debug(asdict(g))
                     logger.debug(self.message_pool)
                     logger.debug(traceback.format_exc())
-                    
-            # select mutators
-            elif req in self.mutators:
-                # get generator of according message type
-                m = self.select_mutator(req, select_mode)
-                
-                if m.msg_type not in self.message_pool.keys():
-                    self.message_pool[m.msg_type] = {}
-                    
-                try:
-                    msg = None
-                    if cache_mode and m.was_used != 0:
-                        # cache mode to avoid randomness in model learning
-                        msg = self.message_pool[m.msg_type][m.name]
-                    else:
-                        # run generator at first time
-                        msg = self.exe_mutator(m)
-                        # if msg:
-                        #     self.message_pool[m.msg_type][m.name] = msg
-                        #     m.was_used += 1
-                        # else:
-                        #     m.broken = False
-                            
-                    if msg:
-                        msg_type = m.msg_type
-                        ms.append((msg_type, msg))
-                    else:
-                        raise Exception
-                except Exception as e:
-                    logger.debug(asdict(m))
-                    logger.debug(self.message_pool)
-                    logger.debug(traceback.format_exc())
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
