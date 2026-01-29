@@ -29,7 +29,7 @@ class Havoc:
     def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
-        p = tuple()
+        p = tuple('')
         while(True):
             p = random.choice(self.S)
             if len(p) > 1 and (self.T[p][self.E[0]] == 'TIMEOUT' or self.T[p][self.E[0]] == 'CRASH' or self.T[p[:-1]][p[-1:]]):
@@ -63,7 +63,6 @@ class Havoc:
         logger.debug(self.alphabet)
         analyzer.set_progress('havoc', 'havoc fuzz', times)
         for i in range(times):
-            random.seed(time.time())
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
             
