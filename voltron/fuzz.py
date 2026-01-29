@@ -186,7 +186,6 @@ class Fuzzer:
             # set membership query and equivelence query method.
             mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
             eq = EquOracle(mapper=self.mapper, executor=self.exe)
-            marked_table: ObTable # final learned model
             
             with analyzer.lock:   
                 analyzer.iter = 0

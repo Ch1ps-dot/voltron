@@ -283,7 +283,7 @@ class AsyncProducer:
         old_m_name = ms[-1].name
         old_code = ''
         old_m_name = f'{old_m_name}.py'
-        old_m_path = self.generator_path / msg_type / old_m_name
+        old_m_path = self.mutator_path / msg_type / old_m_name
         with open(old_m_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
                 
