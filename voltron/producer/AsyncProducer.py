@@ -361,6 +361,7 @@ class AsyncProducer:
             mut_path = msg_dir / f'id{cur_id}.py'
             with open(mut_path, 'w', encoding='utf-8') as f:
                 f.write(mutate_code)
+                f.write('\n\n')
                 f.write(havoc_code)
                 
                 # construct and save information for new generator

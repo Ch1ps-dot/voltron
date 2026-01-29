@@ -289,13 +289,14 @@ class Fuzzer:
             analyzer.iter = 0
         
         havoc = Havoc(self.mapper, self.exe, hypothesis)
+        if self.mapper.mutators == None:
+            self.producer.generator_mutate()
         
         while not stop_event.is_set():
             try:
                 # mutate generator
                 with analyzer.lock:   
                     analyzer.stage = 'fuzzer mutate'
-                self.producer.generator_mutate()
                 # init new learning process with previous model and run fuzzer
                 with analyzer.lock:   
                     analyzer.stage = 'havoc fuzzing'
