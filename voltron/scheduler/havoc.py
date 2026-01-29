@@ -63,7 +63,7 @@ class Havoc:
         logger.debug(self.alphabet)
         analyzer.set_progress('havoc', 'havoc fuzz', times)
         for i in range(times):
-            
+            random.seed(time.time())
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
             
