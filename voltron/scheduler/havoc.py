@@ -24,7 +24,7 @@ class Havoc:
         self.exe = exe
         self.alphabet = mapper.request_types
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
-        self.methods = ['cat', 'inter', 'ood']
+        self.methods = ['cat', 'inter']
         self.mutator_mode = ['new', 'generic']
         self.prefix_mode = ['new', 'generic']
         if machine:
@@ -137,6 +137,8 @@ class Havoc:
                 self.analyze_cons(cons)
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = '/'.join(cons.res_seq)
+                logger.debug(f'sent -> {analyzer.sent}')
+                logger.debug(f'recv <- {analyzer.recv}')
             else:
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = 'None'
