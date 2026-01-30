@@ -9,7 +9,7 @@ class Config:
         self.pre_script: Path
         self.post_script: Path
         self.models_path: Path
-        self.doc_paths: list[Path]
+        self.doc_paths: list[Path] = []
         self.pmp_path: Path
         self.results_path: Path
         
