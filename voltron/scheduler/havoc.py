@@ -4,7 +4,7 @@ from voltron.executor.executor import Executor, Conversation
 from voltron.analyzer.analyzer import analyzer
 from voltron.scheduler.automata import MealyMachine
 from voltron.utils.logger import logger
-import random, time
+import random, time, threading, os
 
 
 
@@ -19,6 +19,7 @@ class Havoc:
         self.mapper = mapper
         self.exe = exe
         self.alphabet = mapper.request_types
+        self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
         if machine:
             self.machine = machine
             self.table = machine.table
@@ -37,7 +38,7 @@ class Havoc:
     def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
-        p = random.choice(self.S)
+        p = self.rand.choice(self.S)
         logger.debug(f'p: {p}')
         w = list(p)
         gs = self.mapper.select_generators(w)
@@ -46,11 +47,11 @@ class Havoc:
     def select_mutators(
         self
     ) -> list[tuple[str, bytes]]:
-        scope = random.randint(1, 10)
+        scope = self.rand.randint(1, 10)
         logger.debug(scope)
         req_seq = []
         for i in range(scope):
-            a = random.choice(self.alphabet)
+            a = self.rand.choice(self.alphabet)
             logger.debug(f'a: {a}')
             req_seq.append(a)
         logger.debug(f'mutators: {req_seq}')
