@@ -69,7 +69,7 @@ class Havoc:
         logger.debug(f'scope: {scope}')
         ms = []
         mode = self.rand.choice(self.mutator_mode)
-        if mode == 'new':
+        if mode == 'new' or len(self.useful_pool) == 0:
             req_seq = []
             for i in range(scope):
                 a = self.rand.choice(self.alphabet)
