@@ -4,7 +4,7 @@ from voltron.executor.executor import Executor, Conversation
 from voltron.analyzer.analyzer import analyzer
 from voltron.scheduler.automata import MealyMachine
 from voltron.utils.logger import logger
-import random, time, threading, os
+import random, time, threading, os, math
 
 
 
@@ -24,7 +24,7 @@ class Havoc:
         self.exe = exe
         self.alphabet = mapper.request_types
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
-        self.methods = ['cat', 'rand', 'ood']
+        self.methods = ['cat', 'inter', 'ood']
         self.mutator_mode = ['new', 'generic']
         self.prefix_mode = ['new', 'generic']
         if machine:
@@ -122,10 +122,15 @@ class Havoc:
             method = self.rand.choice(self.methods)
             if (method == 'cat'):
                 req_seq = prefix + ms + suffix
-            elif (method == 'rand'):
-                req_seq = ms
-            elif (method == 'ood'):
-                req_seq = ms + prefix
+            elif (method == 'inter'):
+                len_p = len(prefix)
+                len_m = len(ms)
+                max_len = max(len_p, len_m)
+                for i in range(max_len):
+                    if (i < len_p):
+                        req_seq.append(prefix[i])
+                    if (i < len_m):
+                        req_seq.append(ms[i])
 
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:
