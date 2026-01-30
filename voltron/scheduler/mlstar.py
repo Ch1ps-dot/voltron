@@ -52,8 +52,8 @@ class ObTable:
                 else:
                     
                     if (configs.time_limit_s < time.time() - analyzer.start_time):
-                        self.stop_event.set()
                         logger.debug('Fuzzer: timeout')
+                        self.stop_event.set()
                     if self.stop_event.is_set(): 
                         sys.exit(0)
                         
@@ -99,8 +99,8 @@ class ObTable:
                 for e in self.E:
                     iter_si += 1
                     if (configs.time_limit_s < time.time() - analyzer.start_time):
-                        self.stop_event.set()
                         logger.debug('Fuzzer: timeout')
+                        self.stop_event.set()
                         
                     if self.stop_event.is_set(): 
                         sys.exit(0)

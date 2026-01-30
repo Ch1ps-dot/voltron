@@ -85,7 +85,7 @@ class Havoc:
             for i in range(scope):
                 a = self.rand.choice(self.useful_msg)
                 ms.append(a)
-                
+            ms = [(f'{msg_type}*', data) for msg_type, data in ms]
         return ms
     
     def analyze_cons(

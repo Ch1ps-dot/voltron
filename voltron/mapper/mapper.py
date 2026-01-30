@@ -184,9 +184,9 @@ class Mapper:
                 obj = name_space[f'generate_{g.msg_type}']
                 return obj()
         except Exception as e:
-            analyzer.stop_event.set()
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
+            analyzer.stop_event.set()
             return None
         
     def exe_mutator(
@@ -202,9 +202,9 @@ class Mapper:
                 # havoc = name_space[f'havoc_{m.msg_type}']
                 return mutate()
         except Exception as e:
-            analyzer.stop_event.set()
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
+            analyzer.stop_event.set()
             return None
             
     def register_mapper(
