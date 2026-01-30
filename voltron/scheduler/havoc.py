@@ -39,7 +39,8 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         p = self.rand.choice(self.S)
-        logger.debug(f'p: {p}')
+        if (len(p) > 1):
+            logger.debug(f'p: {self.T[p[:-1]][p[-1:]]}')
         w = list(p)
         gs = self.mapper.select_generators(w)
         return gs
@@ -56,7 +57,7 @@ class Havoc:
     def select_mutators(
         self
     ) -> list[tuple[str, bytes]]:
-        scope = self.rand.randint(1, 10)
+        scope = self.rand.randint(1, 5)
         logger.debug(scope)
         req_seq = []
         for i in range(scope):
