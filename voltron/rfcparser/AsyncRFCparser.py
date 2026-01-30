@@ -69,6 +69,7 @@ class AsyncRFCParser:
         # sectiontree parse pass
         for i in range(len(self.doc_paths)):
             name=configs.rfc_name[i]
+            logger.debug(f'create st: {name}')
             fn = self.ir_path / f"{name}.pkl"
             if(fn.is_file()):
                 self.load_st(i)
