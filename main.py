@@ -1,7 +1,7 @@
 #!/bin/python3
 
 from voltron.fuzz import Fuzzer
-import click
+import click, random
 
 def test_rand():
     fuzzer = Fuzzer(
@@ -43,6 +43,7 @@ def test_kamailio():
 @click.option("-t", "--target", type=str, required=True, help="fuzzing target")
 def main(target):
     supported_set = {'lightftp','pureftpd','kamailio'}
+    random.seed(42)
     if target in supported_set:
         fuzzer = Fuzzer(
             target_name=target,
