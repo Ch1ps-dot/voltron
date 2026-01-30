@@ -147,6 +147,7 @@ class Executor:
                 self.analyzer.resp_trans_update(f'-/{resp_code}')
         else:
             cons.add_state('-', '-')
+            cons.add_data(bytes(), bytes())
 
         # send the message path
         for msg_type, msg in msg_seq:
@@ -166,7 +167,7 @@ class Executor:
             flag, req_data = self.net_send(msg, sock)
             
             # success to send
-            if(flag):
+            if(flag and req_data):
                 logger.debug(f'sent -> {req_data}')
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
@@ -177,10 +178,12 @@ class Executor:
                     return_code = proc.poll()
                     if return_code:
                         cons.add_state(msg_type, 'CRASH')
+                        cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                     else:
                         cons.add_state(msg_type, 'CLOSED')
+                        cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
                     break
@@ -189,10 +192,12 @@ class Executor:
                     return_code = proc.poll()
                     if return_code:
                         cons.add_state(msg_type, 'CRASH')
+                        cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                     else:
                         cons.add_state(msg_type, 'TIMEOUT')
+                        cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.timeout_num += 1
                     break
@@ -201,10 +206,12 @@ class Executor:
                     return_code = proc.poll()
                     if return_code:
                         cons.add_state(msg_type, 'CRASH')
+                        cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                     else:
                         cons.add_state(msg_type, 'CLOSED')
+                        cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
                     break

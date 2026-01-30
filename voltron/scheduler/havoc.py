@@ -17,7 +17,8 @@ class Havoc:
     ) -> None:
         self.unique_resp: set[str] = set()
         self.unique_resp_trans: set[str] = set()
-        self.useful_pool: list[tuple[str, bytes]] = []
+        self.useful_msg: list[tuple[str, bytes]] = []
+        self.useful_seq: list[list[tuple[str, bytes]]] = []
         
         self.mapper = mapper
         self.exe = exe
@@ -25,20 +26,18 @@ class Havoc:
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
         self.methods = ['cat', 'rand', 'ood']
         self.mutator_mode = ['new', 'generic']
+        self.prefix_mode = ['new', 'generic']
         if machine:
             self.machine = machine
             self.table = machine.table
             self.E = list(self.table[1])
             self.T = self.table[2]
             self.S = []
-            self.score_S = []
             for p in list(self.table[0]):
                 if len(p) == 1:
                     self.S.append(p)
-                    self.score_S.append(1)
                 elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
                     self.S.append(p)
-                    self.score_S.append(1)
             
         else:
             self.machine = None
@@ -46,11 +45,17 @@ class Havoc:
     def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
-        p = self.rand.choice(self.S)
-        if (len(p) > 1):
-            logger.debug(f'prefix resp: {p} -> {self.T[p[:-1]][p[-1:]]}')
-        w = list(p)
-        gs = self.mapper.select_generators(w)
+        mode = self.rand.choice(self.prefix_mode)
+        gs = []
+        
+        if mode == 'new' or len(self.useful_seq) == 0:
+            p = self.rand.choice(self.S)
+            w = list(p)
+            gs = self.mapper.select_generators(w)
+           
+        elif mode == 'generic':
+            gs = self.rand.choice(self.useful_seq)
+
         return gs
     
     def select_suffix(
@@ -66,10 +71,9 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         scope = self.rand.randint(1, 5)
-        logger.debug(f'scope: {scope}')
         ms = []
         mode = self.rand.choice(self.mutator_mode)
-        if mode == 'new' or len(self.useful_pool) == 0:
+        if mode == 'new' or len(self.useful_msg) == 0:
             req_seq = []
             for i in range(scope):
                 a = self.rand.choice(self.alphabet)
@@ -79,17 +83,16 @@ class Havoc:
                 
         elif mode == 'generic':
             for i in range(scope):
-                a = self.rand.choice(self.useful_pool)
+                a = self.rand.choice(self.useful_msg)
                 ms.append(a)
                 
-        logger.debug(f'mutators: {ms}')
-        
         return ms
     
     def analyze_cons(
         self,
         cons: Conversation
     ):
+        seq = []
         for i in range(len(cons.res_seq)):
             if cons.res_seq[i] == '-':
                 continue
@@ -97,8 +100,10 @@ class Havoc:
                 break
             if cons.res_seq[i] not in self.unique_resp:
                 self.unique_resp.add(cons.res_seq[i])
-                self.useful_pool.append((cons.req_seq[i], cons.content[i][0]))
-    
+                self.useful_msg.append((cons.req_seq[i], cons.content[i][0]))
+                seq.append((cons.req_seq[i], cons.content[i][0]))
+        self.useful_seq.append(seq)
+        
     def run(
         self,
         times: int
