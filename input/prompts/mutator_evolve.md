@@ -40,10 +40,10 @@ You will be given:
 * Modify the original program so that **critical fields are generated dynamically and randomly**, rather than using fixed constants.
 * Randomization must **intentionally cover boundary and corner cases**, including but not limited to:
 
+  * delete valid fields or add fictitious fields
+  * convert the values of valid fields into garbled characters
   * empty, missing, or truncated fields
   * minimum, maximum, and off-by-one values for numeric or length-related fields
-  * syntactically valid but semantically invalid values
-  * protocol-specified invalid or deprecated values
   * inconsistent cross-field relationships (e.g., mismatched length vs payload, invalid identifiers)
 * The mutations should prioritize **triggering server-side error responses or abnormal behaviors**, rather than client-side exceptions.
 
