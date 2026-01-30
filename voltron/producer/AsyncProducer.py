@@ -34,7 +34,7 @@ class AsyncProducer:
         self.equipment_path = configs.base_path / 'output' / 'equipment' 
         self.producer_path = self.equipment_path / configs.target_name
         self.generator_path = self.producer_path / 'generators'
-        self.mutator_path = self.producer_path / 'mutator'
+        self.mutator_path = self.producer_path / 'mutators'
         self.parser_path = self.producer_path / 'parsers'
         self.info_path = configs.info_path
         
