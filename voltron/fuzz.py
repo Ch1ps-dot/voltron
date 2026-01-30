@@ -13,7 +13,6 @@ from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
 from voltron.mapper.mapper import Mapper
-from voltron.scheduler.rands import Rands
 from voltron.scheduler.havoc import Havoc
 from voltron.utils.ui import ui_loop
 
@@ -131,7 +130,8 @@ class Fuzzer:
         fuzz_loop = None
         
         if algo == 'rand':
-            fuzz_loop = self.rand_fuzz
+            # fuzz_loop = self.rand_fuzz
+            pass
         elif algo == 'state':
             fuzz_loop = self.state_fuzz
         else:
@@ -161,22 +161,22 @@ class Fuzzer:
         with analyzer.lock:
             analyzer.collect_results()
 
-    def rand_fuzz(
-            self,
-            stop_event: threading.Event
-    ):
-        fuzz = Rands(mapper=self.mapper, executor=self.exe)
-        while not stop_event.is_set():
-            try:
-                if not fuzz.run():
-                    stop_event.set()
-            except Exception as e:
-                logger.debug(f'Fuzzer: exit {e}')
-                logger.debug(traceback.format_exc())
-                stop_event.set()
-            if (configs.time_limit_s < time.time() - analyzer.start_time):
-                stop_event.set()
-                logger.debug('Fuzzer: timeout')
+    # def rand_fuzz(
+    #         self,
+    #         stop_event: threading.Event
+    # ):
+    #     fuzz = Rands(mapper=self.mapper, executor=self.exe)
+    #     while not stop_event.is_set():
+    #         try:
+    #             if not fuzz.run():
+    #                 stop_event.set()
+    #         except Exception as e:
+    #             logger.debug(f'Fuzzer: exit {e}')
+    #             logger.debug(traceback.format_exc())
+    #             stop_event.set()
+    #         if (configs.time_limit_s < time.time() - analyzer.start_time):
+    #             stop_event.set()
+    #             logger.debug('Fuzzer: timeout')
                 
     def state_fuzz(
         self,
