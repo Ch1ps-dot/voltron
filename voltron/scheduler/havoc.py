@@ -48,7 +48,7 @@ class Havoc:
     ) -> list[tuple[str, bytes]]:
         p = self.rand.choice(self.S)
         if (len(p) > 1):
-            logger.debug(f'p: {self.T[p[:-1]][p[-1:]]}')
+            logger.debug(f'prefix resp: {p} -> {self.T[p[:-1]][p[-1:]]}')
         w = list(p)
         gs = self.mapper.select_generators(w)
         return gs
@@ -57,7 +57,7 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         s = self.rand.choice(self.E)
-        logger.debug(f's: {s}')
+        logger.debug(f'suffix: {s}')
         w = list(s)
         gs = self.mapper.select_generators(w)
         return gs
@@ -66,20 +66,20 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         scope = self.rand.randint(1, 5)
-        logger.debug(scope)
+        logger.debug(f'scope: {scope}')
         ms = []
-        mode = self.rand.choices(self.mutator_mode, k=1)
+        mode = self.rand.choice(self.mutator_mode)
         if mode == 'new':
             req_seq = []
             for i in range(scope):
-                a = self.rand.choices(self.alphabet, k=1)
+                a = self.rand.choice(self.alphabet)
                 req_seq.append(a)
             ms = self.mapper.select_mutators(req_seq)
             ms = [(f'{msg_type}*', data) for msg_type, data in ms]
                 
         elif mode == 'generic':
             for i in range(scope):
-                a = self.rand.choices(self.useful_pool, k=1)
+                a = self.rand.choice(self.useful_pool)
                 ms.append(a)
                 
         logger.debug(f'mutators: {ms}')
@@ -115,7 +115,7 @@ class Havoc:
             suffix = self.select_suffix()
             req_seq = []
             
-            method = self.rand.choices(self.methods)
+            method = self.rand.choice(self.methods)
             if (method == 'cat'):
                 req_seq = prefix + ms + suffix
             elif (method == 'rand'):
@@ -125,6 +125,7 @@ class Havoc:
 
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:
+                self.analyze_cons(cons)
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = '/'.join(cons.res_seq)
             else:
