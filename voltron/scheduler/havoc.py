@@ -44,6 +44,15 @@ class Havoc:
         gs = self.mapper.select_generators(w)
         return gs
     
+    def select_suffix(
+        self
+    ) -> list[tuple[str, bytes]]:
+        s = self.rand.choice(self.E)
+        logger.debug(f's: {s}')
+        w = list(s)
+        gs = self.mapper.select_generators(w)
+        return gs
+    
     def select_mutators(
         self
     ) -> list[tuple[str, bytes]]:
@@ -72,7 +81,8 @@ class Havoc:
             
             prefix = self.select_prefix()
             ms = self.select_mutators()
-            req_seq = prefix + ms
+            suffix = self.select_suffix()
+            req_seq = prefix + ms + suffix
 
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:

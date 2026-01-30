@@ -138,8 +138,8 @@ class Mapper:
                     self.message_pool[m.msg_type] = {}
                     
                 try:
-                    muta, havo = self.exe_mutator(m)
-                    if muta and havo:
+                    muta = self.exe_mutator(m)
+                    if muta:
                         msg_type = m.msg_type
                         ms.append((msg_type, muta))
                     else:
@@ -192,20 +192,20 @@ class Mapper:
     def exe_mutator(
         self,
         m: Generator
-    ) -> tuple[bytes | None, bytes | None]:
+    ) -> bytes | None:
         name_space = {}
         try:
             with open(self.m_path(m), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
                 mutate = name_space[f'mutate_{m.msg_type}']
-                havoc = name_space[f'havoc_{m.msg_type}']
-                return mutate(), havoc()
+                # havoc = name_space[f'havoc_{m.msg_type}']
+                return mutate()
         except Exception as e:
             analyzer.stop_event.set()
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
-            return None, None
+            return None
             
     def register_mapper(
         self,

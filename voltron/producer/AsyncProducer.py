@@ -296,12 +296,12 @@ class AsyncProducer:
                         info=doc_info
                     )
                     
-                    havoc_code = await self.chater.llm_mutator_havoc(
-                        code=old_code,
-                        pro_name=self.rfcp.pro_name,
-                        msg_type=msg_type,
-                        info=doc_info
-                    )
+                    # havoc_code = await self.chater.llm_mutator_havoc(
+                    #     code=old_code,
+                    #     pro_name=self.rfcp.pro_name,
+                    #     msg_type=msg_type,
+                    #     info=doc_info
+                    # )
                     
                     # test generated code
                     name_space = {}
@@ -309,19 +309,19 @@ class AsyncProducer:
                     obj = name_space[f'mutate_{msg_type}']
                     obj()
                     
-                    exec(havoc_code, name_space)
-                    obj = name_space[f'havoc_{msg_type}']
-                    obj()
+                    # exec(havoc_code, name_space)
+                    # obj = name_space[f'havoc_{msg_type}']
+                    # obj()
                     with analyzer.lock:
                         analyzer.finished += 1
-                    return msg_type, mutate_code, havoc_code
+                    return msg_type, mutate_code
                 except Exception as e:
                     logger.debug(f'Producer :generate error {e}')
 
     async def _generator_mutate_async(
         self,
         doc_info: str
-    ) -> list[tuple[str, str, str]]:
+    ) -> list[tuple[str, str]]:
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
             self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, sem=sem)
@@ -346,7 +346,7 @@ class AsyncProducer:
         results = asyncio.run(self._generator_mutate_async(doc_info))
         
         # resolve mutator
-        for msg_type, mutate_code, havoc_code in results:
+        for msg_type, mutate_code in results:
             msg_dir = self.mutator_path / f'{msg_type}'
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
@@ -360,8 +360,8 @@ class AsyncProducer:
             mut_path = msg_dir / f'id{cur_id}.py'
             with open(mut_path, 'w', encoding='utf-8') as f:
                 f.write(mutate_code)
-                f.write('\n\n')
-                f.write(havoc_code)
+                # f.write('\n\n')
+                # f.write(havoc_code)
                 
                 # construct and save information for new generator
                 old_name = self.generators[msg_type][0].name

@@ -176,7 +176,7 @@ class Executor:
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
                     if return_code:
-                        cons.add_state(msg_type, 'SOCKETERR')
+                        cons.add_state(msg_type, 'CRASH')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                     else:
@@ -186,15 +186,27 @@ class Executor:
                     break
                 
                 elif resp_code == 'TIMEOUT':
-                    cons.add_state(msg_type, 'TIMEOUT')
-                    with self.analyzer.lock:
-                        self.analyzer.timeout_num += 1
+                    return_code = proc.poll()
+                    if return_code:
+                        cons.add_state(msg_type, 'CRASH')
+                        with self.analyzer.lock:
+                            self.analyzer.crash_num += 1
+                    else:
+                        cons.add_state(msg_type, 'TIMEOUT')
+                        with self.analyzer.lock:
+                            self.analyzer.timeout_num += 1
                     break
                 
                 elif resp_code == 'RCLOSED':
-                    cons.add_state(msg_type, 'CLOSED')
-                    with self.analyzer.lock:
-                        self.analyzer.rclose_num += 1
+                    return_code = proc.poll()
+                    if return_code:
+                        cons.add_state(msg_type, 'CRASH')
+                        with self.analyzer.lock:
+                            self.analyzer.crash_num += 1
+                    else:
+                        cons.add_state(msg_type, 'CLOSED')
+                        with self.analyzer.lock:
+                            self.analyzer.rclose_num += 1
                     break
                 
                 else:
@@ -219,7 +231,7 @@ class Executor:
                 
                 # program exited unexpectly
                 if return_code and return_code != 0:
-                    cons.merge_extra_state('CRASH')
+                    cons.add_state('-', 'CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
                     cons.save_cons()
@@ -400,30 +412,6 @@ class Executor:
         try:
             if (self.trans_layer == 'tcp'):
                 events = poller.poll(time_out_ms)
-
-                # # estimate the suitable timeout for recv
-                # if (self.probe_times > 0):
-                #     s_time = time.time()
-                #     events = poller.poll(self.max_timeout_ms)
-                #     if not events:
-                #         logger.debug('Executor: recv timeout exceed the max limit')
-                #         return None
-                #     else:
-                #         self.probe_times -= 1
-                #         if (self.probe_times <= 0):
-                #             # timeout = mean_value + 2 * standard_error
-                #             mean_time: float = statistics.mean(self.probe_recv_time_s)
-                #             if (len(self.probe_recv_time_s) > 2):
-                #                 std_dev: float = statistics.stdev(self.probe_recv_time_s)
-                #                 self.recv_time_ms = (mean_time + 2 * std_dev) * 1000
-                #             else:
-                #                 self.recv_time_ms = (mean_time + 0.1) * 1000
-                #         else:
-                #             self.probe_recv_time_s.append(time.time() - s_time)
-                #             logger.debug(f'Executor: probe-remain {self.probe_times} time {self.probe_recv_time_s}')
-                # else:
-                #     # recv with estimated timeout 
-                #     events = poller.poll(self.recv_time_ms)
 
                 # handler recv timeout
                 if not events:
