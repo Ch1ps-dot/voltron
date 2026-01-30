@@ -177,35 +177,35 @@ class Mapper:
         g: Generator
     ) -> bytes | None:
         name_space = {}
-        try:
-            with open(self.g_path(g), 'r', encoding='utf-8') as f:
-                code = f.read()
-                exec(code, name_space)
-                obj = name_space[f'generate_{g.msg_type}']
-                return obj()
-        except Exception as e:
-            logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.format_exc())
-            analyzer.stop_event.set()
-            return None
+        while(True):
+            try:
+                with open(self.g_path(g), 'r', encoding='utf-8') as f:
+                    code = f.read()
+                    exec(code, name_space)
+                    obj = name_space[f'generate_{g.msg_type}']
+                    return obj()
+            except Exception as e:
+                logger.debug(f'Executor: generated failure {e}')
+                logger.debug(traceback.format_exc())
+                continue
         
     def exe_mutator(
         self,
         m: Generator
     ) -> bytes | None:
         name_space = {}
-        try:
-            with open(self.m_path(m), 'r', encoding='utf-8') as f:
-                code = f.read()
-                exec(code, name_space)
-                mutate = name_space[f'mutate_{m.msg_type}']
-                # havoc = name_space[f'havoc_{m.msg_type}']
-                return mutate()
-        except Exception as e:
-            logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.format_exc())
-            analyzer.stop_event.set()
-            return None
+        while(True):
+            try:
+                with open(self.m_path(m), 'r', encoding='utf-8') as f:
+                    code = f.read()
+                    exec(code, name_space)
+                    mutate = name_space[f'mutate_{m.msg_type}']
+                    # havoc = name_space[f'havoc_{m.msg_type}']
+                    return mutate()
+            except Exception as e:
+                logger.debug(f'Executor: generated failure {e}')
+                logger.debug(traceback.format_exc())
+                continue
             
     def register_mapper(
         self,

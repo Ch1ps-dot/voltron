@@ -62,7 +62,6 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         s = self.rand.choice(self.E)
-        logger.debug(f'suffix: {s}')
         w = list(s)
         gs = self.mapper.select_generators(w)
         return gs
