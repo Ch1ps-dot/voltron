@@ -20,14 +20,15 @@ class Havoc:
         if machine:
             self.machine = machine
             self.table = machine.table
+            self.E = list(self.table[1])
+            self.T = self.table[2]
+            self.S = []
             for p in list(self.table[0]):
                 if len(p) == 1:
                     self.S.append(p)
                 elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
                     self.S.append(p)
-            self.S = list(self.table[0])
-            self.E = list(self.table[1])
-            self.T = self.table[2]
+            
         else:
             self.machine = None
 
