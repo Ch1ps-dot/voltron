@@ -20,6 +20,11 @@ class Havoc:
         if machine:
             self.machine = machine
             self.table = machine.table
+            for p in list(self.table[0]):
+                if len(p) == 1:
+                    self.S.append(p)
+                elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
+                    self.S.append(p)
             self.S = list(self.table[0])
             self.E = list(self.table[1])
             self.T = self.table[2]
@@ -29,13 +34,8 @@ class Havoc:
     def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
-        p = tuple('')
-        while(True):
-            p = random.choice(self.S)
-            if len(p) > 1 and (self.T[p][self.E[0]] == 'TIMEOUT' or self.T[p][self.E[0]] == 'CRASH' or self.T[p[:-1]][p[-1:]]):
-                continue
-            else:
-                break
+        p = random.choice(self.S)
+        logger.debug(f'p: {p}')
         w = list(p)
         gs = self.mapper.select_generators(w)
         return gs
@@ -48,7 +48,7 @@ class Havoc:
         req_seq = []
         for i in range(scope):
             a = random.choice(self.alphabet)
-            logger.debug(a)
+            logger.debug(f'a: {a}')
             req_seq.append(a)
         logger.debug(f'mutators: {req_seq}')
         ms = self.mapper.select_mutators(req_seq)
@@ -72,7 +72,7 @@ class Havoc:
 
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:
-                analyzer.sent = '/'.join(cons.req_seq)
+                analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = '/'.join(cons.res_seq)
             else:
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])

@@ -3,8 +3,6 @@ from voltron.producer.AsyncProducer import Generator
 from voltron.executor.executor import Executor, Conversation
 import random, time
 
-random.seed(time.time())
-
 class Rands:
     def __init__(
         self,
