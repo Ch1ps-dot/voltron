@@ -30,22 +30,27 @@ class AsyncRFCParser:
         self.chater =chater
 
         # doc related value
-        self.doc_path: Path = configs.doc_path
-        self.doc_file = configs.doc_path.open('r+', encoding='utf-8')
-        self.doc_content: str = self.doc_file.read()
+        self.doc_paths: list[Path] = configs.doc_paths
+        self.tree_list: list[SectionTree] = []
+        
+        # initialize the sectiontree which stands for the section structure of documents 
+        for i in range(len(self.doc_paths)):
+            with open(self.doc_paths[i], 'r+', encoding='utf-8') as f:
+                doc_content: str = f.read()
+                st = SectionTree(name=configs.rfc_name[i], content=doc_content)
+                self.tree_list.append(st)
+                
         self.pro_name = configs.pro_name
         self.rfc_name = configs.rfc_name
-
-        # initialize the sectiontree which stands for the section structure of documents 
-        self.st = SectionTree(id='', content=self.doc_content)
 
         # ir related value
         self.req_json: list[dict] # json data of request field
         self.res_json: list[dict] # json data of response field
-        self.req_types: list[str]
-        self.res_types: list[str]
-        self.req_doc: list = []
-        self.res_doc: list = []
+        self.req_types: set[str] = set()
+        self.res_types: set[str] = set()
+        self.req_doc: set[str] = set()
+        self.res_doc: set[str] = set()
+        self.all_doc: set[str] = set()
         self.ir_path = configs.base_path / 'output' / 'ir' / configs.pro_name
 
         self.poss_res: dict[str, str] = {}
@@ -62,26 +67,29 @@ class AsyncRFCParser:
         self
     ):
         # sectiontree parse pass
-        fn = self.ir_path / "section_tree.pkl"
-        if(fn.is_file()):
-            self.load_st()
-            logger.debug('RFCParser: load parser')
-            self._query_prepare()
-        else:
-            self.spe_parse()
-            logger.debug('RFCParser: parse document')
-            self._query_prepare()
-        logger.debug('RFCParser: finish parse')
+        for i in range(len(self.doc_paths)):
+            name=configs.rfc_name[i]
+            fn = self.ir_path / f"{name}.pkl"
+            if(fn.is_file()):
+                self.load_st(i)
+                logger.debug('RFCParser: load parser')
+                self._query_prepare(i)
+            else:
+                self.spe_parse(i)
+                logger.debug('RFCParser: parse document')
+                self._query_prepare(i)
+            logger.debug('RFCParser: finish parse')
 
-        self.rag_req_msg: fastbm25 = self.rag_init(self.req_doc)
-        self.rag_res_msg: fastbm25 = self.rag_init(self.res_doc)
-        self.rag_all: fastbm25 = self.rag_init([self.st.fetch_node_content(node) for node in self.st.leafs])
+        self.rag_req_msg: fastbm25 = self.rag_init(list(self.req_doc))
+        self.rag_res_msg: fastbm25 = self.rag_init(list(self.res_doc))
+        self.rag_all: fastbm25 = self.rag_init(list(self.all_doc))
 
         # ir generation
         self.ir_generation()
         
     def spe_parse(
-            self
+        self,
+        idx: int
     ):
         """Parse specification documents and annotate the section tree.
 
@@ -91,8 +99,13 @@ class AsyncRFCParser:
         3. all
         4. none
         """
-        asyncio.run(self._spe_parse_aync())
-        self.save_st()
+        with open(self.doc_paths[idx], 'r+', encoding='utf-8') as f:
+            doc_content: str = f.read()
+            st = SectionTree(name=configs.rfc_name[idx], content=doc_content)
+            self.tree_list.append(st)
+            
+            asyncio.run(self._spe_parse_aync(st))
+            self.save_st(st)
 
     def ir_generation(
             self
@@ -151,21 +164,25 @@ class AsyncRFCParser:
 
 
     def _query_prepare(
-            self
+        self,
+        idx: int
     ):
         """Prepare content for ir generation
 
         concatenate the sections of document with the same type as one augmentation info
         """
-        for node in self.st.leafs:
+        for node in self.tree_list[idx].leafs:
             match node.content_type:
                 case "request":
-                    self.req_doc.append(self.st.fetch_node_content(node))
+                    self.req_doc.add(self.tree_list[idx].fetch_node_content(node))
+                    self.all_doc.add(self.tree_list[idx].fetch_node_content(node))
                 case "response":
-                    self.res_doc.append(self.st.fetch_node_content(node))
+                    self.res_doc.add(self.tree_list[idx].fetch_node_content(node))
+                    self.all_doc.add(self.tree_list[idx].fetch_node_content(node))
                 case "all":
-                    self.req_doc.append(self.st.fetch_node_content(node))
-                    self.res_doc.append(self.st.fetch_node_content(node))
+                    self.all_doc.add(self.tree_list[idx].fetch_node_content(node))
+                    self.req_doc.add(self.tree_list[idx].fetch_node_content(node))
+                    self.res_doc.add(self.tree_list[idx].fetch_node_content(node))
                 case "none":
                     pass
                 case _:
@@ -177,12 +194,13 @@ class AsyncRFCParser:
         logger.debug('[RFCParser]: query prepare')
 
     async def _spe_parse_aync(
-            self
+        self,
+        st: SectionTree
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._spe_parse_one(node, sem)
-            for node in self.st.leafs
+            self._spe_parse_one(node, sem, st)
+            for node in st.leafs
         ]
 
         results = await tqdm_asyncio.gather(*tasks, desc="Doc Annotation")
@@ -191,14 +209,15 @@ class AsyncRFCParser:
             node.content_type = doc_type
 
     async def _spe_parse_one(
-            self,
-            node: SectionNode,
-            sem: asyncio.Semaphore
+        self,
+        node: SectionNode,
+        sem: asyncio.Semaphore,
+        st: SectionTree
     ):
         async with sem:
             while True:
                 try:
-                    doc = self.st.fetch_node_content(node)
+                    doc = st.fetch_node_content(node)
                     ans = ''
                     if doc != None:
                         ans = await self.chater.llm_doc_parse(
@@ -229,22 +248,6 @@ class AsyncRFCParser:
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.req_doc])
                     )
-                    
-                    # req_json = await self.chater.llm_try_again(
-                    #     last_question=pmp,
-                    #     last_answer=req_json,
-                    #     current_question=pmp
-                    # )
-                    
-                    # if req_json == None:
-                    #     logger.debug('empty json')
-                    #     continue
-                    
-                    # req_json = await self.chater.llm_try_again(
-                    #     last_question=pmp,
-                    #     last_answer=req_json,
-                    #     current_question=pmp
-                    # )
 
                     if (req_json != None):
                         req_json = json.loads(req_json)
@@ -273,22 +276,6 @@ class AsyncRFCParser:
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.res_doc])
                     )
-                    
-                    # res_json = await self.chater.llm_try_again(
-                    #     last_question=pmp,
-                    #     last_answer=res_json,
-                    #     current_question=pmp
-                    # )
-                    
-                    # if res_json == None:
-                    #     logger.debug('empty json')
-                    #     continue
-                    
-                    # res_json = await self.chater.llm_try_again(
-                    #     last_question=pmp,
-                    #     last_answer=res_json,
-                    #     current_question=pmp
-                    # )
 
                     if (res_json != None):
                         res_json = json.loads(res_json)
@@ -503,20 +490,24 @@ class AsyncRFCParser:
 
 
     def load_st(
-            self
+        self,
+        idx: int
     ):
         """Load rfc parser 
         """
-        with open(self.ir_path / "section_tree.pkl", "rb") as f:
-            self.st = pickle.load(f)
+        name = configs.rfc_name[idx]
+        with open(self.ir_path / f"{name}.pkl", "rb") as f:
+            st = pickle.load(f)
+            self.tree_list.append(st)
         
     def save_st(
-            self
+        self,
+        st: SectionTree
     ):
         """Use pickle to store section tree instance
         """
-        with open(self.ir_path / "section_tree.pkl", "wb") as f:
-            pickle.dump(self.st, f)
+        with open(self.ir_path / f"{st.name}.pkl", "wb") as f:
+            pickle.dump(st, f)
             logger.debug("RFCParser: save sectiontree")   
 
     def rag_init(

@@ -74,7 +74,7 @@ class SectionTree:
     """
     def __init__(
             self, 
-            id: str = '',
+            name: str = '',
             content: str = ''
     ) -> None:
         self.tree: list[list[SectionNode]] = [[SectionNode(0, 0, len(content) - 1, '0.')]]
@@ -82,7 +82,7 @@ class SectionTree:
         self.height: int = 0
         self.doc_toc: str = ''
         self.doc_apx: str = ''
-        self.id: str = id
+        self.name: str = name
 
         ans = self._toc_extract(content)
         if ans != None:

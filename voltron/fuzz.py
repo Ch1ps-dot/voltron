@@ -57,7 +57,8 @@ class Fuzzer:
         configs.post_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
         configs.models_path = configs.base_path / 'output' / 'models' / configs.target_name
         configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.md'
-        configs.doc_path = configs.base_path / 'input' / 'rfcs' / f'{configs.rfc_name}.txt'
+        for rfc in configs.rfc_name:
+            configs.doc_paths.append(configs.base_path / 'input' / 'rfcs' / f'{rfc}.txt')
         configs.pmp_path = configs.base_path / 'input' / 'prompts'
         configs.base_url = configs_yaml['llm']['base_url']
         configs.api_key = configs_yaml['llm']['api_key']

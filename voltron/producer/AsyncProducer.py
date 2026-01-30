@@ -61,8 +61,8 @@ class AsyncProducer:
         self.rfcp = rfcp
         
         # types of symbols
-        self.req_types: list[str] = self.rfcp.req_types
-        self.res_types: list[str] = self.rfcp.res_types
+        self.req_types: set[str] = self.rfcp.req_types
+        self.res_types: set[str] = self.rfcp.res_types
         self.req_dep = self.rfcp.req_dep_map
         
         self.generators: dict[str, list[Generator]] = {}
