@@ -15,22 +15,30 @@ class Havoc:
         exe: Executor,
         machine: MealyMachine
     ) -> None:
-        self.res_trans_types: dict[str, int] = {}
+        self.unique_resp: set[str] = set()
+        self.unique_resp_trans: set[str] = set()
+        self.useful_pool: list[tuple[str, bytes]] = []
+        
         self.mapper = mapper
         self.exe = exe
         self.alphabet = mapper.request_types
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
+        self.methods = ['cat', 'rand', 'ood']
+        self.mutator_mode = ['new', 'generic']
         if machine:
             self.machine = machine
             self.table = machine.table
             self.E = list(self.table[1])
             self.T = self.table[2]
             self.S = []
+            self.score_S = []
             for p in list(self.table[0]):
                 if len(p) == 1:
                     self.S.append(p)
+                    self.score_S.append(1)
                 elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
                     self.S.append(p)
+                    self.score_S.append(1)
             
         else:
             self.machine = None
@@ -59,15 +67,37 @@ class Havoc:
     ) -> list[tuple[str, bytes]]:
         scope = self.rand.randint(1, 5)
         logger.debug(scope)
-        req_seq = []
-        for i in range(scope):
-            a = self.rand.choice(self.alphabet)
-            logger.debug(f'a: {a}')
-            req_seq.append(a)
-        logger.debug(f'mutators: {req_seq}')
-        ms = self.mapper.select_mutators(req_seq)
-        ms = [(f'{msg_type}*', data) for msg_type, data in ms]
+        ms = []
+        mode = self.rand.choices(self.mutator_mode, k=1)
+        if mode == 'new':
+            req_seq = []
+            for i in range(scope):
+                a = self.rand.choices(self.alphabet, k=1)
+                req_seq.append(a)
+            ms = self.mapper.select_mutators(req_seq)
+            ms = [(f'{msg_type}*', data) for msg_type, data in ms]
+                
+        elif mode == 'generic':
+            for i in range(scope):
+                a = self.rand.choices(self.useful_pool, k=1)
+                ms.append(a)
+                
+        logger.debug(f'mutators: {ms}')
+        
         return ms
+    
+    def analyze_cons(
+        self,
+        cons: Conversation
+    ):
+        for i in range(len(cons.res_seq)):
+            if cons.res_seq[i] == '-':
+                continue
+            if cons.res_seq[i] == 'TIMEOUT':
+                break
+            if cons.res_seq[i] not in self.unique_resp:
+                self.unique_resp.add(cons.res_seq[i])
+                self.useful_pool.append((cons.req_seq[i], cons.content[i][0]))
     
     def run(
         self,
@@ -83,7 +113,15 @@ class Havoc:
             prefix = self.select_prefix()
             ms = self.select_mutators()
             suffix = self.select_suffix()
-            req_seq = prefix + ms + suffix
+            req_seq = []
+            
+            method = self.rand.choices(self.methods)
+            if (method == 'cat'):
+                req_seq = prefix + ms + suffix
+            elif (method == 'rand'):
+                req_seq = ms
+            elif (method == 'ood'):
+                req_seq = ms + prefix
 
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:

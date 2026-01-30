@@ -5,7 +5,7 @@ class Conversation:
     Maybe record more information in future
     """
     def __init__(self) -> None:
-        self.content: list[tuple[bytes | None, bytes | None]] = []
+        self.content: list[tuple[bytes, bytes]] = []
         self.req_seq: list[str] = []
         self.res_seq: list[str] = []
         
@@ -39,7 +39,7 @@ class Conversation:
             if item.is_file():
                 file_count += 1
             
-        with open(target_folder / f'{file_count}.raw', 'ab') as f:
+        with open(target_folder / f'{'-'.join(self.res_seq)}.raw', 'ab') as f:
             for request, _ in self.content:
                 if request:
                     f.write(request)

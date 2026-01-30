@@ -301,7 +301,7 @@ class Fuzzer:
                 with analyzer.lock:   
                     analyzer.stage = 'havoc fuzzing'
                 
-                havoc.run(100)
+                havoc.run(124)
                 self.producer.generator_mutate()
                 pre_resp = analyzer.cur_res_types_cnt.keys()
                 
