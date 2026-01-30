@@ -6,6 +6,8 @@ from voltron.scheduler.automata import MealyMachine
 from voltron.utils.logger import logger
 import random, time
 
+random.seed(42)
+
 class Havoc:
     def __init__(
         self,
