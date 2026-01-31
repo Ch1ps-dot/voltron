@@ -124,7 +124,8 @@ class Executor:
             sock = self.setup_socket()
             if sock == None:
                 if proc.poll() is not None:
-                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.stderr}')
+                    stderr_data = proc.communicate()
+                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {stderr_data}')
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
