@@ -135,7 +135,7 @@ class Executor:
             
         # keep request and response in Conversation
         cons: Conversation = Conversation()
-        time.sleep(100)
+        
         # maybe recv initialize message
         resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
         last_recv = '-'
@@ -264,6 +264,7 @@ class Executor:
             os.killpg(clean.pid, signal.SIGTERM)
             clean.wait()
         
+        time.sleep(100)
         # ensure sub-subprocess die
         while True:
             try:
