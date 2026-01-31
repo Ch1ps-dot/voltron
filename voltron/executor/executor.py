@@ -339,7 +339,7 @@ class Executor:
             try:
                 if (self.trans_layer == 'tcp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.connect((self.host, self.port))
+                    sock.connect(('localhost', self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 else:
