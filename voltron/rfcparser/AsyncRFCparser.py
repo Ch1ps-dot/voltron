@@ -31,14 +31,7 @@ class AsyncRFCParser:
 
         # doc related value
         self.doc_paths: list[Path] = configs.doc_paths
-        self.tree_list: list[SectionTree] = []
-        
-        # initialize the sectiontree which stands for the section structure of documents 
-        for i in range(len(self.doc_paths)):
-            with open(self.doc_paths[i], 'r+', encoding='utf-8') as f:
-                doc_content: str = f.read()
-                st = SectionTree(name=configs.rfc_name[i], content=doc_content)
-                self.tree_list.append(st)
+        self.tree_dict: dict[str, SectionTree] = {}
                 
         self.pro_name = configs.pro_name
         self.rfc_name = configs.rfc_name
@@ -77,13 +70,13 @@ class AsyncRFCParser:
             logger.debug(f'create st: {name}')
             fn = self.ir_path / f"{name}.pkl"
             if(fn.is_file()):
-                self.load_st(i)
+                self.load_st(name)
                 logger.debug('RFCParser: load parser')
-                self._query_prepare(i)
+                self._query_prepare(name)
             else:
                 self.spe_parse(i)
                 logger.debug('RFCParser: parse document')
-                self._query_prepare(i)
+                self._query_prepare(name)
             logger.debug('RFCParser: finish parse')
 
         self.rag_req_msg: fastbm25 = self.rag_init(list(self.req_doc))
@@ -109,7 +102,7 @@ class AsyncRFCParser:
             doc_content: str = f.read()
             st = SectionTree(name=configs.rfc_name[idx], content=doc_content)
             asyncio.run(self._spe_parse_async(st))
-            self.tree_list.append(st)
+            self.tree_dict[configs.rfc_name[idx]] = st
             self.save_st(st)
 
     def ir_generation(
@@ -170,26 +163,26 @@ class AsyncRFCParser:
 
     def _query_prepare(
         self,
-        idx: int
+        name: str
     ):
         """Prepare content for ir generation
 
         concatenate the sections of document with the same type as one augmentation info
         """
-        logger.debug(f'query: {self.tree_list[idx]}')
-        self.tree_list[idx].debug_tree()
-        for node in self.tree_list[idx].leafs:
+        logger.debug(f'query: {self.tree_dict[name]}')
+        self.tree_dict[name].debug_tree()
+        for node in self.tree_dict[name].leafs:
             match node.content_type:
                 case "request":
-                    self.req_doc.add(self.tree_list[idx].fetch_node_content(node))
-                    self.all_doc.add(self.tree_list[idx].fetch_node_content(node))
+                    self.req_doc.add(self.tree_dict[name].fetch_node_content(node))
+                    self.all_doc.add(self.tree_dict[name].fetch_node_content(node))
                 case "response":
-                    self.res_doc.add(self.tree_list[idx].fetch_node_content(node))
-                    self.all_doc.add(self.tree_list[idx].fetch_node_content(node))
+                    self.res_doc.add(self.tree_dict[name].fetch_node_content(node))
+                    self.all_doc.add(self.tree_dict[name].fetch_node_content(node))
                 case "all":
-                    self.all_doc.add(self.tree_list[idx].fetch_node_content(node))
-                    self.req_doc.add(self.tree_list[idx].fetch_node_content(node))
-                    self.res_doc.add(self.tree_list[idx].fetch_node_content(node))
+                    self.all_doc.add(self.tree_dict[name].fetch_node_content(node))
+                    self.req_doc.add(self.tree_dict[name].fetch_node_content(node))
+                    self.res_doc.add(self.tree_dict[name].fetch_node_content(node))
                 case "none":
                     pass
                 case _:
@@ -501,14 +494,13 @@ class AsyncRFCParser:
 
     def load_st(
         self,
-        idx: int
+        name: str
     ):
         """Load rfc parser 
         """
-        name = configs.rfc_name[idx]
         with open(self.ir_path / f"{name}.pkl", "rb") as f:
             st = pickle.load(f)
-            self.tree_list.append(st)
+            self.tree_dict[name] = st
         
     def save_st(
         self,
