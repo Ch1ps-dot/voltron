@@ -262,16 +262,18 @@ class Executor:
             os.killpg(clean.pid, signal.SIGTERM)
         
         # ensure sub-subprocess die
-        try:
-            os.killpg(proc.pid, 0)
-            
-            # no die, just kill
-            os.killpg(proc.pid, signal.SIGKILL)
-            analyzer.sut_proc = None
-            logger.debug(f"target process: target process alive")
-        except Exception as e:
-            # sub-subprocess die out
-            logger.debug(f'target process: {e}')
+        while True:
+            try:
+                os.killpg(proc.pid, 0)
+                
+                # no die, just kill
+                os.killpg(proc.pid, signal.SIGKILL)
+                logger.debug(f"target process: target process alive")
+            except Exception as e:
+                # sub-subprocess die out
+                analyzer.sut_proc = None
+                logger.debug(f'target process: {e}')
+                break
         
         # kill clean script
         try:
