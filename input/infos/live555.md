@@ -1,5 +1,5 @@
 **Client Settings**
-Use 000022B8 as session
+Use 000022B8 as session id
  
 **URL Settings**
 

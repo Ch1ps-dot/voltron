@@ -92,6 +92,7 @@ class Executor:
         # prepare some settings and setup SUT
         clean = self.post_exe()
         proc = self.pre_exe()
+        self.kill_listeners(self.port)
         # logger.debug('exe: after setup')
         
         if proc is None or clean is None:
@@ -293,8 +294,37 @@ class Executor:
         logger.debug("Executor: query done")
         return True, cons
     
+    def kill_listeners(
+        self,
+        port: int
+    ):
+        pids = []
+        try:
+            result = subprocess.check_output(
+                ["sudo", "netstat", "-tulnp", "2>/dev/null"],  
+                text=True,
+                stderr=subprocess.DEVNULL
+            )
+            lines = result.strip().split("\n")[1:]
+            for line in lines:
+                if f":{port}" in line:
+                    pid_str = line.split("/")[0].split(" ")[-1]
+                    if pid_str.isdigit():
+                        pids.append(int(pid_str))
+            pids = list(set(pids))
+        except subprocess.CalledProcessError as e:
+            logger.debug(f'kill execution failure {e}')
+        
+        try:
+            for pid in pids:
+                os.kill(pid, signal.SIGTERM)
+        except Exception as e:
+            logger.debug(f'kill execution failure {e}')
+        
+        
+        
     def setup_socket(
-            self
+        self
     ) -> socket.socket | None:
             """Setup the socket for network communication
 
