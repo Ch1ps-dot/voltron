@@ -222,6 +222,7 @@ class AsyncRFCParser:
         st: SectionTree
     ) -> tuple[SectionNode, str]:
         async with sem:
+            st.debug_tree()
             while True:
                 try:
                     doc = st.fetch_node_content(node)

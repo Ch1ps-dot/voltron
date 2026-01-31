@@ -638,7 +638,7 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
 
       Compact Form: none
 
-9 Security Considerations
+9. Security Considerations
 
    The PRACK request can be injected by attackers to force
    retransmissions of reliable provisional responses to cease.  As these
@@ -646,7 +646,7 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
    authenticated as any other request.  Authentication procedures are
    specified in RFC 3261.
 
-10 Collected BNF
+10. Collected BNF
 
    The BNF for the RAck and RSeq headers and the PRACK method are
    defined here.
@@ -660,7 +660,7 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
    CSeq-num      =  1*DIGIT
    RSeq          =  "RSeq" HCOLON response-num
 
-11 Acknowledgements
+11. Acknowledgements
 
    The authors would like to thank Jo Hornsby, Jonathan Lennox, Rohan
    Mahy, Allison Mankin, Adam Roach, and Tim Schroeder for the comments
@@ -676,7 +676,7 @@ Rosenberg & Schulzrinne     Standards Track                    [Page 12]
 RFC 3262      Reliability of Provisional Responses in SIP      June 2002
 
 
-12 Normative References
+12. Normative References
 
    [1]   Rosenberg, J., Schulzrinne, H., Camarillo, G., Johnston, A.,
          Peterson, J., Sparks, R., Handley, M. and E. Schooler, "SIP:
@@ -688,12 +688,12 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
    [3]   Rosenberg, J. and H. Schulzrinne, "An Offer/Answer Model with
          SDP", RFC 3264, June 2002.
 
-13 Informative References
+13. Informative References
 
    [4]   Handley, M., Schulzrinne, H., Schooler, E. and J. Rosenberg,
          "SIP: Session Initiation Protocol", RFC 2543, March 1999.
 
-14 Authors' Addresses
+14. Authors' Addresses
 
    Jonathan Rosenberg
    dynamicsoft
