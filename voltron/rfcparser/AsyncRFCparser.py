@@ -220,7 +220,7 @@ class AsyncRFCParser:
         node: SectionNode,
         sem: asyncio.Semaphore,
         st: SectionTree
-    ) -> tuple[SectionNode, str]:
+    ):
         async with sem:
             st.debug_tree()
             while True:
@@ -236,6 +236,7 @@ class AsyncRFCParser:
                         if ans is None: raise Exception
                         logger.debug(f'[Tree Annotate]: {node.name}:{ans}:{node}')
                         node.content_type = ans
+                        break
                 except Exception as e:
                     logger.error(f'RFCParser: specification parse error {e}')
 
