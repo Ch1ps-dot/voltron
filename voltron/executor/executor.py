@@ -266,6 +266,7 @@ class Executor:
             os.killpg(clean.pid, signal.SIGTERM)
             clean.wait()
         
+        self.kill_listeners(self.port)
         # ensure sub-subprocess die
         while True:
             try:
@@ -338,8 +339,7 @@ class Executor:
             
             try:
                 if (self.trans_layer == 'tcp'):
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.connect(('localhost', self.port))
+                    sock = socket.create_connection(('localhost', self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 else:
