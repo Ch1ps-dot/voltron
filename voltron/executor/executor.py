@@ -257,17 +257,18 @@ class Executor:
         # close process
         if proc.poll() is None:
             os.killpg(proc.pid, signal.SIGTERM)
+            proc.wait()
             
         if clean.poll() is None:
             os.killpg(clean.pid, signal.SIGTERM)
+            clean.wait()
         
         # ensure sub-subprocess die
         while True:
             try:
                 os.killpg(proc.pid, 0)
-                
-                time.sleep(0.5)
                 # no die, just kill
+                time.sleep(0.1)
                 os.killpg(proc.pid, signal.SIGKILL)
             except Exception as e:
                 # sub-subprocess die out
