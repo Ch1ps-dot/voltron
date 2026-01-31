@@ -108,9 +108,8 @@ class AsyncRFCParser:
         with open(self.doc_paths[idx], 'r+', encoding='utf-8') as f:
             doc_content: str = f.read()
             st = SectionTree(name=configs.rfc_name[idx], content=doc_content)
+            asyncio.run(self._spe_parse_async(st))
             self.tree_list.append(st)
-            
-            asyncio.run(self._spe_parse_aync(st))
             self.save_st(st)
 
     def ir_generation(
@@ -195,13 +194,13 @@ class AsyncRFCParser:
                     pass
                 case _:
                     logger.debug(f"[Section type]: unexpected type")
-        if len(self.req_doc) == 0 or len(self.res_doc) == 0:
+        if len(self.req_doc) == 0 and len(self.res_doc) == 0:
             logger.debug('RFCParser: bad documents, lack of request and response information')
             sys.exit(1)
             
         logger.debug('[RFCParser]: query prepare')
 
-    async def _spe_parse_aync(
+    async def _spe_parse_async(
         self,
         st: SectionTree
     ):
@@ -226,7 +225,7 @@ class AsyncRFCParser:
             while True:
                 try:
                     doc = st.fetch_node_content(node)
-                    ans = ''
+                    ans = None
                     if doc != None:
                         ans = await self.chater.llm_doc_parse(
                             rfc_num = self.rfc_name,

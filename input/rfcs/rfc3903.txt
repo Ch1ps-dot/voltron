@@ -1,1184 +1,1795 @@
-<!DOCTYPE html>
-<html>
-    <head>
-    <link rel="profile" href="https://gmpg.org/xfn/11" />
-        <meta charset="UTF-8" />
-        <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />        <title>Information on RFC 3903 &raquo; RFC Editor</title> 
-        <meta name="generator" content="WordPress 6.0.11" /> <!-- leave this for stats -->
-        <link rel="stylesheet" type="text/css" media="screen" href="https://www.rfc-editor.org/wp-content/themes/techozoic-fluid/style.css" />
-                <!--[if IE]>
-                <style type="text/css">
-                #headerimg{ filter:alpha(opacity=80);}
-                .top img{ filter:alpha(opacity=60);}
-                .top img:hover{ filter:alpha(opacity=100);}
-                ul.comment-preview li{ filter:alpha(opacity=70);}
-                ul.comment-preview li:hover{ filter:alpha(opacity=100);}
-                #commentform input[type="text"],#commentform .comment-form-author .required, 
-                #commentform .comment-form-email .required{padding-left: 65px !important;}
-                .top a {position: relative;top: 2px;}
-                </style>
-        <![endif]-->
-        <!--[if IE 7]>
-                <style type="text/css">
-                #headerimgwrap{ position:absolute;left:20%}
-                .hleft{position:absolute;}
-                .hright{position:absolute; right:0;}
-                .top:hover {bottom: -30px;}
-                </style>
-        <![endif]-->
-        <!--[if IE 8 ]>
-                <style type="text/css">
-                .top:hover {bottom: -30px;}
-                </style>
-        <![endif]-->
-        <link rel="pingback" href="https://www.rfc-editor.org/xmlrpc.php" />
-        <meta name='robots' content='max-image-preview:large' />
-<link rel='dns-prefetch' href='//fonts.googleapis.com' />
-<link rel='dns-prefetch' href='//s.w.org' />
-<link rel="alternate" type="application/rss+xml" title="RFC Editor &raquo; Feed" href="https://www.rfc-editor.org/feed/" />
-<link rel="alternate" type="application/rss+xml" title="RFC Editor &raquo; Comments Feed" href="https://www.rfc-editor.org/comments/feed/" />
-<script type="text/javascript">
-window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/14.0.0\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/14.0.0\/svg\/","svgExt":".svg","source":{"concatemoji":"https:\/\/www.rfc-editor.org\/wp-includes\/js\/wp-emoji-release.min.js?ver=6.0.11"}};
-/*! This file is auto-generated */
-!function(e,a,t){var n,r,o,i=a.createElement("canvas"),p=i.getContext&&i.getContext("2d");function s(e,t){var a=String.fromCharCode,e=(p.clearRect(0,0,i.width,i.height),p.fillText(a.apply(this,e),0,0),i.toDataURL());return p.clearRect(0,0,i.width,i.height),p.fillText(a.apply(this,t),0,0),e===i.toDataURL()}function c(e){var t=a.createElement("script");t.src=e,t.defer=t.type="text/javascript",a.getElementsByTagName("head")[0].appendChild(t)}for(o=Array("flag","emoji"),t.supports={everything:!0,everythingExceptFlag:!0},r=0;r<o.length;r++)t.supports[o[r]]=function(e){if(!p||!p.fillText)return!1;switch(p.textBaseline="top",p.font="600 32px Arial",e){case"flag":return s([127987,65039,8205,9895,65039],[127987,65039,8203,9895,65039])?!1:!s([55356,56826,55356,56819],[55356,56826,8203,55356,56819])&&!s([55356,57332,56128,56423,56128,56418,56128,56421,56128,56430,56128,56423,56128,56447],[55356,57332,8203,56128,56423,8203,56128,56418,8203,56128,56421,8203,56128,56430,8203,56128,56423,8203,56128,56447]);case"emoji":return!s([129777,127995,8205,129778,127999],[129777,127995,8203,129778,127999])}return!1}(o[r]),t.supports.everything=t.supports.everything&&t.supports[o[r]],"flag"!==o[r]&&(t.supports.everythingExceptFlag=t.supports.everythingExceptFlag&&t.supports[o[r]]);t.supports.everythingExceptFlag=t.supports.everythingExceptFlag&&!t.supports.flag,t.DOMReady=!1,t.readyCallback=function(){t.DOMReady=!0},t.supports.everything||(n=function(){t.readyCallback()},a.addEventListener?(a.addEventListener("DOMContentLoaded",n,!1),e.addEventListener("load",n,!1)):(e.attachEvent("onload",n),a.attachEvent("onreadystatechange",function(){"complete"===a.readyState&&t.readyCallback()})),(e=t.source||{}).concatemoji?c(e.concatemoji):e.wpemoji&&e.twemoji&&(c(e.twemoji),c(e.wpemoji)))}(window,document,window._wpemojiSettings);
-</script>
-<style type="text/css">
-img.wp-smiley,
-img.emoji {
-	display: inline !important;
-	border: none !important;
-	box-shadow: none !important;
-	height: 1em !important;
-	width: 1em !important;
-	margin: 0 0.07em !important;
-	vertical-align: -0.1em !important;
-	background: none !important;
-	padding: 0 !important;
-}
-</style>
-	<link rel='stylesheet' id='wp-block-library-css'  href='https://www.rfc-editor.org/wp-includes/css/dist/block-library/style.min.css?ver=6.0.11' type='text/css' media='all' />
-<style id='global-styles-inline-css' type='text/css'>
-body{--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgba(6,147,227,1) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgba(252,185,0,1) 0%,rgba(255,105,0,1) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgba(255,105,0,1) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--duotone--dark-grayscale: url('#wp-duotone-dark-grayscale');--wp--preset--duotone--grayscale: url('#wp-duotone-grayscale');--wp--preset--duotone--purple-yellow: url('#wp-duotone-purple-yellow');--wp--preset--duotone--blue-red: url('#wp-duotone-blue-red');--wp--preset--duotone--midnight: url('#wp-duotone-midnight');--wp--preset--duotone--magenta-yellow: url('#wp-duotone-magenta-yellow');--wp--preset--duotone--purple-green: url('#wp-duotone-purple-green');--wp--preset--duotone--blue-orange: url('#wp-duotone-blue-orange');--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
-</style>
-<style id='responsive-menu-inline-css' type='text/css'>
-/** This file is major component of this plugin so please don't try to edit here. */
-#rmp_menu_trigger-2538 {
-  width: 55px;
-  height: 55px;
-  position: fixed;
-  top: 15px;
-  border-radius: 5px;
-  display: none;
-  text-decoration: none;
-  right: 5%;
-  background: #000000;
-  transition: transform 0.5s, background-color 0.5s;
-}
-#rmp_menu_trigger-2538:hover, #rmp_menu_trigger-2538:focus {
-  background: #000000;
-  text-decoration: unset;
-}
-#rmp_menu_trigger-2538.is-active {
-  background: #000000;
-}
-#rmp_menu_trigger-2538 .rmp-trigger-box {
-  width: 25px;
-  color: #ffffff;
-}
-#rmp_menu_trigger-2538 .rmp-trigger-icon-active, #rmp_menu_trigger-2538 .rmp-trigger-text-open {
-  display: none;
-}
-#rmp_menu_trigger-2538.is-active .rmp-trigger-icon-active, #rmp_menu_trigger-2538.is-active .rmp-trigger-text-open {
-  display: inline;
-}
-#rmp_menu_trigger-2538.is-active .rmp-trigger-icon-inactive, #rmp_menu_trigger-2538.is-active .rmp-trigger-text {
-  display: none;
-}
-#rmp_menu_trigger-2538 .rmp-trigger-label {
-  color: #ffffff;
-  pointer-events: none;
-  line-height: 13px;
-  font-family: inherit;
-  font-size: 14px;
-  display: inline;
-  text-transform: inherit;
-}
-#rmp_menu_trigger-2538 .rmp-trigger-label.rmp-trigger-label-top {
-  display: block;
-  margin-bottom: 12px;
-}
-#rmp_menu_trigger-2538 .rmp-trigger-label.rmp-trigger-label-bottom {
-  display: block;
-  margin-top: 12px;
-}
-#rmp_menu_trigger-2538 .responsive-menu-pro-inner {
-  display: block;
-}
-#rmp_menu_trigger-2538 .responsive-menu-pro-inner, #rmp_menu_trigger-2538 .responsive-menu-pro-inner::before, #rmp_menu_trigger-2538 .responsive-menu-pro-inner::after {
-  width: 25px;
-  height: 3px;
-  background-color: #ffffff;
-  border-radius: 4px;
-  position: absolute;
-}
-#rmp_menu_trigger-2538.is-active .responsive-menu-pro-inner, #rmp_menu_trigger-2538.is-active .responsive-menu-pro-inner::before, #rmp_menu_trigger-2538.is-active .responsive-menu-pro-inner::after {
-  background-color: #ffffff;
-}
-#rmp_menu_trigger-2538:hover .responsive-menu-pro-inner, #rmp_menu_trigger-2538:hover .responsive-menu-pro-inner::before, #rmp_menu_trigger-2538:hover .responsive-menu-pro-inner::after {
-  background-color: #ffffff;
-}
-/* Hamburger menu styling */
-@media screen and (max-width: 1024px) {
-  /** Menu Title Style */
-  /** Menu Additional Content Style */
-  #l_sidebar {
-    display: none !important;
-  }
-  #rmp_menu_trigger-2538 {
-    display: block;
-  }
-  #rmp-container-2538 {
-    position: fixed;
-    top: 0;
-    margin: 0;
-    transition: transform 0.5s;
-    overflow: auto;
-    display: block;
-    width: 75%;
-    background-color: #212121;
-    background-image: url("");
-    height: 100%;
-    left: 0;
-    padding-top: 0px;
-    padding-left: 0px;
-    padding-bottom: 0px;
-    padding-right: 0px;
-  }
-  #rmp-menu-wrap-2538 {
-    padding-top: 0px;
-    padding-left: 0px;
-    padding-bottom: 0px;
-    padding-right: 0px;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu, #rmp-menu-wrap-2538 .rmp-submenu {
-    width: 100%;
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu-depth-1 .rmp-menu-item-link {
-    padding-left: 10%;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu-depth-2 .rmp-menu-item-link {
-    padding-left: 15%;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu-depth-3 .rmp-menu-item-link {
-    padding-left: 20%;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu-depth-4 .rmp-menu-item-link {
-    padding-left: 25%;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu.rmp-submenu-open {
-    display: block;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-item {
-    width: 100%;
-    list-style: none;
-    margin: 0;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-item-link {
-    height: 40px;
-    line-height: 40px;
-    font-size: 13px;
-    border-bottom: 1px solid #212121;
-    font-family: inherit;
-    color: #ffffff;
-    text-align: left;
-    background-color: #212121;
-    font-weight: normal;
-    letter-spacing: 0px;
-    display: block;
-    width: 100%;
-    text-decoration: none;
-    position: relative;
-    overflow: hidden;
-    transition: background-color 0.5s, border-color 0.5s, 0.5s;
-    padding: 0 5%;
-    padding-right: 50px;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-item-link:after, #rmp-menu-wrap-2538 .rmp-menu-item-link:before {
-    display: none;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-item-link:hover {
-    color: #ffffff;
-    border-color: #212121;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-item-link:focus {
-    outline: none;
-    border-color: unset;
-    box-shadow: unset;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-item-link .rmp-font-icon {
-    height: 40px;
-    line-height: 40px;
-    margin-right: 10px;
-    font-size: 13px;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-current-item .rmp-menu-item-link {
-    color: #ffffff;
-    border-color: #212121;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-current-item .rmp-menu-item-link:hover {
-    color: #ffffff;
-    border-color: #3f3f3f;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-subarrow {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    text-align: center;
-    overflow: hidden;
-    background-size: cover;
-    overflow: hidden;
-    right: 0;
-    border-left-style: solid;
-    border-left-color: #212121;
-    border-left-width: 1px;
-    height: 40px;
-    width: 40px;
-    color: #ffffff;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-subarrow:hover {
-    color: #ffffff;
-    border-color: #3f3f3f;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-subarrow .rmp-font-icon {
-    margin-right: unset;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-subarrow * {
-    vertical-align: middle;
-    line-height: 40px;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-subarrow-active {
-    display: block;
-    background-size: cover;
-    color: #ffffff;
-    border-color: #212121;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-subarrow-active:hover {
-    color: #ffffff;
-    border-color: #3f3f3f;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu {
-    display: none;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-item-link {
-    height: 40px;
-    line-height: 40px;
-    letter-spacing: 0px;
-    font-size: 13px;
-    border-bottom: 1px solid #212121;
-    font-family: inherit;
-    font-weight: normal;
-    color: #ffffff;
-    text-align: left;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-item-link:hover {
-    color: #ffffff;
-    border-color: #212121;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-current-item .rmp-menu-item-link {
-    color: #ffffff;
-    border-color: #212121;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-current-item .rmp-menu-item-link:hover {
-    color: #ffffff;
-    border-color: #3f3f3f;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-subarrow {
-    right: 0;
-    border-right: unset;
-    border-left-style: solid;
-    border-left-color: #212121;
-    border-left-width: 1px;
-    height: 40px;
-    line-height: 40px;
-    width: 40px;
-    color: #ffffff;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-subarrow:hover {
-    color: #ffffff;
-    border-color: #3f3f3f;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-subarrow-active {
-    color: #ffffff;
-    border-color: #212121;
-    background-color: #212121;
-  }
-  #rmp-menu-wrap-2538 .rmp-submenu .rmp-menu-subarrow-active:hover {
-    color: #ffffff;
-    border-color: #3f3f3f;
-    background-color: #3f3f3f;
-  }
-  #rmp-menu-wrap-2538 .rmp-menu-item-description {
-    margin: 0;
-    padding: 5px 5%;
-    opacity: 0.8;
-    color: #ffffff;
-  }
-  #rmp-search-box-2538 {
-    display: block;
-    padding-top: 0px;
-    padding-left: 5%;
-    padding-bottom: 0px;
-    padding-right: 5%;
-  }
-  #rmp-search-box-2538 .rmp-search-form {
-    margin: 0;
-  }
-  #rmp-search-box-2538 .rmp-search-box {
-    background: #ffffff;
-    border: 1px solid #dadada;
-    color: #333333;
-    width: 100%;
-    padding: 0 5%;
-    border-radius: 30px;
-    height: 45px;
-    -webkit-appearance: none;
-  }
-  #rmp-search-box-2538 .rmp-search-box::placeholder {
-    color: #c7c7cd;
-  }
-  #rmp-search-box-2538 .rmp-search-box:focus {
-    background-color: #ffffff;
-    outline: 2px solid #dadada;
-    color: #333333;
-  }
-  #rmp-menu-title-2538 {
-    background-color: #212121;
-    color: #ffffff;
-    text-align: left;
-    font-size: 13px;
-    padding-top: 10%;
-    padding-left: 5%;
-    padding-bottom: 0%;
-    padding-right: 5%;
-    font-weight: 400;
-    transition: background-color 0.5s, border-color 0.5s, color 0.5s;
-  }
-  #rmp-menu-title-2538:hover {
-    background-color: #212121;
-    color: #ffffff;
-  }
-  #rmp-menu-title-2538 > a {
-    color: #ffffff;
-    width: 100%;
-    background-color: unset;
-    text-decoration: none;
-  }
-  #rmp-menu-title-2538 > a:hover {
-    color: #ffffff;
-  }
-  #rmp-menu-title-2538 .rmp-font-icon {
-    font-size: 13px;
-  }
-  #rmp-menu-additional-content-2538 {
-    padding-top: 0px;
-    padding-left: 5%;
-    padding-bottom: 0px;
-    padding-right: 5%;
-    color: #ffffff;
-    text-align: center;
-    font-size: 16px;
-  }
-}
-/**
-This file contents common styling of menus.
-*/
-.rmp-container {
-  display: none;
-  visibility: visible;
-  padding: 0px 0px 0px 0px;
-  z-index: 99998;
-  transition: all 0.3s;
-  /** Scrolling bar in menu setting box **/
-}
-.rmp-container.rmp-fade-top, .rmp-container.rmp-fade-left, .rmp-container.rmp-fade-right, .rmp-container.rmp-fade-bottom {
-  display: none;
-}
-.rmp-container.rmp-slide-left, .rmp-container.rmp-push-left {
-  transform: translateX(-100%);
-  -ms-transform: translateX(-100%);
-  -webkit-transform: translateX(-100%);
-  -moz-transform: translateX(-100%);
-}
-.rmp-container.rmp-slide-left.rmp-menu-open, .rmp-container.rmp-push-left.rmp-menu-open {
-  transform: translateX(0);
-  -ms-transform: translateX(0);
-  -webkit-transform: translateX(0);
-  -moz-transform: translateX(0);
-}
-.rmp-container.rmp-slide-right, .rmp-container.rmp-push-right {
-  transform: translateX(100%);
-  -ms-transform: translateX(100%);
-  -webkit-transform: translateX(100%);
-  -moz-transform: translateX(100%);
-}
-.rmp-container.rmp-slide-right.rmp-menu-open, .rmp-container.rmp-push-right.rmp-menu-open {
-  transform: translateX(0);
-  -ms-transform: translateX(0);
-  -webkit-transform: translateX(0);
-  -moz-transform: translateX(0);
-}
-.rmp-container.rmp-slide-top, .rmp-container.rmp-push-top {
-  transform: translateY(-100%);
-  -ms-transform: translateY(-100%);
-  -webkit-transform: translateY(-100%);
-  -moz-transform: translateY(-100%);
-}
-.rmp-container.rmp-slide-top.rmp-menu-open, .rmp-container.rmp-push-top.rmp-menu-open {
-  transform: translateY(0);
-  -ms-transform: translateY(0);
-  -webkit-transform: translateY(0);
-  -moz-transform: translateY(0);
-}
-.rmp-container.rmp-slide-bottom, .rmp-container.rmp-push-bottom {
-  transform: translateY(100%);
-  -ms-transform: translateY(100%);
-  -webkit-transform: translateY(100%);
-  -moz-transform: translateY(100%);
-}
-.rmp-container.rmp-slide-bottom.rmp-menu-open, .rmp-container.rmp-push-bottom.rmp-menu-open {
-  transform: translateX(0);
-  -ms-transform: translateX(0);
-  -webkit-transform: translateX(0);
-  -moz-transform: translateX(0);
-}
-.rmp-container::-webkit-scrollbar {
-  width: 0px;
-}
-.rmp-container ::-webkit-scrollbar-track {
-  box-shadow: inset 0 0 5px transparent;
-}
-.rmp-container ::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-.rmp-container ::-webkit-scrollbar-thumb:hover {
-  background: transparent;
-}
-.rmp-container .rmp-menu-wrap .rmp-menu {
-  transition: none;
-  border-radius: 0;
-  box-shadow: none;
-  background: none;
-  border: 0;
-  bottom: auto;
-  box-sizing: border-box;
-  clip: auto;
-  color: #666;
-  display: block;
-  float: none;
-  font-family: inherit;
-  font-size: 14px;
-  height: auto;
-  left: auto;
-  line-height: 1.7;
-  list-style-type: none;
-  margin: 0;
-  min-height: auto;
-  max-height: none;
-  opacity: 1;
-  outline: none;
-  overflow: visible;
-  padding: 0;
-  position: relative;
-  pointer-events: auto;
-  right: auto;
-  text-align: left;
-  text-decoration: none;
-  text-indent: 0;
-  text-transform: none;
-  transform: none;
-  top: auto;
-  visibility: inherit;
-  width: auto;
-  word-wrap: break-word;
-  white-space: normal;
-}
-.rmp-container .rmp-menu-additional-content {
-  display: block;
-  word-break: break-word;
-}
-.rmp-container .rmp-menu-title {
-  display: flex;
-  flex-direction: column;
-}
-.rmp-container .rmp-menu-title .rmp-menu-title-image {
-  max-width: 100%;
-  margin-bottom: 15px;
-  display: block;
-  margin: auto;
-  margin-bottom: 15px;
-}
-button.rmp_menu_trigger {
-  z-index: 999999;
-  overflow: hidden;
-  outline: none;
-  border: 0;
-  display: none;
-  margin: 0;
-  transition: transform 0.5s, background-color 0.5s;
-  padding: 0;
-}
-button.rmp_menu_trigger .responsive-menu-pro-inner::before, button.rmp_menu_trigger .responsive-menu-pro-inner::after {
-  content: "";
-  display: block;
-}
-button.rmp_menu_trigger .responsive-menu-pro-inner::before {
-  top: 10px;
-}
-button.rmp_menu_trigger .responsive-menu-pro-inner::after {
-  bottom: 10px;
-}
-button.rmp_menu_trigger .rmp-trigger-box {
-  width: 40px;
-  display: inline-block;
-  position: relative;
-  pointer-events: none;
-  vertical-align: super;
-}
-.admin-bar .rmp-container, .admin-bar .rmp_menu_trigger {
-  margin-top: 32px !important;
-}
-@media screen and (max-width: 782px) {
-  .admin-bar .rmp-container, .admin-bar .rmp_menu_trigger {
-    margin-top: 46px !important;
-  }
-}
-/*  Menu Trigger Boring Animation */
-.rmp-menu-trigger-boring .responsive-menu-pro-inner {
-  transition-property: none;
-}
-.rmp-menu-trigger-boring .responsive-menu-pro-inner::after, .rmp-menu-trigger-boring .responsive-menu-pro-inner::before {
-  transition-property: none;
-}
-.rmp-menu-trigger-boring.is-active .responsive-menu-pro-inner {
-  transform: rotate(45deg);
-}
-.rmp-menu-trigger-boring.is-active .responsive-menu-pro-inner:before {
-  top: 0;
-  opacity: 0;
-}
-.rmp-menu-trigger-boring.is-active .responsive-menu-pro-inner:after {
-  bottom: 0;
-  transform: rotate(-90deg);
-}
-
-</style>
-<link rel='stylesheet' id='dashicons-css'  href='https://www.rfc-editor.org/wp-includes/css/dashicons.min.css?ver=6.0.11' type='text/css' media='all' />
-<link rel='stylesheet' id='tech-mobile-css'  href='https://www.rfc-editor.org/wp-content/themes/techozoic-fluid/css/mobile.css?ver=0.1' type='text/css' media='all' />
-<link rel='stylesheet' id='google_fonts-css'  href='https://fonts.googleapis.com/css?family=Noto+Sans%7C&#038;ver=6.0.11' type='text/css' media='screen' />
-<script type='text/javascript' src='https://www.rfc-editor.org/wp-includes/js/jquery/jquery.min.js?ver=3.6.0' id='jquery-core-js'></script>
-<script type='text/javascript' src='https://www.rfc-editor.org/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.3.2' id='jquery-migrate-js'></script>
-<script type='text/javascript' id='rmp_menu_scripts-js-extra'>
-/* <![CDATA[ */
-var rmp_menu = {"ajaxURL":"https:\/\/www.rfc-editor.org\/wp-admin\/admin-ajax.php","wp_nonce":"a98be8e449","menu":[{"menu_theme":null,"theme_type":"default","theme_location_menu":"","submenu_submenu_arrow_width":"40","submenu_submenu_arrow_width_unit":"px","submenu_submenu_arrow_height":"40","submenu_submenu_arrow_height_unit":"px","submenu_arrow_position":"right","submenu_sub_arrow_background_colour":"#212121","submenu_sub_arrow_background_hover_colour":"#3f3f3f","submenu_sub_arrow_background_colour_active":"#212121","submenu_sub_arrow_background_hover_colour_active":"#3f3f3f","submenu_sub_arrow_border_width":"1","submenu_sub_arrow_border_width_unit":"px","submenu_sub_arrow_border_colour":"#212121","submenu_sub_arrow_border_hover_colour":"#3f3f3f","submenu_sub_arrow_border_colour_active":"#212121","submenu_sub_arrow_border_hover_colour_active":"#3f3f3f","submenu_sub_arrow_shape_colour":"#ffffff","submenu_sub_arrow_shape_hover_colour":"#ffffff","submenu_sub_arrow_shape_colour_active":"#ffffff","submenu_sub_arrow_shape_hover_colour_active":"#ffffff","use_header_bar":"off","header_bar_items_order":"{\"logo\":\"on\",\"title\":\"on\",\"search\":\"on\",\"html content\":\"on\"}","header_bar_title":"","header_bar_html_content":"","header_bar_logo":"","header_bar_logo_link":"","header_bar_logo_width":null,"header_bar_logo_width_unit":"%","header_bar_logo_height":null,"header_bar_logo_height_unit":"%","header_bar_height":"80","header_bar_height_unit":"px","header_bar_padding":{"top":"0px","right":"5%","bottom":"0px","left":"5%"},"header_bar_font":"","header_bar_font_size":"14","header_bar_font_size_unit":"px","header_bar_text_color":"#ffffff","header_bar_background_color":"#ffffff","header_bar_breakpoint":"800","header_bar_position_type":"fixed","header_bar_adjust_page":null,"header_bar_scroll_enable":"off","header_bar_scroll_background_color":"#36bdf6","mobile_breakpoint":"600","tablet_breakpoint":"1024","transition_speed":"0.5","sub_menu_speed":"0.2","show_menu_on_page_load":"","menu_disable_scrolling":"off","menu_overlay":"off","menu_overlay_colour":"rgba(0, 0, 0, 0.7)","desktop_menu_width":"","desktop_menu_width_unit":"px","desktop_menu_positioning":"fixed","desktop_menu_side":"","desktop_menu_to_hide":"","use_current_theme_location":"off","mega_menu":{"225":"off","227":"off","229":"off","228":"off","226":"off"},"desktop_submenu_open_animation":"none","desktop_submenu_open_animation_speed":"100ms","desktop_submenu_open_on_click":"off","desktop_menu_hide_and_show":"off","menu_name":"Default Menu","menu_to_use":"responsive-menu","different_menu_for_mobile":"off","menu_to_use_in_mobile":"main-menu","use_mobile_menu":"on","use_tablet_menu":"on","use_desktop_menu":null,"menu_display_on":"all-pages","menu_to_hide":"#l_sidebar,.hright,#r_sidebar","submenu_descriptions_on":"","custom_walker":"","menu_background_colour":"#212121","menu_depth":"5","smooth_scroll_on":"off","smooth_scroll_speed":"500","menu_font_icons":[],"menu_links_height":"40","menu_links_height_unit":"px","menu_links_line_height":"40","menu_links_line_height_unit":"px","menu_depth_0":"5","menu_depth_0_unit":"%","menu_font_size":"13","menu_font_size_unit":"px","menu_font":"","menu_font_weight":"normal","menu_text_alignment":"left","menu_text_letter_spacing":"","menu_word_wrap":"off","menu_link_colour":"#ffffff","menu_link_hover_colour":"#ffffff","menu_current_link_colour":"#ffffff","menu_current_link_hover_colour":"#ffffff","menu_item_background_colour":"#212121","menu_item_background_hover_colour":"#3f3f3f","menu_current_item_background_colour":"#212121","menu_current_item_background_hover_colour":"#3f3f3f","menu_border_width":"1","menu_border_width_unit":"px","menu_item_border_colour":"#212121","menu_item_border_colour_hover":"#212121","menu_current_item_border_colour":"#212121","menu_current_item_border_hover_colour":"#3f3f3f","submenu_links_height":"40","submenu_links_height_unit":"px","submenu_links_line_height":"40","submenu_links_line_height_unit":"px","menu_depth_side":"left","menu_depth_1":"10","menu_depth_1_unit":"%","menu_depth_2":"15","menu_depth_2_unit":"%","menu_depth_3":"20","menu_depth_3_unit":"%","menu_depth_4":"25","menu_depth_4_unit":"%","submenu_item_background_colour":"#212121","submenu_item_background_hover_colour":"#3f3f3f","submenu_current_item_background_colour":"#212121","submenu_current_item_background_hover_colour":"#3f3f3f","submenu_border_width":"1","submenu_border_width_unit":"px","submenu_item_border_colour":"#212121","submenu_item_border_colour_hover":"#212121","submenu_current_item_border_colour":"#212121","submenu_current_item_border_hover_colour":"#3f3f3f","submenu_font_size":"13","submenu_font_size_unit":"px","submenu_font":"","submenu_font_weight":"normal","submenu_text_letter_spacing":"","submenu_text_alignment":"left","submenu_link_colour":"#ffffff","submenu_link_hover_colour":"#ffffff","submenu_current_link_colour":"#ffffff","submenu_current_link_hover_colour":"#ffffff","inactive_arrow_shape":"\u25bc","active_arrow_shape":"\u25b2","inactive_arrow_font_icon":"","active_arrow_font_icon":"","inactive_arrow_image":"","active_arrow_image":"","submenu_arrow_width":"40","submenu_arrow_width_unit":"px","submenu_arrow_height":"40","submenu_arrow_height_unit":"px","arrow_position":"right","menu_sub_arrow_shape_colour":"#ffffff","menu_sub_arrow_shape_hover_colour":"#ffffff","menu_sub_arrow_shape_colour_active":"#ffffff","menu_sub_arrow_shape_hover_colour_active":"#ffffff","menu_sub_arrow_border_width":"1","menu_sub_arrow_border_width_unit":"px","menu_sub_arrow_border_colour":"#212121","menu_sub_arrow_border_hover_colour":"#3f3f3f","menu_sub_arrow_border_colour_active":"#212121","menu_sub_arrow_border_hover_colour_active":"#3f3f3f","menu_sub_arrow_background_colour":"#212121","menu_sub_arrow_background_hover_colour":"#3f3f3f","menu_sub_arrow_background_colour_active":"#212121","menu_sub_arrow_background_hover_colour_active":"#3f3f3f","fade_submenus":"off","fade_submenus_side":"left","fade_submenus_delay":"100","fade_submenus_speed":"500","use_slide_effect":"off","slide_effect_back_to_text":"Back","accordion_animation":"off","auto_expand_all_submenus":"off","auto_expand_current_submenus":"off","menu_item_click_to_trigger_submenu":"off","button_width":"55","button_width_unit":"px","button_height":"55","button_height_unit":"px","button_background_colour":"#000000","button_background_colour_hover":"#000000","button_background_colour_active":"#000000","toggle_button_border_radius":"5","button_transparent_background":"off","button_left_or_right":"right","button_position_type":"fixed","button_distance_from_side":"5","button_distance_from_side_unit":"%","button_top":"15","button_top_unit":"px","button_push_with_animation":"off","button_click_animation":"boring","button_line_margin":"5","button_line_margin_unit":"px","button_line_width":"25","button_line_width_unit":"px","button_line_height":"3","button_line_height_unit":"px","button_line_colour":"#ffffff","button_line_colour_hover":"#ffffff","button_line_colour_active":"#ffffff","button_font_icon":"","button_font_icon_when_clicked":"","button_image":"","button_image_when_clicked":"","button_title":"","button_title_open":"","button_title_position":"left","button_font":"","button_font_size":"14","button_font_size_unit":"px","button_title_line_height":"13","button_title_line_height_unit":"px","button_text_colour":"#ffffff","button_trigger_type_click":"on","button_trigger_type_hover":"off","button_click_trigger":"#responsive-menu-button","items_order":{"title":"on","menu":"on","search":"","additional content":"on"},"menu_title":"","menu_title_link":"","menu_title_link_location":"_self","menu_title_image":"","menu_title_font_icon":"","menu_title_section_padding":{"top":"10%","right":"5%","bottom":"0%","left":"5%"},"menu_title_background_colour":"#212121","menu_title_background_hover_colour":"#212121","menu_title_font_size":"13","menu_title_font_size_unit":"px","menu_title_alignment":"left","menu_title_font_weight":"400","menu_title_font_family":"","menu_title_colour":"#ffffff","menu_title_hover_colour":"#ffffff","menu_title_image_width":null,"menu_title_image_width_unit":"%","menu_title_image_height":null,"menu_title_image_height_unit":"px","menu_additional_content":"<a href=\"\/search\/rfc_search.php\">Advanced Search<\/a>\r\n<form id=\"search_query_separator_id\" name=\"search_query_separator_name\"  action=\"\/search\/rfc_search_detail.php\" method=\"POST\" onsubmit=\"return validateComboBox(this);\"> \r\n<input type=\"text\" id =\"combo_box_id\" name=\"combo_box\"  maxlength=\"20\" size =\"35\" placeholder=\"number, title, keyword, or author surname\"><\/form>\r\n","menu_additional_section_padding":{"left":"5%","top":"0px","right":"5%","bottom":"0px"},"menu_additional_content_font_size":"16","menu_additional_content_font_size_unit":"px","menu_additional_content_alignment":"center","menu_additional_content_colour":"#ffffff","menu_search_box_text":"Search","menu_search_section_padding":{"left":"5%","top":"0px","right":"5%","bottom":"0px"},"menu_search_box_height":"45","menu_search_box_height_unit":"px","menu_search_box_border_radius":"30","menu_search_box_text_colour":"#333333","menu_search_box_background_colour":"#ffffff","menu_search_box_placeholder_colour":"#c7c7cd","menu_search_box_border_colour":"#dadada","menu_section_padding":{"top":"0px","right":"0px","bottom":"0px","left":"0px"},"menu_width":"75","menu_width_unit":"%","menu_maximum_width":"","menu_maximum_width_unit":"px","menu_minimum_width":"","menu_minimum_width_unit":"px","menu_auto_height":"off","menu_container_padding":{"top":"0px","right":"0px","bottom":"0px","left":"0px"},"menu_container_background_colour":"#212121","menu_background_image":"","animation_type":"slide","menu_appear_from":"left","animation_speed":"0.5","page_wrapper":"","menu_close_on_body_click":"off","menu_close_on_scroll":"off","menu_close_on_link_click":"off","enable_touch_gestures":"","breakpoint":"1024","menu_depth_5":"30","menu_depth_5_unit":"%","keyboard_shortcut_close_menu":"27,37","keyboard_shortcut_open_menu":"32,39","button_image_alt":"","button_image_alt_when_clicked":"","button_font_icon_type":"font-awesome","button_font_icon_when_clicked_type":"font-awesome","button_trigger_type":"click","active_arrow_image_alt":"","inactive_arrow_image_alt":"","active_arrow_font_icon_type":"font-awesome","inactive_arrow_font_icon_type":"font-awesome","menu_adjust_for_wp_admin_bar":"off","menu_title_image_alt":"","menu_title_font_icon_type":"font-awesome","minify_scripts":"off","scripts_in_footer":"off","external_files":"off","remove_fontawesome":"","remove_bootstrap":"","shortcode":"off","mobile_only":"off","custom_css":"","single_menu_height":"80","single_menu_height_unit":"px","single_menu_font":"","single_menu_font_size":"14","single_menu_font_size_unit":"px","single_menu_submenu_height":"40","single_menu_submenu_height_unit":"px","single_menu_submenu_font":"","single_menu_submenu_font_size":"12","single_menu_submenu_font_size_unit":"px","single_menu_item_link_colour":"#000000","single_menu_item_link_colour_hover":"#000000","single_menu_item_background_colour":"#ffffff","single_menu_item_background_colour_hover":"#ffffff","single_menu_item_submenu_link_colour":"#000000","single_menu_item_submenu_link_colour_hover":"#000000","single_menu_item_submenu_background_colour":"#ffffff","single_menu_item_submenu_background_colour_hover":"#ffffff","header_bar_logo_alt":"","desktop_menu_options":"{}","admin_theme":"light","single_menu_line_height":"80","single_menu_line_height_unit":"px","single_menu_submenu_line_height":"40","single_menu_submenu_line_height_unit":"px","hide_on_mobile":"off","hide_on_desktop":"off","menu_title_padding":{"left":"5%","top":"0px","right":"5%","bottom":"0px"},"menu_id":2538,"active_toggle_contents":"\u25b2","inactive_toggle_contents":"\u25bc"}]};
-/* ]]> */
-</script>
-<script type='text/javascript' src='https://www.rfc-editor.org/wp-content/plugins/responsive-menu/v4.0.0/assets/js/rmp-menu.js?ver=4.1.11' id='rmp_menu_scripts-js'></script>
-<link rel="https://api.w.org/" href="https://www.rfc-editor.org/wp-json/" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.rfc-editor.org/xmlrpc.php?rsd" />
-<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="https://www.rfc-editor.org/wp-includes/wlwmanifest.xml" /> 
-<meta name="generator" content="WordPress 6.0.11" />
-<script type="text/javascript">
-        jQuery(document).ready(function($){
-	/* toggle nav */
-	$("#menu-icon").on("click", function(){
-		$(".top-menu").slideToggle();
-		$(this).toggleClass("active");
-	});
-
-        });
-        </script><script src="https://www.rfc-editor.org/wp-content/themes/techozoic-fluid/js/matomo-tracking.js" type="text/javascript"></script>
-
-<style type="text/css">/*Variable Styles*/
-#page{ 
-background:#FFFFFF url() repeat top center scroll;
-}
-body{
-font:normal 14px/1.3em Noto Sans, Sans-Serif;
-background:#FFFFFF url() repeat top center scroll;
-}
-.techozoic_font_size{
-font-size: 14px;
-}
-.narrowcolumn .entry,.widecolumn .entry, .top {
-font:normal 14px/1.5em Noto Sans, Sans-Serif;
-color: #2C4353;
-}
-.noclass,.home .narrowcolumn .entry, home .widecolumn .entry, .top,.post .singlepost,.archive .narrowcolumn .entry, .archive .widecolumn .entry, .top{
-background-color:#E3E3E3;
-border-top:1px #A0B3C2 solid;
-}
-.top{
-border:none;
-}
-.blog_title, .blog_title a, .blog_title a:hover, .blog_title a:visited{
-font:normal 40px/1.3em Courier, Sans-Serif;
-color:  	#000000;
-}
-h1.post_title{
-font:bold 30px/1.4em Noto Sans, Sans-Serif;
-color:#2C4353 !important;
-}
-.post_title a{
-font:bold 30px/1.4em Noto Sans, Sans-Serif;
-color:#2C4353 !important;
-}
-.entry h1{
-font:bold 3em/2.2em Noto Sans, Sans-Serif;
-color: #2C4353 !important;
-}
-.entry h2{
-font:bold 2em/2em Noto Sans, Sans-Serif;
-color: #2C4353 !important;
-}
-.entry h3{
-font:bold 1.4em/1.6em Noto Sans, Sans-Serif;
-color: #2C4353 !important;
-}
-.entry h4{
-font:bold 1.3em/1.4em Noto Sans, Sans-Serif;
-color: #2C4353 !important;
-}
-.entry h5{
-font:bold 1.2em/1.3em Noto Sans, Sans-Serif;
-color: #2C4353 !important;
-}
-.sidebar h2, .sidebar h3, #footer h2{
-font: bold 18px/1.3em Noto Sans, Sans-Serif;
-color:#2C4353;
-}
-.widgettitle {
-font-size: 18px;
-margin: 1px 0;
-}
-#content {
-font-size: 14px;
-}
-acronym,abbr,span.caps,small,.trackback li,.sidebar, .postmetadata {
-font-size: 12px;
-}
-.postmetadata{
-font: normal 12px/1.3em Noto Sans, Sans-Serif;
-color: #777777;
-}
-ul#nav a, ul#admin a, #dropdown li.current_page_item a:hover, .top-menu li.current-menu-item a:hover, #dropdown li.current_page_item ul a, .top-menu li.current-menu-item ul a, ul#nav li.current_page_item a:hover, {
-color: #A0B3C2;
-}
-.commenlist .author,#searchform #s, #searchsubmit:hover,#catsubmit:hover,#wp-submit:hover,#TB_ajaxContent {
-background-color: #A0B3C2 ;
-}
-ul#admin li, ul#dropdown li, #navmenu .top-menu li{
-/*background-color: #E3E3E3;*/
-}
-ul#admin li a, ul#dropdown li a, #navmenu .top-menu li a{
-font-style: bold; 
-font-size:14px;
-font-family: Noto Sans, Sans-Serif;
-color:#A0B3C2;
-}
-ul#admin li a:hover, ul#dropdown li a:hover, #navmenu .top-menu li a:hover{
-color: #A0B3C2;
-}
-#dropdown > li, ul.top-menu > li{
-margin: 0 3px;
-}
-.ribbon ul.top-menu > li, .square ul.top-menu > li, #dropdown > li{
-margin: 0;
-padding: 0 3px;
-}
-.ribbon ul.top-menu > li.has_children:hover:after, .square ul.top-menu > li.has_children:hover:after, #dropdown > li.has_children:hover:after {
-border-bottom: 5px solid #E3E3E3;
-}
-#dropdown ul, .top-menu ul{
-background-color: #E3E3E3;
-}
-.ribbon, .square, #dropdown{
-background-color: #E3E3E3;
-background-image: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#E3E3E3), to(#CCCCCC));
-background-image: -webkit-linear-gradient(top, #E3E3E3, #CCCCCC);
-background-image:    -moz-linear-gradient(top, #E3E3E3, #CCCCCC);
-background-image:     -ms-linear-gradient(top, #E3E3E3, #CCCCCC);
-background-image:      -o-linear-gradient(top, #E3E3E3, #CCCCCC);
-background-image:         linear-gradient(top, #E3E3E3, #CCCCCC);
-filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#E3E3E3', endColorstr='#CCCCCC');
-}
-.ribbon ul.top-menu:before{
-border-right: 10px solid #CCCCCC;
-}
-.ribbon ul.top-menu:after{
-border-left: 10px solid #CCCCCC;
-}.ribbon ul.top-menu > li:last-child, .square ul.top-menu > li:last-child, #dropdown > li:last-child{
-margin-right: 100px;
-}#navmenu .top-menu li, #navmenu .top-menu ul.sub-menu, ul#admin li, #navmenu #dropdown li{
-background-color: #E3E3E3;
-}       
-#navmenu #dropdown li.current_page_item, #navmenu .top-menu li.current-menu-item, #navmenu .top-menu ul.sub-menu li.current-menu-item {
-background-color: #A0B3C2 ;
-}
-#navmenu #dropdown li:hover, #navmenu .top-menu li:hover, #navmenu .top-menu ul.sub-menu > li:hover {
-background-color:#EFEFEF;
-}
-#navmenu #dropdown li.current_page_item > a:hover, #navmenu .top-menu li.current-menu-item > a:hover, #navmenu .top-menu li.current-menu-item:hover > a, #navmenu .top-menu li:hover > a, #navmenu #dropdown li:hover > a {
-color:#A0B3C2;
-}
-#navmenu #dropdown li.current_page_item > a, #navmenu .top-menu li.current-menu-item > a{
-color:#F7F7F7;
-}
-ul#admin li:hover{
-background:#EFEFEF;
-box-shadow:2px 1px 3px rgba(0, 0, 0, 0.3);
--moz-box-shadow:2px 1px 3px rgba(0, 0, 0, 0.3);
--webkit-box-shadow:2px 1px 3px rgba(0, 0, 0, 0.3);
-}#dropdown li ul li, .top-menu li ul li, #dropdown li ul , .top-menu li ul{
-width: 250px !important;
-}
-#dropdown li ul ul, .top-menu li ul ul{
-left:250px ; 
-}
-.tags {
-border-bottom:1px #A0B3C2 solid;
-border-top:1px #A0B3C2 solid;
-}
-a,h2 a:hover,h3 a:hover,#user_login,#user_pass, #sidenav a:visited {
-color:#597EAA; 
-text-decoration:none;
-}
-#searchform #s {
-color:#E3E3E3; 
-text-decoration:none;
-}
-a:hover {
-color:#114477; 
-text-decoration:underline;
-}
-a:visited{
-color:#476588;
-}
-.description {
-color:#A0B3C2;
-}
-#headerimg {
-;
-float:left;margin-left:10px;
-}
-#header-logo{
-float:left;margin-left:10px;
-padding-top:0px;
-padding-left:0px;
-}
-.single .blog_title a:hover {
-cursor:default;
-text-decoration:none;
-}
-.noclass{
--moz-box-shadow:none !important;
-box-shadow:none !important;
--webkit-box-shadow: none !important;
-opacity:1 !important;
-border: none !important;
-}#headerimgwrap{
-top:20%;
-}  #page {
-width: 90%;
-}
-.narrowcolumn {
-float:left;
-margin:0;
-padding:25px 3% 20px 2%;
-width:75%;
-}
-#l_sidebar {
-float:left;
-padding:25px 1% 0 2%;
-width:17%
-}#dropdown, .top-menu{
-text-align:left;
-}#header {
-background-repeat: no-repeat;  
-background-position: center center;
-height: 110px;
-}
-.hleft, .hright {
-height: 70px;
-}table.statictable {
-        font-family: verdana,arial,sans-serif;
-        font-size:12px;
-        color:#333333;
-        border-width: 1px;
-        border-color: #666666;
-        border-collapse: collapse;
-      
-}
-table.statictable th {
-        border-width: 1px;
-        padding: 8px;
-        border-style: solid;
-        border-left: 1em;
-        border-right: 1em;
-        border-color: #D2D2D2;
-        background-color: #CACACA;
-}
-table.statictable td {
-        border-width: 1px;
-        padding: 8px;
-        border-style:solid;
-        border-left: 1em;
-        border-right: 1em;
-        border-color: #D2D2D2;
-      
-}
 
 
 
-table.statictable tr{
-        background-color: #F6F6F6;
-}
-
-table.statictable td.special {
-          font-weight: bold;
-          color:grey
-}
-table.statictable td.title {
-         font-weight: bold;
-         letter-spacing: inherit
-}
-
-table.statictable .boldtext {
-       font-weight: bold;
-       color: #597eaa;
-}
-
-table.dynamictable {
-        font-family: verdana,arial,sans-serif;
-        font-size:12px;
-        color:#333333;
-        border-width: 1px;
-        border-color: #666666;
-        border-collapse: collapse;
-      
-}
-table.dynamictable th {
-        border-width: 1px;
-        padding: 8px;
-        border-style: solid;
-        border-left: 1em;
-        border-right: 1em;
-        border-color: #D2D2D2;
-        background-color: #FEFEFEFE;
-}
-table.dynamictable td {
-        border-width: 1px;
-        padding: 8px;
-        border-style:solid;
-        border-left: 1em;
-        border-right: 1em;
-        border-color: #D2D2D2;
-      
-}
-
-table.dynamictable tr.even{
-        background-color: #ffffff;
-}
-table.dynamictable tr.odd{
-        background-color: #F6F6F6;
-}
-table.erratasearch {
-        font-family: verdana,arial,sans-serif;
-        font-size:12px;
-        color:#333333;
-        border-color: #666666;
-        border-collapse: collapse;
-        text-align:center;
-}
-table.erratasearch th {
-        border-width: 1px;
-        padding: 8px;
-        
-        text-decoration: underline;
-        border-color: #666666;
-        //background-color: #ffffff;
-        background-color: silver;
-}
-
-table.erratasearch td {
-        border-width: 1px;
-        padding: 8px;
-        border-color: #666666;
-        background-color: #ffffff;
-        text-align:left;
-}
-table.erratasearch td.sbar { 
-          background-color: silver;
-          text-align: center;
-        }
 
 
-.nosidebar{
-    float:left;
-    margin:0 10%;
-    padding:0 0 10px;
-    width:70%;
-}
 
-input[type="button"], .button, div#infinite-handle span {
-    display: inline-block;
-    zoom: 1; /* zoom and *display = ie7 hack for display:inline-block */
-    *display: inline;
-    vertical-align: baseline;
-    margin: 0 2px;
-    outline: none;
-    cursor: pointer;
-    text-align: center;
-    text-decoration: none;
-    padding: .3em 1em .35em;
-    text-shadow: 0 1px 1px rgba(0,0,0,.3);
-    -webkit-border-radius: .25em; 
-    -moz-border-radius: .25em;
-    border-radius: .25em;
-    -webkit-box-shadow: 0 1px 2px rgba(0,0,0,.2);
-    -moz-box-shadow: 0 1px 2px rgba(0,0,0,.2);
-    box-shadow: 0 1px 2px rgba(0,0,0,.2);
-    color: #505050;
-    border: solid 1px #b7b7b7;
-    background: #fff;
-    background: -webkit-gradient(linear, left top, left bottom, from(#fff), to(#ededed));
-    background: -moz-linear-gradient(top,  #fff,  #ededed);
-    filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffffff', endColorstr='#ededed');
-}
-input[type="button"]:hover, .button:hover, div#infinite-handle span:hover {
-    text-decoration: none;
-    background: #ededed;
-    background: -webkit-gradient(linear, left top, left bottom, from(#fff), to(#dcdcdc));
-    background: -moz-linear-gradient(top,  #fff,  #dcdcdc);
-    filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffffff', endColorstr='#dcdcdc');
-}
-input[type="button"]:active, .button:active, div#infinite-handle span: active {
-    position: relative;
-    top: 1px;
-    color: #999;
-    background: -webkit-gradient(linear, left top, left bottom, from(#ededed), to(#fff));
-    background: -moz-linear-gradient(top,  #ededed,  #fff);
-    filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#ededed', endColorstr='#ffffff');
-}
-
-.search_label_bold { text-align: left;
-                     border-style: none;
-                     font-weight: bold;
-                   }
-
-.error { font-weight: bold; color: red; }
-
-textarea {
-   font-family: inherit;
-   font-size: inherit;
-}
-/*DIV to hold scroll tables*/
-.scrolltable{
-   width:95%
-
-}
-
-/*--------------------------------------------------------------------------------
-----------------------------RFCMETA PAGE  Styles---------------------------------------
--------------------------------------------------------------------------------*/
- body.rfcmeta {
-font-family: 'Noto Sans', sans-serif;
-color: #2C4353;
-width: 100%;}
-
- body.rfcmeta #page {
-width: 100%;
-box-shadow:none;
-margin-top: 0px;}
-
- body.rfcmeta .hright { height:120px;}
-
- body.rfcmeta #header {width: 100%;
- background-color: #fff;
- box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    -moz-box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-        margin-bottom: 0px;;}
-
- body.rfcmeta .singlepost.entry {padding-top: 0px!important;}
- body.rfcmeta .singlepost.entry dl,  body.rfcmeta .singlepost.entry p, body.rfcmeta .singlepost.entry h2, body.rfcmeta .singlepost.entry h3 { margin-left:40px;
- margin-right: 20px; }
-
- body.rfcmeta .singlepost.entry dt{
-         font-weight: bold!important;
-         margin-top: 15px;}
-
-          body.rfcmeta .singlepost.entry dd{
-         margin-left: 15px;}
-
- body.rfcmeta a{
-color: #597eaa;}
-  body.rfcmeta .entryheader {background-color:#2C4353 !important;
-  border-bottom: 10px solid #FFF !important;
-  margin-top: 0px;
-  padding-top: 20px !important;
-  padding-bottom: 20px !important;}
-
-   body.rfcmeta .entryheader h2 a, body.rfcmeta .entryheader h2 {color: #fff  !important;
-   font-size: 50px;
-   padding: 0px !important;
-   line-height: 1.2;
-   font:bold !important;}
-
-   body.rfcmeta .entryheader h2 a:hover {color: #aob3c2 !important;}
-
-   body.rfcmeta .entryheader h3 {color: #fff  !important;
-   font-size: 18px;
-   padding: 0px;
-   line-height: 1.2;
-   padding-top: 10px;
-   }
-
-      body.rfcmeta .entryheader h3 span {font-weight: normal;
-          font-size: 14px;
-          text-transform: uppercase;}
-    h2 {font-weight: bold;}
-
- body.rfcmeta   #search_query_separator_id  {padding-bottom: 5px;
- padding-top: 5px;}
-
- body.rfcmeta .page {margin-top: 0px!important;
- padding-top: 0px!important;}
-
-    /*--------------------------------------------------------------------------------
-----------------------------end RFCMETA PAGE Styles---------------------------------------
--------------------------------------------------------------------------------*/
-
-.cluster_heading {
- font-size: 14px;
-}
-</style>    <style type="text/css">
-        #header {
-            background-image: url();
-        }
-    </style>
-    <link rel="icon" href="https://www.rfc-editor.org/wp-content/uploads/favicon-1.ico" sizes="32x32" />
-<link rel="icon" href="https://www.rfc-editor.org/wp-content/uploads/favicon-1.ico" sizes="192x192" />
-<link rel="apple-touch-icon" href="https://www.rfc-editor.org/wp-content/uploads/favicon-1.ico" />
-<meta name="msapplication-TileImage" content="https://www.rfc-editor.org/wp-content/uploads/favicon-1.ico" />
-    </head>
-    <body class="rfcmeta">
-        <a id="top"></a>
-        <div id="page">
-                
-            <div id="header">
-                <div class="hright">
-<div class="hwidget widget_text"><h2 class="widgettitle">Search RFCs</h2>			<div class="textwidget"><form id="search_query_separator_id" name="search_query_separator_name"  action="/search/rfc_search_detail.php" method="POST" onsubmit="return validateComboBox(this);"> 
-<input type="text" id ="combo_box_id" name="combo_box"  maxlength="40" size ="35" placeholder="number, title, keyword, or author surname"></form>
-<a href="/search/rfc_search.php">Advanced Search</a>
-</div>
-		</div></div>
-      
-                <div id="headerimgwrap">
-                      
-                    <div id="headerimg">
-                        <h1 class="blog_title">                            <a href="https://www.rfc-editor.org/">RFC Editor</a>
-                            </h1>                    </div><!--end headerimg-->
-                </div><!--end headerimgwrap-->
+Network Working Group                                      A. Niemi, Ed.
+Request for Comments: 3903                                         Nokia
+Category: Standards Track                                   October 2004
 
 
-            </div><!--end header-->
+              Session Initiation Protocol (SIP) Extension
+                      for Event State Publication
 
-             <div id="content" class="nosidebar">
-     <h1 class="post_title"></h1>
+Status of this Memo
 
-     <div class="post-127 page type-page status-publish hentry post clear" id="post-127">
-     <div class="singlepost entry">
-<div class="entryheader"><h2><a href="https://www.rfc-editor.org/rfc/rfc3903.txt">RFC 3903</a></h2>
-<h3>Session Initiation Protocol (SIP) Extension for Event State Publication, <span>October 2004</span></h3>
-</div><dl>
-  <dt><b>File formats:</b><dd><a href=https://www.rfc-editor.org/rfc/rfc3903.txt><img src=/rfcscripts/images/RFC_ICONS_Text_40x50.png alt="icon for text file" title="text"></a> <a href=https://www.rfc-editor.org/rfc/pdfrfc/rfc3903.txt.pdf><img src=/rfcscripts/images/RFC_ICONS_PDF_2019_50x40.png alt="icon for PDF" title="PDF"></a>     <a href=https://www.rfc-editor.org/rfc/rfc3903.html><img src=/rfcscripts/images/RFC_ICONS_HTML_40x50.png alt="icon for HTML" title="HTML"></a></dd>
-  <dt><b>Status:</b><dd>PROPOSED STANDARD</dd>
-  <dt><b>Updated by:</b><dd><a href="/info/rfc8996">RFC 8996</a></dd>
-  <dt><b>Author:</b><dd>A. Niemi, Ed.</dd>
-  <dt><b>Stream:</b><dd><a href="https://www.ietf.org">IETF</a></dd>
-  <dt><b>Source:</b><dd><a href="//datatracker.ietf.org/wg/sip/about/">sip</a> 
-                                      (<a href="//datatracker.ietf.org/wg/#RAI">rai</a>)</dd>
-</dl>
-<p>
-<b>Cite this RFC</b>: 
-<a href="/refs/ref3903.txt">TXT</a> &nbsp;|</b>&nbsp;
-<a href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.3903.xml">XML</a> &nbsp;| &nbsp;
-<a href="https://datatracker.ietf.org/doc/rfc3903/bibtex/">BibTeX</a>
-</p><p>
-<b>DOI</b>: &nbsp;<a href="https://doi.org/10.17487/RFC3903">https://doi.org/10.17487/RFC3903</a>
-</p><p><b>Discuss this RFC</b>: Send questions or comments to the mailing list <a href="mailto:sipcore@ietf.org?subject=Question regarding RFC 3903 ">sipcore@ietf.org</a></p><p>
-<b>Other actions</b>: 
-<a href="/errata.php#reportnew">Submit Errata</a> &nbsp;|</b>&nbsp;
-<a href="https://datatracker.ietf.org/ipr/search/?draft=&rfc=3903&submit=rfc">
-Find IPR Disclosures from the IETF</a> &nbsp;|</b>&nbsp;
-<a href="https://datatracker.ietf.org/doc/rfc3903/">
-View History of RFC 3903</a>
-</p>
-<hr/>
-<h2>Abstract</h2>
-<p> This document describes an extension to the Session Initiation Protocol (SIP) for publishing event state used within the SIP Events framework.  The first application of this extension is for the publication of presence information. </p><p> The mechanism described in this document can be extended to support publication of any event state for which there exists an appropriate event package.  It is not intended to be a general-purpose mechanism for transport of arbitrary data, as there are better-suited mechanisms for this purpose.  [STANDARDS-TRACK]</p>  <hr>
-<p>
-For the definition of <b>Status</b>,
-see <a href="/info/rfc2026">RFC 2026</a>.
-</p><p>
-For the definition of <b>Stream</b>, see <a href="/info/rfc8729">RFC 8729</a>.
-</p>
-<hr>    </div>
-  </div>
-</div>
-<br><br><div id="footer">
-    <div id="footerdivs">
-            </div>
-    <div style="clear:both"></div>
-    <p class="credit">
-        <a href="//www.iab.org/">IAB</a> • <a href="//www.iana.org/">IANA</a>  • <a href="//www.ietf.org">IETF</a> • <a href="//www.irtf.org">IRTF</a> • <a href="/about/independent">ISE</a> • <a href="//www.internetsociety.org">ISOC</a> • <a href="//trustee.ietf.org/">IETF Trust</a>
-<br>
-<a href="/report-summary">Reports</a> • <a href="//www.ietf.org/privacy-statement/">Privacy Statement</a> • <a href="/sitemap">Site Map</a> • <a href="/contact">Contact Us</a>    </p>
-    
-</div><!--footer-->
-</div><!--page-->
-			<button type="button"  aria-controls="rmp-container-2538" aria-label="Menu Trigger" id="rmp_menu_trigger-2538"  class="rmp_menu_trigger rmp-menu-trigger-boring">
-								<span class="rmp-trigger-box">
-									<span class="responsive-menu-pro-inner"></span>
-								</span>
-					</button>
-						<div id="rmp-container-2538" class="rmp-container rmp-container rmp-slide-left">
-							<div id="rmp-menu-title-2538" class="rmp-menu-title">
-				<a href="" target="_self" id="rmp-menu-title-link">
-								<span></span>
-				</a>
-			</div>
-			<div id="rmp-menu-wrap-2538" class="rmp-menu-wrap"><ul id="rmp-menu-2538" class="rmp-menu" role="menubar" aria-label="Default Menu"><li id="rmp-menu-item-632" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/retrieve/"  class = "rmp-menu-item-link"  role = "menuitem"  >Document Retrieval</a></li><li id="rmp-menu-item-633" class=" menu-item menu-item-type-custom menu-item-object-custom rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "/errata.php"  class = "rmp-menu-item-link"  role = "menuitem"  >Errata</a></li><li id="rmp-menu-item-634" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/faq/"  class = "rmp-menu-item-link"  role = "menuitem"  >Frequently Asked Questions</a></li><li id="rmp-menu-item-636" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/rse/format-faq/"  class = "rmp-menu-item-link"  role = "menuitem"  >Future Format FAQ</a></li><li id="rmp-menu-item-637" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/history/"  class = "rmp-menu-item-link"  role = "menuitem"  >History</a></li><li id="rmp-menu-item-638" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/about/"  class = "rmp-menu-item-link"  role = "menuitem"  >About Us</a></li><li id="rmp-menu-item-639" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/other/"  class = "rmp-menu-item-link"  role = "menuitem"  >Other Information</a></li><li id="rmp-menu-item-640" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/pubprocess/"  class = "rmp-menu-item-link"  role = "menuitem"  >Publication Process</a></li><li id="rmp-menu-item-641" class=" menu-item menu-item-type-custom menu-item-object-custom rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "/current_queue.php"  class = "rmp-menu-item-link"  role = "menuitem"  >Publication Queue</a></li><li id="rmp-menu-item-642" class=" menu-item menu-item-type-post_type menu-item-object-page rmp-menu-item rmp-menu-top-level-item" role="none"><a  href = "https://www.rfc-editor.org/styleguide/"  class = "rmp-menu-item-link"  role = "menuitem"  >Style Guide</a></li></ul></div>			<div id="rmp-menu-additional-content-2538" class="rmp-menu-additional-content">
-					<a href="/search/rfc_search.php">Advanced Search</a>
-<form id="search_query_separator_id" name="search_query_separator_name"  action="/search/rfc_search_detail.php" method="POST" onsubmit="return validateComboBox(this);"> 
-<input type="text" id ="combo_box_id" name="combo_box"  maxlength="20" size ="35" placeholder="number, title, keyword, or author surname"></form>
-				</div>
-						</div>
-			</body>
-</html>
+   This document specifies an Internet standards track protocol for the
+   Internet community, and requests discussion and suggestions for
+   improvements.  Please refer to the current edition of the "Internet
+   Official Protocol Standards" (STD 1) for the standardization state
+   and status of this protocol.  Distribution of this memo is unlimited.
+
+Copyright Notice
+
+   Copyright (C) The Internet Society (2004).
+
+Abstract
+
+   This document describes an extension to the Session Initiation
+   Protocol (SIP) for publishing event state used within the SIP Events
+   framework.  The first application of this extension is for the
+   publication of presence information.
+
+   The mechanism described in this document can be extended to support
+   publication of any event state for which there exists an appropriate
+   event package.  It is not intended to be a general-purpose mechanism
+   for transport of arbitrary data, as there are better-suited
+   mechanisms for this purpose.
+
+Table of Contents
+
+   1.   Introduction . . . . . . . . . . . . . . . . . . . . . . . .   2
+   2.   Definitions and Document Conventions . . . . . . . . . . . .   3
+   3.   Overall Operation  . . . . . . . . . . . . . . . . . . . . .   4
+   4.   Constructing PUBLISH Requests  . . . . . . . . . . . . . . .   5
+        4.1.  Identification of Published Event State. . . . . . . .   6
+        4.2.  Creating Initial Publication . . . . . . . . . . . . .   7
+        4.3.  Refreshing Event State . . . . . . . . . . . . . . . .   8
+        4.4.  Modifying Event State  . . . . . . . . . . . . . . . .   9
+        4.5.  Removing Event State . . . . . . . . . . . . . . . . .   9
+   5.   Processing PUBLISH Responses . . . . . . . . . . . . . . . .  10
+   6.   Processing PUBLISH Requests  . . . . . . . . . . . . . . . .  10
+   7.   Processing OPTIONS Requests  . . . . . . . . . . . . . . . .  13
+   8.   Use of Entity-tags in PUBLISH  . . . . . . . . . . . . . . .  13
+
+
+
+Niemi                       Standards Track                     [Page 1]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+        8.1.  General Notes. . . . . . . . . . . . . . . . . . . . .  13
+        8.2.  Client Usage . . . . . . . . . . . . . . . . . . . . .  14
+        8.3.  Server Usage . . . . . . . . . . . . . . . . . . . . .  14
+   9.   Controlling the Rate of Publication  . . . . . . . . . . . .  15
+   10.  Considerations for Event Packages using PUBLISH  . . . . . .  15
+        10.1. PUBLISH Bodies . . . . . . . . . . . . . . . . . . . .  16
+        10.2. PUBLISH Response Bodies. . . . . . . . . . . . . . . .  16
+        10.3. Multiple Sources for Event State . . . . . . . . . . .  16
+        10.4. Event State Segmentation . . . . . . . . . . . . . . .  17
+        10.5. Rate of Publication. . . . . . . . . . . . . . . . . .  17
+   11.  Protocol Element Definitions . . . . . . . . . . . . . . . .  17
+        11.1. New Methods. . . . . . . . . . . . . . . . . . . . . .  17
+              11.1.1. PUBLISH Method . . . . . . . . . . . . . . . .  17
+        11.2. New Response Codes . . . . . . . . . . . . . . . . . .  19
+              11.2.1. "412 Conditional Request Failed" Response Code  19
+        11.3. New Header Fields  . . . . . . . . . . . . . . . . . .  20
+              11.3.1. "SIP-ETag" Header Field  . . . . . . . . . . .  20
+              11.3.2. "SIP-If-Match" Header Field  . . . . . . . . .  20
+   12.  Augmented BNF Definitions  . . . . . . . . . . . . . . . . .  21
+   13.  IANA Considerations  . . . . . . . . . . . . . . . . . . . .  21
+        13.1. Methods  . . . . . . . . . . . . . . . . . . . . . . .  21
+        13.2. Response Codes . . . . . . . . . . . . . . . . . . . .  21
+        13.3. Header Field Names . . . . . . . . . . . . . . . . . .  21
+   14.  Security Considerations  . . . . . . . . . . . . . . . . . .  22
+        14.1. Access Control . . . . . . . . . . . . . . . . . . . .  22
+        14.2. Denial of Service Attacks  . . . . . . . . . . . . . .  22
+        14.3. Replay Attacks . . . . . . . . . . . . . . . . . . . .  22
+        14.4. Man in the Middle Attacks  . . . . . . . . . . . . . .  23
+        14.5. Confidentiality  . . . . . . . . . . . . . . . . . . .  23
+   15.  Examples . . . . . . . . . . . . . . . . . . . . . . . . . .  24
+   16.  Contributors . . . . . . . . . . . . . . . . . . . . . . . .  29
+   17.  Acknowledgements . . . . . . . . . . . . . . . . . . . . . .  30
+   18.  References . . . . . . . . . . . . . . . . . . . . . . . . .  30
+        18.1. Normative References . . . . . . . . . . . . . . . . .  30
+        18.2. Informative References . . . . . . . . . . . . . . . .  31
+   Author's Address. . . . . . . . . . . . . . . . . . . . . . . . .  31
+   Full Copyright Statement. . . . . . . . . . . . . . . . . . . . .  32
+
+1.  Introduction
+
+   This specification provides a framework for the publication of event
+   state from a user agent to an entity that is responsible for
+   compositing this event state and distributing it to interested
+   parties through the SIP Events [1] framework.
+
+
+
+
+
+
+
+Niemi                       Standards Track                     [Page 2]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   In addition to defining an event publication framework, this
+   specification defines a concrete usage of that framework for the
+   publication of presence state [2] by a presence user agent [3] to a
+   presence compositor, which has a tightly coupled relationship with
+   the presence agent [1].
+
+   The requirements and model for presence publication are documented in
+   [10].  This specification will address each of those requirements.
+
+   The mechanism described in this document can be extended to support
+   publication of any event state for which there exists an appropriate
+   event package as defined in [1].  For instance, an application of SIP
+   events for message waiting indications [11] might choose to collect
+   the statuses of voice-mail boxes across a set of user agents using
+   the PUBLISH mechanism.  The compositor in such an application would
+   then be responsible for collecting and distributing this state to the
+   subscribers of the event package.
+
+   Each application that makes use of the PUBLISH mechanism in the
+   publication of event state will need to adhere to the guidelines set
+   in Section 10.  The mechanism described in this document is not
+   intended to be a general-purpose mechanism for transport of arbitrary
+   data, as there are better-suited mechanisms for this purpose.
+
+2.  Definitions and Document Conventions
+
+   In addition to the definitions of RFC 2778 [3], RFC 3265 [1], and RFC
+   3261 [4], this document introduces some new concepts:
+
+   Event State: State information for a resource, associated with an
+      event package and an address-of-record.
+
+   Event Publication Agent (EPA): The User Agent Client (UAC) that
+      issues PUBLISH requests to publish event state.
+
+   Event State Compositor (ESC): The User Agent Server (UAS) that
+      processes PUBLISH requests, and is responsible for compositing
+      event state into a complete, composite event state of a resource.
+
+   Presence Compositor: A type of Event State Compositor that is
+      responsible for compositing presence state for a presentity.
+
+   Publication: The act of an EPA sending a PUBLISH request to an ESC to
+      publish event state.
+
+   Event Hard State: The steady-state or default event state of a
+      resource, which the ESC may use in the absence of, or in addition
+      to, soft state publications.
+
+
+
+Niemi                       Standards Track                     [Page 3]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   Event Soft State: Event state published by an EPA using the PUBLISH
+      mechanism.  A protocol element (i.e., an entity-tag) is used to
+      identify a specific soft state entity at the ESC.  Soft state has
+      a defined lifetime and will expire after a negotiated amount of
+      time.
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
+   document are to be interpreted as described in BCP 14, RFC 2119 [5]
+   and indicate requirement levels for compliant implementations.
+
+      Indented passages such as this one are used in this document to
+      provide additional information and clarifying text.  They do not
+      contain descriptions of normative protocol behavior.
+
+3.  Overall Operation
+
+   This document defines a new SIP method, PUBLISH, for publishing event
+   state.  PUBLISH is similar to REGISTER in that it allows a user to
+   create, modify, and remove state in another entity which manages this
+   state on behalf of the user.  Addressing a PUBLISH request is
+   identical to addressing a SUBSCRIBE request.  The Request-URI of a
+   PUBLISH request is populated with the address of the resource for
+   which the user wishes to publish event state.  The user may in turn
+   have multiple User Agents or endpoints that publish event state.
+   Each endpoint may publish its own unique state, out of which the
+   event state compositor generates the composite event state of the
+   resource.  In addition to a particular resource, all published event
+   state is associated with a specific event package.  Through a
+   subscription to that event package, the user is able to discover the
+   composite event state of all of the active publications.
+
+   A User Agent Client (UAC) that publishes event state is labeled an
+   Event Publication Agent (EPA).  For presence, this is the familiar
+   Presence User Agent (PUA) role as defined in [2].  The entity that
+   processes the PUBLISH request is known as an Event State Compositor
+   (ESC).  For presence, this is the familiar Presence Agent (PA) role
+   as defined in [2].
+
+   PUBLISH requests create soft state in the ESC.  This event soft state
+   has a defined lifetime and will expire after a negotiated amount of
+   time, requiring the publication to be refreshed by subsequent PUBLISH
+   requests.  There may also be event hard state provisioned for each
+   resource for a particular event package.  This event state represents
+   the resource state that is present at all times, and does not expire.
+   The ESC may use event hard state in the absence of, or in addition
+   to, event soft state provided through the PUBLISH mechanism.  Setting
+
+
+
+
+Niemi                       Standards Track                     [Page 4]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   this event hard state or configuring the ESC policy regarding the
+   aggregation of different event state is out of the scope of this
+   specification.
+
+   The body of a PUBLISH request carries the published event state.  In
+   response to every successful PUBLISH request, the ESC assigns an
+   identifier to the publication in the form of an entity-tag.  This
+   identifier is then used by the EPA in any subsequent PUBLISH request
+   that modifies, refreshes or removes the event state of that
+   publication.  When event state expires or is explicitly removed, the
+   entity-tag associated with it becomes invalid.  A publication for an
+   invalid entity-tag will naturally fail, and the EPA needs to start
+   anew and resend its event state without referencing a previous
+   entity-tag.
+
+4.  Constructing PUBLISH Requests
+
+   PUBLISH requests create, modify, and remove event state associated
+   with an address-of-record.  A suitably authorized third party may
+   also perform publication on behalf of a particular address-of-record.
+
+   Except as noted, the construction of the PUBLISH request and the
+   behavior of clients sending a PUBLISH request are identical to the
+   general UAC behavior described in Section 8.1 and Section 17.1 of RFC
+   3261 [4].
+
+   If necessary, clients may probe for the support of PUBLISH using the
+   OPTIONS request defined in SIP [4].  The presence of "PUBLISH" in the
+   "Allow" header field in a response to an OPTIONS request indicates
+   support for the PUBLISH method.  In addition, the "Allow-Events"
+   header field indicates the supported event packages.
+
+      Note that it is possible for the OPTIONS request to fork, and
+      consequently return a response from a User Agent other than the
+      ESC.  In that case, support for the PUBLISH method may not be
+      appropriately represented for that particular Request-URI.
+
+   A PUBLISH request does not establish a dialog.  A UAC MAY include a
+   Route header field in a PUBLISH request based on a pre-existing route
+   set as described in Section 8.1 of RFC 3261 [4].  The Record-Route
+   header field has no meaning in PUBLISH requests or responses, and
+   MUST be ignored if present.  In particular, the UAC MUST NOT create a
+   new route set based on the presence or absence of a Record-Route
+   header field in any response to a PUBLISH request.
+
+   The PUBLISH request MAY contain a Contact header field, but including
+   one in a PUBLISH request has no meaning in the event publication
+   context and will be ignored by the ESC.  An EPA MAY send a PUBLISH
+
+
+
+Niemi                       Standards Track                     [Page 5]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   request within an existing dialog.  In that case, the request is
+   received in the context of any media session or sessions associated
+   with that dialog.
+
+      Note that while sending a PUBLISH request within an existing
+      dialog is not prohibited, it will typically not result in the
+      expected behavior.  Unless the other end of the dialog is also an
+      ESC, it will probably reject the request.
+
+   EPAs MUST NOT send a new PUBLISH request (not a re-transmission) for
+   the same Request-URI, until they have received a final response from
+   the ESC for the previous one or the previous PUBLISH request has
+   timed out.
+
+4.1.  Identification of Published Event State
+
+   Identification of published event state is provided by three pieces
+   of information: Request-URI, event type, and (optionally) an entity-
+   tag.
+
+   The Request-URI of a PUBLISH request contains enough information to
+   route the request to the appropriate entity per the request routing
+   procedures outlined in RFC 3261 [4].  It also contains enough
+   information to identify the resource whose event state is to be
+   published, but not enough information to determine the type of the
+   published event state.
+
+   For determining the type of the published event state, the EPA MUST
+   include a single Event header field in PUBLISH requests.  The value
+   of this header field indicates the event package for which this
+   request is publishing event state.
+
+   For each successful PUBLISH request, the ESC will generate and assign
+   an entity-tag and return it in the SIP-ETag header field of the 2xx
+   response.
+
+   When updating previously published event state, PUBLISH requests MUST
+   contain a single SIP-If-Match header field identifying the specific
+   event state that the request is refreshing, modifying or removing.
+   This header field MUST contain a single entity-tag that was returned
+   by the ESC in the SIP-ETag header field of the response to a previous
+   publication.
+
+   The PUBLISH request MAY contain a body, which contains event state
+   that the client wishes to publish.  The content format and semantics
+   are dependent on the event package identified in the Event header
+   field.
+
+
+
+
+Niemi                       Standards Track                     [Page 6]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   The presence of a body and the SIP-If-Match header field determine
+   the specific operation that the request is performing, as described
+   in Table 1.
+
+      +-----------+-------+---------------+---------------+
+      | Operation | Body? | SIP-If-Match? | Expires Value |
+      +-----------+-------+---------------+---------------+
+      | Initial   | yes   | no            | > 0           |
+      | Refresh   | no    | yes           | > 0           |
+      | Modify    | yes   | yes           | > 0           |
+      | Remove    | no    | yes           | 0             |
+      +-----------+-------+---------------+---------------+
+
+                 Table 1: Publication Operations
+
+   An 'Initial' publication sets the initial event state for a
+   particular EPA. There may, of course, already be event state
+   published by other EPAs (for the same address-of-record). That state
+   is unaffected by an initial publication.  A 'Refresh' publication
+   refreshes the lifetime of a previous publication, whereas a 'Modify'
+   publication modifies the event state of a previous publication.  A
+   'Remove' publication requests immediate removal of event state.
+   These operations are described in more detail in the following
+   sections.
+
+4.2.  Creating Initial Publication
+
+   An initial publication is a PUBLISH request created by the EPA and
+   sent to the ESC that establishes soft state for the event package
+   indicated in the Event header field of the request, and bound to the
+   address in the Request-URI of the request.
+
+   An initial PUBLISH request MUST NOT contain a SIP-If-Match header
+   field.  However, if the EPA expects an appropriate, locally stored
+   entity-tag to still be valid, it SHOULD first try to modify that
+   event state as described in Section 4.4, instead of submitting an
+   initial publication.
+
+   An initial PUBLISH request MUST contain a body that contains the
+   published event state.
+
+   An initial PUBLISH request MAY contain a single Expires header field.
+   This value indicates the suggested lifetime of the event state
+   publication.
+
+
+
+
+
+
+
+Niemi                       Standards Track                     [Page 7]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   The ESC may lower the suggested lifetime of the publication, but it
+   will never extend it.  If an Expires header field is not present, the
+   EPA is indicating its desire for the ESC to choose.  The Expires
+   header field in a 2xx response to the initial PUBLISH indicates the
+   actual duration for which the publication will remain active.  Unless
+   refreshed before this lifetime is exceeded, the publication will
+   expire.
+
+4.3.  Refreshing Event State
+
+   An EPA is responsible for refreshing its previously established
+   publications before their expiration interval has elapsed.  To
+   refresh a publication, the EPA MUST create a PUBLISH request that
+   includes in a SIP-If-Match header field the entity-tag of the
+   publication to be refreshed.
+
+   The SIP-If-Match header field containing an entity-tag conditions the
+   PUBLISH request to refresh a specific event state established by a
+   prior publication.  If the entity-tag matches previously published
+   event state at the ESC, the refresh succeeds, and the EPA receives a
+   2xx response.
+
+   Like the 2xx response to an initial PUBLISH request, the 2xx response
+   to a refresh PUBLISH request will contain a SIP-ETag header field
+   with an entity-tag.  The EPA MUST store this entity-tag, replacing
+   any existing entity-tag for the refreshed event state.  See Section
+   8.2 for more information on the EPA handling of entity-tags.
+
+   If there is no matching event state, e.g., the event state to be
+   refreshed has already expired, the EPA receives a 412 (Conditional
+   Request Failed) response to the PUBLISH request.
+
+   A publication refresh MAY contain a single Expires header field.
+   This value indicates the suggested lifetime of the event state.
+
+   The ESC may lower the suggested lifetime of the publication refresh,
+   but it will never extend it.  If an Expires header field is not
+   present, the EPA is indicating its desire for the ESC to choose.  The
+   Expires header field in a 2xx response to the publication refresh
+   indicates the actual duration for which the publication will remain
+   active.
+
+   A publication refresh only extends the expiration time of already
+   existing event state.  It does not affect that event state in any
+   other way.  Therefore, a PUBLISH request that refreshes event state
+   MUST NOT have a body.
+
+
+
+
+
+Niemi                       Standards Track                     [Page 8]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+4.4.  Modifying Event State
+
+   Modifying event state closely resembles the creation of initial event
+   state.  However, instead of establishing completely new event state
+   at the ESC, already existing event state is updated with modified
+   event state.  The nature of this update depends on the content of the
+   body, and the semantics associated with the format of that body.
+
+   To modify event state, the EPA MUST construct a PUBLISH request that
+   includes in a SIP-If-Match header field the entity-tag of the event
+   state publication to be modified.  A PUBLISH request that modifies
+   event state MUST contain a body that includes the modified event
+   state.
+
+   The SIP-If-Match header field conditions the PUBLISH request to
+   modify a specific event state established by a prior publication, and
+   identified by the entity-tag.  If the entity-tag matches previously
+   published event state at the ESC, that event state is replaced by the
+   event state carried in the PUBLISH request, and the EPA receives a
+   2xx response.
+
+   Like the 2xx response to an initial PUBLISH request, the 2xx response
+   to a modifying PUBLISH request will contain a SIP-ETag header field
+   with an entity-tag.  The EPA MUST store this entity-tag, replacing
+   any existing entity-tag for the modified event state.  See Section
+   8.2 for more information on the EPA handling of entity-tags.
+
+   If there is no matching event state at the ESC, e.g., the event state
+   to be modified has already expired, the EPA receives a 412
+   (Conditional Request Failed) response to the PUBLISH request.
+
+   A modifying PUBLISH request MAY contain a single Expires header
+   field.  This value indicates the suggested lifetime of the event
+   state publication.
+
+   The ESC may lower the suggested lifetime of the publication, but it
+   will never extend it.  If an Expires header field is not present, the
+   EPA is indicating its desire for the ESC to choose.  The Expires
+   header field in a 2xx response to the modifying PUBLISH request
+   indicates the actual duration for which the publication will remain
+   active.  Unless refreshed before this lifetime is exceeded, the
+   publication will expire.
+
+4.5.  Removing Event State
+
+   Event state established by a prior publication may also be explicitly
+   removed.
+
+
+
+
+Niemi                       Standards Track                     [Page 9]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   To request the immediate removal of event state, an EPA MUST create a
+   PUBLISH request with an Expires value of "0", and set the SIP-If-
+   Match header field to contain the entity-tag of the event state
+   publication to be removed.
+
+      Note that removing event state is effectively a publication
+      refresh suggesting an infinitesimal expiration interval.
+      Consequently, the refreshed event state expires immediately after
+      being refreshed.
+
+   Similar to an event state refresh, the removal of event state only
+   affects the expiry of the event state.  Therefore, a PUBLISH request
+   that removes event state MUST NOT contain a body.
+
+5.  Processing PUBLISH Responses
+
+   When processing responses to PUBLISH requests, the steps in Section
+   8.1.2 of RFC 3261 [4] apply.
+
+   If an EPA receives a 412 (Conditional Request Failed) response, it
+   MUST NOT reattempt the PUBLISH request.  Instead, to publish event
+   state, the EPA SHOULD perform an initial publication, i.e., a PUBLISH
+   request without a SIP-If-Match header field, as described in Section
+   4.2.  The EPA MUST also discard the entity-tag that produced this
+   error response.
+
+   If an EPA receives a 423 (Interval Too Brief) response to a PUBLISH
+   request, it MAY retry the publication after changing the expiration
+   interval in the Expires header field to be equal to or greater than
+   the expiration interval within the Min-Expires header field of the
+   423 (Interval Too Brief) response.
+
+6.  Processing PUBLISH Requests
+
+   The Event State Compositor (ESC) is a User Agent Server (UAS) that
+   processes and responds to PUBLISH requests, and maintains a list of
+   publications for a given address-of-record.  The ESC has to know
+   (e.g., through configuration) the set of addresses for which it
+   maintains event state.
+
+   The ESC MUST ignore the Record-Route header field if it is included
+   in a PUBLISH request.  The ESC MUST NOT include a Record-Route header
+   field in any response to a PUBLISH request.  The ESC MUST ignore the
+   Contact header field if one is present in a PUBLISH request.
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 10]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   PUBLISH requests with the same Request-URI MUST be processed in the
+   order that they are received.  PUBLISH requests MUST also be
+   processed atomically, meaning that a particular PUBLISH request is
+   either processed completely or not at all.
+
+   When receiving a PUBLISH request, the ESC follows the steps defining
+   general UAS behavior in Section 8.2 of RFC 3261 [4].  In addition,
+   for PUBLISH specific behavior the ESC follows these steps:
+
+   1. The ESC inspects the Request-URI to determine whether this request
+      is targeted to a resource for which the ESC is responsible for
+      maintaining event state.  If not, the ESC MUST return a 404 (Not
+      Found) response and skip the remaining steps.
+
+      It may also be that the Request-URI points to a domain that the
+      ESC is not responsible for.  In that case, the UAS receiving the
+      request can assume the role of a proxy server and forward the
+      request to a more appropriate target.
+
+   2. The ESC examines the Event header field of the PUBLISH request.
+      If the Event header field is missing or contains an event package
+      which the ESC does not support, the ESC MUST respond to the
+      PUBLISH request with a 489 (Bad Event) response, and skip the
+      remaining steps.
+
+   3. The ESC examines the SIP-If-Match header field of the PUBLISH
+      request for the presence of a request precondition.
+
+      *  If the request does not contain a SIP-If-Match header field,
+         the ESC MUST generate and store a locally unique entity-tag for
+         identifying the publication.  This entity-tag is associated
+         with the event-state carried in the body of the PUBLISH
+         request.
+
+      *  Else, if the request has a SIP-If-Match header field, the ESC
+         checks whether the header field contains a single entity-tag.
+         If not, the request is invalid, and the ESC MUST return with a
+         400 (Invalid Request) response and skip the remaining steps.
+
+      *  Else, the ESC extracts the entity-tag contained in the SIP-If-
+         Match header field and matches that entity-tag against all
+         locally stored entity-tags for this resource and event package.
+         If no match is found, the ESC MUST reject the publication with
+         a response of 412 (Conditional Request Failed), and skip the
+         remaining steps.
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 11]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   4. The ESC processes the Expires header field value from the PUBLISH
+      request.
+
+      *  If the request has an Expires header field, that value MUST be
+         taken as the requested expiration.
+
+      *  Else, a locally-configured default value MUST be taken as the
+         requested expiration.
+
+      *  The ESC MAY choose an expiration less than the requested
+         expiration interval.  Only if the requested expiration interval
+         is greater than zero and less than a locally-configured
+         minimum, the ESC MAY reject the publication with a response of
+         423 (Interval Too Brief), and skip the remaining steps.  This
+         response MUST contain a Min-Expires header field that states
+         the minimum expiration interval the ESC is willing to honor.
+
+   5. The ESC processes the published event state contained in the body
+      of the PUBLISH request.  If the content type of the request does
+      not match the event package, or is not understood by the ESC, the
+      ESC MUST reject the request with an appropriate response, such as
+      415 (Unsupported Media Type), and skip the remainder of the steps.
+
+      *  The ESC stores the event state delivered in the body of the
+         PUBLISH request and identified by the associated entity-tag,
+         updating any existing event state for that entity-tag.  The
+         expiration value is set to the chosen expiration interval.
+
+      *  If the request has no message body and contained no entity-tag,
+         the ESC SHOULD reject the request with an appropriate response,
+         such as 400 (Invalid Request), and skip the remainder of the
+         steps.  Alternatively, in case either ESC local policy or the
+         event package has defined semantics for an initial publication
+         containing no message body, the ESC MAY accept it.
+
+      *  Else, the event state identified by the entity-tag is
+         refreshed, setting the expiration value to the chosen
+         expiration interval.
+
+      *  If the chosen expiration interval has a special value of "0",
+         the event state identified by the entity-tag MUST be
+         immediately removed.  The ESC MUST NOT store any event state as
+         a result of such a request.
+
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 12]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+      The processing of the PUBLISH request MUST be atomic.  If internal
+      errors (such as the inability to access a back-end database) occur
+      before processing is complete, the publication MUST NOT succeed,
+      and the ESC MUST fail with an appropriate error response, such as
+      504 (Server Time-out), and skip the last step.
+
+   6. The ESC returns a 200 (OK) response.  The response MUST contain an
+      Expires header field indicating the expiration interval chosen by
+      the ESC.  The response MUST also contain a SIP-ETag header field
+      that contains a single entity-tag identifying the publication.
+      The ESC MUST generate a new entity-tag for each successful
+      publication, replacing any previous entity-tag associated with
+      that event state. The generated entity-tag MUST be unique from any
+      other entity-tags currently assigned to event state associated
+      with that Request-URI, and MUST be different from any entity-tag
+      assigned previously to event state for that Request-URI.  See
+      Section 8.3 for more information on the ESC handling of entity-
+      tags.
+
+7.  Processing OPTIONS Requests
+
+   A client may probe the ESC for the support of PUBLISH using the
+   OPTIONS request defined in SIP [4].  The ESC processes OPTIONS
+   requests as defined in Section 11.2 of RFC 3261 [4].  In the response
+   to an OPTIONS request, the ESC SHOULD include "PUBLISH" to the list
+   of allowed methods in the Allow header field.  Also, it SHOULD list
+   the supported event packages in an Allow-Events header field.
+
+   The Allow header field may also be used to specifically announce
+   support for PUBLISH messages when registering.  (See SIP Capabilities
+   [12] for details).
+
+8.  Use of Entity-tags in PUBLISH
+
+   This section makes a general overview of the entity-tags usage in
+   PUBLISH.  It is informative in nature and thus contains no normative
+   protocol description.
+
+8.1.  General Notes
+
+   The PUBLISH mechanism makes use of entity-tags, as defined in HTTP/
+   1.1 [13].  While the main functionality is preserved, the syntax and
+   semantics for entity-tags and the corresponding header fields is
+   adapted specifically for use with the PUBLISH method.  The main
+   differences are:
+
+   o  The syntax for entity-tags is a token instead of quoted-string.
+      There is also no prefix defined for indicating a weak entity-tag.
+
+
+
+Niemi                       Standards Track                    [Page 13]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   o  A PUBLISH precondition can only apply to a single entity-tag, so
+      request preconditions with multiple entity-tags are not allowed.
+
+   o  A request precondition can't apply to "any" entity, namely there
+      is no special "*" entity-tag value defined for PUBLISH.
+
+   o  Whereas in HTTP/1.1 returning an entity-tag is optional for origin
+      servers, in PUBLISH ESCs are required to always return an entity-
+      tag for a successful publication.
+
+   The main motivation for the above adaptation is that PUBLISH is
+   conceptually an HTTP PUT, for which only a subset of the features in
+   cache validation using entity-tags is allowed in HTTP/1.1.  It makes
+   little sense to enable features other than this subset for event
+   state publication.
+
+   To make it apparent that the entity-tags usage in PUBLISH is similar
+   but not identical to HTTP/1.1, we have not adopted the header field
+   names directly from HTTP/1.1, but rather have created similar but
+   distinct names, as can be seen in Section 11.
+
+8.2.  Client Usage
+
+   Each successful publication will get assigned an entity-tag which is
+   then delivered to the EPA in the response to the PUBLISH request.
+   The EPA needs to store that entity-tag, replacing any previous
+   entity-tag for that event state.  If a request fails with a 412
+   (Conditional Request Failed) response, the EPA discards the entity-
+   tag that caused the failure.
+
+   Entity-tags are opaque tokens to the EPA.  The EPA cannot infer any
+   further semantics from an entity-tag beyond a simple identifier, or
+   assume a specific formatting.  An entity-tag may be a monotonically
+   increasing counter, but it may also be a totally random token.  It is
+   up to the ESC implementation as to what the formatting of an entity-
+   tag is.
+
+8.3.  Server Usage
+
+   Entity-tags are generated and maintained by the ESC.  They are part
+   of the state maintained by the ESC that also includes the actual
+   event state and its remaining expiration interval.  An entity-tag is
+   generated and stored for each successful event state publication, and
+   returned to the EPA in a 200 (OK) response.  Each event state
+   publication from the EPA that updates a previous publication will
+   include an entity-tag that the ESC can use as a search key in the set
+   of active publications.
+
+
+
+
+Niemi                       Standards Track                    [Page 14]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   The way in which an entity-tag is generated is an implementation
+   decision.  One possible way to generate an entity-tag is to implement
+   it as an integer counter that is incremented by one for each
+   successfully processed publication.  Other, equally valid ways for
+   generating entity-tags exist, and this document makes no
+   recommendations or preference for a single way.
+
+9.  Controlling the Rate of Publication
+
+   As an entity responsible for aggregating state information from
+   potentially many sources, the ESC can be subject to considerable
+   amounts of publication traffic.  There are ways to reduce the amount
+   of PUBLISH requests that the ESC receives:
+
+   o  Choice of the expiration interval for a publication can be
+      affected by the ESC.  It can insist that an EPA chooses a longer
+      expiration value to what it suggests, in case the ESC's local
+      default minimum expiration value is not reached.  Maintaining a
+      longer default minimum expiration value at the ESC reduces the
+      rate at which publications are refreshed.
+
+   o  Another way of reducing publication traffic is to use a SIP-level
+      push-back to quench a specific source of publication traffic.  To
+      push back on publications from a particular source, the ESC MAY
+      respond to a PUBLISH request with a 503 (Service Unavailable), as
+      defined in RFC 3261 [4].  This response SHOULD contain a Retry-
+      After header field indicating the time interval that the
+      publication source is required to wait until sending another
+      PUBLISH request.
+
+   At the time of writing this specification, work on managing load in
+   SIP is starting, which may be able to provide further tools for
+   managing load in event state publication systems.
+
+10.  Considerations for Event Packages using PUBLISH
+
+   This section discusses several issues which should be taken into
+   consideration when applying the PUBLISH mechanism to event packages.
+   It also demonstrates how these issues are handled when using PUBLISH
+   for presence publication.
+
+   Any future event package specification SHOULD include a discussion of
+   its considerations for using PUBLISH.  At a minimum those
+   considerations SHOULD address the issues presented in this chapter,
+   and MAY include additional considerations.
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 15]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+10.1.  PUBLISH Bodies
+
+   The body of the PUBLISH request typically carries the published event
+   state.  Any application of the PUBLISH mechanism for a given event
+   package MUST define what content type or types are expected in
+   PUBLISH requests.  Each event package MUST also describe the
+   semantics associated with that content type, and MUST prescribe a
+   default, mandatory to implement MIME type.
+
+   This document defines the semantics of the presence publication
+   requests (event package "presence") when the Common Profile for
+   Presence (CPP) Presence Information Data Format (PIDF) [6] is used.
+   A PUA that uses PUBLISH to publish presence state to the PA MUST
+   support the PIDF presence format.  It MAY support other formats.
+
+10.2.  PUBLISH Response Bodies
+
+   The response to a PUBLISH request indicates whether the request was
+   successful or not.  In general, the body of such a response will be
+   empty unless the event package defines explicit meaning for such a
+   body.
+
+   There is no such meaning for the body of a response to a presence
+   publication.
+
+10.3.  Multiple Sources for Event State
+
+   For some event packages, the underlying model is that of a single
+   entity responsible for aggregating event state (ESC), and multiple
+   sources, out of which only some may be using the PUBLISH mechanism.
+
+      Note that sources for event state other than those using the
+      PUBLISH mechanism are explicitly allowed.  However, it is beyond
+      the scope of this document to define such interfaces.
+
+   Event packages that make use of the PUBLISH mechanism SHOULD describe
+   whether this model for event state publication is applicable, and MAY
+   describe specific mechanisms used for aggregating publications from
+   multiple sources.
+
+   For presence, a PUA can publish presence state for just a subset of
+   the tuples that may be composited into the presence document that
+   watchers receive in a NOTIFY.  The mechanism by which the ESC
+   aggregates this information is a matter of local policy and out of
+   the scope of this specification.
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 16]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+10.4.  Event State Segmentation
+
+   For some event packages, there exists a natural decomposition of
+   event state into segments.  Each segment is defined as one of
+   potentially many identifiable sections in the published event state.
+   Any event package whose content type supports such segmentation of
+   event state, SHOULD describe the way in which these event state
+   segments are identified by the ESC.
+
+   In presence publication, the EPA MUST keep the "id" attributes of
+   tuples consistent in the context of an entity-tag.  If a publication
+   modifies the contents of a tuple, that tuple MUST maintain its
+   original "id".  The ESC will interpret each tuple in the context of
+   the entity-tag with which the request arrived.  A tuple whose "id" is
+   missing compared to the original publication will be considered as
+   being removed.  Similarly, a tuple is interpreted as being added if
+   its "id" attribute is one that the original publication did not
+   contain.
+
+10.5.  Rate of Publication
+
+   Controlling the rate of publication is discussed in Section 9.
+   Individual event packages MAY in turn define recommendations (SHOULD
+   or MUST strength) on absolute maximum rates at which publications are
+   allowed to be generated by a single EPA.
+
+   There are no rate limiting recommendations for presence publication.
+
+11.  Protocol Element Definitions
+
+   This section describes the extensions required for event publication
+   in SIP.
+
+11.1.  New Methods
+
+11.1.1.  PUBLISH Method
+
+   "PUBLISH" is added to the definition of the element "Method" in the
+   SIP message grammar.  As with all other SIP methods, the method name
+   is case sensitive.  PUBLISH is used to publish event state to an
+   entity responsible for compositing this event state.
+
+   Table 2 and Table 3 extend Tables 2 and 3 of RFC 3261 [4] by adding
+   an additional column, defining the header fields that can be used in
+   PUBLISH requests and responses.  The keys in these tables are
+   specified in Section 20 of RFC 3261 [4].
+
+
+
+
+
+Niemi                       Standards Track                    [Page 17]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   +---------------------+---------+---------+
+   | Header Field        |  where  | PUBLISH |
+   +---------------------+---------+---------+
+   | Accept              |    R    |    o    |
+   | Accept              |   2xx   |    -    |
+   | Accept              |   415   |    m*   |
+   | Accept-Encoding     |    R    |    o    |
+   | Accept-Encoding     |   2xx   |    -    |
+   | Accept-Encoding     |   415   |    m*   |
+   | Accept-Language     |    R    |    o    |
+   | Accept-Language     |   2xx   |    -    |
+   | Accept-Language     |   415   |    m*   |
+   | Alert-Info          |         |    -    |
+   | Allow               |    R    |    o    |
+   | Allow               |    r    |    o    |
+   | Allow               |   405   |    m    |
+   | Allow-Events        |    R    |    o    |
+   | Allow-Events        |   489   |    m    |
+   | Authentication-Info |   2xx   |    o    |
+   | Authorization       |    R    |    o    |
+   | Call-ID             |    c    |    m    |
+   | Call-Info           |         |    o    |
+   | Contact             |    R    |    -    |
+   | Contact             |   1xx   |    -    |
+   | Contact             |   2xx   |    -    |
+   | Contact             |   3xx   |    o    |
+   | Contact             |   485   |    o    |
+   | Content-Disposition |         |    o    |
+   | Content-Encoding    |         |    o    |
+   | Content-Language    |         |    o    |
+   | Content-Length      |         |    t    |
+   | Content-Type        |         |    *    |
+   | CSeq                |    c    |    m    |
+   | Date                |         |    o    |
+   | Event               |    R    |    m    |
+   | Error-Info          | 300-699 |    o    |
+   | Expires             |         |    o    |
+   | Expires             |   2xx   |    m    |
+   | From                |    c    |    m    |
+   | In-Reply-To         |    R    |    -    |
+   | Max-Forwards        |    R    |    m    |
+   | Min-Expires         |   423   |    m    |
+   | MIME-Version        |         |    o    |
+   | Organization        |         |    o    |
+   +---------------------+---------+---------+
+
+     Table 2: Summary of header fields, A--O
+
+
+
+
+Niemi                       Standards Track                    [Page 18]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   +---------------------+-----------------+---------+
+   | Header Field        |      where      | PUBLISH |
+   +---------------------+-----------------+---------+
+   | Priority            |        R        |    o    |
+   | Proxy-Authenticate  |       407       |    m    |
+   | Proxy-Authenticate  |       401       |    o    |
+   | Proxy-Authorization |        R        |    o    |
+   | Proxy-Require       |        R        |    o    |
+   | Record-Route        |                 |    -    |
+   | Reply-To            |                 |    -    |
+   | Require             |                 |    o    |
+   | Retry-After         | 404,413,480,486 |    o    |
+   | Retry-After         |     500,503     |    o    |
+   | Retry-After         |     600,603     |    o    |
+   | Route               |        R        |    c    |
+   | Server              |        r        |    o    |
+   | Subject             |        R        |    o    |
+   | Supported           |        R        |    o    |
+   | Supported           |       2xx       |    o    |
+   | Timestamp           |                 |    o    |
+   | To                  |       c(1)      |    m    |
+   | Unsupported         |       420       |    o    |
+   | User-Agent          |                 |    o    |
+   | Via                 |        R        |    m    |
+   | Via                 |        rc       |    m    |
+   | Warning             |        r        |    o    |
+   | WWW-Authenticate    |       401       |    m    |
+   | WWW-Authenticate    |       407       |    o    |
+   +---------------------+-----------------+---------+
+
+         Table 3: Summary of header fields, P--Z
+
+11.2.  New Response Codes
+
+11.2.1.  "412 Conditional Request Failed" Response Code
+
+   The 412 (Conditional Request Failed) response is added to the
+   "Client-Error" header field definition.  412 (Conditional Request
+   Failed) is used to indicate that the precondition given for the
+   request has failed.
+
+
+
+
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 19]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+11.3.  New Header Fields
+
+   Table 4, Table 5, and Table 6 expand on Table 3 in SIP [4], as
+   amended by the changes in Section 11.1.
+
+   +--------------+-------+-------+-----+-----+-----+-----+-----+
+   | Header Field | where | proxy | ACK | BYE | CAN | INF | INV |
+   +--------------+-------+-------+-----+-----+-----+-----+-----+
+   | SIP-ETag     |  2xx  |       |  -  |  -  |  -  |  -  |  -  |
+   | SIP-If-Match |   R   |       |  -  |  -  |  -  |  -  |  -  |
+   +--------------+-------+-------+-----+-----+-----+-----+-----+
+
+              Table 4: Summary of header fields, P--Z
+
+   +--------------+-------+-------+-----+-----+-----+-----+-----+
+   | Header Field | where | proxy | NOT | OPT | PRA | REG | SUB |
+   +--------------+-------+-------+-----+-----+-----+-----+-----+
+   | SIP-ETag     |  2xx  |       |  -  |  -  |  -  |  -  |  -  |
+   | SIP-If-Match |   R   |       |  -  |  -  |  -  |  -  |  -  |
+   +--------------+-------+-------+-----+-----+-----+-----+-----+
+
+              Table 5: Summary of header fields, P--Z
+
+    +--------------+-------+-------+-----+-----+-----+---------+
+    | Header Field | where | proxy | UPD | MSG | REF | PUBLISH |
+    +--------------+-------+-------+-----+-----+-----+---------+
+    | SIP-ETag     |  2xx  |       |  -  |  -  |  -  |    m    |
+    | SIP-If-Match |   R   |       |  -  |  -  |  -  |    o    |
+    +--------------+-------+-------+-----+-----+-----+---------+
+
+              Table 6: Summary of header fields, P--Z
+
+11.3.1.  "SIP-ETag" Header Field
+
+   SIP-ETag is added to the definition of the element "general-header"
+   in the SIP message grammar.  Usage of this header is described in
+   Section 4 and Section 6.
+
+11.3.2.  "SIP-If-Match" Header Field
+
+   SIP-If-Match is added to the definition of the element "general-
+   header" in the SIP message grammar.  Usage of this header is
+   described in Section 4 and Section 6.
+
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 20]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+12.  Augmented BNF Definitions
+
+   This section describes the syntax extensions required for event
+   publication in SIP.  The formal syntax definitions described in this
+   section are expressed in the Augmented BNF [7] format used in SIP
+   [4], and contain references to elements defined therein.
+
+      PUBLISHm           = %x50.55.42.4C.49.53.48 ; PUBLISH in caps.
+      extension-method   = PUBLISHm / token
+      SIP-ETag           = "SIP-ETag" HCOLON entity-tag
+      SIP-If-Match       = "SIP-If-Match" HCOLON entity-tag
+      entity-tag         = token
+
+13.  IANA Considerations
+
+   This document registers a new method name, a new response code and
+   two new header field names.
+
+13.1.  Methods
+
+   This document registers a new SIP method, defined by the following
+   information, which has been added to the method and response-code
+   sub-registry under http://www.iana.org/assignments/sip-parameters.
+
+      Method Name:   PUBLISH
+      Reference:     [RFC3903]
+
+13.2.  Response Codes
+
+   This document registers a new response code.  This response code is
+   defined by the following information, which has been added to the
+   method and response-code sub-registry under
+   http://www.iana.org/assignments/sip-parameters.
+
+      Response Code Number:   412
+      Default Reason Phrase:  Conditional Request Failed
+
+13.3.  Header Field Names
+
+   This document registers two new SIP header field names.  These
+   headers are defined by the following information, which has been
+   added to the header sub-registry under
+   http://www.iana.org/assignments/sip-parameters.
+
+      Header Name:    SIP-ETag
+      Compact Form:   (none)
+
+
+
+
+
+Niemi                       Standards Track                    [Page 21]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+      Header Name:    SIP-If-Match
+      Compact Form:   (none)
+
+14.  Security Considerations
+
+14.1.  Access Control
+
+   Since event state may be considered sensitive information, the ESC
+   should have the ability to selectively accept publications from
+   authorized sources only, based on the identity of the EPA.
+
+   The state agent SHOULD authenticate the EPA, and SHOULD apply its
+   authorization policies (e.g., based on access control lists) to all
+   requests.  The composition model makes no assumptions that all input
+   sources for an ESC are on the same network, or in the same
+   administrative domain.
+
+   ESCs and EPAs MUST implement Digest for authenticating PUBLISH
+   requests, as defined in RFC 3261 [4].  The exact methods for creating
+   and manipulating access control policies in the ESC are outside the
+   scope of this document.
+
+14.2.  Denial of Service Attacks
+
+   The creation of state at the ESC upon receipt of a PUBLISH request
+   can be used by attackers to consume resources on a victim's machine,
+   possibly rendering it unusable.
+
+   To reduce the chances of such an attack, implementations of ESCs
+   SHOULD require authentication of PUBLISH requests.  Implementations
+   MUST support Digest authentication, as defined in RFC 3261 [4].
+
+   Also, the ESC SHOULD throttle incoming publications and the
+   corresponding notifications resulting from the changes in event
+   state.  As a first step, careful selection of default minimum Expires
+   header field values for the supported event packages at an ESC can
+   help limit refreshes of event state.
+
+   Additional throttling and debounce logic at the ESC is advisable to
+   further reduce the notification traffic produced as a result of a
+   PUBLISH request.
+
+14.3.  Replay Attacks
+
+   Replaying a PUBLISH request can have detrimental effects.  An
+   attacker may be able to perform any event state publication it
+   witnessed being performed at some point in the past, by replaying
+   that PUBLISH request.  Among other things, such a replay message may
+
+
+
+Niemi                       Standards Track                    [Page 22]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   be used to spoof old event state information, although a versioning
+   mechanism, e.g., a timestamp, in the state information may help
+   mitigate such an attack.
+
+   To prevent replay attacks, implementations MUST support Digest
+   authentication with replay protection, as defined in RFC 3261 [4].
+   Further mechanisms for countering replay attacks are discussed in SIP
+   [4].
+
+14.4.  Man in the Middle Attacks
+
+   Even with authentication, man-in-the-middle attacks using PUBLISH may
+   be used to install arbitrary event state information, modify or
+   remove existing event state information in publications, or even
+   remove event state altogether at an ESC.
+
+   To prevent such attacks, implementations SHOULD, at a minimum,
+   provide integrity protection across the To, From, Event, SIP-If-
+   Match, Route, and Expires header fields and the bodies of PUBLISH
+   requests.
+
+   If the ESC receives event state in a PUBLISH request which is
+   integrity protected using a security association that is not with the
+   ESC (e.g., integrity protection is applied end-to-end, from publisher
+   to subscriber), the state agent coupled with the ESC MUST NOT modify
+   the event state before exposing it to the subscribers of this event
+   state in NOTIFY requests.  This is to preserve the end-to-end
+   integrity of the event state.
+
+   For integrity protection, ESCs MUST implement TLS [8], and MUST
+   support both mutual and one-way authentication, and MUST also support
+   the SIPS URI scheme defined in SIP [4].  EPAs SHOULD be capable of
+   initiating TLS and SHOULD support the SIPS URI scheme.  ESCs and EPAs
+   MAY support S/MIME [9] for integrity protection, as defined in SIP
+   [4].
+
+14.5.  Confidentiality
+
+   The state information contained in a PUBLISH message may potentially
+   contain sensitive information.  Implementations MAY encrypt such
+   information to ensure confidentiality.
+
+   For providing confidentiality, ESCs MUST implement TLS [8], MUST
+   support both mutual and one-way authentication, and MUST also support
+   the SIPS URI scheme defined in SIP [4].  EPAs SHOULD be capable of
+   initiating TLS and SHOULD support the SIPS URI scheme.  ESCs and EPAs
+   MAY support S/MIME [9] for encryption of event state information, as
+   defined in SIP [4].
+
+
+
+Niemi                       Standards Track                    [Page 23]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+15.  Examples
+
+   This section shows an example of using the PUBLISH method for
+   publishing a presence document from a presence user agent to a
+   presence agent.  The watcher in this example is subscribing to the
+   presentity's presence information from the PA.  The PUA may also
+   SUBSCRIBE to its own presence to see the composite presence state
+   exposed by the PA.  This is an optional but likely step for the PUA,
+   and is not shown in this example.
+
+   When the value of the Content-Length header field is "..." this means
+   that the value should be whatever the computed length of the body is.
+
+          PUA                     PA                      WATCHER
+         (EPA)                   (ESC)
+           |                       |                         |
+           |                       | <---- M1: SUBSCRIBE --- |
+           |                       |                         |
+           |                       | ----- M2: 200 OK -----> |
+           |                       |                         |
+           |                       | ----- M3: NOTIFY -----> |
+           |                       |                         |
+           |                       | <---- M4: 200 OK ------ |
+           |                       |                         |
+           |                       |                         |
+           | ---- M5: PUBLISH ---> |                         |
+           |                       |                         |
+           | <--- M6: 200 OK ----  |                         |
+           |                       |                         |
+           |                       | ----- M7: NOTIFY -----> |
+           |                       |                         |
+           |                       | <---- M8: 200 OK ------ |
+           |                       |                         |
+           | ---- M9: PUBLISH ---> |                         |
+           |                       |                         |
+           | <--- M10: 200 OK ---  |                         |
+           |                       |                         |
+           |                       |                         |
+           | --- M11: PUBLISH ---> |                         |
+           |                       |                         |
+           | <-- M12: 200 OK ----  |                         |
+           |                       |                         |
+           |                       | ----- M13: NOTIFY ----> |
+           |                       |                         |
+           |                       | <---- M14: 200 OK ----- |
+           |                       |                         |
+
+
+
+
+
+Niemi                       Standards Track                    [Page 24]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+   Message flow:
+
+   M1: The watcher initiates a new subscription to the
+      presentity@example.com's presence agent.
+
+      SUBSCRIBE sip:presentity@example.com SIP/2.0
+      Via: SIP/2.0/UDP host.example.com;branch=z9hG4bKnashds7
+      To: <sip:presentity@example.com>
+      From: <sip:watcher@example.com>;tag=12341234
+      Call-ID: 12345678@host.example.com
+      CSeq: 1 SUBSCRIBE
+      Max-Forwards: 70
+      Expires: 3600
+      Event: presence
+      Contact: sip:user@host.example.com
+      Content-Length: 0
+
+   M2: The presence agent for presentity@example.com processes the
+      subscription request and creates a new subscription.  A 200 (OK)
+      response is sent to confirm the subscription.
+
+      SIP/2.0 200 OK
+      Via: SIP/2.0/UDP host.example.com;branch=z9hG4bKnashds7
+       ;received=192.0.2.1
+      To: <sip:presentity@example.com>;tag=abcd1234
+      From: <sip:watcher@example.com>;tag=12341234
+      Call-ID: 12345678@host.example.com
+      CSeq: 1 SUBSCRIBE
+      Contact: sip:pa.example.com
+      Expires: 3600
+      Content-Length: 0
+
+   M3: In order to complete the process, the presence agent sends the
+      watcher a NOTIFY with the current presence state of the
+      presentity.
+
+      NOTIFY sip:user@host.example.com SIP/2.0
+      Via: SIP/2.0/UDP pa.example.com;branch=z9hG4bK8sdf2
+      To: <sip:watcher@example.com>;tag=12341234
+      From: <sip:presentity@example.com>;tag=abcd1234
+      Call-ID: 12345678@host.example.com
+      CSeq: 1 NOTIFY
+      Max-Forwards: 70
+      Event: presence
+      Subscription-State: active; expires=3599
+      Contact: sip:pa.example.com
+      Content-Type: application/pidf+xml
+      Content-Length: ...
+
+
+
+Niemi                       Standards Track                    [Page 25]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+      [PIDF document]
+
+   M4: The watcher confirms receipt of the NOTIFY request.
+
+      SIP/2.0 200 OK
+      Via: SIP/2.0/UDP pa.example.com;branch=z9hG4bK8sdf2
+       ;received=192.0.2.2
+      To: <sip:watcher@example.com>;tag=12341234
+      From: <sip:presentity@example.com>;tag=abcd1234
+      Call-ID: 12345678@host.example.com
+      CSeq: 1 NOTIFY
+
+   M5: A presence user agent (acting for the presentity) initiates a
+       PUBLISH request to the presence agent in order to update it with
+       new presence information.  The Expires header field indicates the
+       suggested duration for this event soft state.
+
+      PUBLISH sip:presentity@example.com SIP/2.0
+      Via: SIP/2.0/UDP pua.example.com;branch=z9hG4bK652hsge
+      To: <sip:presentity@example.com>
+      From: <sip:presentity@example.com>;tag=1234wxyz
+      Call-ID: 81818181@pua.example.com
+      CSeq: 1 PUBLISH
+      Max-Forwards: 70
+      Expires: 3600
+      Event: presence
+      Content-Type: application/pidf+xml
+      Content-Length: ...
+
+      [Published PIDF document]
+
+   M6: The presence agent receives, and accepts the presence
+      publication.  The published data is incorporated into the
+      presentity's presence information.
+
+      SIP/2.0 200 OK
+      Via: SIP/2.0/UDP pua.example.com;branch=z9hG4bK652hsge
+       ;received=192.0.2.3
+      To: <sip:presentity@example.com>;tag=1a2b3c4d
+      From: <sip:presentity@example.com>;tag=1234wxyz
+      Call-ID: 81818181@pua.example.com
+      CSeq: 1 PUBLISH
+      SIP-ETag: dx200xyz
+      Expires: 1800
+
+   M7: The presence agent determines that a reportable change has been
+      made to the presentity's presence information, and sends a
+      new presence notification to the watcher.
+
+
+
+Niemi                       Standards Track                    [Page 26]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+      NOTIFY sip:user@host.example.com SIP/2.0
+      Via: SIP/2.0/UDP pa.example.com;branch=z9hG4bK4cd42a
+      To: <sip:watcher@example.com>;tag=12341234
+      From: <sip:presentity@example.com>;tag=abcd1234
+      Call-ID: 12345678@host.example.com
+      CSeq: 2 NOTIFY
+      Max-Forwards: 70
+      Event: presence
+      Subscription-State: active; expires=3400
+      Contact: sip:pa.example.com
+      Content-Type: application/pidf+xml
+      Content-Length: ...
+
+      [New PIDF document]
+
+   M8: The watcher confirms receipt of the NOTIFY request.
+
+      SIP/2.0 200 OK
+      Via: SIP/2.0/UDP pa.example.com;branch=z9hG4bK4cd42a
+       ;received=192.0.2.2
+      To: <sip:watcher@example.com>;tag=12341234
+      From: <sip:presentity@example.com>;tag=abcd1234
+      Call-ID: 12345678@host.example.com
+      CSeq: 2 NOTIFY
+      Content-Length: 0
+
+   M9: The PUA determines that the event state it previously published
+      is about to expire, and refreshes that event state.
+
+      PUBLISH sip:presentity@example.com SIP/2.0
+      Via: SIP/2.0/UDP pua.example.com;branch=z9hG4bK771ash02
+      To: <sip:presentity@example.com>
+      From: <sip:presentity@example.com>;tag=1234kljk
+      Call-ID: 98798798@pua.example.com
+      CSeq: 1 PUBLISH
+      Max-Forwards: 70
+      SIP-If-Match: dx200xyz
+      Expires: 3600
+      Event: presence
+      Content-Length: 0
+
+   M10: The presence agent receives, and accepts the publication
+      refresh.  The timers regarding the expiration of the specific
+      event state identified by the entity-tag are updated.  As always,
+      the ESC returns an entity-tag in the response to a successful
+      PUBLISH.  Note that no actual state change has occurred, so the
+      watchers will receive no NOTIFYs.
+
+
+
+
+Niemi                       Standards Track                    [Page 27]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+      SIP/2.0 200 OK
+      Via: SIP/2.0/UDP pua.example.com;branch=z9hG4bK771ash02
+       ;received=192.0.2.3
+      To: <sip:presentity@example.com>;tag=2affde434
+      From: <sip:presentity@example.com>;tag=1234kljk
+      Call-ID: 98798798@pua.example.com
+      CSeq: 1 PUBLISH
+      SIP-ETag: kwj449x
+      Expires: 1800
+
+   M11: The PUA of the presentity detects a change in the user's
+      presence state.  It initiates a PUBLISH request to the presence
+      agent to modify the published presence information with the recent
+      change.
+
+      PUBLISH sip:presentity@example.com SIP/2.0
+      Via: SIP/2.0/UDP pua.example.com;branch=z9hG4bKcdad2
+      To: <sip:presentity@example.com>
+      From: <sip:presentity@example.com>;tag=54321mm
+      Call-ID: 5566778@pua.example.com
+      CSeq: 1 PUBLISH
+      Max-Forwards: 70
+      SIP-If-Match: kwj449x
+      Expires: 3600
+      Event: presence
+      Content-Type: application/pidf+xml
+      Content-Length: ...
+
+      [Published PIDF Document]
+
+   M12: The presence agent receives, and accepts the modifying
+       publication.  The published data is incorporated into the
+       presentity's presence information, updating the previous
+       publication from the same PUA.
+
+      SIP/2.0 200 OK
+      Via: SIP/2.0/UDP pua.example.com;branch=z9hG4bKcdad2
+       ;received=192.0.2.3
+      To: <sip:presentity@example.com>;tag=effe22aa
+      From: <sip:presentity@example.com>;tag=54321mm
+      Call-ID: 5566778@pua.example.com
+      CSeq: 1 PUBLISH
+      SIP-ETag: qwi982ks
+      Expires: 3600
+
+   M13: The presence agent determines that a reportable change has been
+       made to the presentity's presence document, and sends a
+       new presence notification to all active subscriptions.
+
+
+
+Niemi                       Standards Track                    [Page 28]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+      NOTIFY sip:user@host.example.com SIP/2.0
+      Via: SIP/2.0/UDP pa.example.com;branch=z9hG4bK32defd3
+      To: <sip:watcher@example.com>;tag=12341234
+      From: <sip:presentity@example.com>;tag=abcd1234
+      Call-ID: 12345678@host.example.com
+      CSeq: 2 NOTIFY
+      Max-Forwards: 70
+      Event: presence
+      Subscription-State: active; expires=3400
+      Contact: sip:pa.example.com
+      Content-Type: application/pidf+xml
+      Content-Length: ...
+
+      [New PIDF document]
+
+   M14: The watcher confirms receipt of the NOTIFY request.
+
+      SIP/2.0 200 OK
+      Via: SIP/2.0/UDP pa.example.com;branch=z9hG4bK32defd3
+       ;received=192.0.2.3
+      To: <sip:watcher@example.com>;tag=12341234
+      From: <sip:presentity@example.com>;tag=abcd1234
+      Call-ID: 12345678@host.example.com
+      CSeq: 2 NOTIFY
+      Content-Length: 0
+
+16.  Contributors
+
+   The original contributors to this specification are:
+
+      Ben Campbell
+      Estacado Systems
+
+      Sean Olson
+      Microsoft
+
+      Jon Peterson
+      Neustar, Inc.
+
+      Jonathan Rosenberg
+      dynamicsoft
+
+      Brian Stucker
+      Nortel Networks, Inc.
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 29]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+17.  Acknowledgements
+
+   The authors would like to thank the SIMPLE Working Group for their
+   collective effort, and specifically the following people for their
+   review and support of this work: Henning Schulzrinne, Paul Kyzivat,
+   Hisham Khartabil, George Foti, Keith Drage, Samir Srivastava, Arun
+   Kumar, Adam Roach, Pekka Pessi, Kai Wang, Cullen Jennings, Mikko
+   Lonnfors, Eva-Maria Leppanen, Ernst Horvath, Thanos Diacakis, Oded
+   Cnaan, Rohan Mahy, and Dean Willis.
+
+18.  References
+
+18.1.  Normative References
+
+   [1]  Roach, A., "Session Initiation Protocol (SIP)-Specific Event
+        Notification", RFC 3265, June 2002.
+
+   [2]  Rosenberg, J., "A Presence Event Package for the Session
+        Initiation Protocol (SIP)", RFC 3856, August 2004.
+
+   [3]  Day, M., Rosenberg, J., and H. Sugano, "A Model for Presence and
+        Instant Messaging", RFC 2778, February 2000.
+
+   [4]  Rosenberg, J., Schulzrinne, H., Camarillo, G., Johnston, A.,
+        Peterson, J., Sparks, R., Handley, M., and E. Schooler, "SIP:
+        Session Initiation Protocol", RFC 3261, June 2002.
+
+   [5]  Bradner, S., "Key words for use in RFCs to Indicate Requirement
+        Levels", BCP 14, RFC 2119, March 1997.
+
+   [6]  Sugano, H., Fujimoto, S., Klyne, G., Bateman, A., Carr, W., and
+        J.  Peterson, "Presence Information Data Format (PIDF)", RFC
+        3863, August 2004.
+
+   [7]  Crocker, D., Ed. and P. Overell, "Augmented BNF for Syntax
+        Specifications: ABNF", RFC 2234, November 1997.
+
+   [8]  Dierks, T. and C. Allen, "The TLS Protocol Version 1.0", RFC
+        2246, January 1999.
+
+   [9]  Ramsdell, B., Ed., "Secure/Multipurpose Internet Mail Extensions
+        (S/MIME) Version 3.1 Message Specification", RFC 3851, July
+        2004.
+
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 30]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+19.2.  Informative References
+
+   [10] Campbell, B., "SIMPLE Presence Publication Requirements", Work
+        in Progress, February 2003.
+
+   [11] Mahy, R., "A Message Summary and Message Waiting Indication
+        Event Package for the  Session Initiation Protocol (SIP)", RFC
+        3842, August 2004.
+
+   [12] Rosenberg, J., Schulzrinne, H., and P. Kyzivat, "Indicating User
+        Agent Capabilities in the Session Initiation Protocol (SIP)",
+        RFC 3840, August 2004.
+
+   [13] Fielding, R., Gettys, J., Mogul, J., Frystyk, H., Masinter, L.,
+        Leach, P., and T. Berners-Lee, "Hypertext Transfer Protocol --
+        HTTP/1.1", RFC 2616, June 1999.
+
+Author's Address
+
+   Aki Niemi (editor)
+   Nokia
+   P.O. Box 407
+   NOKIA GROUP, FIN  00045
+   Finland
+
+   Phone: +358 50 389 1644
+   EMail: aki.niemi@nokia.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 31]
+
+RFC 3903              SIP Event State Publication           October 2004
+
+
+Full Copyright Statement
+
+   Copyright (C) The Internet Society (2004).
+
+   This document is subject to the rights, licenses and restrictions
+   contained in BCP 78, and except as set forth therein, the authors
+   retain all their rights.
+
+   This document and the information contained herein are provided on an
+   "AS IS" basis and THE CONTRIBUTOR, THE ORGANIZATION HE/SHE REPRESENTS
+   OR IS SPONSORED BY (IF ANY), THE INTERNET SOCIETY AND THE INTERNET
+   ENGINEERING TASK FORCE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED,
+   INCLUDING BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE
+   INFORMATION HEREIN WILL NOT INFRINGE ANY RIGHTS OR ANY IMPLIED
+   WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+
+Intellectual Property
+
+   The IETF takes no position regarding the validity or scope of any
+   Intellectual Property Rights or other rights that might be claimed to
+   pertain to the implementation or use of the technology described in
+   this document or the extent to which any license under such rights
+   might or might not be available; nor does it represent that it has
+   made any independent effort to identify any such rights.  Information
+   on the IETF's procedures with respect to rights in IETF Documents can
+   be found in BCP 78 and BCP 79.
+
+   Copies of IPR disclosures made to the IETF Secretariat and any
+   assurances of licenses to be made available, or the result of an
+   attempt made to obtain a general license or permission for the use of
+   such proprietary rights by implementers or users of this
+   specification can be obtained from the IETF on-line IPR repository at
+   http://www.ietf.org/ipr.
+
+   The IETF invites any interested party to bring to its attention any
+   copyrights, patents or patent applications, or other proprietary
+   rights that may cover technology that may be required to implement
+   this standard.  Please address the information to the IETF at ietf-
+   ipr@ietf.org.
+
+Acknowledgement
+
+   Funding for the RFC Editor function is currently provided by the
+   Internet Society.
+
+
+
+
+
+
+
+Niemi                       Standards Track                    [Page 32]
+

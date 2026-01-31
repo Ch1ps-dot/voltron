@@ -432,7 +432,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    Authors' Addresses .............................................  267
    Full Copyright Statement .......................................  269
 
-1 Introduction
+1. Introduction
 
    There are many applications of the Internet that require the creation
    and management of a session, where a session is considered an
@@ -463,7 +463,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    protocols and without dependency on the type of session that is being
    established.
 
-2 Overview of SIP Functionality
+2. Overview of SIP Functionality
 
    SIP is an application-layer control protocol that can establish,
    modify, and terminate multimedia sessions (conferences) such as
@@ -541,7 +541,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
 
    SIP works with both IPv4 and IPv6.
 
-3 Terminology
+3. Terminology
 
    In this document, the key words "MUST", "MUST NOT", "REQUIRED",
    "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT
@@ -549,7 +549,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    described in BCP 14, RFC 2119 [2] and indicate requirement levels for
    compliant SIP implementations.
 
-4 Overview of Operation
+4. Overview of Operation
 
    This section introduces the basic operations of SIP using simple
    examples.  This section is tutorial in nature and does not contain
@@ -887,8 +887,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    488 (Not Acceptable Here), which also receives an ACK.  However, the
    failure of the re-INVITE does not cause the existing call to fail -
    the session continues using the previously negotiated
-   characteristics.  Full details on session modification are in Section
-   14.
+   characteristics.  Full details on session modification are in Section 14.
 
 
 
@@ -971,8 +970,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    for routing incoming SIP requests and has no role in authorizing
    outgoing requests.  Authorization and authentication are handled in
    SIP either on a request-by-request basis with a challenge/response
-   mechanism, or by using a lower layer scheme as discussed in Section
-   26.
+   mechanism, or by using a lower layer scheme as discussed in Section 26.
 
    The complete set of SIP message details for this registration example
    is in Section 24.1.
@@ -981,7 +979,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    of a SIP server or client using OPTIONS, or canceling a pending
    request using CANCEL, will be introduced in later sections.
 
-5 Structure of the Protocol
+5. Structure of the Protocol
 
    SIP is structured as a layered protocol, which means that its
    behavior is described in terms of a set of fairly independent
@@ -1094,7 +1092,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    proxy element, which facilitates routing of messages between user
    agents.
 
-6 Definitions
+6. Definitions
 
    The following terms have special significance for SIP.
 
@@ -1153,8 +1151,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
          UAs that persists for some time.  A dialog is established by
          SIP messages, such as a 2xx response to an INVITE request.  A
          dialog is identified by a call identifier, local tag, and a
-         remote tag.  A dialog was formerly known as a call leg in RFC
-         2543.
+         remote tag.  A dialog was formerly known as a call leg in RFC 2543.
 
       Downstream: A direction of message forwarding within a transaction
          that refers to the direction that requests flow from the user
@@ -1448,7 +1445,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    Proxy, location, and registrar servers defined above are logical
    entities; implementations MAY combine them into a single application.
 
-7 SIP Messages
+7. SIP Messages
 
    SIP is a text-based protocol and uses the UTF-8 charset (RFC 2279
    [7]).
@@ -2093,8 +2090,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    No provisioning or human interface is required for the selection of
    the Call-ID header field value for a request.
 
-   For further information on the Call-ID header field, see Section
-   20.8.
+   For further information on the Call-ID header field, see Section 20.8.
 
    Example:
 
@@ -4771,8 +4767,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
 
    If the server retransmits the 2xx response for 64*T1 seconds without
    receiving an ACK, the dialog is confirmed, but the session SHOULD be
-   terminated.  This is accomplished with a BYE, as described in Section
-   15.
+   terminated.  This is accomplished with a BYE, as described in Section 15.
 
 14 Modifying an Existing Session
 
@@ -11130,7 +11125,6 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    differences:
 
       1.  The URI included in the challenge has the following BNF:
-
           URI  =  SIP-URI / SIPS-URI
 
       2.  The BNF in RFC 2617 has an error in that the 'uri' parameter
@@ -11153,7 +11147,6 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
           'uri' MUST be enclosed in quotation marks.
 
       3.  The BNF for digest-uri-value is:
-
           digest-uri-value  =  Request-URI ; as defined in Section 25
 
       4.  The example procedure for choosing a nonce based on Etag does
@@ -14590,15 +14583,13 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
         Leach, P. and T. Berners-Lee, "Hypertext Transfer Protocol --
         HTTP/1.1", RFC 2616, June 1999.
 
-   [9]  Vaha-Sipila, A., "URLs for Telephone Calls", RFC 2806, April
-        2000.
+   [9]  Vaha-Sipila, A., "URLs for Telephone Calls", RFC 2806, April 2000.
 
    [10] Crocker, D. and P. Overell, "Augmented BNF for Syntax
         Specifications: ABNF", RFC 2234, November 1997.
 
    [11] Freed, F. and N. Borenstein, "Multipurpose Internet Mail
-        Extensions (MIME) Part Two: Media Types", RFC 2046, November
-        1996.
+        Extensions (MIME) Part Two: Media Types", RFC 2046, November 1996.
 
    [12] Eastlake, D., Crocker, S. and J. Schiller, "Randomness
         Recommendations for Security", RFC 1750, December 1994.
@@ -14606,8 +14597,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
    [13] Rosenberg, J. and H. Schulzrinne, "An Offer/Answer Model with
         SDP", RFC 3264, June 2002.
 
-   [14] Postel, J., "User Datagram Protocol", STD 6, RFC 768, August
-        1980.
+   [14] Postel, J., "User Datagram Protocol", STD 6, RFC 768, August 1980.
 
    [15] Postel, J., "DoD Standard Transmission Control Protocol", RFC
         761, January 1980.
@@ -14646,8 +14636,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
         Multiparts for MIME: Multipart/Signed and Multipart/Encrypted",
         RFC 1847, October 1995.
 
-   [23] Housley, R., "Cryptographic Message Syntax", RFC 2630, June
-        1999.
+   [23] Housley, R., "Cryptographic Message Syntax", RFC 2630, June 1999.
 
    [24] Ramsdell B., "S/MIME Version 3 Message Specification", RFC 2633,
         June 1999.
@@ -14696,8 +14685,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
 
    [34] Donovan, S., "The SIP INFO Method", RFC 2976, October 2000.
 
-   [35] Rivest, R., "The MD5 Message-Digest Algorithm", RFC 1321, April
-        1992.
+   [35] Rivest, R., "The MD5 Message-Digest Algorithm", RFC 1321, April 1992.
 
    [36] Dawson, F. and T. Howes, "vCard MIME Directory Profile", RFC
         2426, September 1998.

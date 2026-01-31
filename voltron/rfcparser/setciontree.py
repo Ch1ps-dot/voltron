@@ -260,7 +260,8 @@ class SectionTree:
             upper: name of upper level section
 
         """
-        reg = r'^[ ]*' + \
+        reg = r'(?<=^\s*$)\r?\n' + \
+                r'^[ ]*' + \
                 r'\d+\.' * level + \
                 r'[ ]*' + \
                 r'[^,.\n]*' + \
@@ -481,5 +482,5 @@ class SectionTree:
             self
     ):
         for node in self.leafs:
-            logger.debug(node.name)
+            logger.debug(f'{node.name}-{node.content_type}')
     
