@@ -56,7 +56,7 @@ class Executor:
                     [self.post_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    preexec_fn=os.setsid
+                    preexec_fn=os.setpgrp
                 )
                 return proc
             except Exception as e:
@@ -72,7 +72,7 @@ class Executor:
                     [self.pre_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    preexec_fn=os.setsid
+                    preexec_fn=os.setpgrp
                 )
                 analyzer.sut_proc = proc
                 return proc
@@ -264,7 +264,6 @@ class Executor:
         # ensure sub-subprocess die
         try:
             os.killpg(proc.pid, 0)
-            time.sleep(0.1)
             
             # no die, just kill
             os.killpg(proc.pid, signal.SIGKILL)
@@ -277,7 +276,6 @@ class Executor:
         # kill clean script
         try:
             os.killpg(clean.pid, 0)
-            time.sleep(0.1)
             
             # no die, just kill
             os.killpg(clean.pid, signal.SIGKILL)
