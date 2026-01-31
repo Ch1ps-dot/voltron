@@ -22,7 +22,7 @@ class Havoc:
         
         self.mapper = mapper
         self.exe = exe
-        self.alphabet = mapper.request_types
+        self.alphabet = list(mapper.request_types)
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
         self.methods = ['cat', 'inter']
         self.mutator_mode = ['new', 'generic']

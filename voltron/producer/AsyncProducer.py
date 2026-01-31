@@ -383,7 +383,7 @@ class AsyncProducer:
     async def _parser_gen_async(
             self
     ):
-        res_info = json.dumps(self.rfcp.res_doc)
+        res_info = json.dumps(list(self.rfcp.res_doc))
         while(True):
             try:
                 # generate input generator and save it

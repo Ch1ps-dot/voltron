@@ -13,7 +13,7 @@ class MembershipOracle:
     ) -> None:
         self.mapper = mapper
         self.executor = executor
-        self.alphabet = mapper.request_types
+        self.alphabet = list(mapper.request_types)
     
     def query(
         self, 

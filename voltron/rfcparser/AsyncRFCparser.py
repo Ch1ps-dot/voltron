@@ -134,8 +134,8 @@ class AsyncRFCParser:
         res_json = await res_task
         req_json = await req_task
 
-        self.req_types = req_json['value']
-        self.res_types = res_json['value']
+        self.req_types = set(req_json['value'])
+        self.res_types = set(res_json['value'])
 
         logger.debug('RFCParser: finish key field extraction')
     
