@@ -71,7 +71,7 @@ class Executor:
                 proc = subprocess.Popen(
                     [self.pre_script],
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
                     preexec_fn=os.setpgrp
                 )
                 analyzer.sut_proc = proc
@@ -124,7 +124,7 @@ class Executor:
             sock = self.setup_socket()
             if sock == None:
                 if proc.poll() is not None:
-                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
+                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.stderr}')
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
