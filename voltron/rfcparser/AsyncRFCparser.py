@@ -223,7 +223,6 @@ class AsyncRFCParser:
         st: SectionTree
     ):
         async with sem:
-            
             while True:
                 try:
                     doc = st.fetch_node_content(node)
