@@ -260,7 +260,8 @@ class SectionTree:
             upper: name of upper level section
 
         """
-        reg = r'(?<=^\s*$)\r?\n' + \
+        reg =  r'^\s*$' + \
+                r'\r?\n' + \
                 r'^[ ]*' + \
                 r'\d+\.' * level + \
                 r'[ ]*' + \
