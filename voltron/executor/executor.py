@@ -318,6 +318,7 @@ class Executor:
         
         try:
             for pid in pids:
+                logger.debug(f'kill {pid}')
                 os.kill(pid, signal.SIGTERM)
         except Exception as e:
             logger.debug(f'kill execution failure {e}')
