@@ -211,8 +211,8 @@ class AsyncRFCParser:
 
         results = await tqdm_asyncio.gather(*tasks, desc="Doc Annotation")
 
-        for node, doc_type in results:
-            node.content_type = doc_type
+        # for node, doc_type in results:
+        #     node.content_type = doc_type
 
     async def _spe_parse_one(
         self,
@@ -233,7 +233,8 @@ class AsyncRFCParser:
                         )
                         if ans is None: raise Exception
                         logger.debug(f'[Tree Annotate]: {node.name}-{ans}')
-                        return node, ans
+                        node.content_type = ans
+                        break
                 except Exception as e:
                     logger.error(f'RFCParser: specification parse error {e}')
 

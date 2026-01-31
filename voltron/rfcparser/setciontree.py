@@ -26,7 +26,7 @@ class SectionNode:
         self.level: int = level
         self.isLeaf: bool = False
         self.upper: SectionNode | None
-        self.content_type: str
+        self.content_type: str = 'none'
 
         # debug
         # print(f'{name}: [{start}-{end}]')
