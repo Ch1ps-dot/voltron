@@ -90,9 +90,10 @@ class Executor:
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
+        self.kill_listeners(self.port)
         clean = self.post_exe()
         proc = self.pre_exe()
-        self.kill_listeners(self.port)
+        
         # logger.debug('exe: after setup')
         
         if proc is None or clean is None:
