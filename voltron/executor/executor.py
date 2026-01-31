@@ -264,7 +264,6 @@ class Executor:
             os.killpg(clean.pid, signal.SIGTERM)
             clean.wait()
         
-        time.sleep(100)
         # ensure sub-subprocess die
         while True:
             try:
