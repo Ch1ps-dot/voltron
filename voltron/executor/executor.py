@@ -306,6 +306,7 @@ class Executor:
                 text=True,
                 stderr=subprocess.DEVNULL
             )
+            logger.debug(result)
             lines = result.strip().split("\n")[1:]
             for line in lines:
                 if f":{port}" in line:
