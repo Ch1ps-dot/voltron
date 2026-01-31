@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys, traceback, pickle, copy
+import yaml, time, threading, signal, sys, traceback, pickle, copy, os
 
 from voltron.utils.logger import logger
 
@@ -312,6 +312,8 @@ class Fuzzer:
             frame
     ):
         # Handle normal exit of fuzzer Ctrl+C
+        if analyzer.sut_proc != None:
+            os.killpg(analyzer.sut_proc.pid, signal.SIGKILL)
         logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
         self.stop_event.set()
         with analyzer.lock:

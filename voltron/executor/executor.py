@@ -74,6 +74,7 @@ class Executor:
                     stderr=subprocess.DEVNULL,
                     preexec_fn=os.setsid
                 )
+                analyzer.sut_proc = proc
                 return proc
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
@@ -267,6 +268,7 @@ class Executor:
             
             # no die, just kill
             os.killpg(proc.pid, signal.SIGKILL)
+            analyzer.sut_proc = None
             logger.debug(f"target process: target process alive")
         except Exception as e:
             # sub-subprocess die out
