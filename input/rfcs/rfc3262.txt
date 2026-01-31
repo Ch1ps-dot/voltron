@@ -63,7 +63,7 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
    14    Authors' Addresses ..................................   13
    15.   Full Copyright Statement.............................   14
 
-1 Introduction
+1. Introduction
 
    The Session Initiation Protocol (SIP) (RFC 3261 [1]) is a request-
    response protocol for initiating and managing communications
@@ -116,14 +116,14 @@ Rosenberg & Schulzrinne     Standards Track                     [Page 2]
 RFC 3262      Reliability of Provisional Responses in SIP      June 2002
 
 
-2 Terminology
+2. Terminology
 
    In this document, the key words "MUST", "MUST NOT", "REQUIRED",
    "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY",
    and "OPTIONAL" are to be interpreted as described in RFC 2119 [2] and
    indicate requirement levels for compliant SIP implementations.
 
-3 UAS Behavior
+3. UAS Behavior
 
    A UAS MAY send any non-100 provisional response to INVITE reliably,
    so long as the initial INVITE request (the request whose provisional
@@ -284,7 +284,7 @@ Rosenberg & Schulzrinne     Standards Track                     [Page 5]
 RFC 3262      Reliability of Provisional Responses in SIP      June 2002
 
 
-4 UAC Behavior
+4. UAC Behavior
 
    When the UAC creates a new request, it can insist on reliable
    delivery of provisional responses for that request.  To do that, it
@@ -490,7 +490,7 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
    The UAC MAY acknowledge reliable provisional responses received after
    the final response or MAY discard them.
 
-5 The Offer/Answer Model and PRACK
+5. The Offer/Answer Model and PRACK
 
    RFC 3261 describes guidelines for the sets of messages in which
    offers and answers [3] can appear.  Based on those guidelines, this
@@ -538,13 +538,13 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
    as requests, and 2xx and reliable 1xx as non-failure reliable
    responses.
 
-6 Definition of the PRACK Method
+6. Definition of the PRACK Method
 
    This specification defines a new SIP method, PRACK.  The semantics of
    this method are described above.  Tables 1 and 2 extend Tables 2 and
    3 from RFC 3261 for this new method.
 
-7 Header Field Definitions
+7. Header Field Definitions
 
    This specification defines two new header fields, RAck and RSeq.
    Table 3 extends Tables 2 and 3 from RFC 3261 for these headers.
@@ -589,7 +589,7 @@ RFC 3262      Reliability of Provisional Responses in SIP      June 2002
 
       RAck: 776656 1 INVITE
 
-8 IANA Considerations
+8. IANA Considerations
 
    This document registers a new option tag and two new headers, based
    on the IANA registration process of RFC 3261.

@@ -1849,7 +1849,7 @@ Rosenberg, et. al.          Standards Track                    [Page 33]
 RFC 3261            SIP: Session Initiation Protocol           June 2002
 
 
-7.5 Framing SIP Messages
+7.5. Framing SIP Messages
 
    Unlike HTTP, SIP implementations can use UDP or other unreliable
    datagram protocols.  Each such datagram carries one request or
@@ -1864,7 +1864,7 @@ RFC 3261            SIP: Session Initiation Protocol           June 2002
       each SIP message in a stream.  It will always be present when SIP
       messages are sent over stream-oriented transports.
 
-8 General User Agent Behavior
+8. General User Agent Behavior
 
    A user agent represents an end system.  It contains a user agent
    client (UAC), which generates requests, and a user agent server

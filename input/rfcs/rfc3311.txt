@@ -81,7 +81,7 @@ Table of Contents
    14   Author's Address ..........................................   12
    15   Full Copyright Statement ..................................   13
 
-1 Introduction
+1. Introduction
 
    The Session Initiation Protocol (SIP) [1] defines the INVITE method
    for the initiation and modification of sessions.  However, this
@@ -116,7 +116,7 @@ Rosenberg                   Standards Track                     [Page 2]
 RFC 3311                   SIP UPDATE Method              September 2002
 
 
-2 Terminology
+2. Terminology
 
    In this document, the key words "MUST", "MUST NOT", "REQUIRED",
    "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY",
@@ -124,7 +124,7 @@ RFC 3311                   SIP UPDATE Method              September 2002
    [2] and indicate requirement levels for compliant SIP
    implementations.
 
-3 Overview of Operation
+3. Overview of Operation
 
    Operation of this extension is straightforward.  The caller begins
    with an INVITE transaction, which proceeds normally.  Once a dialog
@@ -138,7 +138,7 @@ RFC 3311                   SIP UPDATE Method              September 2002
    UPDATE can be used, based on the restrictions of the offer/answer
    model.
 
-4 Determining Support for this Extension
+4. Determining Support for this Extension
 
    The initiation of a session operates as specified in RFC 3261 [1].
    However, a UAC compliant to this specification SHOULD also include an
@@ -172,7 +172,7 @@ Rosenberg                   Standards Track                     [Page 3]
 RFC 3311                   SIP UPDATE Method              September 2002
 
 
-5 UPDATE Handling
+5. UPDATE Handling
 
 5.1 Sending an UPDATE
 
@@ -340,12 +340,12 @@ Rosenberg                   Standards Track                     [Page 6]
 RFC 3311                   SIP UPDATE Method              September 2002
 
 
-6 Proxy Behavior
+6. Proxy Behavior
 
    Proxy processing of the UPDATE request is identical to any other
    non-INVITE request.
 
-7 Definition of the UPDATE method
+7. Definition of the UPDATE method
 
    The semantics of the UPDATE method are described in detail above.
    This extension adds another value to the Method BNF described in RFC
@@ -360,7 +360,7 @@ RFC 3311                   SIP UPDATE Method              September 2002
 
    Table 2 updates Table 3 of RFC 3261 for the UPDATE method.
 
-8 Example Call Flow
+8. Example Call Flow
 
    This section presents an example call flow using the UPDATE method.
    The flow is shown in Figure 1.  The caller sends an initial INVITE
@@ -564,7 +564,7 @@ Rosenberg                   Standards Track                    [Page 10]
 RFC 3311                   SIP UPDATE Method              September 2002
 
 
-9 Security Considerations
+9. Security Considerations
 
    The security considerations for UPDATE are identical to those for
    re-INVITE.  It is important that the UPDATE be integrity protected
@@ -572,7 +572,7 @@ RFC 3311                   SIP UPDATE Method              September 2002
    other end of the dialog.  RFC 3261 [1] discusses security mechanisms
    for achieving these functions.
 
-10 IANA Considerations
+10. IANA Considerations
 
    As per Section 27.4 of RFC 3261 [1], this specification serves as a
    registration for the SIP UPDATE request method.  The information to
@@ -585,14 +585,14 @@ RFC 3311                   SIP UPDATE Method              September 2002
 
       Reason Phrase: Not applicable.
 
-11 Notice Regarding Intellectual Property Rights
+11. Notice Regarding Intellectual Property Rights
 
       The IETF has been notified of intellectual property rights claimed
       in regard to some or all of the specification contained in this
       document.  For more information consult the online list of claimed
       rights.
 
-12 Normative References
+12. Normative References
 
    [1] Rosenberg, J., Schulzrinne, H., Camarillo, G., Johnston, A.,
        Peterson, J., Sparks, R., Handley, M. and E. Schooler, "SIP:
@@ -620,12 +620,12 @@ Rosenberg                   Standards Track                    [Page 11]
 RFC 3311                   SIP UPDATE Method              September 2002
 
 
-13 Acknowledgements
+13. Acknowledgements
 
    The author would like to thank Jo Hornsby, Markus Isomaki, Rohan
    Mahy, and Bob Penfield for their comments.
 
-14 Author's Address
+14. Author's Address
 
    Jonathan Rosenberg
    dynamicsoft

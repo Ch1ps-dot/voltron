@@ -210,17 +210,17 @@ class AsyncRFCParser:
             for node in st.leafs
         ]
 
-        results = await tqdm_asyncio.gather(*tasks, desc="Doc Annotation")
+        results = await tqdm_asyncio.gather(*tasks, desc=f"Doc Annotation {st.name}")
 
-        # for node, doc_type in results:
-        #     node.content_type = doc_type
+        for node, doc_type in results:
+            node.content_type = doc_type
 
     async def _spe_parse_one(
         self,
         node: SectionNode,
         sem: asyncio.Semaphore,
         st: SectionTree
-    ):
+    ) -> tuple[SectionNode, str]:
         async with sem:
             while True:
                 try:
@@ -235,7 +235,7 @@ class AsyncRFCParser:
                         if ans is None: raise Exception
                         logger.debug(f'[Tree Annotate]: {node.name}-{ans}')
                         node.content_type = ans
-                        break
+                        return node, ans
                 except Exception as e:
                     logger.error(f'RFCParser: specification parse error {e}')
 
