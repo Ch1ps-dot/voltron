@@ -392,7 +392,7 @@ class AsyncRFCParser:
                     ans_str = await self.chater.llm_possible_res(
                         pro_name=self.pro_name,
                         current_request=req_type,
-                        response_types=json.dumps(self.res_types)
+                        response_types=json.dumps(list(self.res_types))
                     )
                     cur_poss_res = json.loads(ans_str)
                     return req_type, cur_poss_res
@@ -439,7 +439,7 @@ class AsyncRFCParser:
                         last_request=last_req,
                         pro_name=self.pro_name,
                         current_request=cur_req,
-                        response_types=json.dumps(self.res_types),
+                        response_types=json.dumps(list(self.res_types)),
                         rfc_content=''.join([' '.join(item[0]) for item in results])
                     )
                     relation = json.loads(ans_str)
