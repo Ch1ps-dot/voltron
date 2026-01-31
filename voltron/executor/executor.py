@@ -257,7 +257,8 @@ class Executor:
         # close process
         if proc.poll() is None:
             os.killpg(proc.pid, signal.SIGTERM)
-            proc.wait()
+            returncode = proc.wait()
+            logger.debug(f'sut returncode: {returncode}')
             
         if clean.poll() is None:
             os.killpg(clean.pid, signal.SIGTERM)
