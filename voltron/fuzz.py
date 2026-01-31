@@ -185,7 +185,6 @@ class Fuzzer:
                 with open(h_path, 'rb') as f:
                     hypothesis = pickle.load(f)
             
-            """--- model learning ---"""
             if hypothesis is None:
                 hypothesis = self.model_learning(mq, eq, stop_event)
             else:
@@ -209,6 +208,7 @@ class Fuzzer:
         """--- model learning ---"""
         h_lsit: list[MealyMachine] = []
         h_path = configs.models_path / 'evolved_hypothesis.pkl'
+        try_limit = 3
         while not stop_event.is_set():
             try:
                 cur_id = str(analyzer.iter)
@@ -241,11 +241,13 @@ class Fuzzer:
                 
                 if last_trans_num >= cur_trans_num:
                     # self.producer.generator_evo(h_lsit[-1], next_id)
-                    with open(h_path, 'wb') as f:
-                        pickle.dump(h, f)
-                    h.graph('evolved')
-                    logger.debug('ml: save evolved model')
-                    break
+                    try_limit -= 1
+                    if try_limit <= 0:
+                        with open(h_path, 'wb') as f:
+                            pickle.dump(h, f)
+                        h.graph('evolved')
+                        logger.debug('ml: save evolved model')
+                        break
                 
                 elif last_trans_num < cur_trans_num:
                     h_lsit.append(h)

@@ -30,7 +30,7 @@ live555:
   protocol: rtsp
   host: 127.0.0.1
   port: 8554
-  rfc_name: rfc3261
+  rfc_name: rfc7826
   trans_layer: udp
 
 llm:
