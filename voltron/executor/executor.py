@@ -135,7 +135,7 @@ class Executor:
             
         # keep request and response in Conversation
         cons: Conversation = Conversation()
-        
+        time.sleep(100)
         # maybe recv initialize message
         resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
         last_recv = '-'
