@@ -176,9 +176,9 @@ class AsyncRFCParser:
 
         concatenate the sections of document with the same type as one augmentation info
         """
+        logger.debug(f'query: {self.tree_list[idx]}')
         self.tree_list[idx].debug_tree()
         for node in self.tree_list[idx].leafs:
-            
             match node.content_type:
                 case "request":
                     self.req_doc.add(self.tree_list[idx].fetch_node_content(node))
@@ -204,6 +204,7 @@ class AsyncRFCParser:
         self,
         st: SectionTree
     ):
+        logger.debug(f'spe parse: {st}')
         st.debug_tree()
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
