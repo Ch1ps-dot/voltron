@@ -483,5 +483,5 @@ class SectionTree:
             self
     ):
         for node in self.leafs:
-            logger.debug(f'{node.name}-{node.content_type}')
+            logger.debug(f'{node.name}:{node.content_type}:{node}')
     
