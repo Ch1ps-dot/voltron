@@ -301,7 +301,7 @@ class Executor:
         pids = []
         try:
             result = subprocess.check_output(
-                ["sudo", "netstat", "-tulnp", "2>/dev/null"],  
+                ["netstat", "-tulnp", "2>/dev/null"],  
                 text=True,
                 stderr=subprocess.DEVNULL
             )
