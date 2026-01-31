@@ -23,7 +23,7 @@ kamailio:
   protocol: sip
   host: 127.0.0.1
   port: 5060
-  rfc_name: ["rfc3261", "rfc3262", "rfc3311", "rfc3428", "rfc3515", "rfc3903", "rfc6086", "rfc6665"]
+  rfc_name: ["rfc3262", "rfc3261",  "rfc3311", "rfc3428", "rfc3515", "rfc3903", "rfc6086", "rfc6665"]
   trans_layer: udp
 
 live555:
