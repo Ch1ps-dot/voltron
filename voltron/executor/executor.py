@@ -266,9 +266,9 @@ class Executor:
             try:
                 os.killpg(proc.pid, 0)
                 
+                time.sleep(0.5)
                 # no die, just kill
                 os.killpg(proc.pid, signal.SIGKILL)
-                logger.debug(f"target process: target process alive")
             except Exception as e:
                 # sub-subprocess die out
                 analyzer.sut_proc = None
