@@ -228,7 +228,7 @@ class AsyncRFCParser:
                             rfc_doc = doc
                         )
                         if ans is None: raise Exception
-                        logger.debug(f'[Tree Annotate]: {node.name}:{ans}:{node}')
+                        logger.debug(f'[Tree Annotate]: {node.name}:{ans}')
                         node.content_type = ans
                         break
                 except Exception as e:

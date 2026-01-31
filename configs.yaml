@@ -31,7 +31,7 @@ live555:
   host: 127.0.0.1
   port: 8554
   rfc_name: ["rfc7826"]
-  trans_layer: udp
+  trans_layer: tcp
 
 llm:
   base_url: https://xiaoai.plus/v1
