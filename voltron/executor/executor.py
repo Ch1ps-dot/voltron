@@ -304,7 +304,7 @@ class Executor:
         pids = []
         try:
             result = subprocess.check_output(
-                ["netstat", "-tulna", "2>/dev/null"],  
+                ["netstat", "-tulnap", "2>/dev/null"],  
                 text=True,
                 stderr=subprocess.DEVNULL
             )
