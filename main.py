@@ -2,15 +2,6 @@
 
 from voltron.fuzz import Fuzzer
 import click, random
-
-def test_rand():
-    fuzzer = Fuzzer(
-        target_name='lightftp',
-        time_limit_min=10
-    )
-    fuzzer.fuzz(
-        algo='rand'
-    )
     
 def test_lightftp():
     fuzzer = Fuzzer(
@@ -38,11 +29,20 @@ def test_kamailio():
     fuzzer.fuzz(
         algo='state'
     )
+    
+def test_live555():
+    fuzzer = Fuzzer(
+        target_name='live555',
+        time_limit_min=1440
+    )
+    fuzzer.fuzz(
+        algo='state'
+    )
 
 @click.command(help='fuzzer')
 @click.option("-t", "--target", type=str, required=True, help="fuzzing target")
 def main(target):
-    supported_set = {'lightftp','pureftpd','kamailio'}
+    supported_set = {'lightftp','pureftpd','kamailio', 'live555'}
     if target in supported_set:
         fuzzer = Fuzzer(
             target_name=target,
