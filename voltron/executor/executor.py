@@ -254,8 +254,7 @@ class Executor:
             self.analyzer.path_num = self.analyzer.path_num + 1
 
         # close socket
-        if sock.fileno() < 0:
-            sock.close()
+        sock.close()
         
         # close process
         if proc.poll() is None:
@@ -267,7 +266,6 @@ class Executor:
             os.killpg(clean.pid, signal.SIGTERM)
             clean.wait()
         
-        self.kill_listeners(self.port)
         # ensure sub-subprocess die
         while True:
             try:
@@ -304,7 +302,7 @@ class Executor:
         pids = []
         try:
             result = subprocess.check_output(
-                ["netstat", "-tulnap", "2>/dev/null"],  
+                ["netstat", "-tulnp", "2>/dev/null"],  
                 text=True,
                 stderr=subprocess.DEVNULL
             )
