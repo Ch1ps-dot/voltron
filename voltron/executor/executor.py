@@ -471,7 +471,12 @@ class Executor:
                 # response can be read
 
                 if event & select.POLLIN:
-                    buf = sock.recv(2048)
+                    buf = b''
+                    while True:
+                        chunk = sock.recv(2048)
+                        if not chunk:
+                            break
+                        buf += chunk
                     # logger.debug(f'net_recv: {buf}')
                     
                     #TODO: handle invalid response
@@ -499,7 +504,12 @@ class Executor:
                 fd, event = events[0]
                 
                 if event & select.POLLIN:
-                    buf, _ = sock.recvfrom(2048)
+                    buf = b''
+                    while True:
+                        chunk, _ = sock.recvfrom(2048)
+                        if not chunk:
+                            break
+                        buf += chunk
                     if len(buf) == 0:
                         return 'RCLOSED', None
                     resp_code = self.parser_func(buf)
