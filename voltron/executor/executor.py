@@ -474,7 +474,7 @@ class Executor:
                     buf = b''
                     
                     while True:
-                        events = poller.poll(time_out_ms)
+                        events = poller.poll(10)
                         if not events:
                             break
                         chunk = sock.recv(2048)
