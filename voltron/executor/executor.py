@@ -276,7 +276,7 @@ class Executor:
             except Exception as e:
                 # sub-subprocess die out
                 analyzer.sut_proc = None
-                logger.debug(f'target process: {e}')
+                # logger.debug(f'target process: {e}')
                 break
         
         # kill clean script
@@ -288,7 +288,8 @@ class Executor:
             logger.debug(f"clean process: clean process alive")
         except Exception as e:
             # sub-subprocess die out
-            logger.debug(f'clean process: {e}')
+            # logger.debug(f'clean process: {e}')
+            pass
                 
 
         # self.post_exe()
@@ -306,7 +307,6 @@ class Executor:
                 text=True,
                 stderr=subprocess.DEVNULL
             )
-            logger.debug(result)
             lines = result.strip().split("\n")[1:]
             for line in lines:
                 if f":{port}" in line:
