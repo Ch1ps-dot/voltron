@@ -473,8 +473,13 @@ class Executor:
                 if event & select.POLLIN:
                     buf = b''
                     
-                    while poller.poll():
+                    while True:
+                        events = poller.poll(time_out_ms)
+                        if not events:
+                            break
                         chunk = sock.recv(2048)
+                        if not chunk:
+                            break
                         buf += chunk
 
                     # logger.debug(f'net_recv: {buf}')
@@ -505,8 +510,13 @@ class Executor:
                 
                 if event & select.POLLIN:
                     buf = b''
-                    while poller.poll():
+                    while True:
+                        events = poller.poll(time_out_ms)
+                        if not events:
+                            break
                         chunk, _ = sock.recvfrom(2048)
+                        if not chunk:
+                            break
                         buf += chunk
                     if len(buf) == 0:
                         return 'RCLOSED', None
