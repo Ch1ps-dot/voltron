@@ -472,11 +472,11 @@ class Executor:
 
                 if event & select.POLLIN:
                     buf = b''
-                    while True:
+                    
+                    while poller.poll():
                         chunk = sock.recv(2048)
-                        if not chunk:
-                            break
                         buf += chunk
+
                     # logger.debug(f'net_recv: {buf}')
                     
                     #TODO: handle invalid response
@@ -505,10 +505,8 @@ class Executor:
                 
                 if event & select.POLLIN:
                     buf = b''
-                    while True:
+                    while poller.poll():
                         chunk, _ = sock.recvfrom(2048)
-                        if not chunk:
-                            break
                         buf += chunk
                     if len(buf) == 0:
                         return 'RCLOSED', None
