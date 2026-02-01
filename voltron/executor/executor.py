@@ -257,10 +257,13 @@ class Executor:
         sock.close()
         
         # close process
-        if proc.poll() is None:
-            os.killpg(proc.pid, signal.SIGTERM)
-            returncode = proc.wait()
-            logger.debug(f'sut returncode: {returncode}')
+        try:
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGTERM)
+                returncode = proc.wait(timeout=0.5)
+                logger.debug(f'sut returncode: {returncode}')
+        except Exception as err:
+            logger.debug(f'proc close err: {err}')
             
         if clean.poll() is None:
             os.killpg(clean.pid, signal.SIGTERM)
