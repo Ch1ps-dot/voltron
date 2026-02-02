@@ -254,7 +254,10 @@ class Executor:
             self.analyzer.path_num = self.analyzer.path_num + 1
 
         # close socket
-        sock.close()
+        try:
+            sock.close()
+        except Exception as e:
+            logger.debug(f'socket close error: {e}')
         
         # close process
         try:
@@ -276,6 +279,7 @@ class Executor:
                 # no die, just kill
                 time.sleep(0.1)
                 os.killpg(proc.pid, signal.SIGKILL)
+                logger.debug(f'try to kill: {proc.pid}')
             except Exception as e:
                 # sub-subprocess die out
                 analyzer.sut_proc = None
