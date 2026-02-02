@@ -417,29 +417,28 @@ class AsyncProducer:
         self,
         message
     ):
+        res_info = json.dumps(list(self.rfcp.res_doc))
         old_code = ''
-        old_p_name = f'id{machine.id}.py'
-        old_p_path = self.generator_path / old_p_name
+        old_p_name = f'{self.parsers[-1].name}.py'
+        old_p_path = self.parser_path / old_p_name
         with open(old_p_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
                 
         while(True):
             try:
                 # generate input generator and save it
-                pkt_parser_code = await self.chater.llm_generator_evolve(
-                    code=old_code,
+                pkt_parser_code = await self.chater.llm_parser_evolve(
+                    old_code=old_code,
                     pro_name=self.rfcp.pro_name,
-                    msg_type=msg_type,
-                    trace= '\n'.join(trace_list),
-                    info=doc_info
+                    res_info=res_info,
+                    message=message,
                 )
                 
                 # test generated code
-                compile(pkt_parser_code, '<string>', 'exec')
-                return pkt_parser_code
                 with analyzer.lock:
                     analyzer.finished += 1
-                return msg_type, input_code
+                compile(pkt_parser_code, '<string>', 'exec')
+                return pkt_parser_code
             except Exception as e:
                 logger.debug(f'Producer: generate error {e}')
 
@@ -451,38 +450,33 @@ class AsyncProducer:
         """
         
         with analyzer.lock:
-            analyzer.set_progress('evolve', 'parser evolve', len(self.req_types))
-            
-        doc_info = ''
-        with open(self.info_path, 'r', encoding='utf-8') as f:
-            doc_info = f.read()
+            analyzer.add_progress_bar('parser evolve', 1)
         
         # produce new generator
-        results = asyncio.run(self._parser_evo_one(doc_info, machine))
-        for parser_code in results:
-            par_dir = self.parser_path / f'{msg_type}'
-            if not par_dir.is_dir():
-                par_dir.mkdir()
+        parser_code = asyncio.run(self._parser_evo_one(message))
+        
+        par_dir = self.parser_path
+        if not par_dir.is_dir():
+            par_dir.mkdir()
+        
+        # save generator
+        cur_id = len(self.parsers)
+        par_path = par_dir / f'id{cur_id}.py'
+        with open(par_path, 'w', encoding='utf-8') as f:
+            f.write(parser_code)
+            # construct and save information for new generator
             
-            # save generator
-            cur_id = len(self.parsers)
-            par_path = par_dir / f'id{cur_id}.py'
-            with open(par_path, 'w', encoding='utf-8') as f:
-                f.write(input_code)
-                # construct and save information for new generator
-                
-                old_name = f'id{machine.id}'
-                new_name = f'id{cur_id}'
-                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(par_path.resolve())}
-                self.generators.setdefault(msg_type, [])
-                self.generators[msg_type].append(Generator(**info))
+            old_name = self.parsers[-1].name
+            new_name = f'id{cur_id}'
+            info: dict = {'evolved_from': old_name, 'name': new_name}
+            self.parsers.append(Parser(**info))
                 
         # save the information of new generator to file   
-        with open(self.generator_info_path, 'w', encoding='utf-8') as f:
-            json.dump(self.generator_info(), f)
+        with open(self.parser_info_path, 'w', encoding='utf-8') as f:
+            json.dump(self.parser_info(), f)
         
         with analyzer.lock:
-            analyzer.clean_progress()
+            analyzer.delete_progress_bar('parser evolve')
         logger.debug("[Producer]: finish generator generation")
 
     def generator_info(

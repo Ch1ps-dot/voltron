@@ -36,8 +36,8 @@ class Mapper:
         
         self.suits = Suite(self.generators)
         
-        self.cur_parser: Parser
-        self.equip_parser(self.parsers[-1])
+        self.cur_parser: Parser  = self.equip_parser()
+        
         
         self.message_pool: dict[str, dict[str, bytes]] = {} # store actual message
         
@@ -62,10 +62,17 @@ class Mapper:
         return self.ms_path / m.msg_type / f'{m.name}.py'
         
     def equip_parser(
+        self
+    ) -> Parser:
+        return self.parsers[-1]
+    
+    def update_parser(
         self,
-        p: Parser
-    ) -> None:
-        self.cur_parser = p
+        message: bytes
+    ) -> Parser:
+        self.producer.parser_evo(message)
+        self.cur_parser = self.equip_parser()
+        return self.cur_parser
         
     def select_generators(
         self,

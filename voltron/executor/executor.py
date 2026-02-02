@@ -491,7 +491,16 @@ class Executor:
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
-                        resp_code: str = self.parser_func(buf)
+                        resp_code = ''
+                        for i in range(5):
+                            resp_code: str = self.parser_func(buf)
+                            if resp_code == '':
+                                new_parser = self.mapper.update_parser(buf)
+                                self.load_parser(new_parser)
+                                logger.debug('Update Parser')
+                        if resp_code == '':
+                            logger.debug('Parse Error')
+                            resp_code = 'UNKOWN'
                         
                         # update some analysis data
                         

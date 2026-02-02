@@ -47,6 +47,7 @@ class Analyzer:
         self.progress_desc = ''
         self.total: int = 0
         self.finished: int = 0
+        self.progress_bar: dict = {}
         
         self.iter = 0 # fuzzer generation iteration
         
@@ -185,6 +186,26 @@ class Analyzer:
         self.progress_desc = desc
         self.total = total
         self.finished = 0
+        
+    def add_progress_bar(
+        self,
+        desc: str,
+        total: int
+    ):
+        self.progress_bar[desc] = {0, total}
+        
+    def update_progress_bar(
+        self,
+        desc: str,
+        inc: int
+    ):
+        self.progress_bar[desc][0] += inc
+        
+    def delete_progress_bar(
+        self,
+        desc: str
+    ):
+        self.progress_bar.pop(desc)
         
 analyzer = Analyzer()
     
