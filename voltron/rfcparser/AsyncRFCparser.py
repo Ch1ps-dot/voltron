@@ -52,7 +52,7 @@ class AsyncRFCParser:
             self.ir_path.mkdir()
 
         self.poss_res: dict[str, str] = {}
-        self.req_dep_map: dict[str, dict] = {} # dependency between requests
+        self.req_dep_map: dict[str, dict[str, dict]] = {} # dependency between requests
 
         self.req_ir = None
         self.res_ir = None
@@ -417,11 +417,12 @@ class AsyncRFCParser:
 
             results = await tqdm_asyncio.gather(*tasks, desc='dependency')
 
-            for pair, relation in results:
-                self.req_dep_map[pair] = relation
+            for last_req, cur_req, relation in results:
+                self.req_dep_map[cur_req].setdefault(last_req, {})
+                self.req_dep_map[cur_req][last_req] = relation
 
             with open(req_dep_path, 'w') as f:
-                    json.dump(self.req_dep_map, f)
+                json.dump(self.req_dep_map, f)
         
 
     async def _state_dependency_one(
@@ -443,7 +444,7 @@ class AsyncRFCParser:
                         rfc_content=''.join([' '.join(item[0]) for item in results])
                     )
                     relation = json.loads(ans_str)
-                    return f'{last_req}/{cur_req}', relation
+                    return last_req, cur_req, relation
                 except Exception as e:
                     logger.debug(f'RFCParser: dependency failure {e}')
 

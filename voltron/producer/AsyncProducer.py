@@ -63,7 +63,7 @@ class AsyncProducer:
         # types of symbols
         self.req_types: set[str] = self.rfcp.req_types
         self.res_types: set[str] = self.rfcp.res_types
-        self.req_dep = self.rfcp.req_dep_map
+        self.req_dep: dict[str, dict[str, dict]] = self.rfcp.req_dep_map
         
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
@@ -188,6 +188,10 @@ class AsyncProducer:
             
         # extract state trace of request pair which has dependency
         trace_list = []
+        for cur_req, last_req_dict in self.req_dep.items():
+            for last_req, relation in last_req_dict.items():
+                if relation['request_dependency'] == 'dependent':
+                    trace_list.append(machine.get_relation(last_req, cur_req))
         for pair in self.req_dep.keys():
             last_request = pair.split('/')[0]
             current_request = pair.split('/')[1]
