@@ -93,7 +93,14 @@ class Havoc:
             req_seq = [target_req]
             cur_req = target_req
             while True:
-                if self.req_dep[]
+                if cur_req not in self.req_dep.keys() or cur_req in req_seq:
+                    break
+                last_dict: dict[str, dict] = self.req_dep[cur_req]
+                last_req = random.choice(list(last_dict.keys()))
+                req_seq = [last_req] + req_seq
+                cur_req = last_req
+            ms = self.mapper.select_mutators(req_seq)
+            ms = [(f'{msg_type}', data) for msg_type, data in ms]
         return ms
     
     def analyze_cons(
