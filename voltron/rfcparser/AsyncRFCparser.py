@@ -419,8 +419,8 @@ class AsyncRFCParser:
 
             for last_req, cur_req, relation in results:
                 if relation['request_dependency'] == 'dependent':
-                    self.req_dep_map[cur_req].setdefault(last_req, {})
-                    self.req_dep_map[cur_req][last_req] = relation
+                    cur_dict = self.req_dep_map.setdefault(cur_req, {})
+                    cur_dict.setdefault(last_req, relation)
 
             with open(req_dep_path, 'w') as f:
                 json.dump(self.req_dep_map, f)
