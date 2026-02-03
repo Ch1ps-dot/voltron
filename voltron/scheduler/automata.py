@@ -54,12 +54,12 @@ class MealyMachine:
         last_request,
         current_request
     ):
-        ans = []
+        ans = set()
         for s1 in self.states:
             s2 = self.delta[(s1, last_request)]
             out1 = self.output[(s1, last_request)]
             out2 = self.output[(s2, current_request)]
-            ans.append(f'( {last_request} / {out1} )->( {current_request} / {out2} )')
+            ans.add(f'( {last_request} / {out1} )->( {current_request} / {out2} )')
         return '\n'.join(ans)
     
     

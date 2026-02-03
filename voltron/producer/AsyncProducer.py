@@ -187,16 +187,16 @@ class AsyncProducer:
             old_code = f.read()
             
         # extract state trace of request pair which has dependency
-        trace_list = []
+        trace_list = set()
         for cur_req, last_req_dict in self.req_dep.items():
             for last_req, relation in last_req_dict.items():
                 if relation['request_dependency'] == 'dependent':
-                    trace_list.append(machine.get_relation(last_req, cur_req))
-        for pair in self.req_dep.keys():
-            last_request = pair.split('/')[0]
-            current_request = pair.split('/')[1]
-            if msg_type == last_request and self.req_dep[pair]['request_dependency'] == 'dependent':
-                trace_list.append(machine.get_relation(last_request, current_request))
+                    trace_list.add(machine.get_relation(last_req, cur_req))
+        # for pair in self.req_dep.keys():
+        #     last_request = pair.split('/')[0]
+        #     current_request = pair.split('/')[1]
+        #     if msg_type == last_request and self.req_dep[pair]['request_dependency'] == 'dependent':
+        #         trace_list.add(machine.get_relation(last_request, current_request))
                 
         async with sem:
             while(True):
