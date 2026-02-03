@@ -28,6 +28,7 @@ class Mapper:
         
         self.request_types: set[str] = producer.req_types
         self.response_types: set[str] = producer.res_types
+        self.req_dep: dict[str, dict[str, dict]] = producer.req_dep
         
         self.generators: dict[str, list[Generator]] = producer.generators
         self.mutators: dict[str, list[Generator]] = producer.mutators

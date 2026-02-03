@@ -23,9 +23,11 @@ class Havoc:
         self.mapper = mapper
         self.exe = exe
         self.alphabet = list(mapper.request_types)
+        self.req_dep: dict[str, dict[str, dict]] = mapper.req_dep
+        
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
         self.methods = ['cat', 'inter']
-        self.mutator_mode = ['new', 'generic']
+        self.mutator_mode = ['new', 'generic', 'dependent']
         self.prefix_mode = ['new', 'generic']
         if machine:
             self.machine = machine
@@ -85,6 +87,13 @@ class Havoc:
                 a = self.rand.choice(self.useful_msg)
                 ms.append(a)
             ms = [(f'{msg_type}', data) for msg_type, data in ms]
+            
+        elif mode == 'dependent':
+            target_req = self.rand.choice(self.alphabet)
+            req_seq = [target_req]
+            cur_req = target_req
+            while True:
+                if self.req_dep[]
         return ms
     
     def analyze_cons(
