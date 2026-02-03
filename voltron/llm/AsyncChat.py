@@ -156,7 +156,8 @@ class AsyncChater:
             msg_type: str,
             code: str,
             info: str,
-            trace: str
+            trace: str,
+            related_code: str
     ) -> str:
         """Repair teh python code
 
@@ -169,7 +170,8 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_generator_evolve
         # logger.debug(trace)
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, trace=trace)
+        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, trace=trace, related_code=related_code)
+        logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_evolve"

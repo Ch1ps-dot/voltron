@@ -16,15 +16,15 @@ You will be given:
    $info
 
    - The SUT information above may include:
-    - configuration file of SUT
-    - real request messages capured in communication.
     - settings of client or server
 * **Observed trace of request and server response**
    $trace
    - Each trace element reflects a semantic transition, e.g.
       (AAA / 888) → (BBB / 666)
       meaning a AAA request triggered a 888 response, followed by a PASS request that triggered a 666 response.
-      
+
+* **Generated Program for other related request message type**
+   $related_code
 ---
 
 ### **Your Task**

@@ -187,11 +187,14 @@ class AsyncProducer:
             old_code = f.read()
             
         # extract state trace of request pair which has dependency
-        trace_list = set()
-        for cur_req, last_req_dict in self.req_dep.items():
-            for last_req, relation in last_req_dict.items():
-                if relation['request_dependency'] == 'dependent':
-                    trace_list.add(machine.get_relation(last_req, cur_req))
+        code_dep: list[str] = []
+        trace_list: set[str] = set()
+        for last_req, relation in self.req_dep[msg_type].items():
+            if relation['request_dependency'] == 'dependent':
+                trace_list.add(machine.get_relation(last_req, msg_type))
+                code_dep_path = self.generator_path / last_req / old_g_name
+                with open(code_dep_path, 'r', encoding='utf-8') as f:
+                    code_dep.append(f.read())
         # for pair in self.req_dep.keys():
         #     last_request = pair.split('/')[0]
         #     current_request = pair.split('/')[1]
@@ -207,7 +210,8 @@ class AsyncProducer:
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
                         trace= '\n'.join(trace_list),
-                        info=doc_info
+                        info=doc_info,
+                        related_code='\n'.join(code_dep)
                     )
                     
                     # test generated code
