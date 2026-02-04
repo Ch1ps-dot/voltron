@@ -50,10 +50,14 @@ class Havoc:
     def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
-        mode = self.rand.choice(self.prefix_mode)
+        mode = ''
+        if len(self.useful_seq) == 0:
+            mode = 'new'
+        else:
+            mode = self.rand.choice(self.prefix_mode)
         gs = []
         
-        if mode == 'new' or len(self.useful_seq) == 0:
+        if mode == 'new':
             p = self.rand.choice(self.S)
             w = list(p)
             gs = self.mapper.select_generators(w)
@@ -89,8 +93,13 @@ class Havoc:
     ) -> list[tuple[str, bytes]]:
         scope = self.rand.randint(1, 5)
         ms = []
-        mode = self.rand.choice(self.mutator_mode)
-        if mode == 'new' or len(self.useful_msg) == 0:
+        mode = ''
+        if len(self.useful_msg) == 0:
+            mode = 'new'
+        else:
+            mode = self.rand.choice(self.prefix_mode)
+            
+        if mode == 'new':
             req_seq = []
             for i in range(scope):
                 a = self.rand.choice(self.alphabet)
@@ -124,7 +133,7 @@ class Havoc:
                     a = self.rand.choice(self.useful_msg)
                     ms.append(a)
                     ms = [(f'{msg_type}', data) for msg_type, data in ms]
-        logger.debug(f'select prefix[{mode}]: {'/'.join([m[0] for m in ms])}')
+        logger.debug(f'select mutators[{mode}]: {'/'.join([m[0] for m in ms])}')
         return ms
     
     def analyze_cons(
@@ -143,7 +152,6 @@ class Havoc:
                 self.unique_resp.add(res)
                 self.useful_msg.append((res, cons.content[i][0]))
                 seq.append((res, cons.content[i][0]))
-            
             
             if req == '-':
                 continue
