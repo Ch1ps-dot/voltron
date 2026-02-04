@@ -304,7 +304,7 @@ class AsyncProducer:
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
                         info=doc_info,
-                        poss_response='\n'.join(self.poss_response),
+                        poss_response='\n'.join(self.poss_response[msg_type]),
                         trace='\n'.join(req_res[msg_type])
                     )
                     

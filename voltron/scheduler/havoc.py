@@ -97,7 +97,7 @@ class Havoc:
         if len(self.useful_msg) == 0:
             mode = 'new'
         else:
-            mode = self.rand.choice(self.prefix_mode)
+            mode = self.rand.choice(self.mutator_mode)
             
         if mode == 'new':
             req_seq = []
@@ -105,13 +105,11 @@ class Havoc:
                 a = self.rand.choice(self.alphabet)
                 req_seq.append(a)
             ms = self.mapper.select_mutators(req_seq)
-            ms = [(f'{msg_type}', data) for msg_type, data in ms]
                 
         elif mode == 'generic':
             for i in range(scope):
                 a = self.rand.choice(self.useful_msg)
                 ms.append(a)
-            ms = [(f'{msg_type}', data) for msg_type, data in ms]
             
         elif mode == 'dependent':
             if len(self.dep_alphabet) > 0:
@@ -127,12 +125,11 @@ class Havoc:
                     last_req = self.rand.choice(list(last_dict.keys()))
                     cur_req = last_req
                 ms = self.mapper.select_mutators(req_seq)
-                ms = [(f'{msg_type}', data) for msg_type, data in ms]
             else:
                 for i in range(scope):
                     a = self.rand.choice(self.useful_msg)
                     ms.append(a)
-                    ms = [(f'{msg_type}', data) for msg_type, data in ms]
+                    
         logger.debug(f'select mutators[{mode}]: {'/'.join([m[0] for m in ms])}')
         return ms
     
