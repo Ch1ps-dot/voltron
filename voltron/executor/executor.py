@@ -360,6 +360,7 @@ class Executor:
                 logger.debug(f"Setup Socket Failure {e}. Connect to {self.host}:{self.port}")
                 return None
             sock.setblocking(False)
+            sock.settimeout(10)
             return sock
 
     def net_send(
