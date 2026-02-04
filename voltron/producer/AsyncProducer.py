@@ -189,8 +189,8 @@ class AsyncProducer:
         # extract state trace of request pair which has dependency
         code_dep: list[str] = []
         trace_list: set[str] = set()
-        for last_req, relation in self.req_dep[msg_type].items():
-            if relation['request_dependency'] == 'dependent':
+        if msg_type in self.req_dep.keys():
+            for last_req, relation in self.req_dep[msg_type].items():
                 trace_list.add(machine.get_relation(last_req, msg_type))
                 code_dep_path = self.generator_path / last_req / old_g_name
                 with open(code_dep_path, 'r', encoding='utf-8') as f:
