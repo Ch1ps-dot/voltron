@@ -94,7 +94,7 @@ class Havoc:
                 cur_req = self.rand.choice(self.dep_alphabet)
                 req_seq = []
                 while True:
-                    if cur_req in req_seq:
+                    if cur_req in req_seq or cur_req not in self.dep_alphabet:
                         break
                     last_dict: dict[str, dict] = self.req_dep[cur_req]
                     last_req = self.rand.choice(list(last_dict.keys()))
