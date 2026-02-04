@@ -14,9 +14,9 @@ You will be given:
 ### **Message type / message name**: 
   $msg_type
 ### **Previous Generated Program**: 
-  ```
+  
   $code
-  ```
+  
 ### **SUT (Server Under Test) Information**:
   `$info`
 
