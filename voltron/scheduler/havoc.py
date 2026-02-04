@@ -24,6 +24,7 @@ class Havoc:
         self.exe = exe
         self.alphabet = list(mapper.request_types)
         self.req_dep: dict[str, dict[str, dict]] = mapper.req_dep
+        self.dep_alphabet = list(self.req_dep.keys())
         
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
         self.methods = ['cat', 'inter']
@@ -89,17 +90,22 @@ class Havoc:
             ms = [(f'{msg_type}', data) for msg_type, data in ms]
             
         elif mode == 'dependent':
-            target_req = self.rand.choice(self.alphabet)
-            req_seq = [target_req]
-            cur_req = target_req
-            while True:
-                if cur_req not in self.req_dep.keys() or cur_req in req_seq:
-                    break
-                last_dict: dict[str, dict] = self.req_dep[cur_req]
-                last_req = random.choice(list(last_dict.keys()))
-                req_seq = [last_req] + req_seq
-                cur_req = last_req
-            ms = self.mapper.select_mutators(req_seq)
+            if len(self.dep_alphabet) > 0:
+                target_req = self.rand.choice(self.dep_alphabet)
+                req_seq = [target_req]
+                cur_req = target_req
+                while True:
+                    if cur_req not in self.req_dep.keys() or cur_req in req_seq:
+                        break
+                    last_dict: dict[str, dict] = self.req_dep[cur_req]
+                    last_req = random.choice(list(last_dict.keys()))
+                    req_seq = [last_req] + req_seq
+                    cur_req = last_req
+                ms = self.mapper.select_mutators(req_seq)
+            else:
+                for i in range(scope):
+                    a = self.rand.choice(self.useful_msg)
+                    ms.append(a)
             ms = [(f'{msg_type}', data) for msg_type, data in ms]
         return ms
     
