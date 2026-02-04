@@ -95,10 +95,12 @@ class Havoc:
                 req_seq = []
                 while True:
                     if cur_req in req_seq or cur_req not in self.dep_alphabet:
+                        req_seq = [cur_req] + req_seq
                         break
+                    req_seq = [cur_req] + req_seq
+                    
                     last_dict: dict[str, dict] = self.req_dep[cur_req]
                     last_req = self.rand.choice(list(last_dict.keys()))
-                    req_seq = [cur_req] + req_seq
                     cur_req = last_req
                 ms = self.mapper.select_mutators(req_seq)
                 ms = [(f'^{msg_type}', data) for msg_type, data in ms]
