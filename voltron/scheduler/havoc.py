@@ -157,10 +157,10 @@ class Havoc:
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
             if cons != None:
                 self.analyze_cons(cons)
-                analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
+                analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq]) + f'({method})'
                 analyzer.recv = '/'.join(cons.res_seq)
-                logger.debug(f'sent -> {analyzer.sent}')
-                logger.debug(f'recv <- {analyzer.recv}')
+                logger.debug(f'sent({method}) -> {analyzer.sent}')
+                logger.debug(f'recv({method}) <- {analyzer.recv}')
             else:
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = 'None'
