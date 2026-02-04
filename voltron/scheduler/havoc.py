@@ -157,9 +157,7 @@ class Havoc:
                         seq.append((cons.req_seq[j], cons.content[j][0]))
                 self.useful_seq.append(seq)
             
-            if req == '-':
-                continue
-            else:
+            if req != '-':
                 map = self.req_res.setdefault(req, set())
                 map.add(res)
         
