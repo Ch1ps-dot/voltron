@@ -174,14 +174,14 @@ def make_progress_panel():
             'recv': analyzer.recv,
         }
         for k, v in analyzer.progress_bar:
-            data[k] = str(v)
+            data[k] = v
             
         table = Table(title="Progress", show_header=False, box=None, expand=True, show_lines=True)
         table.add_column(justify='left')
         table.add_column(justify='right')
         
         for k, v in data.items():
-            table.add_row(k, f'{str(v[0])} / {str(v[1])}')
+            table.add_row(k, v)
         
         progress_panel = Panel(
             table,
