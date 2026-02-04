@@ -27,9 +27,9 @@ class Havoc:
         self.dep_alphabet = list(self.req_dep.keys())
         
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
-        self.methods = ['cat', 'inter']
+        self.methods = ['cat', 'int']
         self.mutator_mode = ['new', 'generic', 'dependent']
-        self.prefix_mode = ['new', 'generic']
+        self.prefix_mode = ['new', 'generic', 'dependent']
         if machine:
             self.machine = machine
             self.table = machine.table
@@ -161,7 +161,7 @@ class Havoc:
             method = self.rand.choice(self.methods)
             if (method == 'cat'):
                 req_seq = prefix + ms + suffix
-            elif (method == 'inter'):
+            elif (method == 'int'):
                 len_p = len(prefix)
                 len_m = len(ms)
                 max_len = max(len_p, len_m)
