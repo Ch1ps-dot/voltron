@@ -118,7 +118,7 @@ class AsyncChater:
     ):
         tmp = self.pmp._tem_ir_repair
         pmp = tmp.substitute(ir=ir, error=error)
-        logger.debug(pmp)
+        # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "ir_repair"
@@ -169,9 +169,9 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_generator_evolve
-        # logger.debug(trace)
+
         pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, trace=trace, related_code=related_code)
-        logger.debug(pmp)
+        # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_evolve"
@@ -196,7 +196,7 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_parser_evolve
-        # logger.debug(trace)
+
         pmp = tmp.substitute(pro_name=pro_name, res_info=res_info, original_code=old_code, message=message)
         ans = await self.chat_llm(
             prompt=pmp,
@@ -224,8 +224,9 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_mutator_evolve
-        # logger.debug(trace)
+        
         pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, poss_response=poss_response, trace=trace)
+        logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "mutator_evolve"
