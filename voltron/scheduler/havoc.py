@@ -91,9 +91,8 @@ class Havoc:
             
         elif mode == 'dependent':
             if len(self.dep_alphabet) > 0:
-                target_req = self.rand.choice(self.dep_alphabet)
+                cur_req = self.rand.choice(self.dep_alphabet)
                 req_seq = []
-                cur_req = target_req
                 while True:
                     if cur_req in req_seq:
                         break
