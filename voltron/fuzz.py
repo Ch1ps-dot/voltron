@@ -311,15 +311,20 @@ class Fuzzer:
                 sys.exit(1)
 
     def handle_normal_fuzzer_exit(
-            self,
-            signal_num, 
-            frame
+        self,
+        signal_num, 
+        frame
     ):
         # Handle normal exit of fuzzer Ctrl+C
         if analyzer.sut_proc != None:
             os.killpg(analyzer.sut_proc.pid, signal.SIGKILL)
+            
         logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
-        logger.debug('\n'.join(traceback.format_stack(frame)))
+        for thread in threading.enumerate():
+            if thread.ident:
+                fra = sys._current_frames().get(thread.ident)
+                logger.debug('\n'.join(traceback.format_stack(fra)))
+        
         self.stop_event.set()
         with analyzer.lock:
             analyzer.collect_results()
