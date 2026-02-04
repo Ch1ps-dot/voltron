@@ -98,7 +98,7 @@ class Havoc:
                     if cur_req not in self.req_dep.keys() or cur_req in req_seq:
                         break
                     last_dict: dict[str, dict] = self.req_dep[cur_req]
-                    last_req = random.choice(list(last_dict.keys()))
+                    last_req = self.rand.choice(list(last_dict.keys()))
                     req_seq = [last_req] + req_seq
                     cur_req = last_req
                 ms = self.mapper.select_mutators(req_seq)
