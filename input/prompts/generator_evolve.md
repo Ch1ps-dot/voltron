@@ -4,30 +4,46 @@ Your task is to **repair and regenerate Python code that constructs a protocol m
 
 ---
 
-### **Input**
+## **Input**
 
 You will be given:
 
-* **Protocol name**: $pro_name
-* **Message type / message name**: $msg_type
-* **Previous Generated Program**: $code
-  - This program may contain incorrect field values, invalid ordering, missing constraints, or violations of server expectations.
-* **SUT (Server Under Test) Information**: 
+### **Protocol name**: 
+   $pro_name
+### **Message type / message name**: 
+   $msg_type
+### **Previous Generated Program**:
+
+   - This program may contain incorrect field values, invalid ordering, missing constraints, or violations of server expectations.
+
+   ```
+   $code
+   ```
+  
+### **SUT (Server Under Test) Information**: 
+
+   - The SUT information above may include settings of client or server
+
    $info
 
-   - The SUT information above may include:
-    - settings of client or server
-* **Observed trace of request and server response**
-   $trace
+   
+
+### **Observed trace of request and server response**
+
    - Each trace element reflects a semantic transition, e.g.
       (AAA / 888) → (BBB / 666)
       meaning a AAA request triggered a 888 response, followed by a PASS request that triggered a 666 response.
 
-* **Generated Program for other related request message type**
+   $trace
+   
+
+### **Generated program of semantic related request message**
+   ```
    $related_code
+   ```
 ---
 
-### **Your Task**
+## **Your Task**
 
 1. **Analyze the previously generated code and observed state transitions**
    - Identify inconsistencies with the observed server behavior
@@ -57,7 +73,7 @@ You will be given:
 
 ---
 
-### **Code Constraints**
+## **Code Constraints**
 
 * Use **Python only**
 * Use **only built-in libraries** (`random`, `string`, `struct`, etc.)
@@ -68,7 +84,7 @@ You will be given:
 
 ---
 
-### **Function Prototype (Must Match Exactly)**
+## **Function Prototype (Must Match Exactly)**
 
 def generate_${msg_type}():
     """Generate one $msg_type message for the $pro_name protocol.
@@ -83,7 +99,7 @@ def generate_${msg_type}():
     
     return message
 
-### **Output Constraints**
+## **Output Constraints**
 
 Only output the completed Python function code
 
