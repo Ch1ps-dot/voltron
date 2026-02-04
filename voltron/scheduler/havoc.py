@@ -151,7 +151,7 @@ class Havoc:
             if res not in self.unique_resp:
                 self.unique_resp.add(res)
                 self.useful_msg.append((res, cons.content[i][0]))
-                seq.append((res, cons.content[i][0]))
+                seq.append((req, cons.content[i][0]))
             
             if req == '-':
                 continue
@@ -203,7 +203,6 @@ class Havoc:
             else:
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = 'None'
-            
             
             cur_trans_nums = analyzer.resp_trans_num()
             cur_resp_num = analyzer.res_types_num()

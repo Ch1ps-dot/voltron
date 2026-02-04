@@ -319,6 +319,7 @@ class Fuzzer:
         if analyzer.sut_proc != None:
             os.killpg(analyzer.sut_proc.pid, signal.SIGKILL)
         logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
+        logger.debug(traceback.format_exc())
         self.stop_event.set()
         with analyzer.lock:
             analyzer.collect_results()
