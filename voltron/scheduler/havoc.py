@@ -150,15 +150,18 @@ class Havoc:
                 break
             if res not in self.unique_resp:
                 self.unique_resp.add(res)
-                self.useful_msg.append((res, cons.content[i][0]))
-                seq.append((req, cons.content[i][0]))
+                self.useful_msg.append((req, cons.content[i][0]))
+                seq = []
+                for j in range(i+1):
+                    if cons.req_seq[j] != '-':
+                        seq.append((cons.req_seq[j], cons.content[j][0]))
+                self.useful_seq.append(seq)
             
             if req == '-':
                 continue
             else:
                 map = self.req_res.setdefault(req, set())
                 map.add(res)
-        self.useful_seq.append(seq)
         
     def run(
         self,
