@@ -74,6 +74,7 @@ You will be given:
   * uses **randomized values and boundary-covering mutations** for key fields
   * returns a `bytes` object
   * **Do not raise exceptions during generation**
+  * The program logic should not be overly complex to avoid excessively long execution times.
 
 ---
 
