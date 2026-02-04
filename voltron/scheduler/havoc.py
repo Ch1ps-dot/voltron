@@ -58,6 +58,19 @@ class Havoc:
            
         elif mode == 'generic':
             gs = self.rand.choice(self.useful_seq)
+            
+        elif mode == 'dependent':
+            if len(self.dep_alphabet) > 0:
+                cur_req = self.rand.choice(self.dep_alphabet)
+                req_seq = []
+                while True:
+                    if cur_req in req_seq or cur_req not in self.dep_alphabet:
+                        req_seq = [cur_req] + req_seq
+                        break
+                    req_seq = [cur_req] + req_seq
+                gs = self.mapper.select_generators(req_seq)
+            else:
+                gs = self.rand.choice(self.useful_seq)
 
         return gs
     
@@ -133,8 +146,10 @@ class Havoc:
     ):
         logger.debug(self.S)
         logger.debug(self.alphabet)
-        analyzer.set_progress('havoc', 'havoc fuzz', times)
-        for i in range(times):
+        analyzer.set_progress('havoc', 'fuzz energy', times)
+        energy = times
+        analyzer.finished = energy
+        while energy >= 0:
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
             
@@ -166,10 +181,17 @@ class Havoc:
             else:
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = 'None'
-            analyzer.finished += 1
+            
             
             cur_trans_nums = analyzer.resp_trans_num()
             cur_resp_num = analyzer.res_types_num()
+            if cur_trans_nums <= last_trans_nums:
+                energy -= 1
+                analyzer.finished -= 1
+            else:
+                energy += 1
+                analyzer.finished += 1
+                
             if flag and self.is_interesting(cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num) and cons != None:
                 cons.save_cons()
         analyzer.clean_progress()
