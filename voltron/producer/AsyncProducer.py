@@ -64,6 +64,7 @@ class AsyncProducer:
         self.req_types: set[str] = self.rfcp.req_types
         self.res_types: set[str] = self.rfcp.res_types
         self.req_dep: dict[str, dict[str, dict]] = self.rfcp.req_dep_map
+        self.poss_response: dict[str, list[str]] = self.rfcp.poss_res
         
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
@@ -281,10 +282,11 @@ class AsyncProducer:
         logger.debug("[Producer]: finish generator generation")
                 
     async def _generator_mutate_one(
-            self,
-            msg_type: str,
-            doc_info: str,
-            sem
+        self,
+        msg_type: str,
+        doc_info: str,
+        req_res: dict[str, set],
+        sem
     ):
         old_m = self.generators[msg_type][0]
         old_m_path = old_m.path
@@ -301,7 +303,9 @@ class AsyncProducer:
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
                         msg_type=msg_type,
-                        info=doc_info
+                        info=doc_info,
+                        poss_response='\n'.join(self.poss_response),
+                        trace='\n'.join(req_res[msg_type])
                     )
                     
                     # havoc_code = await self.chater.llm_mutator_havoc(
@@ -328,18 +332,20 @@ class AsyncProducer:
 
     async def _generator_mutate_async(
         self,
-        doc_info: str
+        doc_info: str,
+        req_res
     ) -> list[tuple[str, str]]:
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
-            self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, sem=sem)
+            self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, req_res=req_res, sem=sem)
             for msg_type in self.req_types
         ]
         results = await asyncio.gather(*tasks)
         return results
 
     def generator_mutate(
-        self
+        self,
+        req_res
     ) -> None:
         """Generate and save input generator
         """
@@ -351,7 +357,7 @@ class AsyncProducer:
             doc_info = f.read()
         
         # produce new mutator
-        results = asyncio.run(self._generator_mutate_async(doc_info))
+        results = asyncio.run(self._generator_mutate_async(doc_info, req_res))
         
         # resolve mutator
         for msg_type, mutate_code in results:

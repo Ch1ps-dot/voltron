@@ -258,7 +258,6 @@ class Fuzzer:
                     h_lsit.append(h)
                     self.producer.generator_evo(h)
                     continue
-                
 
             except Exception as e:
                 logger.debug(f'Fuzzer: exit {e}')
@@ -282,8 +281,6 @@ class Fuzzer:
             analyzer.iter = 0
         
         havoc = Havoc(self.mapper, self.exe, hypothesis)
-        if self.mapper.mutators == {}:
-            self.producer.generator_mutate()
         
         while not stop_event.is_set():
             try:
@@ -294,8 +291,8 @@ class Fuzzer:
                 with analyzer.lock:   
                     analyzer.stage = 'havoc fuzzing'
                 
-                havoc.run(250)
-                self.producer.generator_mutate()
+                req_res = havoc.run(250)
+                self.producer.generator_mutate(req_res)
                 pre_resp = analyzer.cur_res_types_cnt.keys()
                 
                 # save the results

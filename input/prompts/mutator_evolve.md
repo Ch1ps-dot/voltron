@@ -1,32 +1,41 @@
 
-You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for triggering server-side error responses and exceptional behaviors**.
+You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for triggering server-side responses and unexceptional behaviors**.
 
-Your task is to **regenerate Python code that mutates key protocol fields using randomized and boundary-covering values**, with the explicit goal of **eliciting protocol-defined error responses or abnormal server behaviors (e.g., 4xx/5xx responses, protocol error codes, or unexpected state transitions)** from the Server Under Test (SUT).
+Your task is to **regenerate Python code that mutates key protocol fields using randomized and boundary-covering values**, with the explicit goal of **eliciting more protocol-defined responses or abnormal server behaviors (e.g., 4xx/5xx responses, protocol error codes, or unexpected state transitions)** from the Server Under Test (SUT).
 
 ---
 
-### **Input**
+## **Input**
 
 You will be given:
 
-* **Protocol name**: `$pro_name`
-* **Message type / message name**: `$msg_type`
-* **Previous Generated Program**: `$code`
-* **SUT (Server Under Test) Information**:
+### **Protocol name**: 
+  $pro_name
+### **Message type / message name**: 
+  $msg_type
+### **Previous Generated Program**: 
+  ```
+  $code
+  ```
+### **SUT (Server Under Test) Information**:
   `$info`
 
   The SUT information may include:
 
   * server/client configuration files
-  * protocol feature flags
-  * authentication or capability settings
-  * known constraints inferred from prior executions
 
+### **Possible response code extracted from RFC documents**
+
+  $poss_response
+
+### **Real response code after sending previous generated messages**
+
+  $trace
 ---
 
-### **Your Task**
+## **Your Task**
 
-#### 1. Analyze the Previous Program and Protocol Structure
+### 1. Analyze the Previous Program and Protocol Structure
 
 * Identify **key semantic fields** in the previous generated code (e.g., method names, identifiers, lengths, URIs, version numbers, authentication fields).
 * Determine which fields:
@@ -35,7 +44,7 @@ You will be given:
   * are mapped to **specific error response codes or exceptional behaviors**
   * are sensitive to boundary values or malformed content
 
-#### 2. Randomize and Mutate Key Fields with Boundary Coverage
+### 2. Randomize and Mutate Key Fields with Boundary Coverage
 
 * Modify the original program so that **critical fields are generated dynamically and randomly**, rather than using fixed constants.
 * Randomization must **intentionally cover boundary and corner cases**, including but not limited to:
@@ -45,26 +54,26 @@ You will be given:
   * empty, missing, or truncated fields
   * minimum, maximum, and off-by-one values for numeric or length-related fields
   * inconsistent cross-field relationships (e.g., mismatched length vs payload, invalid identifiers)
-* The mutations should prioritize **triggering server-side error responses or abnormal behaviors**, rather than client-side exceptions.
+* The mutations should prioritize **triggering more server-side responses or abnormal behaviors**.
 
-#### 3. Error-Oriented Message Generation Strategy
+### 3. Message Generation Strategy
 
 * Prefer generating messages that are:
 
   * **semantically invalid according to the protocol specification**
   * **likely to reach deep server-side validation logic**
-  * **capable of triggering standard error responses** (e.g., 4xx/5xx, protocol error codes, or unexpected state transitions)
+  * **capable of triggering new types of responses**
 * Keep the payload **compact and valid enough to be processed by the SUT**, but invalid in meaning.
 * **Total serialized message length MUST be ≤ 1400 bytes** to ensure successful socket transmission.
 
-#### 4. Generate a Python Function
+### 4. Generate a Python Function
 
 * Produce a single Python function that:
 
   * constructs **one mutated, error-triggering `$msg_type` message**
   * uses **randomized values and boundary-covering mutations** for key fields
   * returns a `bytes` object
-  * does **not raise exceptions during generation**
+  * **Do not raise exceptions during generation**
 
 ---
 

@@ -23,10 +23,7 @@ You will be given:
 ### **SUT (Server Under Test) Information**: 
 
    - The SUT information above may include settings of client or server
-
    $info
-
-   
 
 ### **Observed trace of request and server response**
 
@@ -35,7 +32,6 @@ You will be given:
       meaning a AAA request triggered a 888 response, followed by a PASS request that triggered a 666 response.
 
    $trace
-   
 
 ### **Generated program of semantic related request message**
    ```

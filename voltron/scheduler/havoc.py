@@ -26,6 +26,8 @@ class Havoc:
         self.req_dep: dict[str, dict[str, dict]] = mapper.req_dep
         self.dep_alphabet = list(self.req_dep.keys())
         
+        self.req_res: dict[str, set[str]] = {}
+        
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
         self.methods = ['cat', 'int']
         self.mutator_mode = ['new', 'generic', 'dependent']
@@ -71,7 +73,7 @@ class Havoc:
                 gs = self.mapper.select_generators(req_seq)
             else:
                 gs = self.rand.choice(self.useful_seq)
-
+        logger.debug(f'select prefix[{mode}]: {'/'.join([g[0] for g in gs])}')
         return gs
     
     def select_suffix(
@@ -94,7 +96,7 @@ class Havoc:
                 a = self.rand.choice(self.alphabet)
                 req_seq.append(a)
             ms = self.mapper.select_mutators(req_seq)
-            ms = [(f'{msg_type}*', data) for msg_type, data in ms]
+            ms = [(f'{msg_type}', data) for msg_type, data in ms]
                 
         elif mode == 'generic':
             for i in range(scope):
@@ -116,12 +118,13 @@ class Havoc:
                     last_req = self.rand.choice(list(last_dict.keys()))
                     cur_req = last_req
                 ms = self.mapper.select_mutators(req_seq)
-                ms = [(f'^{msg_type}', data) for msg_type, data in ms]
+                ms = [(f'{msg_type}', data) for msg_type, data in ms]
             else:
                 for i in range(scope):
                     a = self.rand.choice(self.useful_msg)
                     ms.append(a)
                     ms = [(f'{msg_type}', data) for msg_type, data in ms]
+        logger.debug(f'select prefix[{mode}]: {'/'.join([m[0] for m in ms])}')
         return ms
     
     def analyze_cons(
@@ -130,20 +133,29 @@ class Havoc:
     ):
         seq = []
         for i in range(len(cons.res_seq)):
-            if cons.res_seq[i] == '-':
+            req = cons.req_seq[i]
+            res = cons.res_seq[i]
+            if res == '-':
                 continue
-            if cons.res_seq[i] == 'TIMEOUT':
+            if res == 'TIMEOUT':
                 break
-            if cons.res_seq[i] not in self.unique_resp:
-                self.unique_resp.add(cons.res_seq[i])
-                self.useful_msg.append((cons.req_seq[i], cons.content[i][0]))
-                seq.append((cons.req_seq[i], cons.content[i][0]))
+            if res not in self.unique_resp:
+                self.unique_resp.add(res)
+                self.useful_msg.append((res, cons.content[i][0]))
+                seq.append((res, cons.content[i][0]))
+            
+            
+            if req == '-':
+                continue
+            else:
+                map = self.req_res.setdefault(req, set())
+                map.add(res)
         self.useful_seq.append(seq)
         
     def run(
         self,
         times: int
-    ):
+    ) -> dict[str, set[str]]:
         logger.debug(self.S)
         logger.debug(self.alphabet)
         analyzer.set_progress('havoc', 'fuzz energy', times)
@@ -153,8 +165,10 @@ class Havoc:
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
             
+            ms = []
             prefix = self.select_prefix()
-            ms = self.select_mutators()
+            if self.mapper.mutators != {}:
+                ms = self.select_mutators()
             suffix = self.select_suffix()
             req_seq = []
             
@@ -194,7 +208,9 @@ class Havoc:
                 
             if flag and self.is_interesting(cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num) and cons != None:
                 cons.save_cons()
+        
         analyzer.clean_progress()
+        return self.req_res
         
     def is_interesting(
         self,
@@ -205,3 +221,4 @@ class Havoc:
             return True
         else:
             return False
+        

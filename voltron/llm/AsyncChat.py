@@ -210,7 +210,9 @@ class AsyncChater:
             pro_name: str,
             msg_type: str,
             code: str,
-            info: str
+            info: str,
+            poss_response: str,
+            trace: str
     ) -> str:
         """Repair teh python code
 
@@ -223,7 +225,7 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_mutator_evolve
         # logger.debug(trace)
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info)
+        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, poss_response=poss_response, trace=trace)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "mutator_evolve"

@@ -51,7 +51,7 @@ class AsyncRFCParser:
         if not self.ir_path.is_dir():
             self.ir_path.mkdir()
 
-        self.poss_res: dict[str, str] = {}
+        self.poss_res: dict[str, list[str]] = {}
         self.req_dep_map: dict[str, dict[str, dict]] = {} # dependency between requests
 
         self.req_ir = None
@@ -376,7 +376,8 @@ class AsyncRFCParser:
             ]
             results = await tqdm_asyncio.gather(*tasks, desc='poss res')
             for req_type, poss_res in results:
-                self.poss_res[req_type] = poss_res
+                self.poss_res.setdefault(req_type, [])
+                self.poss_res[req_type].append(poss_res)
         with open(poss_res_path, 'w') as f:
                 json.dump(self.poss_res, f)
         logger.debug('RFCParser: finish poss response')
