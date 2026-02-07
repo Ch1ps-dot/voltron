@@ -607,7 +607,7 @@ class Executor:
         """Load rfc parser 
         """
         with open(self.cons_path / "section_tree.pkl", "rb") as f:
-            vons = pickle.load(f)
+            cons = pickle.load(f)
         
     def save_cons(
         self,

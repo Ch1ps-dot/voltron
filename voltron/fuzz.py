@@ -314,7 +314,8 @@ class Fuzzer:
     def replay(
         self,
         input: Path,
-        output: Path
+        output: Path,
+        cov_folder: Path,
     ):
         configs.cov_setup_path =  configs.base_path / 'input' / 'scripts' / 'cov_setup.sh'
         configs.cov_collect_path =  configs.base_path / 'input' / 'scripts' / 'cov_collect.sh'
@@ -331,6 +332,7 @@ class Fuzzer:
                     file_count += 1
             
             analyzer.set_progress('havoc', 'replay', file_count)
+            self.exe.cov_setup(cov_folder, output)
             for cons in cons_seq:
                 req_seq = []
                 for i in range(len(cons.req_seq)):
@@ -343,7 +345,7 @@ class Fuzzer:
                     analyzer.finished += 1
                     
                 if analyzer.finished % 5 == 0:
-                    pass
+                    self.exe.cov_collect(cov_folder, output)
         except Exception as e:
             logger.debug(f'replayer: exit {e}')
             logger.debug(traceback.format_exc())

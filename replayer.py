@@ -1,22 +1,34 @@
 #!/bin/python3
 
 from voltron.fuzz import Fuzzer
+from voltron.configs import configs
 import click, random
 from pathlib import Path
 
 @click.command(help='fuzzer')
 @click.option("-s", "--sut", type=str, required=True, help="server under test")
-@click.option("-i", "--input", type=str, required=True, help="input direcotory")
-@click.option("-o", "--output", type=str, required=True, help="fuzzing time (minute)")
-def main(sut, input, output):
+@click.option("-i", "--input", type=str, required=True, help="testcase input direcotory")
+@click.option("-o", "--output", type=str, required=True, help="cov metric output")
+@click.option("-f", "--cov_file", type=str, required=True, help="input direcotory")
+def main(
+    sut: str, 
+    input: str, 
+    output: str,
+    cov_folder: str
+):
     supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim'}
     if sut in supported_sut:
+        cmdline = ''
+        with open(configs.base_path / 'input' / 'scripts' / sut / 'run.txt', 'r') as f:
+            cmdline = f.read()
         replayer = Fuzzer(
-            target_name=sut
+            target_name=sut,
+            cmdline=cmdline.split(' ')
         )
         replayer.replay(
             input=Path(input),
-            output=Path(output)
+            output=Path(output),
+            cov_folder=Path(cov_folder)
         )
     else:
         print('Unkown Target')
