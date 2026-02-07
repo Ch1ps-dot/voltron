@@ -30,18 +30,5 @@ class Conversation:
     ):
         self.res_seq[-1] = f'{self.res_seq[-1]}/{extra_res}'
         
-    def save_cons(
-        self
-    ):
-        target_folder = configs.results_path / 'testcases'
-        file_count = 0
-        for item in target_folder.iterdir():
-            if item.is_file():
-                file_count += 1
-            
-        with open(target_folder / f'{'-'.join(self.res_seq)}.raw', 'ab') as f:
-            for request, _ in self.content:
-                if request:
-                    f.write(request)
                     
                 

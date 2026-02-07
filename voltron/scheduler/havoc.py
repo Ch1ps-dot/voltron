@@ -206,13 +206,15 @@ class Havoc:
             cur_resp_num = analyzer.res_types_num()
             if cur_trans_nums <= last_trans_nums:
                 energy -= 1
-                analyzer.finished -= 1
+                with analyzer.lock:
+                    analyzer.finished -= 1
             else:
                 energy += 1
-                analyzer.finished += 1
+                with analyzer.lock:
+                    analyzer.finished += 1
                 
             if flag and self.is_interesting(cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num) and cons != None:
-                cons.save_cons()
+                self.exe.save_cons(cons)
         
         analyzer.clean_progress()
         return self.req_res

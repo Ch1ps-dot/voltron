@@ -15,7 +15,8 @@ class Executor:
     def __init__(
             self,
             mapper: Mapper,
-            stop_event:threading.Event,
+            stop_event: threading.Event,
+            cmdline: list[str],
             setup_time_s:float = 0.1,
             send_time_ms:int = 1000,
             recv_time_ms:int = 1000
@@ -24,6 +25,7 @@ class Executor:
         # some attributes for sut
         self.pre_script: Path = configs.pre_script
         self.post_script: Path = configs.post_script
+        self.cmdline: list[str] = cmdline
         self.host = configs.host
         self.port = configs.port
         self.trans_layer = configs.trans_layer
@@ -46,6 +48,38 @@ class Executor:
         self.cons_path = configs.results_path / 'testcases'
         if (not self.cons_path.is_dir()):
             self.cons_path.mkdir()
+            
+    def cov_setup(
+        self,
+        folder: Path,
+        cov_file: Path
+    ):
+        try:
+            proc = subprocess.Popen(
+                [configs.cov_setup_path, str(folder), str(cov_file)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            return proc
+        except Exception as e:
+            logger.debug(f'[SUT Setup Failure]: {e}')
+            return None
+    
+    def cov_collect(
+        self,
+        folder: Path,
+        cov_file: Path
+    ):
+        try:
+            proc = subprocess.Popen(
+                [configs.cov_collect_path, str(folder), str(cov_file)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return proc
+        except Exception as e:
+            logger.debug(f'[SUT Setup Failure]: {e}')
+            return None
 
     def post_exe(
             self
@@ -69,7 +103,7 @@ class Executor:
         if (self.pre_script.is_file()):
             try:
                 proc = subprocess.Popen(
-                    [self.pre_script],
+                    self.cmdline,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
                     preexec_fn=os.setpgrp
@@ -84,7 +118,7 @@ class Executor:
         self,
         msg_seq: list[tuple[str, bytes]],
         poll_wait_ms: int = 5000
-    ) -> Tuple[bool, Conversation | None]:  
+    ) -> Tuple[bool, Conversation | None] :  
         """
         TODO: Deal with interaction
         """
@@ -245,7 +279,7 @@ class Executor:
                     cons.add_state('-', 'CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
-                    cons.save_cons()
+                    self.save_cons(cons)
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
                 break
@@ -564,7 +598,7 @@ class Executor:
         """Load rfc parser 
         """
         with open(self.cons_path / "section_tree.pkl", "rb") as f:
-            pickle.load(f)
+            vons = pickle.load(f)
         
     def save_cons(
             self,
@@ -572,6 +606,23 @@ class Executor:
     ):
         """Use pickle to store section tree instance
         """
-        with open(self.cons_path / "section_tree.pkl", "wb") as f:
+        target_folder = configs.results_path / 'raw_testcases'
+        file_count = 0
+        for item in target_folder.iterdir():
+            if item.is_file():
+                file_count += 1
+                
+        with open(target_folder / f'{'-'.join(cons.res_seq)}.raw', 'ab') as f:
+            for request, response in cons.content:
+                if request:
+                    f.write(request)
+                f.write(b'\n')
+                if response:
+                    f.write(response)
+                    
+        target_folder = configs.results_path / 'replayable_testcases'
+        for item in target_folder.iterdir():
+            if item.is_file():
+                file_count += 1
+        with open(target_folder / f"conversation{file_count}.pkl", "rb") as f:
             pickle.dump(cons, f)
-            logger.debug("Executor: save cons")  

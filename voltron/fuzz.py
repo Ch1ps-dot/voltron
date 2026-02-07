@@ -1,6 +1,8 @@
 from pathlib import Path
 import yaml, time, threading, signal, sys, traceback, pickle, copy, os
 
+from voltron.executor.conversation import Conversation
+
 from voltron.utils.logger import logger
 
 from voltron.llm.AsyncChat import AsyncChater
@@ -25,12 +27,12 @@ from voltron.scheduler.automata import MealyMachine
 class Fuzzer:
     def __init__(
             self, 
-            time_limit_min: int,
-            target_name: str
+            target_name: str,
+            cmdline: list[str]
         ) -> None:
         self.target_name = target_name
-        self.time_limit_s = time_limit_min * 60
-
+        self.cmdline = cmdline
+        
         self.load_configs()
         self.module_init()
         
@@ -64,8 +66,6 @@ class Fuzzer:
         configs.api_key = configs_yaml['llm']['api_key']
         configs.model = configs_yaml['llm']['model']
         configs.async_sem = configs_yaml['llm']['async_sem']
-        
-        configs.time_limit_s = self.time_limit_s
         
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
@@ -117,18 +117,22 @@ class Fuzzer:
         # setup executor
         self.exe = Executor(
             mapper=self.mapper,
+            cmdline=self.cmdline,
             stop_event=self.stop_event
         )
        
         print('Executor: equipment setup')
 
     def fuzz(
-            self,
-            algo: str
+        self,
+        algo: str,
+        time_limit_min: int
     ):
         """Fuzz the target one
         """
         fuzz_loop = None
+        self.time_limit_s = time_limit_min * 60
+        configs.time_limit_s = self.time_limit_s
         
         if algo == 'rand':
             # fuzz_loop = self.rand_fuzz
@@ -281,16 +285,13 @@ class Fuzzer:
             analyzer.iter = 0
         
         havoc = Havoc(self.mapper, self.exe, hypothesis)
-        
+        with analyzer.lock:   
+            analyzer.stage = 'havoc fuzzing'
+            
         while not stop_event.is_set():
             try:
-                # mutate generator
-                with analyzer.lock:   
-                    analyzer.stage = 'fuzzer mutate'
                 # init new learning process with previous model and run fuzzer
-                with analyzer.lock:   
-                    analyzer.stage = 'havoc fuzzing'
-                
+
                 req_res = havoc.run(250)
                 self.producer.generator_mutate(req_res)
                 pre_resp = analyzer.cur_res_types_cnt.keys()
@@ -309,6 +310,43 @@ class Fuzzer:
                 logger.debug('Fuzzer: timeout')
                 stop_event.set()
                 sys.exit(1)
+                
+    def replay(
+        self,
+        input: Path,
+        output: Path
+    ):
+        configs.cov_setup_path =  configs.base_path / 'input' / 'scripts' / 'cov_setup.sh'
+        configs.cov_collect_path =  configs.base_path / 'input' / 'scripts' / 'cov_collect.sh'
+        with analyzer.lock:   
+            analyzer.stage = 'replay'
+        
+        try:
+            cons_seq: list[Conversation] = []
+            for item in input.iterdir():
+                if item.is_file():
+                    with open(item, 'rb') as f:
+                        cons = pickle.load(f)
+                        cons_seq.append(cons)
+                    file_count += 1
+            
+            analyzer.set_progress('havoc', 'replay', file_count)
+            for cons in cons_seq:
+                req_seq = []
+                for i in range(len(cons.req_seq)):
+                    if cons.req_seq[i] == '-':
+                        continue
+                    req_seq.append((cons.req_seq[i], cons.content[0]))
+                flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
+
+                with analyzer.lock:
+                    analyzer.finished += 1
+                    
+                if analyzer.finished % 5 == 0:
+                    pass
+        except Exception as e:
+            logger.debug(f'replayer: exit {e}')
+            logger.debug(traceback.format_exc())
 
     def handle_normal_fuzzer_exit(
         self,
