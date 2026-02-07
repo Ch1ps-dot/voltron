@@ -236,7 +236,8 @@ class Executor:
                         logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
-                        self.save_cons(cons)
+                        stderr_data = proc.communicate()
+                        self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
@@ -252,7 +253,8 @@ class Executor:
                         logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
-                        self.save_cons(cons)
+                        stderr_data = proc.communicate()
+                        self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -285,7 +287,8 @@ class Executor:
                     cons.add_state('-', 'CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
-                    self.save_cons(cons)
+                    self.save_cons(cons, str(stderr_data))
+                    stderr_data = proc.communicate()
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
                 break
@@ -637,5 +640,10 @@ class Executor:
             if item.is_file():
                 file_count += 1
                 
-        with open(target_folder / f"conversation{file_count}.pkl", "wb") as f:
+        with open(target_folder / f"cons{file_count}.pkl", "wb") as f:
             pickle.dump(cons, f)
+            
+        info_file = configs.results_path / 'cons_info'
+        with open(info_file, 'a', encoding='utf-8') as f:
+            f.write('-'.join(cons.res_seq))
+            f.write(info)

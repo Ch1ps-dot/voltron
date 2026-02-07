@@ -9,9 +9,9 @@ import click, random
 @click.option("-t", "--time", type=str, required=True, help="fuzzing time (minute)")
 @click.option("-c", "--cmdline", type=str, required=True, help="fuzzing time (minute)")
 def main(
-    sut, 
-    algorithm, 
-    time, 
+    sut: str, 
+    algorithm: str, 
+    time: str, 
     cmdline: str
 ):
     supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim'}
@@ -22,7 +22,7 @@ def main(
         )
         fuzzer.fuzz(
             algo=algorithm,
-            time_limit_min=time
+            time_limit_min=int(time)
         )
     else:
         print('Unkown Target')
