@@ -217,8 +217,10 @@ class Executor:
                     if return_code:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
+                        logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
+                        self.save_cons(cons)
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -231,8 +233,10 @@ class Executor:
                     if return_code:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
+                        logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
+                        self.save_cons(cons)
                     else:
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
@@ -245,8 +249,10 @@ class Executor:
                     if return_code:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
+                        logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
+                        self.save_cons(cons)
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -601,8 +607,9 @@ class Executor:
             vons = pickle.load(f)
         
     def save_cons(
-            self,
-            cons: Conversation
+        self,
+        cons: Conversation,
+        info: str = ''
     ):
         """Use pickle to store section tree instance
         """
