@@ -636,5 +636,6 @@ class Executor:
         for item in target_folder.iterdir():
             if item.is_file():
                 file_count += 1
-        with open(target_folder / f"conversation{file_count}.pkl", "rb") as f:
+                
+        with open(target_folder / f"conversation{file_count}.pkl", "wb") as f:
             pickle.dump(cons, f)
