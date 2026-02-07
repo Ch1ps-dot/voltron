@@ -629,9 +629,10 @@ class Executor:
                 if response:
                     f.write(response)
         
+        
+        target_folder = configs.results_path / 'replayable_testcases'
         if not target_folder.is_dir():
             target_folder.mkdir()
-        target_folder = configs.results_path / 'replayable_testcases'
         for item in target_folder.iterdir():
             if item.is_file():
                 file_count += 1
