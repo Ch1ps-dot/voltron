@@ -614,6 +614,8 @@ class Executor:
         """Use pickle to store section tree instance
         """
         target_folder = configs.results_path / 'raw_testcases'
+        if not target_folder.is_dir():
+            target_folder.mkdir()
         file_count = 0
         for item in target_folder.iterdir():
             if item.is_file():
@@ -626,7 +628,9 @@ class Executor:
                 f.write(b'\n')
                 if response:
                     f.write(response)
-                    
+        
+        if not target_folder.is_dir():
+            target_folder.mkdir()
         target_folder = configs.results_path / 'replayable_testcases'
         for item in target_folder.iterdir():
             if item.is_file():
