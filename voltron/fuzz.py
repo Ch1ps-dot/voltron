@@ -170,7 +170,39 @@ class Fuzzer:
         # collect results
         with analyzer.lock:
             analyzer.collect_results()
-                
+            
+    def replay(
+        self,
+        res_dir: Path,
+        cov_folder: Path
+    ):
+        """Fuzz the target one
+        """
+        
+        with analyzer.lock:
+            analyzer.strategy = 'replay'
+            start_time = time.time()
+            analyzer.start_time = start_time
+
+        try:
+            signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+            
+            # start fuzzing and set up ui
+            t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
+            t_fuzz = threading.Thread(target=self.replay_process, args=(res_dir, cov_folder,))
+
+            t_fuzz.start()
+            t_ui.start()
+
+            t_fuzz.join()
+            t_ui.join()
+            
+        except Exception as e:
+            logger.debug(f'replay error: {e}')
+            logger.debug(traceback.format_exc())
+            self.stop_event.set()
+        logger.debug('Fuzzer: finish replay')
+                       
     def state_fuzz(
         self,
         stop_event: threading.Event
@@ -312,7 +344,7 @@ class Fuzzer:
                 stop_event.set()
                 sys.exit(1)
                 
-    def replay(
+    def replay_process(
         self,
         res_dir: Path,
         cov_folder: Path,
