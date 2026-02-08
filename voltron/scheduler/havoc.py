@@ -19,6 +19,7 @@ class Havoc:
         self.unique_resp_trans: set[str] = set()
         self.useful_msg: list[tuple[str, bytes]] = []
         self.useful_seq: list[list[tuple[str, bytes]]] = []
+        self.max_seq_len = 0
         
         self.mapper = mapper
         self.exe = exe
@@ -63,7 +64,10 @@ class Havoc:
             gs = self.mapper.select_generators(w)
            
         elif mode == 'generic':
-            gs = self.rand.choice(self.useful_seq)
+            scope = self.rand.randint(1, 5)
+            gs = []
+            for i in range(scope):
+                gs += self.rand.choice(self.useful_seq)
             
         elif mode == 'dependent':
             if len(self.dep_alphabet) > 0:
@@ -91,7 +95,7 @@ class Havoc:
     def select_mutators(
         self
     ) -> list[tuple[str, bytes]]:
-        scope = self.rand.randint(1, 5)
+        scope = self.rand.randint(1, 10)
         ms = []
         mode = ''
         if len(self.useful_msg) == 0:
@@ -143,8 +147,10 @@ class Havoc:
             res = cons.res_seq[i]
             if res == '-':
                 continue
+            
             if res == 'TIMEOUT':
                 break
+            
             if res not in self.unique_resp:
                 self.unique_resp.add(res)
                 self.useful_msg.append((req, cons.content[i][0]))
@@ -212,9 +218,17 @@ class Havoc:
                 energy += 1
                 with analyzer.lock:
                     analyzer.finished += 1
+                    
+            if cons != None:
+                seq_len = len(cons.res_seq)
+                len_inc = self.max_seq_len - seq_len
+                self.max_seq_len = max(seq_len, self.max_seq_len)
                 
-            if flag and self.is_interesting(cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num) and cons != None:
-                self.exe.save_cons(cons)
+                trans_inc = cur_trans_nums - last_trans_nums
+                type_inc = cur_resp_num - last_resp_num
+                if flag and self.is_interesting(trans_inc, type_inc, len_inc):
+                    self.exe.save_cons(cons)
+                
         
         analyzer.clean_progress()
         return self.req_res
@@ -222,9 +236,10 @@ class Havoc:
     def is_interesting(
         self,
         trans_inc: int,
-        type_inc: int
+        type_inc: int,
+        len_inc: int
     ) -> bool:
-        if trans_inc > 0 or type_inc > 0:
+        if trans_inc > 0 or type_inc > 0 or len_inc > 0:
             return True
         else:
             return False
