@@ -385,6 +385,7 @@ class Fuzzer:
                     
                 if analyzer.finished % 5 == 0:
                     self.exe.cov_collect(cov_folder, cov_file)
+            self.stop_event.set()
         except Exception as e:
             logger.debug(f'replayer: exit {e}')
             logger.debug(traceback.format_exc())
