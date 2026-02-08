@@ -325,9 +325,10 @@ class Fuzzer:
         with analyzer.lock:   
             analyzer.stage = 'replay'
         
+        file_count = 0
         try:
             cons_seq: list[Conversation] = []
-            for item in input.iterdir():
+            for item in in_dir.iterdir():
                 if item.is_file():
                     with open(item, 'rb') as f:
                         cons = pickle.load(f)
