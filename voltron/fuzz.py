@@ -352,8 +352,8 @@ class Fuzzer:
         res_dir: Path,
         cov_folder: Path,
     ):
-        configs.cov_setup_path =  configs.base_path / 'input' / 'scripts' / 'cov_setup.sh'
-        configs.cov_collect_path =  configs.base_path / 'input' / 'scripts' / 'cov_collect.sh'
+        configs.cov_setup_path =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'cov_setup.sh'
+        configs.cov_collect_path =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'cov_collect.sh'
         
         in_dir = res_dir / 'replayable_testcases'
         cov_file = res_dir / 'cov_over_time.csv'
@@ -386,7 +386,7 @@ class Fuzzer:
                 with analyzer.lock:
                     analyzer.finished += 1
                     
-                # self.exe.cov_collect(cov_folder, cov_file, file_list[i])
+                self.exe.cov_collect(cov_folder, cov_file, file_list[i])
             self.stop_event.set()
         except Exception as e:
             logger.debug(f'replayer: exit {e}')

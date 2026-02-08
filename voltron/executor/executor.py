@@ -311,9 +311,14 @@ class Executor:
         # close process
         try:
             if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGTERM)
-                returncode = proc.wait(timeout=0.5)
-                logger.debug(f'sut returncode: {returncode}')
+                if configs.fuzz_mode == 'fuzz':
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    returncode = proc.wait(timeout=0.5)
+                    logger.debug(f'sut returncode: {returncode}')
+                elif configs.fuzz_mode == 'replay':
+                    os.killpg(proc.pid, signal.SIGUSR1)
+                    returncode = proc.wait(timeout=3)
+                    logger.debug(f'sut returncode: {returncode}')
         except Exception as err:
             logger.debug(f'proc close err: {err}')
             
