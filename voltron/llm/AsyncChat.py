@@ -226,7 +226,7 @@ class AsyncChater:
         tmp = self.pmp._tem_mutator_evolve
         
         pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, poss_response=poss_response, trace=trace)
-        logger.debug(pmp)
+        # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "mutator_evolve"

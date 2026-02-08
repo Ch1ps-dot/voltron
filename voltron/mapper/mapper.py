@@ -100,9 +100,7 @@ class Mapper:
             elif req in self.generators.keys(): 
                 # get generator of according message type
                 g = self.select_generator(req, select_mode)
-                
-                if g.msg_type not in self.message_pool.keys():
-                    self.message_pool[g.msg_type] = {}
+                self.message_pool.setdefault(g.msg_type, {})
                     
                 try:
                     msg = None
@@ -110,13 +108,13 @@ class Mapper:
                         # cache mode to avoid randomness in model learning
                         msg = self.message_pool[g.msg_type][g.name]
                     else:
-                        # run generator at first time
+                        # run generator
+                        # sometimes the generator code may raise exception and return none,
+                        # we run generator until the results can be used.
                         msg = self.exe_generator(g)
-                        if msg:
-                            self.message_pool[g.msg_type][g.name] = msg
-                            g.was_used += 1
-                        else:
-                            g.broken = False
+                        while msg == None:
+                            msg = self.exe_generator(g)
+                        self.message_pool[g.msg_type][g.name] = msg
                             
                     if msg:
                         msg_type = g.msg_type
@@ -142,16 +140,16 @@ class Mapper:
                 # get generator of according message type
                 m = self.select_mutator(req, select_mode)
                 
-                if m.msg_type not in self.message_pool.keys():
-                    self.message_pool[m.msg_type] = {}
+                self.message_pool.setdefault(m.msg_type, {})
                     
                 try:
-                    muta = self.exe_mutator(m)
-                    if muta:
-                        msg_type = m.msg_type
-                        ms.append((msg_type, muta))
-                    else:
-                        raise Exception
+                    # sometimes the generator code may raise exception and return none,
+                    # we run generator until the results can be used.
+                    msg = self.exe_mutator(m)
+                    msg_type = m.msg_type
+                    while msg == None:
+                        msg = self.exe_mutator(m)
+                    ms.append((msg_type, msg))
                 except Exception as e:
                     logger.debug(asdict(m))
                     logger.debug(self.message_pool)
@@ -185,35 +183,36 @@ class Mapper:
         g: Generator
     ) -> bytes | None:
         name_space = {}
-        while(True):
-            try:
-                with open(self.g_path(g), 'r', encoding='utf-8') as f:
-                    code = f.read()
-                    exec(code, name_space)
-                    obj = name_space[f'generate_{g.msg_type}']
-                    return obj()
-            except Exception as e:
-                logger.debug(f'Executor: generated failure {e}')
-                logger.debug(traceback.format_exc())
-                continue
+        
+        try:
+            with open(self.g_path(g), 'r', encoding='utf-8') as f:
+                code = f.read()
+                exec(code, name_space)
+                obj = name_space[f'generate_{g.msg_type}']
+                return obj()
+        except Exception as e:
+            logger.debug(f'Executor: generated failure {e}')
+            logger.debug(traceback.format_exc())
+            return None
         
     def exe_mutator(
         self,
         m: Generator
     ) -> bytes | None:
         name_space = {}
-        while(True):
-            try:
-                with open(self.m_path(m), 'r', encoding='utf-8') as f:
-                    code = f.read()
-                    exec(code, name_space)
-                    mutate = name_space[f'mutate_{m.msg_type}']
-                    # havoc = name_space[f'havoc_{m.msg_type}']
-                    return mutate()
-            except Exception as e:
-                logger.debug(f'Executor: generated failure {e}')
-                logger.debug(traceback.format_exc())
-                continue
+        
+        try:
+            with open(self.m_path(m), 'r', encoding='utf-8') as f:
+                code = f.read()
+                exec(code, name_space)
+                mutate = name_space[f'mutate_{m.msg_type}']
+                # havoc = name_space[f'havoc_{m.msg_type}']
+                return mutate()
+        except Exception as e:
+            logger.debug(f'Executor: generated failure {e}')
+            logger.debug(traceback.format_exc())
+            return None
+                
             
     def register_mapper(
         self,
