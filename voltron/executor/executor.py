@@ -54,8 +54,10 @@ class Executor:
             proc = subprocess.Popen(
                 [configs.cov_setup_path, str(folder), str(cov_file)],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.PIPE
             )
+            stderr = proc.communicate()
+            logger.debug(f'cov setup: {proc.returncode} {stderr}')
             return proc
         except Exception as e:
             logger.debug(f'[SUT Setup Failure]: {e}')
@@ -70,8 +72,10 @@ class Executor:
             proc = subprocess.Popen(
                 [configs.cov_collect_path, str(folder), str(cov_file)],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
             )
+            stderr = proc.communicate()
+            logger.debug(f'cov collect: {proc.returncode} {stderr}')
             return proc
         except Exception as e:
             logger.debug(f'[SUT Setup Failure]: {e}')
