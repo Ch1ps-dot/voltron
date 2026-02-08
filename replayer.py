@@ -7,13 +7,11 @@ from pathlib import Path
 
 @click.command(help='fuzzer')
 @click.option("-s", "--sut", type=str, required=True, help="server under test")
-@click.option("-i", "--input", type=str, required=True, help="testcase input direcotory")
-@click.option("-o", "--output", type=str, required=True, help="cov metric output")
+@click.option("-d", "--dir", type=str, required=True, help="testcase input direcotory")
 @click.option("-f", "--cov_file", type=str, required=True, help="input direcotory")
 def main(
     sut: str, 
-    input: str, 
-    output: str,
+    dir: str, 
     cov_folder: str
 ):
     supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim'}
@@ -26,8 +24,7 @@ def main(
             cmdline=cmdline.split(' ')
         )
         replayer.replay(
-            input=Path(input),
-            output=Path(output),
+            res_dir=Path(dir),
             cov_folder=Path(cov_folder)
         )
     else:

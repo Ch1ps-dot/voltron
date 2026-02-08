@@ -632,7 +632,7 @@ class Executor:
                 if response:
                     f.write(response)
         
-        
+        file_count = 0
         target_folder = configs.results_path / 'replayable_testcases'
         if not target_folder.is_dir():
             target_folder.mkdir()

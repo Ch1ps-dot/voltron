@@ -283,11 +283,12 @@ class Fuzzer:
         """--- havoc fuzzing ---"""
         with analyzer.lock:   
             analyzer.iter = 0
+            analyzer.stage = 'havoc fuzzing'
+            analyzer.res_types_cnt = {}
+            analyzer.resp_trans_cnt = {}
         
         havoc = Havoc(self.mapper, self.exe, hypothesis)
-        with analyzer.lock:   
-            analyzer.stage = 'havoc fuzzing'
-            
+                    
         while not stop_event.is_set():
             try:
                 # init new learning process with previous model and run fuzzer
@@ -313,12 +314,14 @@ class Fuzzer:
                 
     def replay(
         self,
-        input: Path,
-        output: Path,
+        res_dir: Path,
         cov_folder: Path,
     ):
         configs.cov_setup_path =  configs.base_path / 'input' / 'scripts' / 'cov_setup.sh'
         configs.cov_collect_path =  configs.base_path / 'input' / 'scripts' / 'cov_collect.sh'
+        
+        in_dir = res_dir / 'replayable_testcases'
+        cov_file = res_dir / 'cov_over_time.csv'
         with analyzer.lock:   
             analyzer.stage = 'replay'
         
@@ -332,7 +335,7 @@ class Fuzzer:
                     file_count += 1
             
             analyzer.set_progress('havoc', 'replay', file_count)
-            self.exe.cov_setup(cov_folder, output)
+            self.exe.cov_setup(cov_folder, cov_file)
             for cons in cons_seq:
                 req_seq = []
                 for i in range(len(cons.req_seq)):
@@ -345,7 +348,7 @@ class Fuzzer:
                     analyzer.finished += 1
                     
                 if analyzer.finished % 5 == 0:
-                    self.exe.cov_collect(cov_folder, output)
+                    self.exe.cov_collect(cov_folder, cov_file)
         except Exception as e:
             logger.debug(f'replayer: exit {e}')
             logger.debug(traceback.format_exc())
