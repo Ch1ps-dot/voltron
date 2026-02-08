@@ -81,6 +81,7 @@ class Fuzzer:
             configs.models_path.mkdir()
         
         configs.results_path = results_dir
+        configs.fuzz_mode = self.mode
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name

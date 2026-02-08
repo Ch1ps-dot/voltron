@@ -14,6 +14,7 @@ class Config:
         self.results_path: Path
         self.cov_setup_path: Path
         self.cov_collect_path: Path
+        self.fuzz_mode: str
         
         self.target_name: str
         self.trans_layer: str

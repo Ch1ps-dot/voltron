@@ -44,10 +44,6 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.stop_event = stop_event
-        
-        self.cons_path = configs.results_path / 'testcases'
-        if (not self.cons_path.is_dir()):
-            self.cons_path.mkdir()
             
     def cov_setup(
         self,
@@ -220,7 +216,9 @@ class Executor:
                         logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
-                        self.save_cons(cons)
+                        if configs.fuzz_mode != 'replay':
+                            stderr_data = proc.communicate()
+                            self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -236,8 +234,9 @@ class Executor:
                         logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
-                        stderr_data = proc.communicate()
-                        self.save_cons(cons, str(stderr_data))
+                        if configs.fuzz_mode != 'replay':
+                            stderr_data = proc.communicate()
+                            self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
@@ -253,8 +252,9 @@ class Executor:
                         logger.debug(f'Program crash exitcode {return_code}')
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
-                        stderr_data = proc.communicate()
-                        self.save_cons(cons, str(stderr_data))
+                        if configs.fuzz_mode != 'replay':
+                            stderr_data = proc.communicate()
+                            self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -287,8 +287,9 @@ class Executor:
                     cons.add_state('-', 'CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
-                    self.save_cons(cons, str(stderr_data))
-                    stderr_data = proc.communicate()
+                    if configs.fuzz_mode != 'replay':
+                        stderr_data = proc.communicate()
+                        self.save_cons(cons, str(stderr_data))
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
                 break
@@ -599,15 +600,6 @@ class Executor:
                 self.parser_func = obj
         except Exception as e:
             logger.debug(f'Mapper: generated failure {e}')
-    
-    def load_cons(
-            self,
-            cons: Conversation
-    ):
-        """Load rfc parser 
-        """
-        with open(self.cons_path / "section_tree.pkl", "rb") as f:
-            cons = pickle.load(f)
         
     def save_cons(
         self,
