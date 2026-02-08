@@ -28,10 +28,12 @@ class Fuzzer:
     def __init__(
             self, 
             target_name: str,
-            cmdline: list[str]
+            cmdline: list[str],
+            mode='fuzz'
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
+        self.mode = mode
         
         self.load_configs()
         self.module_init()
@@ -70,7 +72,7 @@ class Fuzzer:
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
         results_dir = configs.base_path / f'results-{self.target_name}-voltron-{formatted_time}'
-        if not results_dir.is_dir():
+        if not results_dir.is_dir() and self.mode != 'replay':
             results_dir.mkdir()
             
         models_dir = configs.base_path / 'output' / 'models'
@@ -402,6 +404,7 @@ class Fuzzer:
                 logger.debug('\n'.join(traceback.format_stack(fra)))
         
         self.stop_event.set()
-        with analyzer.lock:
-            analyzer.collect_results()
+        if self.mode != 'replay':
+            with analyzer.lock:
+                analyzer.collect_results()
         sys.exit(1)

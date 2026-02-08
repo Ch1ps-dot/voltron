@@ -21,7 +21,8 @@ def main(
             cmdline = f.read()
         replayer = Fuzzer(
             target_name=sut,
-            cmdline=cmdline.split(' ')
+            cmdline=cmdline.split(' '),
+            mode = 'replay'
         )
         replayer.replay(
             res_dir=Path(dir),
