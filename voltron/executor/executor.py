@@ -619,10 +619,10 @@ class Executor:
         with open(target_folder / f'{'-'.join(cons.res_seq)}.raw', 'ab') as f:
             for request, response in cons.content:
                 if request:
-                    f.write(request)
+                    f.write(request + b'\n')
                 f.write(b'\n')
                 if response:
-                    f.write(response)
+                    f.write(response + b'\n')
         
         file_count = 0
         target_folder = configs.results_path / 'replayable_testcases'
@@ -637,5 +637,5 @@ class Executor:
             
         info_file = configs.results_path / 'cons_info'
         with open(info_file, 'a', encoding='utf-8') as f:
-            f.write('-'.join(cons.res_seq))
+            f.write('-'.join(cons.res_seq) + '\n')
             f.write(info)

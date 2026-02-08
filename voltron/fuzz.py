@@ -377,7 +377,7 @@ class Fuzzer:
                 for i in range(len(cons.req_seq)):
                     if cons.req_seq[i] == '-':
                         continue
-                    req_seq.append((cons.req_seq[i], cons.content[0]))
+                    req_seq.append((cons.req_seq[i], cons.content[i][0]))
                 flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
 
                 with analyzer.lock:
