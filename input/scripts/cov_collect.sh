@@ -2,8 +2,10 @@
 
 folder=$1   #gcovr result folder
 covfile=$2  #path to coverage file
+file=$3 #conversation file
 
 #process fuzzer-generated testcases
+time=$(stat -c %Y $file)
 cov_data=$(gcovr -r $folder -s | grep "[lb][a-z]*:")
 l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)
 l_abs=$(echo "$cov_data" | grep lines | cut -d" " -f3 | cut -c2-)

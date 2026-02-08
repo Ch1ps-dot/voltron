@@ -363,17 +363,20 @@ class Fuzzer:
         file_count = 0
         try:
             cons_seq: list[Conversation] = []
+            file_list: list[Path] = []
             for item in in_dir.iterdir():
                 if item.is_file():
                     with open(item, 'rb') as f:
                         cons = pickle.load(f)
                         cons_seq.append(cons)
+                        file_list.append(item)
                     file_count += 1
             
             analyzer.set_progress('havoc', 'replay', file_count)
             self.exe.cov_setup(cov_folder, cov_file)
-            for cons in cons_seq:
+            for i in range(file_count):
                 req_seq = []
+                cons = cons_seq[i]
                 for i in range(len(cons.req_seq)):
                     if cons.req_seq[i] == '-':
                         continue
@@ -384,7 +387,7 @@ class Fuzzer:
                     analyzer.finished += 1
                     
                 if analyzer.finished % 5 == 0:
-                    self.exe.cov_collect(cov_folder, cov_file)
+                    self.exe.cov_collect(cov_folder, cov_file, file_list[i])
             self.stop_event.set()
         except Exception as e:
             logger.debug(f'replayer: exit {e}')
