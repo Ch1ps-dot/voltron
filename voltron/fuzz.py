@@ -301,6 +301,7 @@ class Fuzzer:
                         break
                 
                 elif last_trans_num < cur_trans_num:
+                    try_limit = 3
                     h_lsit.append(h)
                     self.producer.generator_evo(h)
                     continue

@@ -10,9 +10,13 @@ Your task is to **regenerate Python code that mutates key protocol fields using 
 You will be given:
 
 ### **Protocol name**: 
+
   $pro_name
+  
 ### **Message type / message name**: 
+
   $msg_type
+
 ### **Previous Generated Program**: 
   
   $code
