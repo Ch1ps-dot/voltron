@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys, traceback, pickle, copy, os
+import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit
 
 from voltron.executor.conversation import Conversation
 
@@ -23,6 +23,15 @@ from voltron.configs import configs
 from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
 from voltron.scheduler.automata import MealyMachine
 
+def exit_handler():
+    exit_code = sys.exitcode
+    logger.debug(exit_code)
+    for thread in threading.enumerate():
+        if thread.ident:
+            fra = sys._current_frames().get(thread.ident)
+            logger.debug('\n'.join(traceback.format_stack(fra)))
+            
+atexit.register(exit_handler)
 
 class Fuzzer:
     def __init__(
