@@ -8,6 +8,7 @@ from voltron.analyzer.analyzer import analyzer
 import traceback, sys
 from voltron.utils.logger import logger
 from dataclasses import asdict
+import threading
 
 from pathlib import Path
 
@@ -149,6 +150,7 @@ class Mapper:
                     msg_type = m.msg_type
                     while msg == None:
                         msg = self.exe_mutator(m)
+                        logger.debug(f'mutator error {req} {m.name}')
                     ms.append((msg_type, msg))
                 except Exception as e:
                     logger.debug(asdict(m))
@@ -190,6 +192,15 @@ class Mapper:
                 exec(code, name_space)
                 obj = name_space[f'generate_{g.msg_type}']
                 return obj()
+                # result = []
+                # def thread_task():
+                #     res = obj()
+                #     result.append(res)
+                    
+                # t = threading.Thread(target=thread_task)
+                # t.start()
+                # t.join(timeout=3)
+                # return result[0]
         except Exception as e:
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())

@@ -94,6 +94,7 @@ class Havoc:
         self
     ) -> list[tuple[str, bytes]]:
         scope = self.rand.randint(1, 10)
+        mut = self.rand.choice([True, False])
         ms = []
         mode = ''
         if len(self.useful_msg) == 0:
@@ -106,7 +107,11 @@ class Havoc:
             for i in range(scope):
                 a = self.rand.choice(self.alphabet)
                 req_seq.append(a)
-            ms = self.mapper.select_mutators(req_seq)
+                
+            if mut:
+                ms = self.mapper.select_mutators(req_seq)
+            else:
+                ms = self.mapper.select_generators(req_seq)
                 
         elif mode == 'generic':
             for i in range(scope):
@@ -126,7 +131,10 @@ class Havoc:
                     last_dict: dict[str, dict] = self.req_dep[cur_req]
                     last_req = self.rand.choice(list(last_dict.keys()))
                     cur_req = last_req
-                ms = self.mapper.select_mutators(req_seq)
+                if mut:
+                    ms = self.mapper.select_mutators(req_seq)
+                else:
+                    ms = self.mapper.select_generators(req_seq)
             else:
                 for i in range(scope):
                     a = self.rand.choice(self.useful_msg)
