@@ -24,8 +24,6 @@ from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle, Ob
 from voltron.scheduler.automata import MealyMachine
 
 def exit_handler():
-    exit_code = sys.exitcode
-    logger.debug(exit_code)
     for thread in threading.enumerate():
         if thread.ident:
             fra = sys._current_frames().get(thread.ident)
