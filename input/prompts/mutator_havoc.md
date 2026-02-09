@@ -14,10 +14,10 @@ You will be given:
 * **SUT (Server Under Test) Information**: 
    $info
 
-   - The SUT information above may include:
-    - configuration file of SUT
-    - real request messages captured in communication.
-    - settings of client or server
+   The SUT information above may include:
+   - configuration file of SUT
+   - real request messages captured in communication.
+   - settings of client or server
 
 ---
 
@@ -63,6 +63,7 @@ You will be given:
 * No input parameters
 * Output must be a **bytes object**
 * Do NOT include networking code
+* Pay attention to handling loop operations in functions and avoid infinite loops.
 * **CRITICAL**: The total length of the returned bytes object must be ≤ 1400 bytes (to comply with socket send limits)
 
 ---

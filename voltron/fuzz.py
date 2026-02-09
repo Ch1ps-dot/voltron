@@ -342,6 +342,7 @@ class Fuzzer:
                 logger.debug(traceback.format_exc())
                 stop_event.set()
                 sys.exit(1)
+                
             if (configs.time_limit_s < time.time() - analyzer.start_time):
                 logger.debug('Fuzzer: timeout')
                 stop_event.set()
