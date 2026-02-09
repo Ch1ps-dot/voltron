@@ -161,6 +161,13 @@ class Havoc:
                 map = self.req_res.setdefault(req, set())
                 map.add(res)
         
+        seq = []
+        if len(cons.res_seq) > self.max_seq_len:
+            for i in range(len(cons.res_seq)):
+                if cons.req_seq[j] != '-':
+                    seq.append((cons.req_seq[i], cons.content[i][0]))
+            self.useful_seq.append(seq)
+        
     def run(
         self,
         times: int
