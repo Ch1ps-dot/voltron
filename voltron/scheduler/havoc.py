@@ -218,7 +218,7 @@ class Havoc:
                     
             if cons != None:
                 seq_len = len(cons.res_seq)
-                len_inc = self.max_seq_len - seq_len
+                len_inc = seq_len - self.max_seq_len
                 self.max_seq_len = max(seq_len, self.max_seq_len)
                 
                 trans_inc = cur_trans_nums - last_trans_nums
