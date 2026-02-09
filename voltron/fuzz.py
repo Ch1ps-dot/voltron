@@ -328,7 +328,7 @@ class Fuzzer:
             try:
                 # init new learning process with previous model and run fuzzer
 
-                req_res = havoc.run(250)
+                req_res = havoc.run(500)
                 self.producer.generator_mutate(req_res)
                 pre_resp = analyzer.cur_res_types_cnt.keys()
                 
