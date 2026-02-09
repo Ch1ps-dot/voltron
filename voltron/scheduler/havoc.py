@@ -31,6 +31,7 @@ class Havoc:
         self.methods = ['cat', 'int']
         self.mutator_mode = ['new', 'generic', 'dependent']
         self.prefix_mode = ['new', 'generic', 'dependent']
+        self.suffix_mode = ['new', 'generic']
         if machine:
             self.machine = machine
             self.table = machine.table
@@ -84,9 +85,20 @@ class Havoc:
     def select_suffix(
         self
     ) -> list[tuple[str, bytes]]:
-        s = self.rand.choice(self.E)
-        w = list(s)
-        gs = self.mapper.select_generators(w)
+        mode = ''
+        if len(self.useful_seq) == 0:
+            mode = 'new'
+        else:
+            mode = self.rand.choice(self.suffix_mode)
+            
+        gs = []
+        if mode == 'new':
+            p = self.rand.choice(self.E)
+            w = list(p)
+            gs = self.mapper.select_generators(w)
+           
+        elif mode == 'generic':
+            gs = self.rand.choice(self.useful_seq)
         return gs
     
     def select_mutators(
@@ -186,6 +198,7 @@ class Havoc:
             if self.mapper.mutators != {}:
                 ms = self.select_mutators()
             suffix = self.select_suffix()
+            ms = ms + suffix
             req_seq = []
             
             method = self.rand.choice(self.methods)
