@@ -1,0 +1,1 @@
+./src/lighttpd -D -f /home/ubuntu/experiments/lighttpd.conf -m ./src/.libs
