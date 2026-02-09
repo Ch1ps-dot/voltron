@@ -85,20 +85,9 @@ class Havoc:
     def select_suffix(
         self
     ) -> list[tuple[str, bytes]]:
-        mode = ''
-        if len(self.useful_seq) == 0:
-            mode = 'new'
-        else:
-            mode = self.rand.choice(self.suffix_mode)
-            
-        gs = []
-        if mode == 'new':
-            p = self.rand.choice(self.E)
-            w = list(p)
-            gs = self.mapper.select_generators(w)
-           
-        elif mode == 'generic':
-            gs = self.rand.choice(self.useful_seq)
+        p = self.rand.choice(self.E)
+        w = list(p)
+        gs = self.mapper.select_generators(w)
         return gs
     
     def select_mutators(
