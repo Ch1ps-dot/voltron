@@ -164,7 +164,7 @@ class Havoc:
         seq = []
         if len(cons.res_seq) > self.max_seq_len:
             for i in range(len(cons.res_seq)):
-                if cons.req_seq[j] != '-':
+                if cons.req_seq[i] != '-':
                     seq.append((cons.req_seq[i], cons.content[i][0]))
             self.useful_seq.append(seq)
         
