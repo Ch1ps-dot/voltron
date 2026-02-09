@@ -37,6 +37,7 @@ class Analyzer:
         self.recv = ''
         self.last_sent = '-'
         self.last_recv = '-'
+        self.useful_cons: int = 0
 
         self.autamata = None
         self.state = 0

@@ -238,6 +238,8 @@ class Havoc:
         len_inc: int
     ) -> bool:
         if trans_inc > 0 or type_inc > 0 or len_inc > 0:
+            with analyzer.lock:
+                analyzer.useful_cons += 1
             logger.debug(f'{trans_inc} {type_inc} {len_inc}')
             return True
         else:

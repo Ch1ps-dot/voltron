@@ -84,7 +84,8 @@ def make_runtime_table():
         'state num': ana.state,
         'CRASH num': ana.crash_num,
         'CLOSED num': ana.rclose_num,
-        'TIMEOUT num': ana.timeout_num
+        'TIMEOUT num': ana.timeout_num,
+        'SAVED_CONS': ana.useful_cons
         # 'PULLERR num': ana.pollerr_num,
         # 'TIMEOUT num': ana.timeout_num,
         # 'RCLOSE num': ana.rclose_num
