@@ -463,9 +463,6 @@ class AsyncProducer:
         """Generate and save input generator
         """
         
-        with analyzer.lock:
-            analyzer.add_progress_bar('parser evolve', 1)
-        
         # produce new generator
         parser_code = asyncio.run(self._parser_evo_one(message))
         

@@ -235,6 +235,8 @@ class Havoc:
                     
             if cons != None:
                 seq_len = len(cons.res_seq)
+                unique_res = set(cons.res_seq)
+                
                 len_inc = seq_len - self.max_seq_len
                 self.max_seq_len = max(seq_len, self.max_seq_len)
                 
