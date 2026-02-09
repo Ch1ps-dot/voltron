@@ -409,11 +409,11 @@ class Fuzzer:
         if analyzer.sut_proc != None:
             os.killpg(analyzer.sut_proc.pid, signal.SIGKILL)
             
-        logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
-        for thread in threading.enumerate():
-            if thread.ident:
-                fra = sys._current_frames().get(thread.ident)
-                logger.debug('\n'.join(traceback.format_stack(fra)))
+        # logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
+        # for thread in threading.enumerate():
+        #     if thread.ident:
+        #         fra = sys._current_frames().get(thread.ident)
+        #         logger.debug('\n'.join(traceback.format_stack(fra)))
         
         self.stop_event.set()
         if self.mode != 'replay':

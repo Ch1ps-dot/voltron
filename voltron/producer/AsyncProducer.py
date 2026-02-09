@@ -288,7 +288,7 @@ class AsyncProducer:
         req_res: dict[str, set],
         sem
     ):
-        old_m = self.generators[msg_type][0]
+        old_m = self.mutators[msg_type][-1]
         old_m_path = old_m.path
         old_code = ''
         with open(old_m_path, 'r', encoding='utf-8') as f:
