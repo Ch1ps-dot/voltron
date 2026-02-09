@@ -6,8 +6,6 @@ from voltron.scheduler.automata import MealyMachine
 from voltron.utils.logger import logger
 import random, time, threading, os, math
 
-
-
 class Havoc:
     def __init__(
         self,
@@ -44,7 +42,6 @@ class Havoc:
                     self.S.append(p)
                 elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
                     self.S.append(p)
-            
         else:
             self.machine = None
 
@@ -227,6 +224,7 @@ class Havoc:
                 trans_inc = cur_trans_nums - last_trans_nums
                 type_inc = cur_resp_num - last_resp_num
                 if flag and self.is_interesting(trans_inc, type_inc, len_inc):
+                    
                     self.exe.save_cons(cons)
                 
         
@@ -240,6 +238,7 @@ class Havoc:
         len_inc: int
     ) -> bool:
         if trans_inc > 0 or type_inc > 0 or len_inc > 0:
+            logger.debug(f'{trans_inc} {type_inc} {len_inc}')
             return True
         else:
             return False

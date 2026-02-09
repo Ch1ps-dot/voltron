@@ -191,12 +191,7 @@ class Executor:
         # send the message path
         for msg_type, msg in msg_seq:
             
-            if self.stop_event.is_set():
-                sock.close()
-                break
-            
-            # the target is running
-            if proc.poll() is not None:
+            if self.stop_event.is_set() or proc.poll() is not None:
                 break
             
             # send message and parse response
@@ -229,6 +224,7 @@ class Executor:
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
+                        logger.debug(f'recv <- POLLERR')
                     break
                 
                 elif resp_code == 'TIMEOUT':
@@ -247,6 +243,7 @@ class Executor:
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.timeout_num += 1
+                        logger.debug(f'recv <- TIMEOUT')
                     break
                 
                 elif resp_code == 'RCLOSED':
@@ -265,12 +262,14 @@ class Executor:
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
+                        logger.debug(f'recv <- rclose')
                     break
                 
                 else:
                     if(resp_code == None):
                         logger.debug('Executor: parse error')
                         continue
+                    
                     with self.analyzer.lock:
                         self.analyzer.res_num += 1
                         self.analyzer.res_types_update(resp_code)
@@ -591,7 +590,9 @@ class Executor:
                     return resp_code, buf
                 else:
                     logger.debug('recv: no data')
-            
+        except Exception as e:
+            logger.debug(f'net_recv error: {e}')
+            logger.debug(traceback.format_exc())   
         finally:
             poller.unregister(sock)
     
@@ -625,8 +626,12 @@ class Executor:
         for item in target_folder.iterdir():
             if item.is_file():
                 file_count += 1
-                
-        with open(target_folder / f'{'-'.join(cons.res_seq)}.raw', 'ab') as f:
+        
+        file_count = str(file_count)
+        while len(file_count) < 6:
+            file_count = '0' + file_count
+
+        with open(target_folder / f'cons_{file_count}.raw', 'ab') as f:
             for request, response in cons.content:
                 if request:
                     f.write(request + b'\n')
@@ -642,10 +647,15 @@ class Executor:
             if item.is_file():
                 file_count += 1
                 
-        with open(target_folder / f"cons{file_count}.pkl", "wb") as f:
+        file_count = str(file_count)
+        while len(file_count) < 6:
+            file_count = '0' + file_count        
+        with open(target_folder / f"cons_{file_count}.pkl", "wb") as f:
             pickle.dump(cons, f)
-            
+        
+        logger.debug(f'run: save cons_{file_count}')    
         info_file = configs.results_path / 'cons_info'
         with open(info_file, 'a', encoding='utf-8') as f:
+            f.write(file_count + '\n')
             f.write('-'.join(cons.res_seq) + '\n')
             f.write(info)
