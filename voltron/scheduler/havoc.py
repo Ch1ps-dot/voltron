@@ -14,6 +14,7 @@ class Havoc:
         machine: MealyMachine
     ) -> None:
         self.unique_resp: set[str] = set()
+        self.max_unique_resp_num = 0
         self.unique_resp_trans: set[str] = set()
         self.useful_msg: list[tuple[str, bytes]] = []
         self.useful_seq: list[list[tuple[str, bytes]]] = []
@@ -145,7 +146,9 @@ class Havoc:
     
     def analyze_cons(
         self,
-        cons: Conversation
+        cons: Conversation,
+        trans_inc: int,
+        type_inc: int
     ):
         seq = []
         for i in range(len(cons.res_seq)):
@@ -169,7 +172,17 @@ class Havoc:
             if req != '-':
                 map = self.req_res.setdefault(req, set())
                 map.add(res)
+            
+        seq_len = len(cons.res_seq)
+        unique_res_num = len(set(cons.res_seq))
+        unique_res_inc = unique_res_num - self.max_unique_resp_num
+            
+        len_inc = seq_len - self.max_seq_len
+        self.max_seq_len = max(seq_len, self.max_seq_len)
+        self.max_unique_resp_num = max(unique_res_num, self.max_unique_resp_num)
         
+        if self.is_interesting(trans_inc, type_inc, len_inc, unique_res_inc):         
+            self.exe.save_cons(cons)
         # seq = []
         # if len(cons.res_seq) > self.max_seq_len:
         #     for i in range(len(cons.res_seq)):
@@ -212,8 +225,11 @@ class Havoc:
                         req_seq.append(ms[i])
 
             flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
+            cur_trans_nums = analyzer.resp_trans_num()
+            cur_resp_num = analyzer.res_types_num()
+            
             if cons != None:
-                self.analyze_cons(cons)
+                self.analyze_cons(cons, cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num)
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq]) + f'({method})'
                 analyzer.recv = '/'.join(cons.res_seq)
                 logger.debug(f'sent({method}) -> {analyzer.sent}')
@@ -222,8 +238,6 @@ class Havoc:
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = 'None'
             
-            cur_trans_nums = analyzer.resp_trans_num()
-            cur_resp_num = analyzer.res_types_num()
             if cur_trans_nums <= last_trans_nums:
                 energy -= 1
                 with analyzer.lock:
@@ -232,19 +246,6 @@ class Havoc:
                 energy += 1
                 with analyzer.lock:
                     analyzer.finished += 1
-                    
-            if cons != None:
-                seq_len = len(cons.res_seq)
-                unique_res = set(cons.res_seq)
-                
-                len_inc = seq_len - self.max_seq_len
-                self.max_seq_len = max(seq_len, self.max_seq_len)
-                
-                trans_inc = cur_trans_nums - last_trans_nums
-                type_inc = cur_resp_num - last_resp_num
-                if flag and self.is_interesting(trans_inc, type_inc, len_inc):
-                    
-                    self.exe.save_cons(cons)
                 
         
         analyzer.clean_progress()
@@ -254,9 +255,10 @@ class Havoc:
         self,
         trans_inc: int,
         type_inc: int,
-        len_inc: int
+        len_inc: int,
+        unique_res_inc: int
     ) -> bool:
-        if trans_inc > 0 or type_inc > 0 or len_inc > 0:
+        if trans_inc > 0 or type_inc > 0 or len_inc > 0 or unique_res_inc > 0:
             with analyzer.lock:
                 analyzer.useful_cons += 1
             logger.debug(f'{trans_inc} {type_inc} {len_inc}')
