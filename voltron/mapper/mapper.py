@@ -191,6 +191,7 @@ class Mapper:
                 code = f.read()
                 exec(code, name_space)
                 obj = name_space[f'generate_{g.msg_type}']
+                g.was_used += 1
                 return obj()
                 # result = []
                 # def thread_task():
