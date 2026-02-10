@@ -201,7 +201,7 @@ class Executor:
             
             # success to send
             if(flag and req_data):
-                logger.debug(f'sent -> {req_data}')
+                # logger.debug(f'sent -> {req_data}')
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
@@ -274,7 +274,7 @@ class Executor:
                         self.analyzer.res_types_update(resp_code)
                         self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
                     last_recv = resp_code
-                    logger.debug(f'recv <- {resp_data}')
+                    # logger.debug(f'recv <- {resp_data}')
                     
                     # record conversation data
                     if(req_data and resp_data):

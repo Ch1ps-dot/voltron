@@ -123,7 +123,9 @@ class ObTable:
                             self.T[si][e] = ('TIMEOUT',)
                             continue
                         
-                        while(True):
+                        try_times = 3
+                        out = []
+                        while True:
                             out = self.mq.query(si + e)
                             if (out):
                                 # sometimes the randomness of server will cause timeout
@@ -131,7 +133,11 @@ class ObTable:
                                 if len(si) > 0:
                                     if 'TIMEOUT' == out[-1] and len(out) < len(si):
                                         logger.debug('fill table: try again')
-                                        continue
+                                        try_times -= 1
+                                        if try_times <= 0:
+                                            self.T[si[:len(out)-1]][si[-1:]] = ('TIMEOUT',)
+                                        else:
+                                            continue
                                 
                                 self.T[si][e] = tuple(out[-len(e):])
                                 
