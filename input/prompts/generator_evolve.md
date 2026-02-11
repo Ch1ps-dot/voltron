@@ -36,11 +36,11 @@ $trace
 
 ## **Your Task**
 
-### 1. Root Cause Analysis for Restricted State Transitions
-- **Analyze code defects**: Identify issues in the previous program (e.g., invalid field values, incorrect field ordering, missing mandatory fields, mismatched length/payload, non-compliant encodings) that caused restricted state transitions.
+### 1. Root Cause Analysis for Error Response
+- **Analyze code defects**: Identify issues in the previous program (e.g., invalid field values, incorrect field ordering, missing mandatory fields, mismatched length/payload, non-compliant encodings) that caused error response of server.
 - **Analyze response trace patterns**: 
   - Map observed state transitions to protocol specification and SUT constraints
-  - Identify untriggered state transitions (gaps between expected and observed behavior)
+  - Identify untriggered legal state transitions (gaps between expected and observed behavior)
   - Determine why the server remained in the same state, entered an error state, or rejected transitions (e.g., invalid field semantics, missing preconditions, state machine violations)
 - **Identify semantic dependencies**: Extract cross-message/cross-field semantic relationships from traces and related code that are critical for valid state transitions.
 
@@ -51,8 +51,7 @@ $trace
   - Which state-compatible message variations (within protocol specs) can reach unobserved server states
 - Prioritize message variations that:
   - Are strictly protocol-valid and SUT-compatible
-  - Are semantically distinct from previously attempted messages
-  - Target unobserved state transitions (e.g., error states, edge-case valid states, sequential transition chains)
+  - Target unobserved state transitions 
 
 ### 3. Repair and Enhance Message Generation Logic
 - Fix all code defects identified in root cause analysis (e.g., correct field ordering, adjust values to legal ranges, add missing mandatory fields, align length/payload)
