@@ -196,11 +196,12 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_parser_evolve
-
+        if len(message) > 100:
+            message = message[:99]
         pmp = tmp.substitute(pro_name=pro_name, res_info=res_info, original_code=old_code, message=message)
         ans = await self.chat_llm(
             prompt=pmp,
-            usage = "generator_evolve"
+            usage = "parser_evolve"
         )
 
         return self.code_extract(ans)
