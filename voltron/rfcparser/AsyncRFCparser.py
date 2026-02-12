@@ -135,7 +135,9 @@ class AsyncRFCParser:
             
             res_json = await res_task
             req_json = await req_task
-
+            
+            self.req_types = set(req_json['value'])
+            self.res_types = set(res_json['value'])
             
         else:
             with open(req_path, 'r', encoding='utf-8') as f:
