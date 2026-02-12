@@ -385,10 +385,10 @@ class Fuzzer:
             for i in range(file_count):
                 req_seq = []
                 cons = cons_seq[i]
-                for i in range(len(cons.req_seq)):
-                    if cons.req_seq[i] == '-':
+                for j in range(len(cons.req_seq)):
+                    if cons.req_seq[j] == '-':
                         continue
-                    req_seq.append((cons.req_seq[i], cons.content[i][0]))
+                    req_seq.append((cons.req_seq[j], cons.content[j][0]))
                 flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
 
                 with analyzer.lock:

@@ -490,8 +490,6 @@ class AsyncProducer:
         with open(self.parser_info_path, 'w', encoding='utf-8') as f:
             json.dump(self.parser_info(), f)
         
-        with analyzer.lock:
-            analyzer.delete_progress_bar('parser evolve')
         logger.debug("[Producer]: finish generator generation")
 
     def generator_info(
