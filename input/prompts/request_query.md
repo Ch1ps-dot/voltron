@@ -1,12 +1,12 @@
 You are an expert in networking protocols and RFC analysis.
 
-Your task:
-Analyzing the format related sections of ${rfc_num} document of the ${pro_name} protocol, extract the field from the **request message** that can be used to distinguish or identify the message type or function. Briefly explain how the field is used for this purpose. Focus only on field that directly determine the type of the request message, and do not include fields related to content, parameters, or other functionalities. Only return the most related field in json file. 
+## Your task:
+Analyzing the format related sections of ${rfc_num} document of the ${pro_name} protocol, extract the field from the **request message** that can be used to distinguish or identify the message type or function. Briefly explain how the field is used for this purpose. Focus only on field that directly determine the type of the request message, and do not include fields related to content, parameters, or other functionalities.  Only return one JSON element describing the most related field in json file.
 
-**Format related document sections:**
+## **Format related document sections:**
 {$rfc_doc}
 
-**Output the result in the following JSON format:**
+## **Output the result in the following JSON format:**
 
 {
   "field_name": "",
@@ -15,7 +15,7 @@ Analyzing the format related sections of ${rfc_num} document of the ${pro_name} 
   "value": []
 }
 
-**Sample output:**
+## **Sample output:**
 
 {
   "field_name": "Method",
@@ -24,7 +24,10 @@ Analyzing the format related sections of ${rfc_num} document of the ${pro_name} 
   "value": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", ...]
 }
 
+## **Output Constraint**
 
+- Please extract and explain only the fields related to **request messages**, strictly according to the format and requirements above.
 
-Please extract and explain only the fields related to **request messages**, strictly according to the format and requirements above.
-Only respond with the analysis result in JSON format.
+- Only respond with the analysis result in JSON format.
+
+- Only return one JSON element describing the most related field in json file.
