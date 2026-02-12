@@ -128,14 +128,23 @@ class AsyncRFCParser:
         """Key Field Parse"""
         req_path = self.ir_path / 'req.json'
         res_path = self.ir_path / 'res.json'
-        res_task = asyncio.create_task(self._res_field(res_path))
-        req_task = asyncio.create_task(self._req_field(req_path))
         
-        res_json = await res_task
-        req_json = await req_task
+        if not req_path.is_file() or not res_path.is_file():
+            res_task = asyncio.create_task(self._res_field(res_path))
+            req_task = asyncio.create_task(self._req_field(req_path))
+            
+            res_json = await res_task
+            req_json = await req_task
 
-        self.req_types = set(req_json['value'])
-        self.res_types = set(res_json['value'])
+            
+        else:
+            with open(req_path, 'r', encoding='utf-8') as f:
+                req_json = json.load(f)
+                self.req_types = set(req_json['value'])
+                
+            with open(res_path, 'r', encoding='utf-8') as f:
+                res_json = json.load(f)
+                self.res_types = set(res_json['value'])
 
         logger.debug('RFCParser: finish key field extraction')
     
