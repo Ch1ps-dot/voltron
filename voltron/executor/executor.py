@@ -98,7 +98,6 @@ class Executor:
                 logger.debug(f'[SUT Setup Failure]: {e}')
                 return None
         else:
-            logger.debug(f'no post_exe')
             return None
 
     def pre_exe(
