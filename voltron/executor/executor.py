@@ -97,6 +97,9 @@ class Executor:
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
                 return None
+        else:
+            logger.debug(f'no post_exe')
+            return None
 
     def pre_exe(
         self
@@ -136,6 +139,7 @@ class Executor:
         if proc is None or clean is None:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
+        
         if proc.poll() is not None: 
             # out, err = proc.communicate()
             # logger.debug(f'Executor: SUT Setup Failure: {err} {out}')
@@ -321,10 +325,11 @@ class Executor:
                     logger.debug(f'sut returncode: {returncode}')
         except Exception as err:
             logger.debug(f'proc close err: {err}')
-            
-        if clean.poll() is None:
-            os.killpg(clean.pid, signal.SIGTERM)
-            clean.wait()
+        
+        if clean != None:   
+            if clean.poll() is None:
+                os.killpg(clean.pid, signal.SIGTERM)
+                clean.wait()
         
         # ensure sub-subprocess die
         while True:
@@ -341,16 +346,17 @@ class Executor:
                 break
         
         # kill clean script
-        try:
-            os.killpg(clean.pid, 0)
-            
-            # no die, just kill
-            os.killpg(clean.pid, signal.SIGKILL)
-            logger.debug(f"clean process: clean process alive")
-        except Exception as e:
-            # sub-subprocess die out
-            # logger.debug(f'clean process: {e}')
-            pass
+        if clean != None:
+            try:
+                os.killpg(clean.pid, 0)
+                
+                # no die, just kill
+                os.killpg(clean.pid, signal.SIGKILL)
+                logger.debug(f"clean process: clean process alive")
+            except Exception as e:
+                # sub-subprocess die out
+                # logger.debug(f'clean process: {e}')
+                pass
                 
 
         # self.post_exe()
