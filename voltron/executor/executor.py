@@ -136,7 +136,7 @@ class Executor:
         
         # logger.debug('exe: after setup')
         
-        if proc is None or clean is None:
+        if proc is None:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
         
