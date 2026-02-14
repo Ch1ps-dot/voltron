@@ -112,7 +112,6 @@ class Executor:
                     preexec_fn=os.setpgrp
                 )
                 analyzer.sut_proc = proc
-                time.sleep(20)
                 return proc
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
@@ -141,6 +140,7 @@ class Executor:
         if proc.poll() is not None: 
             # out, err = proc.communicate()
             logger.debug(f'Executor: SUT Setup Failure: {proc.returncode}')
+            time.sleep(20)
             return False, None
         
         # avoid unexceptional crash of target
