@@ -171,12 +171,18 @@ class Executor:
             time.sleep(self.setup_time_s)
             sock = self.setup_socket()
             if sock == None:
-                if proc.poll() is not None:
+                if proc != None and proc.poll() is not None:
                     logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
+                    proc = self.pre_exe()
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
                 break
+            
+        if proc is None:
+            raise Exception('Execute: process bad')
+        if proc.poll() is not None:
+            raise Exception('Execute: process bad')
             
         if sock == None:
             logger.debug('socket: setup failure')
