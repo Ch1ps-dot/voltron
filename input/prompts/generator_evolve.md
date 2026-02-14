@@ -28,6 +28,12 @@ $info
 
 $trace
 
+### **Generated program of semantic related request message**:
+   
+   $related_code
+   
+---
+
 ## **Your Task**
 
 ### 1. Root Cause Analysis for Error Response
@@ -54,11 +60,11 @@ $trace
 - Maintain compatibility with the current server state (where applicable) while exploring new transition paths
 
 ### 4. Generate a State Transition-Oriented Message Generator
-- Produce a Python function that constructs **protocol-valid, state-transition-aware instances** of the $msg_type message:
+- Produce a Python function that constructs **protocol-valid, state-transition-aware instance** of the $msg_type message:
   - All fields are instantiated with valid values that can trigger diverse state transitions
   - Includes controlled variations of key semantic fields to unlock unobserved states
   - Ensures compatibility with SUT's expected behavior while maximizing transition diversity
-  - Generates messages that can progress through sequential state transition chains (not just single-step transitions)
+  - The output of generator only contains only one target type of message.
 
 ---
 
