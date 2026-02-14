@@ -303,7 +303,8 @@ class AsyncProducer:
             while(True):
                 try:
                     # generate input generator and save it
-                    
+                    logger.debug(self.poss_response)
+                    logger.debug(self.poss_response[msg_type])
                     mutate_code = await self.chater.llm_mutator_evolve(
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
