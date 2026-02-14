@@ -211,9 +211,24 @@ class Executor:
         # send the message path
         for msg_type, msg in msg_seq:
             
-            if self.stop_event.is_set() or proc.poll() is not None:
-                cons.add_state(msg_type, 'TIMEOUR')
-                logger.debug('server close')
+            if self.stop_event.is_set():
+                break
+            
+            if proc.poll() is not None:
+                
+                return_code = proc.poll()
+                if return_code:
+                    cons.add_state(msg_type, 'CRASH')
+                    cons.add_data(req_data, bytes())
+                    logger.debug(f'Program crash exitcode {return_code}')
+                    with self.analyzer.lock:
+                        self.analyzer.crash_num += 1
+                    if configs.fuzz_mode != 'replay':
+                        stderr_data = proc.communicate()
+                        self.save_cons(cons, str(stderr_data))
+                else:
+                    cons.add_state(msg_type, 'TIMEOUR')
+                    logger.debug('server close')
                 break
             
             # send message and parse response
