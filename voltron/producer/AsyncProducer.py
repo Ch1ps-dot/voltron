@@ -4,6 +4,7 @@ from tqdm import tqdm
 import json, asyncio
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
+import traceback
 
 from voltron.producer.generator import Generator
 from voltron.producer.parser import Parser
@@ -333,6 +334,7 @@ class AsyncProducer:
                     return msg_type, mutate_code
                 except Exception as e:
                     logger.debug(f'Producer :generate error {e}')
+                    logger.debug(f'Producer :generate error {traceback.format_exc()}')
 
     async def _generator_mutate_async(
         self,
