@@ -9,7 +9,7 @@ lightftp:
 pureftpd:
   protocol: ftp
   host: 127.0.0.1
-  port: 21
+  port: 2121
   rfc_name: ["rfc959"]
   trans_layer: tcp
   server: parent
