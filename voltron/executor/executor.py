@@ -112,8 +112,7 @@ class Executor:
                     preexec_fn=os.setpgrp
                 )
                 analyzer.sut_proc = proc
-                stderr = proc.communicate()
-                logger.debug(f'pre exe: {proc.returncode} {str(stderr)}')
+                time.sleep(20)
                 return proc
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
