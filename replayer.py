@@ -14,7 +14,7 @@ def main(
     dir: str, 
     gcov_folder: str
 ):
-    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd'}
+    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighthttpd'}
     if sut in supported_sut:
         cmdline = ''
         with open(configs.base_path / 'input' / 'scripts' / sut / 'run.txt', 'r') as f:
