@@ -332,8 +332,8 @@ class Executor:
             if proc.poll() is None:
                 if configs.fuzz_mode == 'fuzz':
                     os.killpg(proc.pid, signal.SIGTERM)
-                    returncode = proc.wait(timeout=0.5)
-                    logger.debug(f'sut returncode: {returncode}')
+                    returncode = proc.wait(timeout=3)
+                    logger.debug(f'sut returncode: {returncode} {proc.pid}')
                 elif configs.fuzz_mode == 'replay':
                     os.killpg(proc.pid, signal.SIGUSR1)
                     returncode = proc.wait(timeout=3)
