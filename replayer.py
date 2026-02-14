@@ -12,7 +12,7 @@ from pathlib import Path
 def main(
     sut: str, 
     dir: str, 
-    cov_folder: str
+    gcov_folder: str
 ):
     supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd'}
     if sut in supported_sut:
@@ -26,7 +26,7 @@ def main(
         )
         replayer.replay(
             res_dir=Path(dir),
-            cov_folder=Path(cov_folder)
+            cov_folder=Path(gcov_folder)
         )
     else:
         print('Unkown Target')
