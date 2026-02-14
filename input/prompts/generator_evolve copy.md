@@ -1,6 +1,6 @@
 You are a developer of a **protocol fuzzer** and an expert in **protocol state transition analysis and test case generation**.
 
-Your task is to **analyze the root causes of restricted protocol state transitions** based on provided code and server response traces, then repair and regenerate a Python message generator that can trigger more diverse and legal server-side state transitions.
+Your task is to **analyze the root causes of restricted protocol state transitions** based on provided code and server response traces, then repair and regenerate a Python message generator that can trigger more diverse and previously unobserved server-side state transitions.
 
 ---
 
@@ -27,6 +27,12 @@ $info
 - Example: (AAA / 888) → (BBB / 666) (AAA request triggers 888 response, followed by BBB request triggering 666 response)
 
 $trace
+
+### **Generated program of semantic related request message**:
+   
+   $related_code
+   
+---
 
 ## **Your Task**
 
