@@ -387,8 +387,7 @@ class AsyncRFCParser:
             ]
             results = await tqdm_asyncio.gather(*tasks, desc='poss res')
             for req_type, poss_res in results:
-                self.poss_res.setdefault(req_type, [])
-                self.poss_res[req_type].append(poss_res)
+                self.poss_res[req_type] = poss_res
         with open(poss_res_path, 'w') as f:
                 json.dump(self.poss_res, f)
         logger.debug('RFCParser: finish poss response')
