@@ -407,7 +407,7 @@ class AsyncRFCParser:
                         response_types=json.dumps(list(self.res_types))
                     )
                     cur_poss_res = json.loads(ans_str)
-                    return req_type, cur_poss_res
+                    return req_type, cur_poss_res['possible_response']
                 except Exception as e:
                     logger.debug(f'RFCParser: poss response {e}')
 
