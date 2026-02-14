@@ -121,6 +121,7 @@ class Executor:
                         stderr=subprocess.PIPE
                     )
                     analyzer.sut_proc = proc
+                    logger.debug(f'exe pid {proc.pid}')
                     return proc
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
@@ -402,6 +403,7 @@ class Executor:
             for pid in pids:
                 logger.debug(f'kill {pid}')
                 os.kill(pid, signal.SIGTERM)
+
         except Exception as e:
             logger.debug(f'kill execution failure {e}')
         
