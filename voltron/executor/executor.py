@@ -212,6 +212,8 @@ class Executor:
         for msg_type, msg in msg_seq:
             
             if self.stop_event.is_set() or proc.poll() is not None:
+                cons.add_state(msg_type, 'TIMEOUR')
+                logger.debug('server close')
                 break
             
             # send message and parse response

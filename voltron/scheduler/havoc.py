@@ -157,7 +157,7 @@ class Havoc:
         for i in range(len(cons.res_seq)):
             req = cons.req_seq[i]
             res = cons.res_seq[i]
-            if res == '-':
+            if res == '-' or res == '-':
                 continue
             
             if res == 'TIMEOUT':
