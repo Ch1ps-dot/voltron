@@ -75,6 +75,7 @@ class Fuzzer:
         configs.api_key = configs_yaml['llm']['api_key']
         configs.model = configs_yaml['llm']['model']
         configs.async_sem = configs_yaml['llm']['async_sem']
+        configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)

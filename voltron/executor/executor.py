@@ -105,14 +105,23 @@ class Executor:
     ) -> subprocess.Popen | None:
         if (self.pre_script.is_file()):
             try:
-                proc = subprocess.Popen(
-                    self.cmdline,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    preexec_fn=os.setpgrp
-                )
-                analyzer.sut_proc = proc
-                return proc
+                if configs.server == 'parent':
+                    proc = subprocess.Popen(
+                        self.cmdline,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.PIPE,
+                        preexec_fn=os.setpgrp
+                    )
+                    analyzer.sut_proc = proc
+                    return proc
+                elif configs.server == 'child':
+                    proc = subprocess.Popen(
+                        self.cmdline,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.PIPE
+                    )
+                    analyzer.sut_proc = proc
+                    return proc
             except Exception as e:
                 logger.debug(f'[SUT Setup Failure]: {e}')
                 return None
@@ -330,18 +339,19 @@ class Executor:
                 clean.wait()
         
         # ensure sub-subprocess die
-        while True:
-            try:
-                os.killpg(proc.pid, 0)
-                # no die, just kill
-                time.sleep(0.1)
-                os.killpg(proc.pid, signal.SIGKILL)
-                logger.debug(f'try to kill: {proc.pid}')
-            except Exception as e:
-                # sub-subprocess die out
-                analyzer.sut_proc = None
-                # logger.debug(f'target process: {e}')
-                break
+        if proc.poll is None:
+            while True:
+                try:
+                    os.killpg(proc.pid, 0)
+                    # no die, just kill
+                    time.sleep(0.1)
+                    os.killpg(proc.pid, signal.SIGKILL)
+                    logger.debug(f'try to kill: {proc.pid}')
+                except Exception as e:
+                    # sub-subprocess die out
+                    analyzer.sut_proc = None
+                    # logger.debug(f'target process: {e}')
+                    break
         
         # kill clean script
         if clean != None:

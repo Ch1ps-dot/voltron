@@ -4,6 +4,7 @@ lightftp:
   port: 2200
   rfc_name: ["rfc959"]
   trans_layer: tcp
+  server: parent
 
 pureftpd:
   protocol: ftp
@@ -11,6 +12,7 @@ pureftpd:
   port: 2121
   rfc_name: ["rfc959"]
   trans_layer: tcp
+  server: parent
 
 kamailio:
   protocol: sip
@@ -18,6 +20,7 @@ kamailio:
   port: 5060
   rfc_name: ["rfc3262", "rfc3261",  "rfc3311", "rfc3428", "rfc3515", "rfc3903", "rfc6086", "rfc6665"]
   trans_layer: udp
+  server: parent
 
 live555:
   protocol: rtsp
@@ -25,6 +28,7 @@ live555:
   port: 8554
   rfc_name: ["rfc7826"]
   trans_layer: tcp
+  server: parent
 
 lighthttpd:
   protocol: http
@@ -32,6 +36,7 @@ lighthttpd:
   port: 8080
   rfc_name: ["rfc9110"]
   trans_layer: tcp
+  server: child
 
 llm:
   base_url: https://xiaoai.plus/v1

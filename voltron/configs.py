@@ -28,6 +28,8 @@ class Config:
         self.model: str
         self.async_sem: int
         
+        self.server: str
+        
         self.time_limit_s: int
 
 configs = Config()
