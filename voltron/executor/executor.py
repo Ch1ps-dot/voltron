@@ -113,6 +113,7 @@ class Executor:
                         preexec_fn=os.setpgrp
                     )
                     analyzer.sut_proc = proc
+                    logger.debug(f'exe pid {proc.pid}')
                     return proc
                 elif configs.server == 'child':
                     proc = subprocess.Popen(
