@@ -8,13 +8,13 @@ from pathlib import Path
 @click.command(help='fuzzer')
 @click.option("-s", "--sut", type=str, required=True, help="server under test")
 @click.option("-d", "--dir", type=str, required=True, help="testcase input direcotory")
-@click.option("-c", "--cov_folder", type=str, required=True, help="coverage analysis directory")
+@click.option("-c", "--gcov_folder", type=str, required=True, help="gcov analysis directory")
 def main(
     sut: str, 
     dir: str, 
     cov_folder: str
 ):
-    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim'}
+    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd'}
     if sut in supported_sut:
         cmdline = ''
         with open(configs.base_path / 'input' / 'scripts' / sut / 'run.txt', 'r') as f:

@@ -77,6 +77,9 @@ class Havoc:
                         req_seq = [cur_req] + req_seq
                         break
                     req_seq = [cur_req] + req_seq
+                    last_dict: dict[str, dict] = self.req_dep[cur_req]
+                    last_req = self.rand.choice(list(last_dict.keys()))
+                    cur_req = last_req
                 gs = self.mapper.select_generators(req_seq)
             else:
                 gs = self.rand.choice(self.useful_seq)
