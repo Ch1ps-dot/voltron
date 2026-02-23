@@ -360,7 +360,7 @@ class Executor:
                 try:
                     os.killpg(proc.pid, 0)
                     # no die, just kill
-                    stderr = proc.communicate()
+                    stderr = proc.communicate(1)
                     time.sleep(0.1)
                     os.killpg(proc.pid, signal.SIGKILL)
                     logger.debug(f'try to kill: {proc.pid} {stderr}')
