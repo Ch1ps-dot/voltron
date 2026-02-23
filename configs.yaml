@@ -14,6 +14,14 @@ pureftpd:
   trans_layer: tcp
   server: parent
 
+exim:
+  protocol: smtp
+  host: 127.0.0.1
+  port: 25
+  rfc_name: ["rfc5321"]
+  trans_layer: tcp
+  server: parent
+
 kamailio:
   protocol: sip
   host: 127.0.0.1
