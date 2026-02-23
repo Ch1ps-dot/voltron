@@ -228,6 +228,7 @@ class Executor:
                         self.save_cons(cons, str(stderr_data))
                 else:
                     cons.add_state(msg_type, 'TIMEOUR')
+                    cons.add_data(req_data, bytes())
                     logger.debug('server close')
                 break
             
