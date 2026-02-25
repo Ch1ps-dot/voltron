@@ -389,7 +389,12 @@ class Fuzzer:
                     if cons.req_seq[j] == '-':
                         continue
                     req_seq.append((cons.req_seq[j], cons.content[j][0]))
-                flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
+                    
+                try:
+                    flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
+                except Exception as e:
+                    logger.debug(f'replayer: exit {e}')
+                    logger.debug(traceback.format_exc())
 
                 with analyzer.lock:
                     analyzer.finished += 1

@@ -354,21 +354,21 @@ class Executor:
                     returncode = proc.wait(timeout=3)
                     logger.debug(f'sut returncode: {returncode}')
         except Exception as err:
-            while True:
-                try:
-                    os.killpg(proc.pid, 0)
-                    # no die, just kill
-                    stderr = proc.communicate(1)
-                    time.sleep(0.1)
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    logger.debug(f'try to kill: {proc.pid} {stderr}')
-                except Exception as e:
-                    # sub-subprocess die out
-                    analyzer.sut_proc = None
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    logger.debug(f'target process: {e}')
-                    break
             logger.debug(f'proc close err: {err}')
+            
+        while True:
+            try:
+                os.killpg(proc.pid, 0)
+                # no die, just kill
+                stderr = proc.communicate(1)
+                time.sleep(0.1)
+                os.killpg(proc.pid, signal.SIGKILL)
+                logger.debug(f'try to kill: {proc.pid} {stderr}')
+            except Exception as e:
+                # sub-subprocess die out
+                analyzer.sut_proc = None
+                logger.debug(f'target process: {e}')
+                break
         
         # ensure sub-subprocess die
         # if proc.poll is None:
