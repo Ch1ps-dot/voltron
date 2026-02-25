@@ -314,7 +314,6 @@ class Fuzzer:
             if (configs.time_limit_s < time.time() - analyzer.start_time):
                 logger.debug('Fuzzer: timeout')
                 stop_event.set()
-                sys.exit(1)
                 
         return h_lsit[-1]
     
@@ -344,17 +343,17 @@ class Fuzzer:
                 with analyzer.lock:   
                     analyzer.iter += 1
                     analyzer.reset_automata_cnt()
+                analyzer.collect_results()
                 
             except Exception as e:
                 logger.debug(f'Fuzzer: exit {e}')
                 logger.debug(traceback.format_exc())
                 stop_event.set()
-                sys.exit(1)
                 
             if (configs.time_limit_s < time.time() - analyzer.start_time):
                 logger.debug('Fuzzer: timeout')
                 stop_event.set()
-                sys.exit(1)
+                analyzer.collect_results()
                 
     def replay_process(
         self,

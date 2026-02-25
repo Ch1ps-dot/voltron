@@ -95,7 +95,7 @@ class Executor:
                 )
                 return proc
             except Exception as e:
-                logger.debug(f'[SUT Setup Failure]: {e}')
+                logger.debug(f'[SUT clean Failure]: {e}')
                 return None
         else:
             return None
