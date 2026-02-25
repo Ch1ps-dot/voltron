@@ -142,16 +142,13 @@ class Executor:
         clean = self.post_exe()
         proc = self.pre_exe()
         
-        # logger.debug('exe: after setup')
         
         if proc is None:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
         
         if proc.poll() is not None: 
-            # out, err = proc.communicate()
             logger.debug(f'Executor: SUT Setup Failure: {proc.returncode}')
-            time.sleep(20)
             return False, None
         
         # avoid unexceptional crash of target
@@ -217,7 +214,7 @@ class Executor:
             if proc.poll() is not None:
                 
                 return_code = proc.poll()
-                if return_code:
+                if return_code == 1:
                     cons.add_state(msg_type, 'CRASH')
                     cons.add_data(req_data, bytes())
                     logger.debug(f'Program crash exitcode {return_code}')
@@ -248,7 +245,7 @@ class Executor:
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
-                    if return_code:
+                    if return_code == 1:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -267,7 +264,7 @@ class Executor:
                 
                 elif resp_code == 'TIMEOUT':
                     return_code = proc.poll()
-                    if return_code:
+                    if return_code == 1:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -286,7 +283,7 @@ class Executor:
                 
                 elif resp_code == 'RCLOSED':
                     return_code = proc.poll()
-                    if return_code:
+                    if return_code == 1:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -368,29 +365,25 @@ class Executor:
                 except Exception as e:
                     # sub-subprocess die out
                     analyzer.sut_proc = None
-                    # logger.debug(f'target process: {e}')
+                    os.killpg(proc.pid, signal.SIGKILL)
+                    logger.debug(f'target process: {e}')
                     break
             logger.debug(f'proc close err: {err}')
         
-        if clean != None:   
-            if clean.poll() is None:
-                os.killpg(clean.pid, signal.SIGTERM)
-                clean.wait()
-        
         # ensure sub-subprocess die
-        if proc.poll is None:
-            while True:
-                try:
-                    os.killpg(proc.pid, 0)
-                    # no die, just kill
-                    time.sleep(0.1)
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    logger.debug(f'try to kill: {proc.pid}')
-                except Exception as e:
-                    # sub-subprocess die out
-                    analyzer.sut_proc = None
-                    # logger.debug(f'target process: {e}')
-                    break
+        # if proc.poll is None:
+        #     while True:
+        #         try:
+        #             os.killpg(proc.pid, 0)
+        #             # no die, just kill
+        #             time.sleep(0.1)
+        #             os.killpg(proc.pid, signal.SIGKILL)
+        #             logger.debug(f'try to kill: {proc.pid}')
+        #         except Exception as e:
+        #             # sub-subprocess die out
+        #             analyzer.sut_proc = None
+        #             logger.debug(f'target process: {e}')
+        #             break
         
         # kill clean script
         if clean != None:
