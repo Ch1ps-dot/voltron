@@ -6,7 +6,7 @@ file=$3 #conversation file
 
 #process fuzzer-generated testcases
 time=$(stat -c %Y $file)
-cp /home/fuzzing/home/ubuntu/experiments/pure-ftpd-gcov/src/*.gcda /home/ubuntu/experiments/pure-ftpd-gcov/src/ > /dev/null 2>&1
+cp /home/fuzzing/experiments/pure-ftpd-gcov/src/*.gcda /home/ubuntu/experiments/pure-ftpd-gcov/src/ > /dev/null 2>&1
 cov_data=$(gcovr -r $folder -s | grep "[lb][a-z]*:")
 l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)
 l_abs=$(echo "$cov_data" | grep lines | cut -d" " -f3 | cut -c2-)
