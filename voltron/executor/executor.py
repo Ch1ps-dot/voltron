@@ -105,7 +105,17 @@ class Executor:
     ) -> subprocess.Popen | None:
         if (self.pre_script.is_file()):
             try:
-                if configs.server == 'parent':
+                if configs.fuzz_mode == 'replay':
+                    proc = subprocess.Popen(
+                        self.cmdline,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.PIPE,
+                        preexec_fn=os.setpgrp
+                    )
+                    analyzer.sut_proc = proc
+                    logger.debug(f'exe pid {proc.pid}')
+                    return proc
+                elif configs.server == 'parent':
                     proc = subprocess.Popen(
                         self.cmdline,
                         stdout=subprocess.DEVNULL,
