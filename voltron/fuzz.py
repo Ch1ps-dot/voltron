@@ -370,9 +370,15 @@ class Fuzzer:
             
         file_count = 0
         try:
+            file_paths = [f for f in in_dir.iterdir() if f.is_file()]
+            sorted_files = sorted(
+                file_paths,
+                key=self.get_creation_timestamp,
+                reverse=False
+            )
             cons_seq: list[Conversation] = []
             file_list: list[Path] = []
-            for item in in_dir.iterdir():
+            for item in sorted_files:
                 if item.is_file():
                     with open(item, 'rb') as f:
                         cons = pickle.load(f)
@@ -425,3 +431,12 @@ class Fuzzer:
             with analyzer.lock:
                 analyzer.collect_results()
         sys.exit(1)
+        
+    def get_creation_timestamp(
+        self, 
+        file: Path
+    ) -> float:
+        try:
+            return file.stat().st_birthtime
+        except AttributeError:
+            return file.stat().st_ctime
