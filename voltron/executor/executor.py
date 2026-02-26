@@ -106,8 +106,10 @@ class Executor:
         if (self.pre_script.is_file()):
             try:
                 if configs.fuzz_mode == 'replay':
+                    cmd = ['bash', '-c']
+                    cmd.append(' '.join(self.cmdline))
                     proc = subprocess.Popen(
-                        self.cmdline,
+                        cmd,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         preexec_fn=os.setpgrp
