@@ -221,7 +221,7 @@ class Executor:
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
                     if configs.fuzz_mode != 'replay':
-                        stderr_data = proc.communicate()
+                        stderr_data = proc.communicate(timeout=1)
                         self.save_cons(cons, str(stderr_data))
                 else:
                     cons.add_state(msg_type, 'TIMEOUR')
@@ -252,7 +252,7 @@ class Executor:
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate()
+                            stderr_data = proc.communicate(timeout=1)
                             self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'CLOSED')
@@ -271,7 +271,7 @@ class Executor:
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate()
+                            stderr_data = proc.communicate(timeout=1)
                             self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'TIMEOUT')
@@ -290,7 +290,7 @@ class Executor:
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate()
+                            stderr_data = proc.communicate(timeout=1)
                             self.save_cons(cons, str(stderr_data))
                     else:
                         cons.add_state(msg_type, 'CLOSED')
@@ -327,7 +327,7 @@ class Executor:
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
                     if configs.fuzz_mode != 'replay':
-                        stderr_data = proc.communicate()
+                        stderr_data = proc.communicate(timeout=1)
                         self.save_cons(cons, str(stderr_data))
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
@@ -360,7 +360,7 @@ class Executor:
             try:
                 os.killpg(proc.pid, 0)
                 # no die, just kill
-                stderr = proc.communicate(1)
+                stderr = proc.communicate(timeout=1)
                 time.sleep(0.1)
                 os.killpg(proc.pid, signal.SIGKILL)
                 logger.debug(f'try to kill: {proc.pid} {stderr}')
