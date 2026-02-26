@@ -1,4 +1,5 @@
 #!/bin/bash
+pkill pure-ftpd
 rm -rf /home/fuzzing/*
 
 TARGET_DIR="/home/ubuntu"  # 要清理的目录（绝对路径/相对路径）
