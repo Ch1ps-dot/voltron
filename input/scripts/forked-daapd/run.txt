@@ -1,0 +1,1 @@
+./src/forked-daapd -d 0 -c ./forked-daapd.conf -f

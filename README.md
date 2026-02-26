@@ -51,14 +51,16 @@ source .venv/bin/activate
 
 1. Prepare server information and rfc documents of target protocol implementations, and put them under the folder input/infos and input/rfcs.
 
-2. Put the script of running and resetting target program under folder input/script/<targetname>.
+2. Put the script of running and resetting target program under folder input/scripts/<targetname>.
+    - run.txt: command to setup sut.
+    - post.sh: scripts to reset the sut.
 
 3. Write configurations of server under test in configs.yaml like other target, and dont forget to set your LLM API. 
 
 4. run fuzzer. 
 
 ```bash
-uv run main.py -t <target-name>
+uv run cli.py -s <target-name> -a <mode> -t <time_s>
 ```
 
 If it is the first time to test the target, fuzzer will begin to split provided rfc documents. Then it will use LLM to transform the message and state information within rfc to protoIR and state constraint. Finally, use LLM to generate seed generator and parser. The intermidiate files during above steps can be reused in another new round of fuzzing.

@@ -367,7 +367,7 @@ class Fuzzer:
         cov_file = res_dir / 'cov_over_time.csv'
         with analyzer.lock:   
             analyzer.stage = 'replay'
-        
+            
         file_count = 0
         try:
             cons_seq: list[Conversation] = []
