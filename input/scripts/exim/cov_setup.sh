@@ -5,6 +5,7 @@ covfile=$2  #path to coverage file
 
 #delete the existing coverage file
 rm $covfile; touch $covfile
+./src/build-Linux-x86_64/exim -bd -oX 25
 
 #clear gcov data
 #since the source files of LightFTP are stored in the parent folder of the current folder
