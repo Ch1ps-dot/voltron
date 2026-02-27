@@ -1,1 +1,1 @@
-exim -bd -oX 25
+./src/build-Linux-x86_64/exim -bd -oX 25
