@@ -611,13 +611,16 @@ class Executor:
                     else:
                         # recv response and parse it
                         resp_code = ''
-                        for i in range(5):
+                        for i in range(2):
                             resp_code: str = self.parser_func(buf)
                             if resp_code == '':
                                 logger.debug(f'parse error:{buf}')
                                 new_parser = self.mapper.update_parser(buf)
                                 self.load_parser(new_parser)
                                 logger.debug('Update Parser')
+                            else:
+                                break
+                            
                         if resp_code == '':
                             logger.debug('Parse Error')
                             resp_code = 'UNKOWN'
