@@ -68,8 +68,10 @@ class Analyzer:
                 f.write(f'{"protocol_name":<15}: {self.pro_name}\n')
                 f.write(f'{"exec_path_num":<15}: {self.path_num}\n')
                 f.write(f'{"sent_request":<15}: {self.req_num}\n')
+                f.write(f'{"recv_resp":<15}: {self.res_num}\n')
                 f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
                 f.write(f'{"resp_transitions":<15}: {self.resp_trans_num()}\n')
+                f.write(f'{"crash_num":<15}: {self.crash_num}\n')
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
             
