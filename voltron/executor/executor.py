@@ -702,6 +702,7 @@ class Executor:
             for request, response in cons.content:
                 if request:
                     f.write(request + b'\n')
+                    f.write(response + b'\n')
         
         file_count = 0
         target_folder = configs.results_path / 'replayable_testcases'
