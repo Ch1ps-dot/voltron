@@ -160,7 +160,7 @@ class Havoc:
             if res == '-' or res == '-':
                 continue
             
-            if res == 'TIMEOUT':
+            if res == 'TIMEOUT' or res == 'CRASH':
                 break
             
             if res not in self.unique_resp:

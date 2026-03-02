@@ -257,7 +257,7 @@ class Executor:
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
-                    if return_code == 1:
+                    if return_code != None and return_code < 0:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -265,7 +265,7 @@ class Executor:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
                             stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data))
+                            self.save_cons(cons, str(stderr_data), True)
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -276,7 +276,7 @@ class Executor:
                 
                 elif resp_code == 'TIMEOUT':
                     return_code = proc.poll()
-                    if return_code == 1:
+                    if return_code != None and return_code < 0:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -284,7 +284,7 @@ class Executor:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
                             stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data))
+                            self.save_cons(cons, str(stderr_data), True)
                     else:
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
@@ -295,7 +295,7 @@ class Executor:
                 
                 elif resp_code == 'RCLOSED':
                     return_code = proc.poll()
-                    if return_code == 1:
+                    if return_code != None and return_code < 0:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -303,7 +303,7 @@ class Executor:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
                             stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data))
+                            self.save_cons(cons, str(stderr_data), True)
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -334,11 +334,12 @@ class Executor:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                if return_code == 1:
+                if return_code != None and return_code < 0:
                     cons.add_state('-', 'CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
                         stderr_data = proc.communicate(timeout=1)
+                        logger.debug(f'Program crash exitcode {return_code}')
                         self.save_cons(cons, str(stderr_data), True)
                     if configs.fuzz_mode != 'replay':
                         stderr_data = proc.communicate(timeout=1)
