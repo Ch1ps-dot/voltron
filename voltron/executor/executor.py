@@ -381,7 +381,6 @@ class Executor:
             except Exception as e:
                 # sub-subprocess die out
                 analyzer.sut_proc = None
-                os.killpg(proc.pid, signal.SIGKILL)
                 logger.debug(f'target process: {e}')
                 break
         
