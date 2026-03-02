@@ -142,10 +142,14 @@ class AsyncRFCParser:
         else:
             with open(req_path, 'r', encoding='utf-8') as f:
                 req_json = json.load(f)
+                if type(req_json) == list:
+                    req_json = req_json[0]
                 self.req_types = set(req_json['value'])
                 
             with open(res_path, 'r', encoding='utf-8') as f:
                 res_json = json.load(f)
+                if type(req_json) == list:
+                    req_json = req_json[0]
                 self.res_types = set(res_json['value'])
 
         logger.debug('RFCParser: finish key field extraction')
