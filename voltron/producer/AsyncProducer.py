@@ -469,31 +469,30 @@ class AsyncProducer:
     ) -> None:
         """Generate and save input generator
         """
-        
-        # produce new generator
+        # produce new parser
         parser_code = asyncio.run(self._parser_evo_one(message))
         
         par_dir = self.parser_path
         if not par_dir.is_dir():
             par_dir.mkdir()
         
-        # save generator
+        # save parser
         cur_id = len(self.parsers)
         par_path = par_dir / f'id{cur_id}.py'
         with open(par_path, 'w', encoding='utf-8') as f:
             f.write(parser_code)
-            # construct and save information for new generator
+            # construct and save information for new parser
             
             old_name = self.parsers[-1].name
             new_name = f'id{cur_id}'
             info: dict = {'evolved_from': old_name, 'name': new_name}
             self.parsers.append(Parser(**info))
                 
-        # save the information of new generator to file   
+        # save the information of new parser to file   
         with open(self.parser_info_path, 'w', encoding='utf-8') as f:
             json.dump(self.parser_info(), f)
         
-        logger.debug("[Producer]: finish generator generation")
+        logger.debug("[Producer]: finish parser evolve")
 
     def generator_info(
         self
