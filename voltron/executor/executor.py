@@ -29,6 +29,7 @@ class Executor:
         self.host = configs.host
         self.port = configs.port
         self.trans_layer = configs.trans_layer
+        self.try_times_parser = 2
 
         # time related values
         self.setup_time_s = setup_time_s
@@ -612,7 +613,8 @@ class Executor:
                     else:
                         # recv response and parse it
                         resp_code = ''
-                        for i in range(2):
+                        while self.try_times_parser > 0:
+                            self.try_times_parser = self.try_times_parser - 1
                             resp_code: str = self.parser_func(buf)
                             if resp_code == '':
                                 logger.debug(f'parse error:{buf}')
