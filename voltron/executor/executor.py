@@ -334,10 +334,12 @@ class Executor:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                if return_code and return_code != 0:
+                if return_code == 1:
                     cons.add_state('-', 'CRASH')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
+                        stderr_data = proc.communicate(timeout=1)
+                        self.save_cons(cons, str(stderr_data), True)
                     if configs.fuzz_mode != 'replay':
                         stderr_data = proc.communicate(timeout=1)
                         self.save_cons(cons, str(stderr_data))
@@ -676,10 +678,14 @@ class Executor:
     def save_cons(
         self,
         cons: Conversation,
-        info: str = ''
+        info: str = '',
+        crash: bool = False
     ):
         """Use pickle to store section tree instance
         """
+        pending = ''
+        if crash:
+            pending = '_crash'
         target_folder = configs.results_path / 'raw_testcases'
         if not target_folder.is_dir():
             target_folder.mkdir()
@@ -692,13 +698,10 @@ class Executor:
         while len(file_count) < 6:
             file_count = '0' + file_count
 
-        with open(target_folder / f'cons_{file_count}.raw', 'ab') as f:
+        with open(target_folder / f'cons_{file_count}{pending}.raw', 'ab') as f:
             for request, response in cons.content:
                 if request:
                     f.write(request + b'\n')
-                f.write(b'\n')
-                if response:
-                    f.write(response + b'\n')
         
         file_count = 0
         target_folder = configs.results_path / 'replayable_testcases'
@@ -711,8 +714,9 @@ class Executor:
         file_count = str(file_count)
         while len(file_count) < 6:
             file_count = '0' + file_count        
-        with open(target_folder / f"cons_{file_count}.pkl", "wb") as f:
+        with open(target_folder / f"cons_{file_count}{pending}.pkl", "wb") as f:
             pickle.dump(cons, f)
+            
         
         logger.debug(f'run: save cons_{file_count}')    
         info_file = configs.results_path / 'cons_info'
