@@ -612,17 +612,18 @@ class Executor:
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
-                        resp_code = ''
-                        while self.try_times_parser > 0:
-                            self.try_times_parser = self.try_times_parser - 1
-                            resp_code: str = self.parser_func(buf)
-                            if resp_code == '':
-                                logger.debug(f'parse error:{buf}')
-                                new_parser = self.mapper.update_parser(buf)
-                                self.load_parser(new_parser)
-                                logger.debug('Update Parser')
-                            else:
-                                break
+                        resp_code: str = self.parser_func(buf)
+                        if resp_code == '':
+                            while self.try_times_parser > 0:
+                                self.try_times_parser = self.try_times_parser - 1
+                                resp_code = self.parser_func(buf)
+                                if resp_code == '':
+                                    logger.debug(f'parse error:{buf}')
+                                    new_parser = self.mapper.update_parser(buf)
+                                    self.load_parser(new_parser)
+                                    logger.debug('Update Parser')
+                                else:
+                                    break
                             
                         if resp_code == '':
                             logger.debug('Parse Error')
