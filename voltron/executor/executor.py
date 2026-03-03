@@ -612,7 +612,7 @@ class Executor:
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
-                        resp_code: str = self.parser_func(buf)
+                        resp_code: str = self.parser_func(buf).decode("utf-8", errors="backslashreplace")
                         if resp_code == '':
                             while self.try_times_parser > 0:
                                 self.try_times_parser = self.try_times_parser - 1

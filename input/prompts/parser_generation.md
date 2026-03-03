@@ -37,7 +37,7 @@ Using the provided protocol format information as **the only source of truth**, 
 * Use **packet_parser** as function name
 * Do NOT hard-code protocol-specific assumptions beyond what is stated in the field format information
 * Input is 'bytes'
-* Final output type is `str`
+* Final output type is `bytes`
 
 ---
 
