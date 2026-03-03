@@ -337,14 +337,14 @@ class Executor:
                 # program exited unexpectly
                 if return_code != None and return_code < 0:
                     cons.add_state('-', 'CRASH')
+                    logger.debug(f'Program crash exitcode {return_code}')
                     with self.analyzer.lock:
                         self.analyzer.crash_num += 1
-                        stderr_data = proc.communicate(timeout=1)
-                        logger.debug(f'Program crash exitcode {return_code}')
-                        self.save_cons(cons, str(stderr_data), True)
+
                     if configs.fuzz_mode != 'replay':
                         stderr_data = proc.communicate(timeout=1)
-                        self.save_cons(cons, str(stderr_data))
+                        self.save_cons(cons, str(stderr_data), True)
+                        
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
                 break
