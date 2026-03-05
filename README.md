@@ -50,12 +50,23 @@ source .venv/bin/activate
 ## Usage
 
 1. Prepare server information and rfc documents of target protocol implementations, and put them under the folder input/infos and input/rfcs.
+    - sut info -> input/infos
+    - rfc documents -> input/rfc
 
 2. Put the script of running and resetting target program under folder input/scripts/<targetname>.
     - run.txt: command to setup sut.
     - post.sh: scripts to reset the sut.
 
-3. Write configurations of server under test in configs.yaml like other target, and dont forget to set your LLM API. 
+3. Write configurations of server under test in configs.yaml like other target, and don't forget to set your LLM API. 
+    ```yaml
+    lightftp:
+        protocol: ftp
+        host: 127.0.0.1
+        port: 2200
+        rfc_name: ["rfc959"]
+        trans_layer: tcp #transport layer protoocl
+        server: parent #server mode (parent as default, a few of sut set up child process as server.)
+    ```
 
 4. run fuzzer. 
 
