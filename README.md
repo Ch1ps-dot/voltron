@@ -64,7 +64,7 @@ source .venv/bin/activate
         host: 127.0.0.1
         port: 2200
         rfc_name: ["rfc959"]
-        trans_layer: tcp #transport layer protoocl
+        trans_layer: tcp #transport layer protocol
         server: parent #server mode (parent as default, a few of sut set up child process as server.)
     ```
 
