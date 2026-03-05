@@ -8,9 +8,13 @@ Implemented functions contains:
 
 2. LLM guided synthesis of message generator and parser.
 
-3. modified LM* algorithm for model learning
+3. Modified LM* algorithm for model learning
 
-4. response feedback and request dependencies guided generator evolving.
+4. Response feedback and request dependencies guided generator and parser evolving.
+
+5. State dependency guided message sequence generation.
+
+6. Replayer for code coverage calculation. 
 
 ## Project Structure
 
@@ -77,6 +81,10 @@ uv run cli.py -s <target-name> -a <mode> -t <time_s>
 If it is the first time to test the target, fuzzer will begin to split provided rfc documents. Then it will use LLM to transform the message and state information within rfc to protoIR and state constraint. Finally, use LLM to generate seed generator and parser. The intermidiate files during above steps can be reused in another new round of fuzzing.
 
 When you see the fuzzer runtime monitor menu, it means the fuzzer begins to work.
+
+## command line for profuzzbench
+
+After setting up voltron, you can
 
 ## Analysis
 
