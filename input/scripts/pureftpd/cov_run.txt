@@ -1,1 +1,1 @@
-GCOV_PREFIX=/home/fuzzing/ src/pure-ftpd -A
+GCOV_PREFIX=/home/fuzzing/ /home/fuzzing/experiments/pure-ftpd-gcov/src/pure-ftpd -A
