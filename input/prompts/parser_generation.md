@@ -25,8 +25,8 @@ Using the provided protocol format information as **the only source of truth**, 
 1. Accepts a **response message** as input (string or bytes).
 2. Locates the **status / reply code field** according to the `position` description.
 3. Extracts the status code from the response message.
-4. Converts the extracted status code into an **string**.
-5. Return empty string '' if the status code cannot be located
+4. Converts the extracted status code into a bytes.
+5. Return empty bytes('') if the status code cannot be located
 
 ---
 

@@ -11,6 +11,8 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback, sys, os, signal
 
+CRASH_SIGNALS = {-6, -11, -4, -8}
+
 class Executor:
     def __init__(
             self,
@@ -227,7 +229,7 @@ class Executor:
             if proc.poll() is not None:
                 
                 return_code = proc.poll()
-                if return_code == 1:
+                if return_code in CRASH_SIGNALS:
                     cons.add_state(msg_type, 'CRASH')
                     cons.add_data(req_data, bytes())
                     logger.debug(f'Program crash exitcode {return_code}')
@@ -258,7 +260,7 @@ class Executor:
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
-                    if return_code != None and return_code < 0:
+                    if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -277,7 +279,7 @@ class Executor:
                 
                 elif resp_code == 'TIMEOUT':
                     return_code = proc.poll()
-                    if return_code != None and return_code < 0:
+                    if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -296,7 +298,7 @@ class Executor:
                 
                 elif resp_code == 'RCLOSED':
                     return_code = proc.poll()
-                    if return_code != None and return_code < 0:
+                    if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -335,7 +337,7 @@ class Executor:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                if return_code != None and return_code < 0:
+                if return_code != None and return_code in CRASH_SIGNALS:
                     cons.add_state('-', 'CRASH')
                     logger.debug(f'Program crash exitcode {return_code}')
                     with self.analyzer.lock:

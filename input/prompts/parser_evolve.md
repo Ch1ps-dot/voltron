@@ -29,7 +29,7 @@ When modifying the original `packet_parser` code:
 4. **Maintain constraints**: 
    - Still use only Python 3.x built-in libraries
    - Function name remains `packet_parser`
-   - Input type: bytes, Output type: str (empty string only for truly invalid status code)
+   - Input type: bytes, Output type: bytes (empty bytes('') only for truly invalid status code)
 
 ---
 
