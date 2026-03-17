@@ -54,6 +54,14 @@ lighttpd:
   trans_layer: tcp
   server: child
 
+dnsmasq:
+  protocol: dns
+  host: 127.0.0.1
+  port: 5353
+  rfc_name: ["rfc1034", "rfc1035"]
+  trans_layer: udp
+  server: parent
+
 llm:
   base_url: https://xiaoai.plus/v1
   api_key: sk-vUIK7aS2md6wOsKyEsEEDzzDYNu5BwwaQ9UofpG9N7XB6egQ
