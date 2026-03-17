@@ -8,7 +8,7 @@ import click, random
 @click.option("-s", "--sut", type=str, required=True, help="server under test")
 @click.option("-a", "--algorithm", type=str, default='state', help="fuzzing algorithm")
 @click.option("-t", "--time", type=str, required=True, help="fuzzing time (minute)")
-@click.option("-c", "--cmdline", type=str, default='auto', help="fuzzing time (minute)")
+@click.option("-c", "--cmdline", type=str, default='auto', help="cmd line to invoke target")
 def main(
     sut: str, 
     algorithm: str, 
