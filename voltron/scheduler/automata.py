@@ -2,6 +2,20 @@ from voltron.configs import configs
 from graphviz import Digraph
 
 class MealyMachine:
+    """Mealy machine implementation for modeling the sut's behavior.
+    
+    Attributes:
+        id: Identifier for the automaton.
+        states: A set of states in the automaton.
+        alphabet: A set of input symbols (requests).
+        delta: A transition function mapping (state, input) pairs to the next state.
+        output: An output function mapping (state, input) pairs to the corresponding output (response).
+        start: The initial state of the automaton.
+        map: A mapping from request types to their possible responses and corresponding byte representations.
+        res_types: A mapping from response types to their appearance counts.
+        res_trans_types: A mapping from response transition types to their appearance counts.
+        table: A tuple representing the transition table for the automaton. 
+    """
     def __init__(
         self,
         id: str,
@@ -38,6 +52,11 @@ class MealyMachine:
         self,
         name
     ):
+        """Generate a graph representation of the automaton using Graphviz.
+        
+        Args:
+            name: The name to be used for the generated graph file.
+        """
         g = Digraph(comment='automata')
         for sid in self.states:
             g.node(str(sid), str(sid))
@@ -54,6 +73,15 @@ class MealyMachine:
         last_request,
         current_request
     ):
+        """Get the relation between two requests based on the transitions and outputs of the automaton.
+        
+        Args:
+            last_request: The last request made to the system.
+            current_request: The current request being analyzed.
+            
+        Returns:
+            A string representation of the relation between the two requests, showing the transitions and outputs for each state in the automaton.
+        """
         ans = set()
         for s1 in self.states:
             s2 = self.delta[(s1, last_request)]

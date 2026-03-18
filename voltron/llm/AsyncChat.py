@@ -164,6 +164,10 @@ class AsyncChater:
         Args:
             pro_name: name of protocol
             msg_type: required protocol message type
+            code: the original generator code to be evolved
+            info: the information to be used for generator evolution
+            trace: the execution trace of the current generator, which provides the information for generator evolution
+            related_code: the related generator code which provides the information for generator evolution
 
         Returns:
             generated generator
@@ -220,9 +224,13 @@ class AsyncChater:
         Args:
             pro_name: name of protocol
             msg_type: required protocol message type
+            code: the original mutator code to be evolved
+            info: the information to be used for mutator evolution
+            poss_response: the possible response for the current request message, which provides the information for mutator evolution
+            trace: the execution trace of the current mutator, which provides the information for mutator
 
         Returns:
-            generated generator
+            generated mutator
         """
         tmp = self.pmp._tem_mutator_evolve
         

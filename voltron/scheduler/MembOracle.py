@@ -6,6 +6,13 @@ from voltron.configs import configs
 import pprint
 
 class MembershipOracle:
+    """Membership Oracle for querying the SUT with sequences of requests and obtaining the corresponding responses.
+    
+    Attributes:
+        mapper: An instance of Mapper used to select the appropriate generators for the given input sequences.
+        executor: An instance of Executor used to interact with the SUT and obtain the conversations (request and response sequences).
+        alphabet: A list of input symbols (requests) that can be sent to the SUT, derived from the request types defined in the mapper.
+    """
     def __init__(
         self,
         mapper: Mapper,
