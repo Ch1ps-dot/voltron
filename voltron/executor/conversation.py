@@ -3,6 +3,11 @@ class Conversation:
     """Record the conversation
     
     Maybe record more information in future
+    
+    Attributes:
+        content: A list of tuples containing the raw request and response data in bytes.
+        req_seq: A list of strings representing the sequence of request codes sent to the SUT.
+        res_seq: A list of strings representing the sequence of response codes received from the SUT
     """
     def __init__(self) -> None:
         self.content: list[tuple[bytes, bytes]] = []

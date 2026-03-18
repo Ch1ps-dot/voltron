@@ -14,6 +14,15 @@ import math, statistics, threading, traceback, sys, os, signal
 CRASH_SIGNALS = {-6, -11, -4, -8}
 
 class Executor:
+    """Executor for interacting with the SUT, sending requests and receiving responses, and recording the conversation.
+    
+    Attributes:
+        pre_script: A Path object representing the script to be executed before interacting with the SUT, used for setup.
+        post_script: A Path object representing the script to be executed after interacting with the SUT, used for cleanup.
+        cmdline: A list of strings representing the command line arguments to execute the SUT.
+        host: The hostname or IP address of the SUT to connect to.
+        port: The port number on which the SUT is listening for connections.
+    """
     def __init__(
             self,
             mapper: Mapper,
@@ -148,8 +157,11 @@ class Executor:
         msg_seq: list[tuple[str, bytes]],
         poll_wait_ms: int = 5000
     ) -> Tuple[bool, Conversation | None] :  
-        """
-        TODO: Deal with interaction
+        """Interact with the SUT by sending a sequence of messages and receiving the corresponding responses, while recording the conversation.
+        
+        Args:
+            msg_seq: A list of tuples, where each tuple contains a string representing the message type and a bytes object representing the message content to be sent to the SUT.
+            poll_wait_ms: An integer representing the maximum time in milliseconds to wait for a response from the SUT after sending each message.
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT

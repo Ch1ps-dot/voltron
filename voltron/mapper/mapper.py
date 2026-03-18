@@ -16,6 +16,19 @@ class Mapper:
     """Mapper between actual messages and abstract symbols.
     
     Select generator, mutator and parser for symbols
+    
+    Attributes:
+        producer: AsyncProducer
+        analyzer: Analyzer
+        gs_path: Path of generator code
+        ps_path: Path of parser code
+        ms_path: Path of mutator code
+        request_types: set of message types for request
+        response_types: set of message types for response
+        req_dep: dependency between message types
+        generators: dict of message type to list of generators
+        mutators: dict of message type to list of mutators
+        parsers: list of parsers
     """
     def __init__(
         self,
@@ -86,6 +99,7 @@ class Mapper:
         
         req_seq: message type list
         cache_mode: cache the generated message and get message from cache (for automata learning)
+        select_mode: select generator in 'new' or 'old' mode
         
         Return:
             generated message
@@ -109,7 +123,7 @@ class Mapper:
                         # cache mode to avoid randomness in model learning
                         msg = self.message_pool[g.msg_type][g.name]
                     else:
-                        # run generator
+                        # run generator and cache the generated message in pool
                         # sometimes the generator code may raise exception and return none,
                         # we run generator until the results can be used.
                         msg = self.exe_generator(g)
@@ -135,6 +149,14 @@ class Mapper:
         req_seq: list[str],
         select_mode = 'new'
     ) -> list[tuple[str, bytes]]:
+        """Select and execute message mutator based on the list of message type
+        
+        req_seq: message type list
+        select_mode: select mutator in 'new' or 'old' mode
+        
+        return:
+            mutated messages
+        """
         ms = []
         for req in req_seq:
             if req in self.mutators:

@@ -20,6 +20,18 @@ from dataclasses import dataclass, asdict, field
 
 class AsyncProducer:
     """Prepare message Producer (input generator and packet parser).
+    
+    Atrributes:
+        *_path: lots of file path
+        chater: the chater to call LLM
+        rfcp: the RFC parser to provide IR and dependency information
+        req_types: the types of request messages
+        res_types: the types of response messages
+        req_dep: the dependency between request messages
+        poss_response: possible response for each request message
+        generators: the generated input generators
+        parsers: the generated packet parsers
+        mutators: the generated mutators
     """
 
     def __init__(
@@ -74,7 +86,8 @@ class AsyncProducer:
     def run(
         self
     ):
-
+        """run the producer to generate initial generator and parser
+        """
         # load existed generator info or generate init generators
         if(self.generator_info_path.is_file()):
             try:
@@ -99,7 +112,8 @@ class AsyncProducer:
                 logger.debug(f'Producer: parser load error {e}')
         else:
             self.parser_gen()
-            
+        
+        # load existed parser info or generate init mutator
         if (self.mutator_info_path.is_file()):
             try:
                 with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
@@ -110,9 +124,9 @@ class AsyncProducer:
                 logger.debug(f'Mutator: load error {e}')
 
     async def _generator_gen_one(
-            self,
-            msg,
-            sem
+        self,
+        msg,
+        sem
     ):
         msg_ir = etree.tostring(msg, encoding="utf-8", pretty_print=True).decode("utf-8")
         msg_type = msg.get('name')
@@ -141,7 +155,7 @@ class AsyncProducer:
                     logger.debug(f'Producer :generate error {e}')
 
     async def _generator_gen_async(
-            self
+        self
     ):
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
@@ -152,9 +166,9 @@ class AsyncProducer:
         return results
 
     def generator_gen(
-            self
+        self
     ) -> None:
-        """Generate and save input generator
+        """Generate and save init input generator
         """
         
         results = asyncio.run(self._generator_gen_async())
@@ -176,19 +190,26 @@ class AsyncProducer:
         logger.debug("[Producer]: finish generator generation")
         
     async def _generator_evo_one(
-            self,
-            msg_type: str,
-            doc_info:str,
-            machine: MealyMachine,
-            sem
+        self,
+        msg_type: str,
+        doc_info:str,
+        machine: MealyMachine,
+        sem
     ):
+        """Generate and save evolved input generator for one message type
+        
+        Attribute:
+            msg_type: the message type of generator to be evolved
+            doc_info: the document information to be used for generator evolution
+            machine: the current MealyMachine which provides the state transition information for generator evolution
+        """
         old_code = ''
         old_g_name = f'id{machine.id}.py'
         old_g_path = self.generator_path / msg_type / old_g_name
         with open(old_g_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
             
-        # extract state trace of request pair which has dependency
+        # extract state trace of request pair which has dependency and the code of related generators 
         code_dep: list[str] = []
         trace_list: set[str] = set()
         if msg_type in self.req_dep.keys():
@@ -244,7 +265,10 @@ class AsyncProducer:
             self,
             machine: MealyMachine
     ) -> None:
-        """Generate and save input generator
+        """Evolve and save input generator
+        
+        Attribute:
+            machine: the current MealyMachine which provides the state transition information for generator evolution
         """
         
         with analyzer.lock:
@@ -289,6 +313,13 @@ class AsyncProducer:
         req_res: dict[str, set],
         sem
     ):
+        """Generate and save evolved input mutator for one message type
+        
+        Attribute:
+            msg_type: the message type of mutator to be evolved
+            doc_info: the document information to be used for mutator evolution
+            req_res: the actual response for each request message, which provides the information for mutator evolution
+        """
         old_m = None
         if msg_type in self.mutators.keys():
             old_m = self.mutators[msg_type][-1]
@@ -354,7 +385,10 @@ class AsyncProducer:
         self,
         req_res
     ) -> None:
-        """Generate and save input generator
+        """Generate and save input mutator
+        
+        Attribute:
+            req_res: the actual response for each request message, which provides the information for mutator
         """
         with analyzer.lock:
             analyzer.set_progress('evolve', 'mutate', len(self.req_types))
@@ -467,7 +501,7 @@ class AsyncProducer:
         self,
         message
     ) -> None:
-        """Generate and save input generator
+        """Generate and save parser
         """
         # produce new parser
         parser_code = asyncio.run(self._parser_evo_one(message))
@@ -511,7 +545,7 @@ class AsyncProducer:
         self
     ) -> dict:
         """The information of mutators
-        Contains a dict to map msg_type and corresponded generator
+        Contains a dict to map msg_type and corresponded mutator
         """
         info: dict[str, list[dict]]= {}
         for msg_type, ms in self.mutators.items():
@@ -523,6 +557,8 @@ class AsyncProducer:
     def parser_info(
         self
     ) -> list:
+        """The information of parsers
+        """
         info: list[dict] = []
         for p in self.parsers:
             info.append(asdict(p))

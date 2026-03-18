@@ -4,6 +4,9 @@ class Generator:
     """Generator of request message
 
     msg_type: message type
+    name: name of the generator
+    path: the path of the generator, used to locate the generator
+    other atributes haved been used
     """
     msg_type: str
     name: str

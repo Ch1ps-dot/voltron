@@ -7,6 +7,22 @@ from voltron.utils.logger import logger
 import random, time, threading, os, math
 
 class Havoc:
+    """Havoc scheduler implementation for fuzzing the system under test (SUT) with random sequences of requests, aiming to explore the state space and find interesting behaviors.
+    
+    Attributes:
+        unique_resp: A set of unique responses observed during fuzzing.
+        max_unique_resp_num: The maximum number of unique responses observed so far.
+        unique_resp_trans: A set of unique response transitions observed during fuzzing.
+        useful_msg: A list of useful messages (request-response pairs) that have been observed during fuzzing.
+        useful_seq: A list of useful sequences of request-response pairs that have been observed during fuzzing.
+        max_seq_len: The maximum length of request-response sequences observed so far.
+        mapper: An instance of the Mapper class for selecting generators and mutators based on request sequences.
+        exe: An instance of the Executor class for interacting with the SUT and obtaining responses.
+        alphabet: A list of request types that can be used for generating test sequences.
+        req_dep: A dictionary representing the dependencies between requests and their possible responses, used for generating dependent sequences.
+        dep_alphabet: A list of request types that have dependencies, used for generating dependent sequences.
+        req_res: A dictionary mapping request types to the set of response types observed for those requests
+    """
     def __init__(
         self,
         mapper: Mapper,
@@ -29,10 +45,20 @@ class Havoc:
         self.req_res: dict[str, set[str]] = {}
         
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
+        
+        # Define the methods and modes for selecting prefixes, mutators, and suffixes during fuzzing
+        # cat: concatenate prefix, mutators, and suffix; 
+        # int: interleave prefix and mutators, then concatenate with suffix
         self.methods = ['cat', 'int']
+        
+         # new: select new sequences or messages that have not been observed before; 
+        # generic: select from the useful sequences or messages observed so far; 
+        # dependent: select sequences or messages based on the dependencies between requests
         self.mutator_mode = ['new', 'generic', 'dependent']
         self.prefix_mode = ['new', 'generic', 'dependent']
         self.suffix_mode = ['new', 'generic']
+        
+        # Initialize the automaton and related sets based on the provided Mealy machine, if available
         if machine:
             self.machine = machine
             self.table = machine.table
@@ -50,6 +76,8 @@ class Havoc:
     def select_prefix(
         self
     ) -> list[tuple[str, bytes]]:
+        """Select a prefix sequence of requests to be used for generating test sequences, based on the observed useful sequences and the dependencies between requests.
+        """
         mode = ''
         if len(self.useful_seq) == 0:
             mode = 'new'
@@ -153,6 +181,13 @@ class Havoc:
         trans_inc: int,
         type_inc: int
     ):
+        """Analyze the conversation obtained from interacting with the SUT.
+        
+        Args:
+            cons: The conversation object containing the request and response sequences, as well as the content of the responses
+            trans_inc: The increment in the number of response transitions observed compared to the last interaction
+            type_inc: The increment in the number of unique response types observed compared to the last interaction
+        """
         seq = []
         for i in range(len(cons.res_seq)):
             req = cons.req_seq[i]
@@ -197,11 +232,15 @@ class Havoc:
         self,
         times: int
     ) -> dict[str, set[str]]:
+        """fuzing the SUT with random sequences of requests.
+        """
         logger.debug(self.S)
         logger.debug(self.alphabet)
         analyzer.set_progress('havoc', 'fuzz energy', times)
         energy = times
         analyzer.finished = energy
+        
+        # fuzze the SUT until the energy is depleted, where energy is increased when new behaviors are observed and decreased when no new behaviors are found
         while energy >= 0:
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
@@ -261,6 +300,14 @@ class Havoc:
         len_inc: int,
         unique_res_inc: int
     ) -> bool:
+        """Check if the current conversation is interesting based on the increments in response transitions, response types, sequence length, and unique response types.
+        
+        Args:
+            trans_inc: The increment in the number of response transitions observed.
+            type_inc: The increment in the number of unique response types observed.
+            len_inc: The increment in the length of the request-response sequence observed.
+            unique_res_inc: The increment in the number of unique response types observed.
+        """
         if trans_inc > 0 or type_inc > 0 or len_inc > 0 or unique_res_inc > 0:
             with analyzer.lock:
                 analyzer.useful_cons += 1
