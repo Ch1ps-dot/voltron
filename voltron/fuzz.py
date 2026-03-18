@@ -85,8 +85,8 @@ class Fuzzer:
             
         models_dir = configs.base_path / 'output' / 'models'
         if not models_dir.is_dir():
-            models_dir.mkdir()
-            configs.models_path.mkdir()
+            models_dir.mkdir(parents=True, exist_ok=True)
+            configs.models_path.mkdir(parents=True, exist_ok=True)
         
         configs.results_path = results_dir
         configs.fuzz_mode = self.mode
