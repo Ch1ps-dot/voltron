@@ -269,7 +269,7 @@ class AsyncRFCParser:
 
                     if (req_json != None):
                         req_json = json.loads(req_json)
-                        if self._field_check(req_json): 
+                        if not self._field_check(req_json): 
                             continue
                         with open(req_path, 'w', encoding="utf-8") as f:
                             json.dump(req_json, f)
@@ -297,7 +297,7 @@ class AsyncRFCParser:
 
                     if (res_json != None):
                         res_json = json.loads(res_json)
-                        if self._field_check(res_json): 
+                        if not self._field_check(res_json): 
                             continue
                         with open(res_path, 'w', encoding="utf-8") as f:
                             json.dump(res_json, f)
@@ -477,8 +477,11 @@ class AsyncRFCParser:
         Return:
             True or False
         """
-        for key in data:
-            if key not in ['field', 'position', 'explanation', 'value']:
+        if len(data) != 4: 
+            return False
+        
+        for key, val in data.keys():
+            if key not in ['field_name', 'position', 'explanation', 'value']:
                 logger.debug('bad json')
                 return False
         return True
