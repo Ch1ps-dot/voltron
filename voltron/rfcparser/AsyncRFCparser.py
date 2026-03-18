@@ -353,9 +353,14 @@ class AsyncRFCParser:
             root = etree.Element('ir')
             sem = asyncio.Semaphore(configs.async_sem)
 
+            m_types  = ''
+            if field_type == 'req':
+                m_types = self.req_types
+            elif field_type == 'res':
+                m_types = self.res_types
             tasks = [
                 self._msg_model_gen_one(msg_type, sem)
-                for msg_type in self.req_types
+                for msg_type in m_types
             ]
 
             results = await tqdm_asyncio.gather(*tasks, desc=f"{field_type} msg ir")

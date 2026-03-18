@@ -467,7 +467,7 @@ class AsyncProducer:
         self,
         message
     ) -> None:
-        """Generate and save input generator
+        """Generate and save parser
         """
         # produce new parser
         parser_code = asyncio.run(self._parser_evo_one(message))
