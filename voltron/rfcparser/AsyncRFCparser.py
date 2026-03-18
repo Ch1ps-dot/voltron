@@ -477,6 +477,9 @@ class AsyncRFCParser:
         Return:
             True or False
         """
+        if len(data.keys()) != 4: 
+            return False
+        
         for key in data.keys():
             if key not in ['field_name', 'position', 'explanation', 'value']:
                 logger.debug('bad json')
