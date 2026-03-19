@@ -82,6 +82,8 @@ class ObTable:
                     if (out):
                         if len(s) > 0:
                             if 'TIMEOUT' == out[-1] and len(out) < len(s):
+                                # TODO：需要写个循环重新尝试
+                                self.T[s][e] = ('TIMEOUT',)
                                 logger.debug('fill table: try again')
                                 continue
                         with analyzer.lock:
@@ -91,6 +93,7 @@ class ObTable:
                         self.T[s][e] = tuple(out[-len(e):])
                         logger.debug(f'query entry: {s}:{e} => {self.T[s][e]}')
                     else:
+                        self.T[s][e] = ('NOOUTPUT',)
                         logger.debug('fill table: no out')
 
         with analyzer.lock:
@@ -157,6 +160,7 @@ class ObTable:
                                 logger.debug(f'query entry: {s}:{a}:{e} => {self.T[si][e]}')
                                 break
                             else:
+                                self.T[si][e] = ('NOOUTPUT',)
                                 logger.debug('fill table: no out')
         with analyzer.lock:
             analyzer.clean_progress()

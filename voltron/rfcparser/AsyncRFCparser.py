@@ -6,7 +6,7 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 from fastbm25 import fastbm25
 
-from voltron.rfcparser.setciontree import SectionTree, SectionNode
+from voltron.rfcparser.sectiontree import SectionTree, SectionNode
 from voltron.utils.logger import logger
 from voltron.llm.AsyncChat import AsyncChater
 from voltron.configs import configs
