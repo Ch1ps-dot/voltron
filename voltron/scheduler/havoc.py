@@ -240,7 +240,7 @@ class Havoc:
         energy = times
         analyzer.finished = energy
         
-        # fuzze the SUT until the energy is depleted, where energy is increased when new behaviors are observed and decreased when no new behaviors are found
+        # fuzzing the SUT until the energy is depleted, where energy is increased when new behaviors are observed and decreased when no new behaviors are found
         while energy >= 0:
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()

@@ -92,6 +92,8 @@ class ObTable:
                         logger.debug(f'query entry: {s}:{e} => {self.T[s][e]}')
                     else:
                         logger.debug('fill table: no out')
+                        sys.exit(0)
+                        
 
         with analyzer.lock:
             analyzer.set_progress('Obtable', desc='fill si table', total=1)
@@ -158,6 +160,7 @@ class ObTable:
                                 break
                             else:
                                 logger.debug('fill table: no out')
+                                sys.exit(0)
         with analyzer.lock:
             analyzer.clean_progress()
 
