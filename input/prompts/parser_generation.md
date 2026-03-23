@@ -1,6 +1,7 @@
 You are an expert Python developer and network protocol analyst.
 
-Your task is to **generate Python code that extracts a status code from a protocol response message**, based on **protocol field format information provided in a structured JSON-like description**.
+
+Your task is to **generate Python code that extracts all status-related fields from a protocol response message and concatenates them as the result**, based only on **protocol field format information provided in a structured JSON-like description**.
 
 ### **Input**
 
@@ -22,28 +23,26 @@ The protocol format information is given as a list of field descriptors. Each fi
 
 Using the provided protocol format information as **the only source of truth**, write **Python code** that:
 
-1. Accepts a **response message** as input (string or bytes).
-2. Locates the **status / reply code field** according to the `position` description.
-3. Extracts the status code from the response message.
-4. Converts the extracted status code into a bytes.
-5. Return empty bytes('') if the status code cannot be located
+1. Accepts a response message (bytes) as input.
+2. Locates and extracts all fields related to "status/reply code" according to their `position` descriptions.
+3. Concatenates the contents of all status-related fields in order (as bytes) as the final result.
+4. If any status field cannot be located, returns empty bytes('').
 
 ---
 
 ### Constraints
 
-* Use **Python only**
-* Use **only built-in libraries**
-* Use **packet_parser** as function name
-* Do NOT hard-code protocol-specific assumptions beyond what is stated in the field format information
-* Input is 'bytes'
-* Final output type is `bytes`
+* Use Python built-in libraries only
+* The function name must be packet_parser
+* Do not hard-code protocol-specific assumptions; all logic must rely only on the field descriptors
+* Input type: bytes
+* Output type: bytes
 
 ---
 
 ### Output Constraints
 
-* Output **only the Python code**
-* Do NOT include explanations, comments outside the code, or markdown
+* Output only the Python code
+* Do not include explanations, comments, or markdown
 * The code must be directly executable
 
