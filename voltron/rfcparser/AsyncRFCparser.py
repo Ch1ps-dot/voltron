@@ -525,7 +525,7 @@ class AsyncRFCParser:
         for ele in data:
             if len(ele) != 4: 
                 return False
-            for key, val in ele.keys():
+            for key in ele.keys():
                 if key not in ['field_name', 'position', 'explanation', 'value']:
                     logger.debug('bad json')
                     return False
@@ -546,7 +546,7 @@ class AsyncRFCParser:
         for ele in data:
             if len(ele) != 4: 
                 return False
-            for key, val in ele.keys():
+            for key in ele.keys():
                 if key not in ['field_name', 'position', 'explanation', 'value']:
                     logger.debug('bad json')
                     return False

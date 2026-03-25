@@ -438,7 +438,7 @@ class AsyncProducer:
     async def _parser_gen_async(
             self
     ):
-        res_info = json.dumps(list(self.rfcp.res_doc))
+        res_info = json.dumps(self.rfcp.res_json)
         while(True):
             try:
                 # generate input generator and save it
@@ -472,7 +472,7 @@ class AsyncProducer:
         self,
         message
     ):
-        res_info = json.dumps(list(self.rfcp.res_doc))
+        res_info = json.dumps(self.rfcp.res_json)
         old_code = ''
         old_p_name = f'{self.parsers[-1].name}.py'
         old_p_path = self.parser_path / old_p_name
