@@ -708,6 +708,7 @@ class Executor:
         if crash:
             pending = '_crash'
         target_folder = configs.results_path / 'raw_testcases'
+        enrich_folder = configs.results_path / 'enrich_testcases'
         if not target_folder.is_dir():
             target_folder.mkdir()
         file_count = 0
@@ -724,6 +725,11 @@ class Executor:
                 if request:
                     f.write(request + b'\n')
                     f.write(response + b'\n')
+        
+        with open(enrich_folder / f'request_{file_count}{pending}.raw', 'ab') as f:
+            for request, _ in cons.content:
+                if request:
+                    f.write(request + b'\n')
         
         file_count = 0
         target_folder = configs.results_path / 'replayable_testcases'
