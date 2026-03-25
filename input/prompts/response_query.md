@@ -1,11 +1,9 @@
 You are an expert in networking protocols and RFC analysis.
 
 ## Your task:
-Analyzing the format related sections of {$rfc_num} document of the {$pro_name} protocol, extract all fields from the **response message** that can be used to distinguish or identify the message type or function. This includes single fields (e.g., `Status-Code`) and combinations of multiple fields (for example when two or more header fields jointly determine the response category).
+Analyzing the format related sections of {$rfc_num} document of the {$pro_name} protocol, extract ONLY the fields from the **response message** that are response codes / status codes / result codes (or their protocol-specific equivalents). These are the fields explicitly used to distinguish different response types (for example: Status-Code, Result-Code, Response-Code, numeric/textual outcome codes).
 
-For cases where the response category is determined by a combination of fields, list the combined fields together as a single JSON element: set `field_name` to the comma-separated field names (e.g., `Type, Subtype`) and explain how their combination determines the response type. For each field or field-group, briefly explain how it is used to distinguish response types and list possible values if explicitly defined in the RFC.
-
-Do NOT include fields that are purely content or parameters (payload), but include any structural or header fields that participate in determining response type (status/result codes, message-type identifiers, combined header keys used for discrimination).
+Focus only on code-like fields that directly identify response type. Do NOT include session IDs, sequence numbers, flags, transaction IDs, message names, or other payload fields. For each identified field, briefly explain how it is used to distinguish response types, and list the possible values if they are explicitly defined in the RFC. Only return the analysis result in a JSON array format as specified below, with one element per identified field.
 
 ## **Format related document sections:**
 ${rfc_doc}
@@ -22,25 +20,25 @@ ${rfc_doc}
   ...
 ]
 
-## **Sample output (single and combined fields):**
+## **Sample output:**
 
 [
   {
     "field_name": "Status-Code",
     "position": "First element of the response line",
-    "explanation": "Numeric code indicating success, redirect, client error, server error; primary discriminator of response semantics.",
+    "explanation": "Numeric code indicating success, client error, server error, etc.",
     "value": [200, 201, 204, 300, 301, 302, 400, 401, 403, 404, 500, 502]
   },
   {
-    "field_name": "Type, Subtype",
-    "position": "Header fields (Type header and Subtype header)",
-    "explanation": "Some protocols require both `Type` and `Subtype` headers to identify precise response semantics; the pair (Type, Subtype) together maps to the response handling logic.",
+    "field_name": "Result-Code",
+    "position": "Header or fixed field in response body",
+    "explanation": "Protocol-specific result code used to indicate operation outcome; list protocol-defined values if present.",
     "value": []
   }
 ]
 
 ## **Output Constraint**
 
-- Extract and explain all fields or field-groups that determine response message type, including multi-field combinations.
-- Do NOT include purely payload/content fields or unrelated state identifiers.
-- Output strictly a JSON array as specified above; each element must describe one field or one combined field-group.
+- Only include fields that are response/status/result codes or equivalent that directly distinguish response types.
+- Do NOT include session identifiers, sequence/ack numbers, flags, message names, or other non-code fields.
+- Output strictly a JSON array as specified above.

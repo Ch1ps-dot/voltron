@@ -1,7 +1,8 @@
 You are an expert in networking protocols and RFC analysis.
 
 ## Your task:
-Analyzing the format related sections of ${rfc_num} document of the ${pro_name} protocol, extract ALL fields from the **request message** that can be used to distinguish or identify the message type or function. For each field, briefly explain how it is used for this purpose. 
+Analyzing the format related sections of {$rfc_num} document of the {$pro_name} protocol, extract ONLY the fields from the **request message** that are method codes / request codes / function codes (or their protocol-specific equivalents). These are the fields explicitly used to distinguish different request types or subtypes (for example: Method, Request-Type, Subtype, numeric/textual operation codes).
+
 Focus only on code-like fields that directly identify request type. Do NOT include session IDs, sequence numbers, flags, transaction IDs, message names, or other state/payload fields. For each identified field, briefly explain how it is used to distinguish response types, and list the possible values if they are explicitly defined in the RFC. Only return the analysis result in a JSON array format as specified below, with one element per identified field.
 
 - Output all relevant fields as elements in a JSON array.
