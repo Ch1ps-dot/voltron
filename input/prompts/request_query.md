@@ -3,7 +3,6 @@ You are an expert in networking protocols and RFC analysis.
 ## Your task:
 Analyzing the format related sections of ${rfc_num} document of the ${pro_name} protocol, extract ALL fields from the **request message** that can be used to distinguish or identify the message type or function. For each field, briefly explain how it is used for this purpose. Focus only on fields that directly determine the type of the request message, and do not include fields related to content, parameters, or other functionalities.
 
-- If the request category is determined by a combination of multiple fields, treat the combination as a single identifying key and describe those fields together (comma-separated) in the `field_name` value.
 - Output all relevant fields as elements in a JSON array.
 
 ## **Format related document sections:**
