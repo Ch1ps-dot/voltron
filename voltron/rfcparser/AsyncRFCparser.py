@@ -269,7 +269,7 @@ class AsyncRFCParser:
 
                     if (req_json != None):
                         req_json = json.loads(req_json)
-                        if not self._field_check(req_json): 
+                        if not self._req_field_check(req_json): 
                             continue
                         with open(req_path, 'w', encoding="utf-8") as f:
                             json.dump(req_json, f)
@@ -470,9 +470,9 @@ class AsyncRFCParser:
                     logger.debug(f'RFCParser: dependency failure {e}')
 
 
-    def _field_check(
+    def _req_field_check(
             self,
-            data: dict
+            data: list[dict]
     ) -> bool:
         """Check the json content of message field information
 
@@ -482,13 +482,13 @@ class AsyncRFCParser:
         Return:
             True or False
         """
-        if len(data) != 4: 
-            return False
-        
-        for key, val in data.keys():
-            if key not in ['field_name', 'position', 'explanation', 'value']:
-                logger.debug('bad json')
+        for ele in data:
+            if len(ele) != 4: 
                 return False
+            for key, val in ele.keys():
+                if key not in ['field_name', 'position', 'explanation', 'value']:
+                    logger.debug('bad json')
+                    return False
         return True
     
     def _res_field_check(
@@ -503,9 +503,9 @@ class AsyncRFCParser:
         Return:
             True or False
         """
-        if len(data) != 4: 
-            return False
         for ele in data:
+            if len(ele) != 4: 
+                return False
             for key, val in ele.keys():
                 if key not in ['field_name', 'position', 'explanation', 'value']:
                     logger.debug('bad json')
