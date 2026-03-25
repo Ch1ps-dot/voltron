@@ -297,7 +297,7 @@ class AsyncRFCParser:
 
                     if (res_json != None):
                         res_json = json.loads(res_json)
-                        if not self._field_check(res_json): 
+                        if not self._res_field_check(res_json): 
                             continue
                         with open(res_path, 'w', encoding="utf-8") as f:
                             json.dump(res_json, f)
@@ -489,6 +489,27 @@ class AsyncRFCParser:
             if key not in ['field_name', 'position', 'explanation', 'value']:
                 logger.debug('bad json')
                 return False
+        return True
+    
+    def _res_field_check(
+            self,
+            data: list[dict]
+    ) -> bool:
+        """Check the json content of message field information
+
+        Args:
+            data: json file of message format
+
+        Return:
+            True or False
+        """
+        if len(data) != 4: 
+            return False
+        for ele in data:
+            for key, val in ele.keys():
+                if key not in ['field_name', 'position', 'explanation', 'value']:
+                    logger.debug('bad json')
+                    return False
         return True
     
     def _escape_xml_attr(
