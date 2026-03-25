@@ -123,7 +123,7 @@ class AsyncRFCParser:
         logger.debug('RFCParser: finish ir generation')
     
     async def key_field_extract(
-            self
+        self
     ):
         """Key Field Parse"""
         req_path = self.ir_path / 'req.json'
@@ -136,23 +136,63 @@ class AsyncRFCParser:
             res_json = await res_task
             req_json = await req_task
             
-            self.req_types = set(req_json['value'])
-            self.res_types = set(res_json['value'])
+            self.req_types = self.combine_field(req_json)
+            self.res_types = self.combine_field(res_json)
             
         else:
             with open(req_path, 'r', encoding='utf-8') as f:
                 req_json = json.load(f)
-                if type(req_json) == list:
-                    req_json = req_json[0]
-                self.req_types = set(req_json['value'])
+                self.req_types = self.combine_field(req_json)
                 
             with open(res_path, 'r', encoding='utf-8') as f:
                 res_json = json.load(f)
-                if type(res_json) == list:
-                    res_json = res_json[0]
-                self.res_types = set(res_json['value'])
+                self.res_types = self.combine_field(res_json)
 
         logger.debug('RFCParser: finish key field extraction')
+        
+    def combine_field(
+        self,
+        fields: list[dict]
+    ) -> set[str]:
+        """Combine fields to generate new request/response type if necessary
+
+        For example, if the combination of two fields can determine the message type, we can combine them together and add the combination into request/response type set.
+        """
+        from itertools import combinations, product
+
+        ret = set()
+
+        # Normalize input: expect list of dicts with keys 'field_name' and 'value' (list)
+        usable = []
+        for f in fields:
+            if not isinstance(f, dict):
+                continue
+            name = f.get('field_name') or f.get('name')
+            vals = f.get('value')
+            if not name or not vals or not isinstance(vals, list):
+                continue
+            # filter out empty/None values
+            clean_vals = [str(v).strip() for v in vals if v is not None and str(v).strip() != '']
+            if len(clean_vals) == 0:
+                continue
+            usable.append((name.strip(), clean_vals))
+
+        # If fewer than 2 usable fields, nothing to combine
+        if len(usable) < 2:
+            return ret
+
+        # For each subset of fields of size >=2, generate Cartesian product of their values
+        for r in range(2, len(usable) + 1):
+            for combo in combinations(usable, r):
+                names = [c[0] for c in combo]
+                vals_lists = [c[1] for c in combo]
+                for prod in product(*vals_lists):
+                    # Format: FieldA=valA|FieldB=valB|...
+                    parts = [f"{n}={v}" for n, v in zip(names, prod)]
+                    combined = "|".join(parts)
+                    ret.add(combined)
+        logger.debug(f'Combined fields: {ret}')
+        return ret
     
     def message_model_generation(
             self
@@ -252,7 +292,7 @@ class AsyncRFCParser:
     async def _req_field(
             self,
             req_path: Path
-    ) -> dict:
+    ) -> list[dict]:
         # request field extraction
         if(req_path.is_file()):
             with open(req_path, 'r', encoding='utf-8') as f:
@@ -280,7 +320,7 @@ class AsyncRFCParser:
     async def _res_field(
             self,
             res_path: Path
-    ) -> dict:
+    ) -> list[dict]:
         # response field extraction
         if(res_path.is_file()):
             with open(res_path, 'r', encoding='utf-8') as f:
