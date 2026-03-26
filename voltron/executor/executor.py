@@ -711,6 +711,10 @@ class Executor:
         enrich_folder = configs.results_path / 'enrich_testcases'
         if not target_folder.is_dir():
             target_folder.mkdir()
+
+        if not enrich_folder.is_dir():
+            enrich_folder.mkdir()
+            
         file_count = 0
         for item in target_folder.iterdir():
             if item.is_file():
