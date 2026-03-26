@@ -135,6 +135,9 @@ class AsyncRFCParser:
             
             res_json = await res_task
             req_json = await req_task
+
+            self.res_json = res_json
+            self.req_json = req_json
             
             self.req_types = req_json[0]['value']
             self.res_types = self.combine_field(res_json)
