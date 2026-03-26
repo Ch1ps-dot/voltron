@@ -342,7 +342,7 @@ class AsyncProducer:
                         msg_type=msg_type,
                         info=doc_info,
                         poss_response='\n'.join(self.poss_response[msg_type]),
-                        trace='\n'.join(req_res[msg_type])
+                        trace='\n'.join(req_res[msg_type] if msg_type in req_res.keys() else [])
                     )
                     
                     # havoc_code = await self.chater.llm_mutator_havoc(
