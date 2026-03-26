@@ -371,11 +371,11 @@ class AsyncRFCParser:
                 try:
                     ir_xml = etree.fromstring(msg_ir)
                     return ir_xml
-                except etree.XMLSyntaxError as e:
+                except Exception as e:
                     logger.debug(f'RFCParser: [bad xml format] {msg_type} err: {e}')
                     fix_ir = await self.chater.llm_ir_repair(
                                 ir=msg_ir,
-                                error=e.msg
+                                error=str(e)
                             )
                     if (fix_ir != None):
                         msg_ir = fix_ir
