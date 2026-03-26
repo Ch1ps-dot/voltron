@@ -151,6 +151,7 @@ class AsyncRFCParser:
             with open(res_path, 'r', encoding='utf-8') as f:
                 res_json = json.load(f)
                 self.res_types = self.combine_field(res_json)
+                logger.debug(self.res_types)
                 self.res_json = res_json
 
         logger.debug('RFCParser: finish key field extraction')
@@ -184,7 +185,7 @@ class AsyncRFCParser:
 
         # If fewer than 2 usable fields, nothing to combine
         if len(usable) < 2:
-            return ret
+            return fields[0]['value'] if len(usable) == 1 else set()
 
         # For each subset of fields of size >=2, generate Cartesian product of their values
         for r in range(2, len(usable) + 1):
