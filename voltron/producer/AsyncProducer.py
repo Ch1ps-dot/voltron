@@ -152,7 +152,7 @@ class AsyncProducer:
                     
                     return msg_type, input_code
                 except Exception as e:
-                    logger.debug(f'Producer :generate error {e}')
+                    logger.debug(f'Producer :generate error {str(e)}')
 
     async def _generator_gen_async(
         self
