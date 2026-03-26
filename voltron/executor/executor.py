@@ -628,9 +628,10 @@ class Executor:
                         # recv response and parse it
                         resp_code = None
                         resp_byte: bytes = self.parser_func(buf)
+                        try_times = 3
                         if resp_byte == b'':
-                            while self.try_times_parser > 0:
-                                self.try_times_parser = self.try_times_parser - 1
+                            while try_times > 0:
+                                try_times -= 1
                                 resp_code = self.parser_func(buf)
                                 if resp_code == b'':
                                     logger.debug(f'parse error:{buf}')
