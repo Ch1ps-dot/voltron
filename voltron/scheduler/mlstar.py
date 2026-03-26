@@ -10,6 +10,16 @@ import pprint, pickle, threading, sys, traceback, time, copy
 
 
 class ObTable:
+    """Oberservation Table for LM* algorithm, which is used to learn the Mealy machine model of the SUT.
+    
+    Attributes:
+        alphabet: A list of input symbols (requests) that can be sent to the SUT.
+        S: A set of tuples representing the prefixes of input sequences observed so far.
+        E: A set of tuples representing the suffixes of input sequences observed so far.
+        T: A dictionary mapping tuples of prefixes and suffixes to the corresponding outputs (responses) observed from the SUT.
+        mq: An instance of MembershipOracle used to query the SUT for responses to input sequences.
+        eq: An instance of EquOracle used to compare the learned Mealy machine with the actual behavior of the SUT and find distinguishing input sequences if they are not equivalent
+    """
     def __init__(
         self,
         mq: MembershipOracle,
@@ -82,6 +92,8 @@ class ObTable:
                         logger.debug(f'query entry: {s}:{e} => {self.T[s][e]}')
                     else:
                         logger.debug('fill table: no out')
+                        sys.exit(0)
+                        
 
         with analyzer.lock:
             analyzer.set_progress('Obtable', desc='fill si table', total=1)
@@ -148,6 +160,7 @@ class ObTable:
                                 break
                             else:
                                 logger.debug('fill table: no out')
+                                sys.exit(0)
         with analyzer.lock:
             analyzer.clean_progress()
 

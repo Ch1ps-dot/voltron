@@ -11,7 +11,18 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback, sys, os, signal
 
+CRASH_SIGNALS = {-6, -11, -4, -8}
+
 class Executor:
+    """Executor for interacting with the SUT, sending requests and receiving responses, and recording the conversation.
+    
+    Attributes:
+        pre_script: A Path object representing the script to be executed before interacting with the SUT, used for setup.
+        post_script: A Path object representing the script to be executed after interacting with the SUT, used for cleanup.
+        cmdline: A list of strings representing the command line arguments to execute the SUT.
+        host: The hostname or IP address of the SUT to connect to.
+        port: The port number on which the SUT is listening for connections.
+    """
     def __init__(
             self,
             mapper: Mapper,
@@ -146,8 +157,11 @@ class Executor:
         msg_seq: list[tuple[str, bytes]],
         poll_wait_ms: int = 5000
     ) -> Tuple[bool, Conversation | None] :  
-        """
-        TODO: Deal with interaction
+        """Interact with the SUT by sending a sequence of messages and receiving the corresponding responses, while recording the conversation.
+        
+        Args:
+            msg_seq: A list of tuples, where each tuple contains a string representing the message type and a bytes object representing the message content to be sent to the SUT.
+            poll_wait_ms: An integer representing the maximum time in milliseconds to wait for a response from the SUT after sending each message.
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
@@ -227,7 +241,7 @@ class Executor:
             if proc.poll() is not None:
                 
                 return_code = proc.poll()
-                if return_code == 1:
+                if return_code in CRASH_SIGNALS:
                     cons.add_state(msg_type, 'CRASH')
                     cons.add_data(req_data, bytes())
                     logger.debug(f'Program crash exitcode {return_code}')
@@ -258,7 +272,7 @@ class Executor:
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
-                    if return_code != None and return_code < 0:
+                    if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -277,7 +291,7 @@ class Executor:
                 
                 elif resp_code == 'TIMEOUT':
                     return_code = proc.poll()
-                    if return_code != None and return_code < 0:
+                    if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -296,7 +310,7 @@ class Executor:
                 
                 elif resp_code == 'RCLOSED':
                     return_code = proc.poll()
-                    if return_code != None and return_code < 0:
+                    if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
                         logger.debug(f'Program crash exitcode {return_code}')
@@ -335,7 +349,7 @@ class Executor:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                if return_code != None and return_code < 0:
+                if return_code != None and return_code in CRASH_SIGNALS:
                     cons.add_state('-', 'CRASH')
                     logger.debug(f'Program crash exitcode {return_code}')
                     with self.analyzer.lock:
@@ -696,8 +710,13 @@ class Executor:
         if crash:
             pending = '_crash'
         target_folder = configs.results_path / 'raw_testcases'
+        enrich_folder = configs.results_path / 'enrich_testcases'
         if not target_folder.is_dir():
             target_folder.mkdir()
+
+        if not enrich_folder.is_dir():
+            enrich_folder.mkdir()
+            
         file_count = 0
         for item in target_folder.iterdir():
             if item.is_file():
@@ -712,6 +731,11 @@ class Executor:
                 if request:
                     f.write(request + b'\n')
                     f.write(response + b'\n')
+        
+        with open(enrich_folder / f'request_{file_count}{pending}.raw', 'ab') as f:
+            for request, _ in cons.content:
+                if request:
+                    f.write(request + b'\n')
         
         file_count = 0
         target_folder = configs.results_path / 'replayable_testcases'

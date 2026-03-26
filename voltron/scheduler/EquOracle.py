@@ -4,6 +4,8 @@ from voltron.scheduler.automata import MealyMachine
 from collections import deque
 
 class EquOracle:
+    """Haven'd been used yet, but can be used to compare two mealy machines and find a distinguishing input sequence if they are not equivalent.
+    """
     def __init__(
         self,
         mapper: Mapper,

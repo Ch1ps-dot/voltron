@@ -11,6 +11,7 @@ for item in "$TARGET_DIR"/*; do
         folder_name=$(basename "$item")
         if ! [[ " ${KEEP_NAMES[@]} " =~ " $folder_name " ]]; then
             rm -rf "$item"
+            rm -f "$item"
         fi
     fi
 done

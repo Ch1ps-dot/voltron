@@ -1,1 +1,1 @@
-./testOnDemandRTSPServer 8554
+/home/ubuntu/experiments/live/testProgs/testOnDemandRTSPServer 8554
