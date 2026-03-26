@@ -145,7 +145,7 @@ class AsyncRFCParser:
         else:
             with open(req_path, 'r', encoding='utf-8') as f:
                 req_json = json.load(f)
-                self.req_types = self.combine_field(req_json)
+                self.req_types = req_json[0]['value']
                 self.req_json = req_json
                 
             with open(res_path, 'r', encoding='utf-8') as f:
