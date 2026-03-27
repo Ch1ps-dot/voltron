@@ -97,7 +97,7 @@ class Executor:
     def post_exe(
             self
     ) -> subprocess.Popen | None:
-        if (self.post_script.is_file()):
+        if (self.post_script.is_file() and configs.fuzz_mode != 'replay'):
             try:
                 proc = subprocess.Popen(
                     [self.post_script],
@@ -626,12 +626,14 @@ class Executor:
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
-                        resp_code: str = self.parser_func(buf).decode("utf-8", errors="backslashreplace")
-                        if resp_code == '':
-                            while self.try_times_parser > 0:
-                                self.try_times_parser = self.try_times_parser - 1
+                        resp_code = None
+                        resp_byte: bytes = self.parser_func(buf)
+                        try_times = 3
+                        if resp_byte == b'':
+                            while try_times > 0:
+                                try_times -= 1
                                 resp_code = self.parser_func(buf)
-                                if resp_code == '':
+                                if resp_code == b'':
                                     logger.debug(f'parse error:{buf}')
                                     new_parser = self.mapper.update_parser(buf)
                                     self.load_parser(new_parser)
@@ -639,16 +641,17 @@ class Executor:
                                 else:
                                     break
                             
-                        if resp_code == '':
+                        if resp_byte == b'':
                             logger.debug('Parse Error')
                             resp_code = 'UNKOWN'
-                        
+                        else:
+                            resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
                         # update some analysis data
                         
                             # self.analyzer.last_parser = self.mapper.cur_parser
                             # if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
                             #     self.analyzer.last_generator.cur_res.append(resp_code)
-                                
+                        
                         return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):

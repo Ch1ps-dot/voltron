@@ -1,1 +1,1 @@
-sleep 5
+exim -bd -d -oX 25 -oP /var/lock/exim.pid
