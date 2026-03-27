@@ -1,3 +1,11 @@
+tinydtls:
+  protocol: udp
+  host: 127.0.0.1
+  port: 20220
+  rfc_name: ["rfc6347"]
+  trans_layer: udp
+  server: parent
+
 lightftp:
   protocol: ftp
   host: 127.0.0.1
