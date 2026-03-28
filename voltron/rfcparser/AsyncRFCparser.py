@@ -448,17 +448,19 @@ class AsyncRFCParser:
         logger.debug('RFCParser: finish poss response')
 
     async def _poss_response_one(
-            self,
-            req_type,
-            sem
+        self,
+        req_type,
+        sem
     ):
         async with sem:
+            info = self.rag_res_msg.top_k_sentence([req_type], 8)
             while(True):
                 try:
                     ans_str = await self.chater.llm_possible_res(
                         pro_name=self.pro_name,
                         current_request=req_type,
-                        response_types=json.dumps(list(self.res_types))
+                        response_types=json.dumps(list(self.res_types)),
+                        info=''.join([' '.join(item[0]) for item in info])
                     )
                     cur_poss_res = json.loads(ans_str)
                     return req_type, cur_poss_res['possible_response']
@@ -499,7 +501,7 @@ class AsyncRFCParser:
             sem
     ):
         query = [last_req, cur_req]
-        results = self.rag_all.top_k_sentence(query, 5)
+        results = self.rag_all.top_k_sentence(query, 8)
         async with sem:
             while(True):
                 try:

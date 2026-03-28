@@ -326,10 +326,11 @@ class AsyncChater:
             self,
             pro_name: str,
             current_request: str,
-            response_types: str
+            response_types: str,
+            info: str = ""
     ) -> str:
         tmp = self.pmp._tem_possible_response
-        pmp = tmp.substitute(pro_name=pro_name, current_request=current_request, response_types=response_types)
+        pmp = tmp.substitute(pro_name=pro_name, current_request=current_request, response_types=response_types, info=info)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "possible_res"
