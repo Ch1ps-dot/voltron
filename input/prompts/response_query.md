@@ -5,6 +5,10 @@ Analyzing the format related sections of {$rfc_num} document of the {$pro_name} 
 
 Focus only on code-like fields that directly identify response type. Do NOT include session IDs, sequence numbers, flags, transaction IDs, message names, or other payload fields. For each identified field, briefly explain how it is used to distinguish response types, and list the possible values if they are explicitly defined in the RFC. Only return the analysis result in a JSON array format as specified below, with one element per identified field.
 
+- Output all relevant fields as elements in a JSON array. Put the most critical distinguishing fields first (e.g., Method before Subtype).
+- The value array must be character strings, bytes, or numbers as explicitly defined in the RFC. Do NOT include inferred or example values that are not directly specified in the document.
+- For string values in the `value` array, each item must contain only letters, digits, or underscores (`^[A-Za-z0-9_]+$`).
+
 ## **Format related document sections:**
 ${rfc_doc}
 
