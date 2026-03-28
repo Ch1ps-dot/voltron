@@ -306,6 +306,7 @@ class AsyncRFCParser:
             logger.debug('[IR Generation]: request description load')
         else:
             while(True):
+                req_json = None
                 try:
                     pmp, req_json = await self.chater.llm_request_query(
                         rfc_num = self.rfc_name,
@@ -321,6 +322,7 @@ class AsyncRFCParser:
                             json.dump(req_json, f)
                         return req_json
                 except Exception as e:
+                    logger.debug(req_json)
                     logger.debug(f'RFCParser: req field {e}')
 
     async def _res_field(
@@ -334,6 +336,7 @@ class AsyncRFCParser:
             logger.debug('[IR Generation]: response description load')
         else:
             while(True):
+                res_json = None
                 try:
                     pmp, res_json = await self.chater.llm_response_query(
                         rfc_num = self.rfc_name,
@@ -349,6 +352,7 @@ class AsyncRFCParser:
                             json.dump(res_json, f)
                         return res_json
                 except Exception as e:
+                    logger.debug(res_json)
                     logger.debug(f'RFCParser: res field {e}')
     
     async def _msg_model_gen_one(
@@ -455,6 +459,7 @@ class AsyncRFCParser:
         async with sem:
             info = self.rag_res_msg.top_k_sentence([req_type], 8)
             while(True):
+                ans_str = None
                 try:
                     ans_str = await self.chater.llm_possible_res(
                         pro_name=self.pro_name,
@@ -465,6 +470,7 @@ class AsyncRFCParser:
                     cur_poss_res = json.loads(ans_str)
                     return req_type, cur_poss_res['possible_response']
                 except Exception as e:
+                    logger.debug(ans_str)
                     logger.debug(f'RFCParser: poss response {e}')
 
     async def _state_dependency_async(
@@ -515,6 +521,7 @@ class AsyncRFCParser:
                     relation = json.loads(ans_str)
                     return last_req, cur_req, relation
                 except Exception as e:
+                    logger.debug(ans_str)
                     logger.debug(f'RFCParser: dependency failure {e}')
 
 
