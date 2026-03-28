@@ -1,5 +1,5 @@
 tinydtls:
-  protocol: udp
+  protocol: dtls
   host: 127.0.0.1
   port: 20220
   rfc_name: ["rfc6347"]
