@@ -169,7 +169,7 @@ class Executor:
         clean = self.post_exe()
         proc = self.pre_exe()
         
-        
+        logger.debug(">>>Executor: interact start")
         if proc is None:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
@@ -232,7 +232,7 @@ class Executor:
             cons.add_state('-', '-')
             cons.add_data(bytes(), bytes())
 
-        # send the message path
+        # send the message sequence and parse the response, record the conversation in cons
         for msg_type, msg in msg_seq:
             
             if self.stop_event.is_set():
@@ -378,11 +378,11 @@ class Executor:
                 if configs.fuzz_mode == 'fuzz':
                     os.killpg(proc.pid, signal.SIGTERM)
                     returncode = proc.wait(timeout=3)
-                    logger.debug(f'sut returncode: {returncode} {proc.pid}')
+                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
                 elif configs.fuzz_mode == 'replay':
                     os.killpg(proc.pid, signal.SIGUSR1)
                     returncode = proc.wait(timeout=3)
-                    logger.debug(f'sut returncode: {returncode}')
+                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
         except Exception as err:
             logger.debug(f'proc close err: {err}')
             
@@ -397,7 +397,7 @@ class Executor:
             except Exception as e:
                 # sub-subprocess die out
                 analyzer.sut_proc = None
-                logger.debug(f'target process: {e}')
+                logger.debug(f'target process already closed: {e}')
                 break
         
         # ensure sub-subprocess die
@@ -430,7 +430,7 @@ class Executor:
                 
 
         # self.post_exe()
-        logger.debug("Executor: query done")
+        logger.debug("<<<Executor: interact done")
         return True, cons
     
     def kill_listeners(
