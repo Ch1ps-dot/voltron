@@ -9,7 +9,7 @@ Your task is to **generate Python code that constructs protocol messages followi
 You will be given:
 
 * **Protocol name**: $pro_name
-* **Message type / message name**: {$field_name}
+* **field name**: {$field_name}
 * **Field value**: {$msg_type}
 * **Message syntax specification in protoIR format**:
   $msg_ir
@@ -88,7 +88,7 @@ For each `<field>` in `$msg_ir`:
 ### **Function Prototype (Must Match Exactly)**
 
 def generate_${msg_type}():
-    """Generate one semantically valid, state-exploratory $msg_type message for the $pro_name protocol.
+    """Generate one semantically valid, state-exploratory (field name: $field_name value: $msg_type) message for the $pro_name protocol.
     - Input: none
     - Output: bytes (valid message that explores edge cases/SUT states)
     """

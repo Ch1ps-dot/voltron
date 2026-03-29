@@ -13,7 +13,7 @@ You will be given:
 
   $pro_name
 
-### **Message type / message name**: 
+### **field name**: 
 
   $field_name
 

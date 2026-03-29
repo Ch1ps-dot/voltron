@@ -678,6 +678,7 @@ class Executor:
                         # recv response and parse it
                         resp_code = None
                         resp_byte: bytes = self.parser_func(buf)
+
                         try_times = 3
                         if resp_byte == b'':
                             while try_times > 0:

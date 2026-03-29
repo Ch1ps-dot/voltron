@@ -11,7 +11,7 @@ You will be given:
 ### **Protocol name**: 
    $pro_name
    
-### **Message type / message name**
+### **field name**
    {$field_name}
 
 ### **Field value** 
