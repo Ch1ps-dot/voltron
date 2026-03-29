@@ -128,6 +128,7 @@ class AsyncChater:
     async def llm_generator_gen(
             self,
             pro_name: str,
+            field_name: str,
             msg_type: str,
             msg_ir: str,
             info: str
@@ -142,7 +143,7 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_gen_generator
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, msg_ir=msg_ir, info=info)
+        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, msg_ir=msg_ir, info=info)
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_gen"
@@ -153,6 +154,7 @@ class AsyncChater:
     async def llm_generator_evolve(
             self,
             pro_name: str,
+            field_name: str,
             msg_type: str,
             code: str,
             info: str,
@@ -174,7 +176,7 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_generator_evolve
 
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, trace=trace, related_code=related_code)
+        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, code=code, info=info, trace=trace, related_code=related_code)
         # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
@@ -213,6 +215,7 @@ class AsyncChater:
     async def llm_mutator_evolve(
             self,
             pro_name: str,
+            field_name: str,
             msg_type: str,
             code: str,
             info: str,
@@ -234,7 +237,7 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_mutator_evolve
         
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info, poss_response=poss_response, trace=trace)
+        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, code=code, info=info, poss_response=poss_response, trace=trace)
         # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,

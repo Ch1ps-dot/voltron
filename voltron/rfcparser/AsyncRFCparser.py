@@ -139,18 +139,18 @@ class AsyncRFCParser:
             self.res_json = res_json
             self.req_json = req_json
             
-            self.req_types = req_json[0]['value']
-            self.res_types = res_json[0]['value']
+            self.req_types = {str(v) for v in req_json[0]['value']}
+            self.res_types = {str(v) for v in res_json[0]['value']}
             
         else:
             with open(req_path, 'r', encoding='utf-8') as f:
                 req_json = json.load(f)
-                self.req_types = req_json[0]['value']
+                self.req_types = {str(v) for v in req_json[0]['value']}
                 self.req_json = req_json
                 
             with open(res_path, 'r', encoding='utf-8') as f:
                 res_json = json.load(f)
-                self.res_types = res_json[0]['value']
+                self.res_types = {str(v) for v in res_json[0]['value']}
                 logger.debug(self.res_types)
                 self.res_json = res_json
 
@@ -320,6 +320,7 @@ class AsyncRFCParser:
                             continue
                         with open(req_path, 'w', encoding="utf-8") as f:
                             json.dump(req_json, f)
+
                         return req_json
                 except Exception as e:
                     logger.debug(req_json)

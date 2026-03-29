@@ -139,6 +139,7 @@ class AsyncProducer:
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_gen(
                         pro_name=self.rfcp.pro_name,
+                        
                         msg_type=msg_type,
                         msg_ir=msg_ir,
                         info=info

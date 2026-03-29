@@ -9,7 +9,8 @@ Your task is to **generate Python code that constructs protocol messages followi
 You will be given:
 
 * **Protocol name**: $pro_name
-* **Message type / message name**: $msg_type
+* **Message type / message name**: {$field_name}
+* **Field value**: {$msg_type}
 * **Message syntax specification in protoIR format**:
   $msg_ir
 
