@@ -87,7 +87,7 @@ For each `<field>` in `$msg_ir`:
 
 ### **Function Prototype (Must Match Exactly)**
 
-def generate_${msg_type}():
+def generate():
     """Generate one semantically valid, state-exploratory (field name: $field_name value: $msg_type) message for the $pro_name protocol.
     - Input: none
     - Output: bytes (valid message that explores edge cases/SUT states)
@@ -110,6 +110,5 @@ def generate_${msg_type}():
 * The function must be directly executable
 * The function takes no arguments
 * Use generate_${msg_type} as function name
-* Ensure the code generates static valid values
 
 ---

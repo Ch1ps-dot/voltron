@@ -33,3 +33,4 @@ Focus only on code-like fields that directly identify request type. Do NOT inclu
 
 - Please extract and explain only the fields related to **request messages** that determine message type or function, strictly according to the format and requirements above.
 - Only respond with a JSON array as specified.
+- For string values in the `value` array, each item must contain only letters, digits, or underscores (`^[A-Za-z0-9_]`).
