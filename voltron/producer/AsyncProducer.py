@@ -139,7 +139,7 @@ class AsyncProducer:
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_gen(
                         pro_name=self.rfcp.pro_name,
-                        
+                        field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
                         msg_ir=msg_ir,
                         info=info
@@ -232,6 +232,7 @@ class AsyncProducer:
                     input_code = await self.chater.llm_generator_evolve(
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
+                        field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
                         trace= '\n'.join(trace_list),
                         info=doc_info,
@@ -340,6 +341,7 @@ class AsyncProducer:
                     mutate_code = await self.chater.llm_mutator_evolve(
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
+                        field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
                         info=doc_info,
                         poss_response='\n'.join(self.poss_response[msg_type]),

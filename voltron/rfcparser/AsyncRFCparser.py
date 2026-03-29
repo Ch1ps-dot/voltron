@@ -41,6 +41,8 @@ class AsyncRFCParser:
         self.res_json: list[dict] # json data of response field
         self.req_types: set[str] = set()
         self.res_types: set[str] = set()
+        self.req_fields: list[str] = list()
+        self.res_fields: list[str] = list()  
         self.req_doc: set[str] = set()
         self.res_doc: set[str] = set()
         self.all_doc: set[str] = set()
@@ -139,20 +141,20 @@ class AsyncRFCParser:
             self.res_json = res_json
             self.req_json = req_json
             
-            self.req_types = {str(v) for v in req_json[0]['value']}
-            self.res_types = {str(v) for v in res_json[0]['value']}
-            
         else:
             with open(req_path, 'r', encoding='utf-8') as f:
                 req_json = json.load(f)
-                self.req_types = {str(v) for v in req_json[0]['value']}
                 self.req_json = req_json
                 
             with open(res_path, 'r', encoding='utf-8') as f:
                 res_json = json.load(f)
-                self.res_types = {str(v) for v in res_json[0]['value']}
-                logger.debug(self.res_types)
                 self.res_json = res_json
+
+        self.req_types = {str(v) for v in req_json[0]['value']}
+        self.res_types = {str(v) for v in res_json[0]['value']}
+
+        self.req_fields = [str(v['field_name']) for v in req_json]
+        self.res_fields = [str(v['field_name']) for v in res_json]
 
         logger.debug('RFCParser: finish key field extraction')
         
