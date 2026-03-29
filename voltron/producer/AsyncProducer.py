@@ -148,7 +148,7 @@ class AsyncProducer:
                     # test generated code
                     name_space = {}
                     exec(input_code, name_space)
-                    obj = name_space[f'generate_{msg_type}']
+                    obj = name_space[f'generate']
                     obj()
                     
                     return msg_type, input_code
@@ -358,7 +358,7 @@ class AsyncProducer:
                     # test generated code
                     name_space = {}
                     exec(mutate_code, name_space)
-                    obj = name_space[f'mutate_{msg_type}']
+                    obj = name_space[f'mutate']
                     obj()
                     
                     # exec(havoc_code, name_space)
