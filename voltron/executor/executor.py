@@ -671,10 +671,33 @@ class Executor:
                         if not chunk:
                             break
                         buf += chunk
+
                     if len(buf) == 0:
                         return 'RCLOSED', None
-                    resp_code = self.parser_func(buf)
-                    return resp_code, buf
+                    else:
+                        # recv response and parse it
+                        resp_code = None
+                        resp_byte: bytes = self.parser_func(buf)
+                        try_times = 3
+                        if resp_byte == b'':
+                            while try_times > 0:
+                                try_times -= 1
+                                resp_code = self.parser_func(buf)
+                                if resp_code == b'':
+                                    logger.debug(f'parse error:{buf}')
+                                    new_parser = self.mapper.update_parser(buf)
+                                    self.load_parser(new_parser)
+                                    logger.debug('Update Parser')
+                                else:
+                                    break
+                            
+                        if resp_byte == b'':
+                            logger.debug('Parse Error')
+                            resp_code = 'UNKOWN'
+                        else:
+                            resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
+
+                        return resp_code, buf
                 else:
                     logger.debug('recv: no data')
         except Exception as e:
