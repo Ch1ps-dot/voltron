@@ -87,7 +87,7 @@ $trace
 
 ## **Function Prototype (Must Match Exactly)**
 
-def generate_${msg_type}():
+def generate():
  """Generate one $msg_type message for the $pro_name protocol.
  - Input: none
  - Output: bytes
