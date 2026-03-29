@@ -479,7 +479,6 @@ class Executor:
                     sock = socket.create_connection(('localhost', self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    sock.bind(('localhost', 12345))
                 else:
                     return None
             except ConnectionRefusedError as e:
