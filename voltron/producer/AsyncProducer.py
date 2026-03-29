@@ -242,7 +242,7 @@ class AsyncProducer:
                     # test generated code
                     name_space = {}
                     exec(input_code, name_space)
-                    obj = name_space[f'generate_{msg_type}']
+                    obj = name_space[f'generate']
                     obj()
                     with analyzer.lock:
                         analyzer.finished += 1
