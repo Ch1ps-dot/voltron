@@ -23,6 +23,12 @@ You will be given:
   $response_types
   ```
 
+* **Request information**:
+
+  ```
+  $info
+  ```
+
 ---
 
 #### **Task Definition**
