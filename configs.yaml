@@ -1,0 +1,77 @@
+tinydtls:
+  protocol: dtls
+  host: 127.0.0.1
+  port: 20220
+  rfc_name: ["rfc6347"]
+  trans_layer: udp
+  server: parent
+
+lightftp:
+  protocol: ftp
+  host: 127.0.0.1
+  port: 2200
+  rfc_name: ["rfc959"]
+  trans_layer: tcp
+  server: parent
+
+pureftpd:
+  protocol: ftp
+  host: 127.0.0.1
+  port: 21
+  rfc_name: ["rfc959"]
+  trans_layer: tcp
+  server: parent
+
+forked-daapd:
+  protocol: ftp
+  host: 127.0.0.1
+  port: 3689
+  rfc_name: ["rfc959"]
+  trans_layer: tcp
+  server: parent
+
+exim:
+  protocol: smtp
+  host: 127.0.0.1
+  port: 25
+  rfc_name: ["rfc5321"]
+  trans_layer: tcp
+  server: parent
+
+kamailio:
+  protocol: sip
+  host: 127.0.0.1
+  port: 5060
+  rfc_name: ["rfc3262", "rfc3261",  "rfc3311", "rfc3428", "rfc3515", "rfc3903", "rfc6086", "rfc6665"]
+  trans_layer: udp
+  server: parent
+
+live555:
+  protocol: rtsp
+  host: 127.0.0.1
+  port: 8554
+  rfc_name: ["rfc7826"]
+  trans_layer: tcp
+  server: parent
+
+lighttpd:
+  protocol: http
+  host: 127.0.0.1
+  port: 8080
+  rfc_name: ["rfc9110"]
+  trans_layer: tcp
+  server: child
+
+dnsmasq:
+  protocol: dns
+  host: 127.0.0.1
+  port: 5353
+  rfc_name: ["rfc1034", "rfc1035"]
+  trans_layer: udp
+  server: parent
+
+llm:
+  base_url: # Replace with your actual base URL for the LLM API
+  api_key: # Replace with your actual API key for the LLM API
+  model: gpt-5-mini-2025-08-07
+  async_sem: 8
