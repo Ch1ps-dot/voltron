@@ -41,6 +41,8 @@ class AsyncRFCParser:
         self.res_json: list[dict] # json data of response field
         self.req_types: set[str] = set()
         self.res_types: set[str] = set()
+        self.req_fields: list[str] = list()
+        self.res_fields: list[str] = list()  
         self.req_doc: set[str] = set()
         self.res_doc: set[str] = set()
         self.all_doc: set[str] = set()
@@ -123,7 +125,7 @@ class AsyncRFCParser:
         logger.debug('RFCParser: finish ir generation')
     
     async def key_field_extract(
-            self
+        self
     ):
         """Key Field Parse"""
         req_path = self.ir_path / 'req.json'
@@ -135,24 +137,70 @@ class AsyncRFCParser:
             
             res_json = await res_task
             req_json = await req_task
-            
-            self.req_types = set(req_json['value'])
-            self.res_types = set(res_json['value'])
+
+            self.res_json = res_json
+            self.req_json = req_json
             
         else:
             with open(req_path, 'r', encoding='utf-8') as f:
                 req_json = json.load(f)
-                if type(req_json) == list:
-                    req_json = req_json[0]
-                self.req_types = set(req_json['value'])
+                self.req_json = req_json
                 
             with open(res_path, 'r', encoding='utf-8') as f:
                 res_json = json.load(f)
-                if type(res_json) == list:
-                    res_json = res_json[0]
-                self.res_types = set(res_json['value'])
+                self.res_json = res_json
+
+        self.req_types = {str(v) for v in req_json[0]['value']}
+        self.res_types = {str(v) for v in res_json[0]['value']}
+
+        self.req_fields = [str(v['field_name']) for v in req_json]
+        self.res_fields = [str(v['field_name']) for v in res_json]
 
         logger.debug('RFCParser: finish key field extraction')
+        
+    def combine_field(
+        self,
+        fields: list[dict]
+    ) -> set[str]:
+        """Combine fields to generate new request/response type if necessary
+
+        For example, if the combination of two fields can determine the message type, we can combine them together and add the combination into request/response type set.
+        """
+        from itertools import combinations, product
+
+        ret = set()
+
+        # Normalize input: expect list of dicts with keys 'field_name' and 'value' (list)
+        usable = []
+        for f in fields:
+            if not isinstance(f, dict):
+                continue
+            name = f.get('field_name') or f.get('name')
+            vals = f.get('value')
+            if not name or not vals or not isinstance(vals, list):
+                continue
+            # filter out empty/None values
+            clean_vals = [str(v).strip() for v in vals if v is not None and str(v).strip() != '']
+            if len(clean_vals) == 0:
+                continue
+            usable.append((name.strip(), clean_vals))
+
+        # If fewer than 2 usable fields, nothing to combine
+        if len(usable) < 2:
+            return fields[0]['value'] if len(usable) == 1 else set()
+
+        # For each subset of fields of size >=2, generate Cartesian product of their values
+        for r in range(2, len(usable) + 1):
+            for combo in combinations(usable, r):
+                names = [c[0] for c in combo]
+                vals_lists = [c[1] for c in combo]
+                for prod in product(*vals_lists):
+                    # Format: FieldA=valA|FieldB=valB|...
+                    parts = [f"{n}={v}" for n, v in zip(names, prod)]
+                    combined = "|".join(parts)
+                    ret.add(combined)
+        logger.debug(f'Combined fields: {ret}')
+        return ret
     
     def message_model_generation(
             self
@@ -252,7 +300,7 @@ class AsyncRFCParser:
     async def _req_field(
             self,
             req_path: Path
-    ) -> dict:
+    ) -> list[dict]:
         # request field extraction
         if(req_path.is_file()):
             with open(req_path, 'r', encoding='utf-8') as f:
@@ -260,6 +308,7 @@ class AsyncRFCParser:
             logger.debug('[IR Generation]: request description load')
         else:
             while(True):
+                req_json = None
                 try:
                     pmp, req_json = await self.chater.llm_request_query(
                         rfc_num = self.rfc_name,
@@ -269,18 +318,20 @@ class AsyncRFCParser:
 
                     if (req_json != None):
                         req_json = json.loads(req_json)
-                        if not self._field_check(req_json): 
+                        if not self._req_field_check(req_json): 
                             continue
                         with open(req_path, 'w', encoding="utf-8") as f:
                             json.dump(req_json, f)
+
                         return req_json
                 except Exception as e:
+                    logger.debug(req_json)
                     logger.debug(f'RFCParser: req field {e}')
 
     async def _res_field(
             self,
             res_path: Path
-    ) -> dict:
+    ) -> list[dict]:
         # response field extraction
         if(res_path.is_file()):
             with open(res_path, 'r', encoding='utf-8') as f:
@@ -288,6 +339,7 @@ class AsyncRFCParser:
             logger.debug('[IR Generation]: response description load')
         else:
             while(True):
+                res_json = None
                 try:
                     pmp, res_json = await self.chater.llm_response_query(
                         rfc_num = self.rfc_name,
@@ -303,6 +355,7 @@ class AsyncRFCParser:
                             json.dump(res_json, f)
                         return res_json
                 except Exception as e:
+                    logger.debug(res_json)
                     logger.debug(f'RFCParser: res field {e}')
     
     async def _msg_model_gen_one(
@@ -325,11 +378,11 @@ class AsyncRFCParser:
                 try:
                     ir_xml = etree.fromstring(msg_ir)
                     return ir_xml
-                except etree.XMLSyntaxError as e:
+                except Exception as e:
                     logger.debug(f'RFCParser: [bad xml format] {msg_type} err: {e}')
                     fix_ir = await self.chater.llm_ir_repair(
                                 ir=msg_ir,
-                                error=e.msg
+                                error=str(e)
                             )
                     if (fix_ir != None):
                         msg_ir = fix_ir
@@ -402,21 +455,25 @@ class AsyncRFCParser:
         logger.debug('RFCParser: finish poss response')
 
     async def _poss_response_one(
-            self,
-            req_type,
-            sem
+        self,
+        req_type,
+        sem
     ):
         async with sem:
+            info = self.rag_res_msg.top_k_sentence([req_type], 8)
             while(True):
+                ans_str = None
                 try:
                     ans_str = await self.chater.llm_possible_res(
                         pro_name=self.pro_name,
                         current_request=req_type,
-                        response_types=json.dumps(list(self.res_types))
+                        response_types=json.dumps(list(self.res_types)),
+                        info=''.join([' '.join(item[0]) for item in info])
                     )
                     cur_poss_res = json.loads(ans_str)
                     return req_type, cur_poss_res['possible_response']
                 except Exception as e:
+                    logger.debug(ans_str)
                     logger.debug(f'RFCParser: poss response {e}')
 
     async def _state_dependency_async(
@@ -453,7 +510,7 @@ class AsyncRFCParser:
             sem
     ):
         query = [last_req, cur_req]
-        results = self.rag_all.top_k_sentence(query, 5)
+        results = self.rag_all.top_k_sentence(query, 8)
         async with sem:
             while(True):
                 try:
@@ -467,12 +524,13 @@ class AsyncRFCParser:
                     relation = json.loads(ans_str)
                     return last_req, cur_req, relation
                 except Exception as e:
+                    logger.debug(ans_str)
                     logger.debug(f'RFCParser: dependency failure {e}')
 
 
-    def _field_check(
+    def _req_field_check(
             self,
-            data: dict
+            data: list[dict]
     ) -> bool:
         """Check the json content of message field information
 
@@ -482,13 +540,13 @@ class AsyncRFCParser:
         Return:
             True or False
         """
-        if len(data) != 4: 
-            return False
-        
-        for key, val in data.keys():
-            if key not in ['field_name', 'position', 'explanation', 'value']:
-                logger.debug('bad json')
+        for ele in data:
+            if len(ele) != 4: 
                 return False
+            for key in ele.keys():
+                if key not in ['field_name', 'position', 'explanation', 'value']:
+                    logger.debug('bad json')
+                    return False
         return True
     
     def _res_field_check(
@@ -503,10 +561,10 @@ class AsyncRFCParser:
         Return:
             True or False
         """
-        if len(data) != 4: 
-            return False
         for ele in data:
-            for key, val in ele.keys():
+            if len(ele) != 4: 
+                return False
+            for key in ele.keys():
                 if key not in ['field_name', 'position', 'explanation', 'value']:
                     logger.debug('bad json')
                     return False

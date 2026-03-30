@@ -1,3 +1,11 @@
+tinydtls:
+  protocol: dtls
+  host: 127.0.0.1
+  port: 20220
+  rfc_name: ["rfc6347"]
+  trans_layer: udp
+  server: parent
+
 lightftp:
   protocol: ftp
   host: 127.0.0.1
@@ -63,7 +71,7 @@ dnsmasq:
   server: parent
 
 llm:
-  base_url: https://xiaoai.plus/v1
-  api_key: sk-vUIK7aS2md6wOsKyEsEEDzzDYNu5BwwaQ9UofpG9N7XB6egQ
+  base_url: # Replace with your actual base URL for the LLM API
+  api_key: # Replace with your actual API key for the LLM API
   model: gpt-5-mini-2025-08-07
   async_sem: 8

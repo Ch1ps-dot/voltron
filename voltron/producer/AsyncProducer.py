@@ -139,6 +139,7 @@ class AsyncProducer:
                     # generate input generator and save it
                     input_code = await self.chater.llm_generator_gen(
                         pro_name=self.rfcp.pro_name,
+                        field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
                         msg_ir=msg_ir,
                         info=info
@@ -147,12 +148,12 @@ class AsyncProducer:
                     # test generated code
                     name_space = {}
                     exec(input_code, name_space)
-                    obj = name_space[f'generate_{msg_type}']
+                    obj = name_space[f'generate']
                     obj()
                     
                     return msg_type, input_code
                 except Exception as e:
-                    logger.debug(f'Producer :generate error {e}')
+                    logger.debug(f'Producer :generate error {str(e)}')
 
     async def _generator_gen_async(
         self
@@ -231,6 +232,7 @@ class AsyncProducer:
                     input_code = await self.chater.llm_generator_evolve(
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
+                        field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
                         trace= '\n'.join(trace_list),
                         info=doc_info,
@@ -240,7 +242,7 @@ class AsyncProducer:
                     # test generated code
                     name_space = {}
                     exec(input_code, name_space)
-                    obj = name_space[f'generate_{msg_type}']
+                    obj = name_space[f'generate']
                     obj()
                     with analyzer.lock:
                         analyzer.finished += 1
@@ -339,10 +341,11 @@ class AsyncProducer:
                     mutate_code = await self.chater.llm_mutator_evolve(
                         code=old_code,
                         pro_name=self.rfcp.pro_name,
+                        field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
                         info=doc_info,
                         poss_response='\n'.join(self.poss_response[msg_type]),
-                        trace='\n'.join(req_res[msg_type])
+                        trace='\n'.join(req_res[msg_type] if msg_type in req_res.keys() else [])
                     )
                     
                     # havoc_code = await self.chater.llm_mutator_havoc(
@@ -355,7 +358,7 @@ class AsyncProducer:
                     # test generated code
                     name_space = {}
                     exec(mutate_code, name_space)
-                    obj = name_space[f'mutate_{msg_type}']
+                    obj = name_space[f'mutate']
                     obj()
                     
                     # exec(havoc_code, name_space)
@@ -438,7 +441,7 @@ class AsyncProducer:
     async def _parser_gen_async(
             self
     ):
-        res_info = json.dumps(list(self.rfcp.res_doc))
+        res_info = json.dumps(self.rfcp.res_json)
         while(True):
             try:
                 # generate input generator and save it
@@ -472,7 +475,7 @@ class AsyncProducer:
         self,
         message
     ):
-        res_info = json.dumps(list(self.rfcp.res_doc))
+        res_info = json.dumps(self.rfcp.res_json)
         old_code = ''
         old_p_name = f'{self.parsers[-1].name}.py'
         old_p_path = self.parser_path / old_p_name

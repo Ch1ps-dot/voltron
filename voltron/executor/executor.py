@@ -97,7 +97,7 @@ class Executor:
     def post_exe(
             self
     ) -> subprocess.Popen | None:
-        if (self.post_script.is_file()):
+        if (self.post_script.is_file() and configs.fuzz_mode != 'replay'):
             try:
                 proc = subprocess.Popen(
                     [self.post_script],
@@ -169,7 +169,7 @@ class Executor:
         clean = self.post_exe()
         proc = self.pre_exe()
         
-        
+        logger.debug(">>>Executor: interact start")
         if proc is None:
             logger.debug(f'Executor: SUT Setup Failure')
             return False, None
@@ -232,7 +232,7 @@ class Executor:
             cons.add_state('-', '-')
             cons.add_data(bytes(), bytes())
 
-        # send the message path
+        # send the message sequence and parse the response, record the conversation in cons
         for msg_type, msg in msg_seq:
             
             if self.stop_event.is_set():
@@ -378,11 +378,11 @@ class Executor:
                 if configs.fuzz_mode == 'fuzz':
                     os.killpg(proc.pid, signal.SIGTERM)
                     returncode = proc.wait(timeout=3)
-                    logger.debug(f'sut returncode: {returncode} {proc.pid}')
+                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
                 elif configs.fuzz_mode == 'replay':
                     os.killpg(proc.pid, signal.SIGUSR1)
                     returncode = proc.wait(timeout=3)
-                    logger.debug(f'sut returncode: {returncode}')
+                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
         except Exception as err:
             logger.debug(f'proc close err: {err}')
             
@@ -397,7 +397,7 @@ class Executor:
             except Exception as e:
                 # sub-subprocess die out
                 analyzer.sut_proc = None
-                logger.debug(f'target process: {e}')
+                logger.debug(f'target process already closed: {e}')
                 break
         
         # ensure sub-subprocess die
@@ -430,7 +430,7 @@ class Executor:
                 
 
         # self.post_exe()
-        logger.debug("Executor: query done")
+        logger.debug("<<<Executor: interact done")
         return True, cons
     
     def kill_listeners(
@@ -626,12 +626,14 @@ class Executor:
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
-                        resp_code: str = self.parser_func(buf).decode("utf-8", errors="backslashreplace")
-                        if resp_code == '':
-                            while self.try_times_parser > 0:
-                                self.try_times_parser = self.try_times_parser - 1
+                        resp_code = None
+                        resp_byte: bytes = self.parser_func(buf)
+                        try_times = 3
+                        if resp_byte == b'':
+                            while try_times > 0:
+                                try_times -= 1
                                 resp_code = self.parser_func(buf)
-                                if resp_code == '':
+                                if resp_code == b'':
                                     logger.debug(f'parse error:{buf}')
                                     new_parser = self.mapper.update_parser(buf)
                                     self.load_parser(new_parser)
@@ -639,16 +641,17 @@ class Executor:
                                 else:
                                     break
                             
-                        if resp_code == '':
+                        if resp_byte == b'':
                             logger.debug('Parse Error')
                             resp_code = 'UNKOWN'
-                        
+                        else:
+                            resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
                         # update some analysis data
                         
                             # self.analyzer.last_parser = self.mapper.cur_parser
                             # if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
                             #     self.analyzer.last_generator.cur_res.append(resp_code)
-                                
+                        
                         return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):
@@ -668,10 +671,34 @@ class Executor:
                         if not chunk:
                             break
                         buf += chunk
+
                     if len(buf) == 0:
                         return 'RCLOSED', None
-                    resp_code = self.parser_func(buf)
-                    return resp_code, buf
+                    else:
+                        # recv response and parse it
+                        resp_code = None
+                        resp_byte: bytes = self.parser_func(buf)
+
+                        try_times = 3
+                        if resp_byte == b'':
+                            while try_times > 0:
+                                try_times -= 1
+                                resp_code = self.parser_func(buf)
+                                if resp_code == b'':
+                                    logger.debug(f'parse error:{buf}')
+                                    new_parser = self.mapper.update_parser(buf)
+                                    self.load_parser(new_parser)
+                                    logger.debug('Update Parser')
+                                else:
+                                    break
+                            
+                        if resp_byte == b'':
+                            logger.debug('Parse Error')
+                            resp_code = 'UNKOWN'
+                        else:
+                            resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
+
+                        return resp_code, buf
                 else:
                     logger.debug('recv: no data')
         except Exception as e:
@@ -711,6 +738,10 @@ class Executor:
         enrich_folder = configs.results_path / 'enrich_testcases'
         if not target_folder.is_dir():
             target_folder.mkdir()
+
+        if not enrich_folder.is_dir():
+            enrich_folder.mkdir()
+            
         file_count = 0
         for item in target_folder.iterdir():
             if item.is_file():

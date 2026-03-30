@@ -212,7 +212,7 @@ class Mapper:
             with open(self.g_path(g), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
-                obj = name_space[f'generate_{g.msg_type}']
+                obj = name_space[f'generate']
                 g.was_used += 1
                 return obj()
                 # result = []
@@ -239,7 +239,7 @@ class Mapper:
             with open(self.m_path(m), 'r', encoding='utf-8') as f:
                 code = f.read()
                 exec(code, name_space)
-                mutate = name_space[f'mutate_{m.msg_type}']
+                mutate = name_space[f'mutate']
                 # havoc = name_space[f'havoc_{m.msg_type}']
                 return mutate()
         except Exception as e:

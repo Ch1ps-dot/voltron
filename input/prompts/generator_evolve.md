@@ -10,8 +10,13 @@ You will be given:
 
 ### **Protocol name**: 
    $pro_name
-### **Message type / message name**
-   $msg_type
+   
+### **field name**
+   {$field_name}
+
+### **Field value** 
+   {$msg_type}
+
 ### **Previous Generated Program**:
    - This program may contain incorrect field values, invalid ordering, missing constraints, or violations of server expectations that restrict state transitions.
 
@@ -82,7 +87,7 @@ $trace
 
 ## **Function Prototype (Must Match Exactly)**
 
-def generate_${msg_type}():
+def generate():
  """Generate one $msg_type message for the $pro_name protocol.
  - Input: none
  - Output: bytes

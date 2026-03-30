@@ -91,7 +91,7 @@ class Havoc:
             gs = self.mapper.select_generators(w)
            
         elif mode == 'generic':
-            scope = self.rand.randint(1, 5)
+            scope = self.rand.randint(1, 8)
             gs = []
             for i in range(scope):
                 gs += self.rand.choice(self.useful_seq)
@@ -125,7 +125,7 @@ class Havoc:
     def select_mutators(
         self
     ) -> list[tuple[str, bytes]]:
-        scope = self.rand.randint(1, 10)
+        scope = self.rand.randint(1, 42)
         mut = self.rand.choice([True, False])
         ms = []
         mode = ''
