@@ -66,7 +66,7 @@ lighttpd:
   protocol: http
   host: 127.0.0.1
   port: 8080
-  rfc_name: ["rfc9110"]
+  rfc_name: ["rfc9110","rfc7540","rfc2616","rfc1945","rfc3875"]
   trans_layer: tcp
   server: child
 
