@@ -109,6 +109,6 @@ def generate():
 * Do NOT include explanations, comments outside the function, or markdown
 * The function must be directly executable
 * The function takes no arguments
-* Use generate_${msg_type} as function name
+* Use generate as function name
 
 ---
