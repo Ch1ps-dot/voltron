@@ -38,14 +38,6 @@ pureftpd:
   trans_layer: tcp
   server: parent
 
-forked-daapd:
-  protocol: ftp
-  host: 127.0.0.1
-  port: 3689
-  rfc_name: ["rfc959"]
-  trans_layer: tcp
-  server: parent
-
 exim:
   protocol: smtp
   host: 127.0.0.1
