@@ -10,7 +10,7 @@ lightftp:
   protocol: ftp
   host: 127.0.0.1
   port: 2200
-  rfc_name: ["rfc959"]
+  rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
   trans_layer: tcp
   server: parent
 
@@ -18,7 +18,7 @@ bftpd:
   protocol: ftp
   host: 127.0.0.1
   port: 21
-  rfc_name: ["rfc959"]
+  rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
   trans_layer: tcp
   server: parent
 
@@ -26,7 +26,7 @@ pureftpd:
   protocol: ftp
   host: 127.0.0.1
   port: 21
-  rfc_name: ["rfc959"]
+  rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
   trans_layer: tcp
   server: parent
 
