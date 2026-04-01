@@ -15,7 +15,7 @@ def main(
     time: str, 
     cmdline: str
 ):
-    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd', 'tinydtls', 'dnsmasq'}
+    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd', 'tinydtls', 'dnsmasq', 'bftpd'}
     if sut in supported_sut:
         if cmdline == 'auto':
             with open(configs.base_path / 'input' / 'scripts' / sut / 'run.txt', 'r') as f:
