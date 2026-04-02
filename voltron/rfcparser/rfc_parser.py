@@ -8,7 +8,7 @@ from fastbm25 import fastbm25
 
 from voltron.rfcparser.setciontree import SectionTree, SectionNode
 from voltron.utils.logger import logger
-from voltron.llm.AsyncChat import AsyncChater
+from voltron.llm.chatter import AsyncChater
 from voltron.configs import configs
 
 

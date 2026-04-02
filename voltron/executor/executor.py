@@ -6,7 +6,7 @@ from typing import Callable, Tuple
 from voltron.configs import configs
 from voltron.utils.logger import logger
 from voltron.mapper.mapper import Mapper
-from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.producer.producer import Generator, Parser
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback, sys, os, signal

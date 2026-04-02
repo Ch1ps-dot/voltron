@@ -1,4 +1,4 @@
-from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.producer.producer import Generator, Parser
 
 """TODO: maybe use this class to manage generator
 """

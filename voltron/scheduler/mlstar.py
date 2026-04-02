@@ -1,8 +1,8 @@
 from voltron.mapper.mapper import Mapper
-from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.producer.producer import Generator, Parser
 from voltron.scheduler.automata import MealyMachine
-from voltron.scheduler.EquOracle import EquOracle
-from voltron.scheduler.MembOracle import MembershipOracle
+from voltron.scheduler.equ_oracle import EquOracle
+from voltron.scheduler.mem_oracle import MembershipOracle
 from voltron.utils.logger import logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer

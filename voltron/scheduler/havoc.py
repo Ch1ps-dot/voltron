@@ -1,5 +1,5 @@
 from voltron.mapper.mapper import Mapper
-from voltron.producer.AsyncProducer import Generator
+from voltron.producer.producer import Generator
 from voltron.executor.executor import Executor, Conversation
 from voltron.analyzer.analyzer import analyzer
 from voltron.scheduler.automata import MealyMachine
