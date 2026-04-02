@@ -50,6 +50,10 @@ class Analyzer:
         self.finished: int = 0
         self.progress_bar: dict[str, str] = {}
         
+        self.model_learning_time_s:float = 0
+        self.chat_time_s:float = 0
+        self.chat_token = 0
+        
         self.iter = 0 # fuzzer generation iteration
         
         self.stop_event: threading.Event
@@ -72,6 +76,9 @@ class Analyzer:
                 f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
                 f.write(f'{"resp_transitions":<15}: {self.resp_trans_num()}\n')
                 f.write(f'{"crash_num":<15}: {self.crash_num}\n')
+                f.write(f'{"model_learn_time_s":<15}: {self.seconds_to_hms(self.model_learning_time_s)}\n')
+                f.write(f'{"chat_time_s":<15}: {self.seconds_to_hms(self.chat_time_s)}\n')
+                f.write(f'{"chat_token":<15}: {self.chat_token}\n')
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
             

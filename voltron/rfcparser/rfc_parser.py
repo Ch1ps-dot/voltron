@@ -396,6 +396,7 @@ class AsyncRFCParser:
             ir_path =  self.ir_path / 'req_ir.xml'
         elif (field_type == 'res'):
             ir_path =  self.ir_path / 'res_ir.xml'
+            
         if (ir_path.is_file()):
             if (field_type == 'req'):
                 self.req_ir = etree.parse(ir_path)
@@ -409,12 +410,14 @@ class AsyncRFCParser:
             m_types  = ''
             if field_type == 'req':
                 m_types = self.req_types
+                tasks = [
+                    self._msg_model_gen_one(msg_type, sem)
+                    for msg_type in m_types
+                ]
+                
             elif field_type == 'res':
                 m_types = self.res_types
-            tasks = [
-                self._msg_model_gen_one(msg_type, sem)
-                for msg_type in m_types
-            ]
+                tasks = [self._msg_model_gen_one(f'response message of {self.pro_name} protocol', sem)]
 
             results = await tqdm_asyncio.gather(*tasks, desc=f"{field_type} msg ir")
             for ir_xml in results:

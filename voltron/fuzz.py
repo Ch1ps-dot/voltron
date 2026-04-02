@@ -237,11 +237,14 @@ class Fuzzer:
                 with open(h_path, 'rb') as f:
                     hypothesis = pickle.load(f)
             
+            begin_time = time.time()
             if hypothesis is None:
                 hypothesis = self.model_learning(mq, eq, stop_event)
             else:
                 self.mapper.message_pool = hypothesis.map
-                
+            end_time = time.time()
+            with analyzer.lock:   
+                analyzer.model_learning_time_s = end_time - begin_time
             self.havoc_fuzz(hypothesis, stop_event)
                 
             self.stop_event.set()

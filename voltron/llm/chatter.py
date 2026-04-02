@@ -8,6 +8,7 @@ import asyncio
 from voltron.llm.prompt import Prompter
 from voltron.utils.logger import logger
 from voltron.configs import configs
+from voltron.analyzer.analyzer import analyzer
 
 class AsyncChater:
     """Chat with llm through api and manage the context.
@@ -58,6 +59,10 @@ class AsyncChater:
                 response = completion.choices[0].message.content
 
                 logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
+                with analyzer.lock:
+                    analyzer.chat_time_s += end - start
+                    if completion.usage != None:
+                        analyzer.chat_token += completion.usage.total_tokens
                 break
             except OpenAIError as e:
                 await asyncio.sleep(0.5)
