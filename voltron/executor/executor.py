@@ -272,6 +272,8 @@ class Executor:
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
+
+                    # crash
                     if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
@@ -279,8 +281,10 @@ class Executor:
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data), True)
+                            stdout, stderr_data = proc.communicate(timeout=1)
+                            self.save_cons(cons, str(stdout), str(stderr_data), True)
+
+                    # normal
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -291,6 +295,8 @@ class Executor:
                 
                 elif resp_code == 'TIMEOUT':
                     return_code = proc.poll()
+
+                    # crash
                     if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
@@ -298,8 +304,9 @@ class Executor:
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data), True)
+                            stdout, stderr_data = proc.communicate(timeout=1)
+                            self.save_cons(cons, str(stdout), str(stderr_data), True)
+                    # noraml
                     else:
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
@@ -310,6 +317,7 @@ class Executor:
                 
                 elif resp_code == 'RCLOSED':
                     return_code = proc.poll()
+                    # crash
                     if return_code != None and return_code in CRASH_SIGNALS:
                         cons.add_state(msg_type, 'CRASH')
                         cons.add_data(req_data, bytes())
@@ -317,8 +325,9 @@ class Executor:
                         with self.analyzer.lock:
                             self.analyzer.crash_num += 1
                         if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data), True)
+                            stdout, stderr_data = proc.communicate(timeout=1)
+                            self.save_cons(cons, str(stdout), str(stderr_data), True)
+                    # normal
                     else:
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
@@ -356,8 +365,8 @@ class Executor:
                         self.analyzer.crash_num += 1
 
                     if configs.fuzz_mode != 'replay':
-                        stderr_data = proc.communicate(timeout=1)
-                        self.save_cons(cons, str(stderr_data), True)
+                        stdout, stderr_data = proc.communicate(timeout=1)
+                        self.save_cons(cons, str(stdout), str(stderr_data), True)
                         
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
@@ -726,7 +735,8 @@ class Executor:
     def save_cons(
         self,
         cons: Conversation,
-        info: str = '',
+        stdout: str = '',
+        stderr: str = '',
         crash: bool = False
     ):
         """Use pickle to store section tree instance
@@ -782,4 +792,5 @@ class Executor:
         with open(info_file, 'a', encoding='utf-8') as f:
             f.write(file_count + '\n')
             f.write('-'.join(cons.res_seq) + '\n')
-            f.write(info)
+            f.write(f'stdout: {stdout}' + '\n')
+            f.write(f'stderr: {stderr}' + '\n')
