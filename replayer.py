@@ -17,7 +17,7 @@ def main(
     supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighthttpd'}
     if sut in supported_sut:
         cmdline = ''
-        with open(configs.base_path / 'input' / 'scripts' / sut / 'cov_run.txt', 'r') as f:
+        with open(configs.base_path / 'configs' / sut / 'cov_run.txt', 'r') as f:
             cmdline = f.read()
         replayer = Fuzzer(
             target_name=sut,

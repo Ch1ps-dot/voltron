@@ -50,7 +50,7 @@ class Fuzzer:
     ) -> None:
         self.configs_yaml: str
         try:
-            with open(configs.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:
+            with open(configs.base_path / 'configs' /'configs.yaml', 'r', encoding='utf-8') as f:
                 configs_yaml = yaml.safe_load(f)
         except Exception as e:
             logger.error(f'Fuzzer: config load failure {e}')
@@ -64,13 +64,13 @@ class Fuzzer:
         configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
 
         # some file path 
-        configs.pre_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'run.txt'
-        configs.post_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
+        configs.pre_script = configs.base_path / 'configs' / configs.target_name / 'run.txt'
+        configs.post_script = configs.base_path / 'configs' / configs.target_name / 'post.sh'
         configs.models_path = configs.base_path / 'output' / 'models' / configs.target_name
-        configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.md'
+        configs.info_path = configs.base_path / 'configs' / configs.target_name / f'{configs.target_name}.md'
         for rfc in configs.rfc_name:
-            configs.doc_paths.append(configs.base_path / 'input' / 'rfcs' / f'{rfc}.txt')
-        configs.pmp_path = configs.base_path / 'input' / 'prompts'
+            configs.doc_paths.append(configs.base_path / 'rfcs' / f'{rfc}.txt')
+        configs.pmp_path = configs.base_path / 'prompts'
         configs.base_url = configs_yaml['llm']['base_url']
         configs.api_key = configs_yaml['llm']['api_key']
         configs.model = configs_yaml['llm']['model']
