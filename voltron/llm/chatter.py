@@ -88,20 +88,6 @@ class AsyncChater:
         )
         return ans
     
-    async def llm_try_again(
-        self,
-        last_question: str,
-        last_answer: str,
-        current_question: str
-    ) -> str | None:
-        tmp = self.pmp._tem_try_again
-        pmp = tmp.substitute(last_question=last_question, last_answer=last_answer, current_question=current_question)
-        ans = await self.chat_llm(
-            prompt=pmp,
-            usage="try again"
-        )
-        return ans
-    
     async def llm_ir_generation(
         self,
         pro_name: str,
