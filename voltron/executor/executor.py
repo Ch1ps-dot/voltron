@@ -458,7 +458,8 @@ class Executor:
         pids = []
         try:
             result = subprocess.check_output(
-                ["netstat", "-tulnp", "2>/dev/null"],  
+                f"netstat -tulnp 2>/dev/null | grep :{port}",
+                shell=True,
                 text=True,
                 stderr=subprocess.DEVNULL
             )
