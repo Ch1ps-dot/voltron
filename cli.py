@@ -15,21 +15,17 @@ def main(
     time: str, 
     cmdline: str
 ):
-    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd', 'tinydtls', 'dnsmasq', 'bftpd', 'forked-daapd'}
-    if sut in supported_sut:
-        if cmdline == 'auto':
-            with open(configs.base_path / 'configs' / sut / 'run.txt', 'r') as f:
-                cmdline = f.read()
-        fuzzer = Fuzzer(
-            target_name=sut,
-            cmdline=cmdline.split(' ')
-        )
-        fuzzer.fuzz(
-            algo=algorithm,
-            time_limit_min=int(time)
-        )
-    else:
-        print('Unkown Target')
+    if cmdline == 'auto':
+        with open(configs.base_path / 'configs' / sut / 'run.txt', 'r') as f:
+            cmdline = f.read()
+    fuzzer = Fuzzer(
+        target_name=sut,
+        cmdline=cmdline.split(' ')
+    )
+    fuzzer.fuzz(
+        algo=algorithm,
+        time_limit_min=int(time)
+    )
 
 if __name__ == '__main__':
     main()

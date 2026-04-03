@@ -52,6 +52,8 @@ class Fuzzer:
         try:
             with open(configs.base_path / 'configs' /'configs.yaml', 'r', encoding='utf-8') as f:
                 configs_yaml = yaml.safe_load(f)
+                if self.target_name not in configs_yaml.keys():
+                    raise Exception(f'Fuzzer: unknown target {self.target_name}')
         except Exception as e:
             logger.error(f'Fuzzer: config load failure {e}')
             
