@@ -8,6 +8,8 @@ Focus only on code-like fields that directly identify request type. Do NOT inclu
 - Output all relevant fields as elements in a JSON array. Put the most critical distinguishing fields first (e.g., Method before Subtype).
 - The value array must be character strings, bytes, or numbers as explicitly defined in the RFC. Do NOT include inferred or example values that are not directly specified in the document.
 - For string values in the `value` array, each item must contain only letters, digits, or underscores (`^[A-Za-z0-9_]`).
+- Check for duplicate extracted fields before final output. Treat fields as duplicates when they refer to the same request-discriminating code based on their `position` and `explanation` (even if wording differs).
+- If duplicates are found, keep only one canonical entry: prefer the clearer/more specific `field_name` and merge non-conflicting `value` items.
 
 ## **Format related document sections:**
 {$rfc_doc}
@@ -34,3 +36,4 @@ Focus only on code-like fields that directly identify request type. Do NOT inclu
 - Please extract and explain only the fields related to **request messages** that determine message type or function, strictly according to the format and requirements above.
 - Only respond with a JSON array as specified.
 - For string values in the `value` array, each item must contain only letters, digits, or underscores (`^[A-Za-z0-9_]`).
+- De-duplicate the final JSON array so semantically repeated fields (judged by `position` + `explanation`) appear only once.
