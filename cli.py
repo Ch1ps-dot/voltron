@@ -18,7 +18,7 @@ def main(
     supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd', 'tinydtls', 'dnsmasq', 'bftpd', 'forked-daapd'}
     if sut in supported_sut:
         if cmdline == 'auto':
-            with open(configs.base_path / 'input' / 'scripts' / sut / 'run.txt', 'r') as f:
+            with open(configs.base_path / 'configs' / sut / 'run.txt', 'r') as f:
                 cmdline = f.read()
         fuzzer = Fuzzer(
             target_name=sut,
