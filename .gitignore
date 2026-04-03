@@ -1,3 +1,51 @@
-gitflow.sh
 fuzz_logs
 __pycache__/
+# Python 编译缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C 扩展编译文件
+*.so
+
+# 分布式打包文件
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# 编辑器/IDE 缓存
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 测试/覆盖率文件
+.coverage
+htmlcov/
+.pytest_cache/
+.nox/
+.tox/
+
+# 日志文件
+*.log
