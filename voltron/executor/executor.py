@@ -202,6 +202,7 @@ class Executor:
                 if proc != None and proc.poll() is not None:
                     logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
                     proc = self.pre_exe()
+                    self.kill_listeners(self.port)
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
