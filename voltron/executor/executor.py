@@ -171,14 +171,14 @@ class Executor:
         clean = self.post_exe()
         proc = self.pre_exe()
         
-        logger.debug(">>>Executor: interact start")
-        if proc is None:
-            logger.debug(f'Executor: SUT Setup Failure')
-            return False, None
         
-        if proc.poll() is not None: 
-            logger.debug(f'Executor: SUT Setup Failure: {proc.returncode}')
-            return False, None
+        # if proc is None:
+        #     logger.debug(f'Executor: SUT Setup Failure')
+        #     return False, None
+        
+        # if proc.poll() is not None: 
+        #     logger.debug(f'Executor: SUT Setup Failure: {proc.returncode}')
+        #     return False, None
         
         # avoid unexceptional crash of target
         for _ in range(100):
@@ -200,7 +200,7 @@ class Executor:
             sock = self.setup_socket()
             if sock == None:
                 if proc != None and proc.poll() is not None:
-                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
+                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
                     proc = self.pre_exe()
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
@@ -216,7 +216,9 @@ class Executor:
             logger.debug('socket: setup failure')
             self.stop_event.set()
             sys.exit(0)
-            
+        
+        
+        logger.debug(">>>Executor: interact start")
         # keep request and response in Conversation
         cons: Conversation = Conversation()
         
