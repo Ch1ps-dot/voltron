@@ -44,7 +44,7 @@ class AsyncProducer:
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.equipment_path = configs.base_path / 'output' / 'equipment' 
+        self.equipment_path = configs.base_path / 'component' / 'equipment' 
         self.producer_path = self.equipment_path / configs.target_name
         self.generator_path = self.producer_path / 'generators'
         self.mutator_path = self.producer_path / 'mutators'

@@ -1,0 +1,315 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="GET">
+    <!-- HTTP/1.x GET request: retrieve the representation identified by the Request-URI; start-line, headers, and optional body as defined by RFC 2616 -->
+
+    <field name="Method" type="constant" length="3B" value="GET"/>
+    <!-- The HTTP request method token identifying a retrieval operation (literal "GET") -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating method and Request-URI -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="URI (origin-form / absolute-URI / authority-form / asterisk) using US-ASCII; excludes CR and LF"/>
+    <!-- Target identifier for the request. Usually an origin-form (e.g., /path?query). Length varies; characters per URI grammar (see RFC 2396/3986). -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating Request-URI and HTTP version -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII string matching 'HTTP/&lt;major&gt;.&lt;minor&gt;' (e.g., HTTP/1.1)"/>
+    <!-- Protocol version token indicating the HTTP version; treated as a textual token of form HTTP/x.y -->
+
+    <field name="CRLF_RequestLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the request-line -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="Sequence of header-field lines: &lt;field-name&gt;: &lt;field-value&gt; terminated by CRLF; US-ASCII excluding bare CR/LF in names/values"/>
+    <!-- Zero or more header fields (e.g., Host, User-Agent, Range, If-Modified-Since). Each header line ends with CRLF. Header grammar and semantics per RFC 2616. -->
+
+    <field name="HeaderTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF indicating end of the header section (i.e., the CRLF after the final header's terminating CRLF). Marks start of optional message-body. -->
+
+    <field name="EntityBody" type="variable" length="undefined" value="opaque octets (may be absent for GET); semantics undefined for GET unless out-of-band agreement; length determined by Transfer-Encoding or Content-Length headers if present"/>
+    <!-- Optional message body. GET requests ordinarily have no defined semantics for a body; presence is allowed but uncommon. If present, its length is governed by headers such as Content-Length or Transfer-Encoding. -->
+</message>
+  <message name="DELETE">
+    <!-- The HTTP DELETE request: requests that the origin server delete the resource identified by the Request-URI. -->
+
+    <field name="Method" type="constant" length="6B" value="DELETE"/>
+    <!-- The request method token. Case-sensitive. Indicates the DELETE semantic to the origin server (idempotent, not safe). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the method token and the request target. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="URI-reference (ASCII); allowed chars: ALPHA / DIGIT / % HEX HEX / unreserved / sub-delims; excludes SP, CR, LF"/>
+    <!-- The target resource identifier (Request-URI). Variable-length URI-reference per HTTP/URI rules. Length and encoding are undefined here; must not contain SP/CR/LF. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the request target and the HTTP version. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII pattern 'HTTP/&lt;DIGIT&gt;.&lt;DIGIT&gt;' (e.g., HTTP/1.1)"/>
+    <!-- Protocol version token specifying the HTTP version for this request-line. Format is the literal "HTTP/" followed by a major.minor numeric version. -->
+
+    <field name="CRLF_RequestLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the request-line. -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="Zero or more header fields: 'Field-Name: Field-Value' each terminated by CRLF; field-name is token (ASCII tchar set); field-value is field-content (visible chars, OWS allowed)"/>
+    <!-- The header section conveys message metadata (host, conditional headers, content-length, etc.). May be empty. The total byte length is undefined and depends on included headers. Many semantic behaviors (e.g., cache, conditional requests) are influenced by headers. -->
+
+    <field name="CRLF_EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that separates header section from the optional message body (end-of-headers marker). -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Opaque octets; length indicated by Content-Length or Transfer-Encoding; may be absent for DELETE"/>
+    <!-- Optional entity-body. DELETE requests can include a body but such usage is not widely interoperable; when present, its length and framing are determined by headers (e.g., Content-Length or chunked Transfer-Encoding). -->
+</message>
+  <message name="OPTIONS">
+    <!-- OPTIONS request: ask the server or an intermediary for the communication options available for the target resource (Request-URI). The "*" target applies to the server in general. -->
+
+    <field name="Method" type="constant" length="7B" value="OPTIONS"/>
+    <!-- The HTTP request method token. For this message the method is the literal "OPTIONS". -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method and Request-URI (ASCII SP). -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="origin-form | absoluteURI | '*' ; ASCII excluding CR, LF"/>
+    <!-- Target of the request. May be '*' (server-wide ping), an origin-form (path and optional query) or an absoluteURI. Characters exclude CR and LF. Length depends on URI. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI and HTTP version. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token. This model targets HTTP/1.1 as described; other versions would use different framing. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of start-line (Carriage Return + Line Feed). -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="*(Field-Name ':' SP? Field-Value CRLF) ; ASCII header lines"/>
+    <!-- Zero or more header fields. Each header is a field-name, colon, optional space, field-value, and CRLF. Specific headers of interest are modeled separately below. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="1*DIGIT (decimal integer)"/>
+    <!-- Optional request-header used with OPTIONS/TRACE to limit forwarding. Value is a decimal integer (one or more digits). Each intermediary MUST check and update (decrement or respond if 0) when forwarding. May be absent. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="media-type (e.g., type '/' subtype) ; ASCII token"/>
+    <!-- If an entity-body is present the client MUST send a valid Content-Type describing the representation media type. This header is required when a body is included. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT (decimal)"/>
+    <!-- If present, indicates the octet length of the Entity-Body. Must match actual Entity-Body length. May be omitted if Transfer-Encoding is used. -->
+
+    <field name="Header-Terminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- CRLF sequence that terminates the header section (empty line). Marks end of headers; if no entity-body is present, this is the end of the request. -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="octets ; length determined by Content-Length or Transfer-Encoding"/>
+    <!-- Optional message body. RFC/this specification defines no defined use for an OPTIONS body; if present the client MUST provide Content-Type. A server MAY discard an unsupported body. -->
+</message>
+  <message name="PRI">
+    <!-- PRI method registration: models the HTTP request-line "PRI * HTTP/2.0" as it may appear when an HTTP/1.1 parser encounters the HTTP/2 connection preface. This message captures the literal method token, target, version, and the canonical HTTP/2 client connection preface bytes that cause the appearance of this method. -->
+
+    <field name="Method" type="constant" length="3B" value="PRI"/>
+    <!-- The HTTP method token "PRI" registered for this special-case; appears when HTTP/1.1 parsers interpret the HTTP/2 connection preface as a request line -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating method and request-target -->
+
+    <field name="RequestTarget" type="constant" length="1B" value="*"/>
+    <!-- Request-target is the asterisk "*" token as used in the canonical preface-derived request-line -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating request-target and HTTP version -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/2.0"/>
+    <!-- HTTP version token exactly "HTTP/2.0" as present in the preface-derived request-line -->
+
+    <field name="EndOfRequestLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the request-line -->
+
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- An additional CRLF producing an empty line following the request-line in the canonical HTTP/2 client preface (inference from HTTP/2 preface sequence) -->
+
+    <field name="ConnectionPrefaceMagic" type="constant" length="2B" value="SM"/>
+    <!-- The two literal bytes "SM" that follow the initial CRLF CRLF in the HTTP/2 client connection preface; this is why the preface can be misparsed as a PRI request -->
+
+    <field name="PrefaceTermination" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Final CRLF CRLF terminating the canonical HTTP/2 client connection preface segment "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n". Included by reasonable inference from RFC-specified preface sequence. -->
+</message>
+  <message name="TRACE">
+    <!-- TRACE request: requests a remote application-level loop-back of the request message so the final recipient reflects the received message back as the entity-body of a 200 (OK) response; used for diagnostics. -->
+
+    <field name="Method" type="constant" length="5B" value="TRACE"/>
+    <!-- Method token identifying the request method. For TRACE this is the fixed ASCII string "TRACE". -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between Method and Request-URI. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="URI (abs-path | absolute-URI | '*' ); ASCII excluding SP, CR, LF"/>
+    <!-- The target URI for the request. For TRACE this may be an absolute path or absolute-URI; '*' is allowed in some contexts. Length is protocol-defined and therefore marked undefined. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between Request-URI and HTTP-Version. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token. Modeled here as the HTTP/1.1 literal used by this specification. -->
+
+    <field name="CRLF_after_startline" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the start-line. -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="zero or more header-field lines: field-name ':' [ field-value ] ; each terminated by CRLF"/>
+    <!-- Generic header section comprising zero or more header fields. Header-field characters follow HTTP token/value rules (ASCII excluding CRLF). For TRACE clients: MUST NOT generate fields containing sensitive data. -->
+
+    <field name="Max-Forwards-Header" type="variable" length="undefined" value="&quot;Max-Forwards&quot; ':' 1*DIGIT (decimal)"/>
+    <!-- Optional Max-Forwards request-header specific to TRACE/OPTIONS. Value is one or more ASCII digits (decimal integer). Each intermediary MUST decrement (or respond as final recipient if value==0) prior to forwarding. This header limits forward hops for tracing. -->
+
+    <field name="Other-Headers-Optional" type="variable" length="undefined" value="other header-field lines (e.g., Via)"/>
+    <!-- Other optional headers. The Via header is of particular interest for TRACE because it records the request chain. Clients SHOULD avoid sending sensitive headers (e.g., Authorization, Cookie). -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line marking the end of the header section (end of headers). -->
+
+    <field name="EntityBody" type="constant" length="0B" value=""/>
+    <!-- TRACE requests MUST NOT include an entity-body; modelled as zero-length. Any presence of a message body in a TRACE request is not permitted by the specification. -->
+</message>
+  <message name="CONNECT">
+    <!-- Request to establish a blind TCP tunnel to the origin server identified by host:port (used with proxies; after a successful 2xx response the connection switches to tunnel mode) -->
+
+    <field name="Method" type="constant" length="7B" value="CONNECT"/>
+    <!-- The request method token indicating tunnel establishment -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single ASCII space separating method and request-target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="authority-form: host (reg-name | IPv4 | IPv6-literal) ':' port (1-65535, decimal)"/>
+    <!-- Authority-form request-target consisting only of host:port. Client MUST include the port number even if normally elided; server MUST reject empty/invalid port. Character set: ASCII (host reg-name per URI rules), digits and ':' -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single ASCII space separating request-target and HTTP-version -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="ASCII token like 'HTTP/1.1' or 'HTTP/1.0'"/>
+    <!-- Protocol version token in start-line. Note: HTTP/2 maps CONNECT to pseudo-headers (:method='CONNECT', :authority contains host:port) rather than a textual start-line -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the start-line -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="zero or more header-field lines: field-name ':' OWS field-value OWS CRLF; ASCII header octets excluding raw CRLF within field values"/>
+    <!-- Header fields section. Typical/important headers for CONNECT: Host (host[:port] recommended), Proxy-Authorization (optional). A successful 2xx response MUST NOT include Transfer-Encoding or Content-Length; clients MUST ignore those if present in a successful response. -->
+
+    <field name="HeaderSectionTerminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Empty line (CRLF CRLF) marking end of header section. After a successful 2xx response the peer switches to raw tunnel mode and subsequent bytes are tunneled; if response is non-2xx the tunnel is not formed. -->
+
+    <field name="MessageBody" type="constant" length="0B" value=""/>
+    <!-- CONNECT request does not carry a message body. Any data semantics after header section depend on HTTP version and tunnel state (e.g., HTTP/1.x or framed DATA after HTTP/2 HEADERS). -->
+</message>
+  <message name="POST">
+    <!-- HTTP POST request: requests that the target resource process the enclosed representation according to the resource's semantics -->
+
+    <field name="Method" type="constant" length="4B" value="POST"/>
+    <!-- The HTTP method token indicating this is a POST request -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separator following the method in the Request-Line -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="URI (ASCII) excluding SP, CR, LF"/>
+    <!-- The target resource identifier from the Request-Line (e.g., absolute-URI or absolute-path); must not contain space or CR/LF -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separator between Request-URI and HTTP-Version -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII matching 'HTTP/&lt;major&gt;.&lt;minor&gt;' (e.g., HTTP/1.0, HTTP/1.1)"/>
+    <!-- Protocol version token from the Request-Line; typically HTTP/1.0 or HTTP/1.1; treated as a constant-style token but exact version may vary -->
+
+    <field name="EndOfRequestLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Request-Line -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="0*(field-name ':' [SP] field-value CRLF) ; ASCII header lines"/>
+    <!-- Zero or more header fields (each 'Name: Value' terminated by CRLF). Header names are tokens; header values are field-value sequences. Headers control message semantics (e.g., Content-Type, caching) -->
+
+    <field name="Content-Length-Header" type="variable" length="undefined" value="1*DIGIT (decimal) ; optional header line 'Content-Length: &lt;digits&gt;'"/>
+    <!-- Optional Content-Length header indicating size in octets of the message-body. Required for HTTP/1.0 POST requests per the specification. If present, its decimal value MUST equal the length (in bytes) of MessageBody. This field is the header line's value (digits) — the full header line would be 'Content-Length: &lt;value&gt;' in HeaderSection. -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Blank line (CRLF) separating header section from the message-body -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Opaque octet sequence; length = Content-Length (if present); otherwise undefined"/>
+    <!-- The enclosed representation (entity-body) to be processed by the origin server. Its length in bytes is determined by the Content-Length header when present. Content format governed by headers (e.g., Content-Type). May be absent (zero length) for some POSTs. -->
+</message>
+  <message name="HEAD">
+    <!-- HTTP/HEAD request message: request method identical to GET but typically without a message-body; used to retrieve header metadata about the target resource -->
+
+    <field name="Method" type="constant" length="4B" value="HEAD"/>
+    <!-- The HTTP request method token identifying a HEAD request; indicates that the client requests only the header metadata that would accompany a GET -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) character separating method and Request-URI -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="URI (RFC3986) in US-ASCII, excluding CR and LF"/>
+    <!-- Target resource URI (absolute-path or absolute-URI or "*"); character set: US-ASCII allowed for URI characters per RFC; length varies with URI -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) character separating Request-URI and HTTP-Version -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII string matching 'HTTP/&lt;major&gt;.&lt;minor&gt;' (digits), e.g., HTTP/1.1"/>
+    <!-- Protocol version token indicating HTTP version for the request-line; format HTTP/<digit>.<digit> -->
+
+    <field name="CRLF_RequestLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the request-line -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="0 or more header-field lines; each 'field-name: OWS field-value OWS' in US-ASCII excluding CR and LF in field-name; lines end with CRLF"/>
+    <!-- Sequence of header fields (Zero or more). Each header-field provides metadata (e.g., Host, User-Agent, Accept). Header-field syntax follows HTTP header rules; header folding deprecated. The combined length is variable. -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) indicating end of header section and start of optional message-body -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="entity-body octets (if any); for HEAD requests, SHOULD be absent; if present, semantics are undefined and may be rejected by some servers"/>
+    <!-- Optional message-body (entity-body). By design, a HEAD request normally has no body; clients SHOULD NOT send one unless explicit out-of-band agreement exists. Presence and length (if present) follow message framing (e.g., Content-Length/Transfer-Encoding headers), dependency on HeaderFields. -->
+</message>
+  <message name="PUT">
+    <!-- HTTP/1.1 PUT request: upload or replace the representation of the target resource.
+         May carry an entire representation or, if a Content-Range header is present and
+         supported by the origin server, a partial representation to be applied at an offset. -->
+
+    <field name="Method" type="constant" length="3B" value="PUT"/>
+    <!-- The request method token indicating an upload/replace operation -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method and Request-URI -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="URI characters (ASCII) excluding SP, CR, LF"/>
+    <!-- Target resource identifier (absolute or absolute-path), as defined by URI syntax;
+         length and encoding depend on the URI; contains percent-encoding as needed -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI and HTTP-Version -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token; here modeled for HTTP/1.1 (bytes: 'HTTP/1.1') -->
+
+    <field name="Request-Line-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Request-Line -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT (decimal ASCII)"/>
+    <!-- Optional entity-header indicating octet length of the message-body.
+         If present, the Entity-Body length MUST match this value.
+         Absent when Transfer-Encoding (e.g., chunked) is used. -->
+
+    <field name="Content-Range" type="variable" length="undefined" value="ASCII range specification, e.g. 'bytes start-end/total'"/>
+    <!-- Optional entity-header used for Partial PUT requests to indicate the offset and
+         length of the enclosed content relative to the current selected representation.
+         If the origin server does not support partial PUT, it SHOULD respond with 400 (Bad Request). -->
+
+    <field name="Allow" type="variable" length="undefined" value="comma-separated Method tokens (ASCII)"/>
+    <!-- Optional header recommending methods supported for the new/modified resource.
+         Not authoritative; server response SHOULD include an Allow header to show actual supported methods. -->
+
+    <field name="Conditional-Headers" type="variable" length="undefined" value="header-lines such as If-Match, If-Unmodified-Since, If-None-Match, If-Modified-Since (ASCII)"/>
+    <!-- Optional conditional request headers to prevent lost updates (preconditions evaluated before applying PUT).
+         Order and evaluation rules follow HTTP conditional request semantics. -->
+
+    <field name="Other-Header-Fields" type="variable" length="undefined" value="0*header-field (field-name: field-value) ASCII"/>
+    <!-- Any other request or entity header fields (Host, Content-Type, ETag, etc.).
+         Header-field format and allowed characters follow HTTP header syntax; each header-line terminated by CRLF. -->
+
+    <field name="Header-Section-Terminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Blank line (CRLF CRLF) marking the end of the header section and start of the entity-body (if any) -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octets (length indicated by Content-Length or Transfer-Encoding)"/>
+    <!-- Optional message-body containing the representation to be stored.
+         When Content-Range is present and supported, body contains the partial representation to be applied at the indicated offset.
+         If no body is present (e.g., Content-Length: 0 or absent), PUT may still be used to create an empty resource. -->
+</message>
+</ir>

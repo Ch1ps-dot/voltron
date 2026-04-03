@@ -66,7 +66,7 @@ class Fuzzer:
         # some file path 
         configs.pre_script = configs.base_path / 'configs' / configs.target_name / 'run.txt'
         configs.post_script = configs.base_path / 'configs' / configs.target_name / 'post.sh'
-        configs.models_path = configs.base_path / 'output' / 'models' / configs.target_name
+        configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
         configs.info_path = configs.base_path / 'configs' / configs.target_name / f'{configs.target_name}.md'
         for rfc in configs.rfc_name:
             configs.doc_paths.append(configs.base_path / 'rfcs' / f'{rfc}.txt')
@@ -83,7 +83,7 @@ class Fuzzer:
         if not results_dir.is_dir() and self.mode != 'replay':
             results_dir.mkdir()
             
-        models_dir = configs.base_path / 'output' / 'models'
+        models_dir = configs.base_path / 'component' / 'models'
         if not models_dir.is_dir():
             models_dir.mkdir(parents=True, exist_ok=True)
             configs.models_path.mkdir(parents=True, exist_ok=True)

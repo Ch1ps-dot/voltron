@@ -46,8 +46,8 @@ class AsyncRFCParser:
         self.req_doc: set[str] = set()
         self.res_doc: set[str] = set()
         self.all_doc: set[str] = set()
-        self.ir_base_path = configs.base_path / 'output' / 'ir'
-        self.ir_path = configs.base_path / 'output' / 'ir' / configs.pro_name
+        self.ir_base_path = configs.base_path / 'component' / 'ir'
+        self.ir_path = configs.base_path / 'component' / 'ir' / configs.pro_name
         if not self.ir_base_path.is_dir():
             self.ir_base_path.mkdir()
         if not self.ir_path.is_dir():

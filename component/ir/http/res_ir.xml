@@ -1,0 +1,2244 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="204">
+    <!-- 204 No Content response: server fulfilled the request but returns no message-body; response consists of a status-line and zero or more header fields, terminated by an empty line. -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="ASCII 'HTTP/x.y' (e.g., HTTP/1.0, HTTP/1.1)"/>
+    <!-- Protocol version token indicating the HTTP version used in the response; variable to allow different HTTP versions (format 'HTTP' '/' DIGIT '.' DIGIT). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating the HTTP-version and the status-code in the status-line. -->
+
+    <field name="StatusCode" type="constant" length="3B" value="204"/>
+    <!-- Three-digit status code indicating "No Content". This field is constant for this message type. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating the status-code and the reason-phrase in the status-line. -->
+
+    <field name="ReasonPhrase" type="constant" length="10B" value="No Content"/>
+    <!-- Reason phrase associated with status code 204; common standard phrase "No Content". Reason phrase may vary in implementations, but this is the normative phrase for 204. -->
+
+    <field name="StatusLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line. -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="zero or more header field lines; each: field-name (token) ':' [SP] field-value (ASCII excluding CRLF) CRLF"/>
+    <!-- Zero or more header fields (message-headers). May include entity-headers (e.g., ETag) reflecting updated metadata. Each header line is ASCII text terminated by CRLF. This block is terminated by the following empty line. -->
+
+    <field name="EndOfHeaderSection" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) that terminates the header section. The 204 response is terminated here and MUST NOT include a message-body or trailers. -->
+
+    <field name="MessageBody" type="constant" length="0B" value=""/>
+    <!-- 204 responses MUST NOT include a message-body; modeled as zero-length. Any presence of a body would violate the status-code semantics. -->
+</message>
+  <message name="411">
+    <!-- HTTP response with status code 411 (Length Required): indicates the server refuses the request because a valid Content-Length header was not provided by the client -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="HTTP/&lt;major&gt;.&lt;minor&gt; (e.g., 'HTTP/1.1')"/>
+    <!-- Protocol version token for the response start-line; typically 'HTTP/1.1' for 411 responses but modeled as variable -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating start-line tokens -->
+
+    <field name="StatusCode" type="constant" length="3B" value="411"/>
+    <!-- Three-digit numeric status code indicating 'Length Required' -->
+
+    <field name="SP_afterStatus" type="constant" length="1B" value="0x20"/>
+    <!-- Space separating status code and reason phrase in the start-line -->
+
+    <field name="Reason-Phrase" type="constant" length="15B" value="Length Required"/>
+    <!-- Human-readable reason phrase for status 411; canonical phrase is "Length Required" (15 octets ASCII) -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the start-line (carriage return + line feed) -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="*( field-name ':' OWS field-value CRLF ) ; ASCII/obs-text, no CRLF within a field-value"/>
+    <!-- Zero or more HTTP header-field lines. Each header line ends with CRLF. Header presence and semantics (e.g., Content-Length, Transfer-Encoding) determine message-body handling. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT (decimal number of OCTETs)"/>
+    <!-- Optional Content-Length header field (decimal octet count). Per RFC semantics: if present, value MUST exactly match message-body length when a body is allowed; servers may require this header for requests and may respond with 411 when missing. If both Transfer-Encoding (non-identity) and Content-Length are present, Content-Length MUST be ignored. This field is part of HeaderFields when present. -->
+
+    <field name="Transfer-Encoding" type="variable" length="undefined" value="token *( OWS ';' OWS transfer-parameter ) ; e.g., 'chunked'"/>
+    <!-- Optional Transfer-Encoding header field. If present with any value other than 'identity' it changes how transfer-length is determined (e.g., chunked coding). MUST NOT be combined meaningfully with Content-Length; when both present, Content-Length is ignored. This field is part of HeaderFields when present. -->
+
+    <field name="Header-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty-line (CRLF) that terminates the header section and precedes the message-body (represents the required blank line after header lines). Note: header lines themselves each end with CRLF; this CRLF denotes the empty line. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="OCTET* (present only if allowed and indicated by headers or connection close)"/>
+    <!-- Optional response body octets. Presence/length determined in order of precedence: (1) status codes that MUST NOT include bodies (e.g., 1xx, 204, 304) — then none; (2) Transfer-Encoding (non-identity) e.g., chunked; (3) Content-Length decimal value; (4) media type self-delimiting rules (e.g., multipart/byteranges); (5) connection close. For 411 responses, bodies are not required; if present, Content-Length/Transfer-Encoding rules apply. -->
+</message>
+  <message name="503">
+    <!-- 503 Service Unavailable response: indicates the server is currently unable to handle the request.
+         This model focuses on the Status-Line, the Date and Retry-After header semantics, end-of-headers, and optional entity-body. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII 'HTTP/&lt;major&gt;.&lt;minor&gt;' where major/minor = DIGIT"/>
+    <!-- HTTP version token from the Status-Line (e.g., HTTP/1.1).  Syntax: "HTTP/" DIGIT "." DIGIT.
+         Version is not fixed to a single value in practice; length varies with digits. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating version and status-code in the Status-Line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="503"/>
+    <!-- Three-digit numeric status code identifying 'Service Unavailable' (RFC-defined constant). -->
+
+    <field name="SP_after_StatusCode" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status-code and reason-phrase in the Status-Line. -->
+
+    <field name="Reason-Phrase" type="variable" length="undefined" value="Visible ASCII excluding CR and LF; typical: 'Service Unavailable'"/>
+    <!-- Human-readable reason phrase corresponding to the status code.  Not protocol-critical; may vary or be empty.
+         Must not contain CR or LF.  Common value for 503 is "Service Unavailable". -->
+
+    <field name="StatusLine-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Status-Line. -->
+
+    <field name="Date-Header" type="variable" length="undefined" value="HTTP-date in IMF-fixdate (RFC1123), e.g. 'Tue, 15 Nov 1994 08:12:31 GMT'"/>
+    <!-- Optional Date header field value representing message origination time.
+         RFC: responses SHOULD include Date in RFC1123 format; origin servers MUST include Date except in certain server-error cases (503 may be omitted when inconvenient).
+         If absent and response will be cached/gatewayed, recipient MUST assign a Date. -->
+
+    <field name="Retry-After-Header" type="variable" length="undefined" value="either HTTP-date (IMF-fixdate) or delay-seconds = 1*DIGIT (decimal seconds), e.g. 'Fri, 31 Dec 1999 23:59:59 GMT' or '120'"/>
+    <!-- Retry-After header field used with 503 (and optionally 3xx) to indicate how long the client should wait before retrying.
+         Semantics: if value is HTTP-date, it is the time after which retrying is allowed; if numeric, it is the number of seconds delay after the response.
+         delay-seconds is a non-negative decimal integer (1*DIGIT). -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero or more header-field lines: 'Field-Name: Field-Value' (visible ASCII; header syntax per HTTP)"/>
+    <!-- Placeholder for any additional header fields not explicitly modeled (e.g., Content-Length, Content-Type, Transfer-Encoding).
+         The order of headers is not fixed; headers MAY appear in any sequence. -->
+
+    <field name="EndOfHeaders" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- CRLF CRLF: empty line terminating the header section and indicating start of optional entity-body. -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octets (binary/ASCII); length determined by headers such as Content-Length or Transfer-Encoding"/>
+    <!-- Optional message body (entity). Present only when response carries an entity.  Its length and encoding are governed by headers (not modeled here).
+         If present, recipients use Content-Length or Transfer-Encoding to determine extent; otherwise semantics-dependent. -->
+</message>
+  <message name="409">
+    <!-- HTTP/1.x Response message with status code 409 (Conflict). Represents the wire-format response starting with a status-line, followed by header fields, an empty line, and an optional message body. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII: 'HTTP/' DIGIT '.' DIGIT (e.g., 'HTTP/1.1')"/>
+    <!-- Protocol version token identifying the HTTP version used for this response. Matches the pattern "HTTP/x.y". Length varies by version token. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the HTTP-Version and the status code in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="409"/>
+    <!-- Three-digit decimal status code indicating "Conflict". Fixed numeric characters '4','0','9'. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the status code and the reason-phrase in the status-line. -->
+
+    <field name="Reason-Phrase" type="constant" length="8B" value="Conflict"/>
+    <!-- Human-readable reason phrase for status code 409. For interoperability, implementations MAY ignore this text; it is provided here as the registry phrase "Conflict". -->
+
+    <field name="CRLF_StatusLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line. -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="zero or more header-field lines; each: field-name ':' OWS field-value OWS CRLF; characters VCHAR / obs-text excluding CR and LF"/>
+    <!-- Sequence of header fields conveying metadata (e.g., Date, Content-Length, Transfer-Encoding, Content-Type). The section may be empty. Individual header line lengths and count are variable. -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) that terminates the header section and separates headers from the message body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="octet sequence (opaque payload)"/>
+    <!-- Optional response payload. Its presence and length are determined by header semantics (e.g., Content-Length: N, Transfer-Encoding: chunked, or connection closing). If Transfer-Encoding is chunked, length is encoded per chunked framing; otherwise, the Content-Length header (or other protocol rules) defines the body size. -->
+</message>
+  <message name="426">
+    <!-- 426 Upgrade Required: HTTP response indicating the server refuses the request with the current protocol and MUST advertise acceptable upgrade protocol(s) via an Upgrade header. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII 'HTTP/' followed by protocol-version token (e.g., '1.1')"/>
+    <!-- Protocol version token at start of the status-line (e.g., HTTP/1.1). Variable because other HTTP versions (HTTP/2, HTTP/3 textual representations) may appear; represented as ASCII characters. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating HTTP-Version and Status-Code in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="426"/>
+    <!-- Numeric status code for this response: 426 (Upgrade Required). Represented as three ASCII digits. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Status-Code and Reason-Phrase in the status-line. -->
+
+    <field name="Reason-Phrase" type="constant" length="16B" value="Upgrade Required"/>
+    <!-- Standard reason-phrase for 426 responses. ASCII text that describes the status code. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line. -->
+
+    <field name="Header-Upgrade-Name" type="constant" length="7B" value="Upgrade"/>
+    <!-- Header field name 'Upgrade' (case-insensitive). This header MUST be present in a 426 response to indicate acceptable protocol(s). -->
+
+    <field name="Header-Colon" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' delimiter between header name and header value. -->
+
+    <field name="Header-SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after colon before header field value (OWS may permit absent/multiple spaces; model uses single SP here). -->
+
+    <field name="Header-Upgrade-Value" type="variable" length="undefined" value="list of protocol entries: protocol-name [ '/' protocol-version ] *( OWS ',' OWS protocol ); protocol-name/token characters per HTTP token"/>
+    <!-- Value of Upgrade header: a comma-separated list of protocol tokens (e.g., 'HTTP/3.0'). Per RFC grammar: protocol = protocol-name [ '/' protocol-version ]. Recipients SHOULD match protocol-names case-insensitively. -->
+
+    <field name="CRLF_after_Upgrade" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Upgrade header line. -->
+
+    <field name="Header-Connection-Name" type="constant" length="10B" value="Connection"/>
+    <!-- Header field name 'Connection' (case-insensitive). When Upgrade is used a Connection option 'Upgrade' MUST be present to inform intermediaries not to forward the Upgrade header. -->
+
+    <field name="Header-Colon2" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' delimiter for Connection header. -->
+
+    <field name="Header-SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after colon for Connection header. -->
+
+    <field name="Header-Connection-Value" type="variable" length="undefined" value="comma-separated connection-options (tokens); MUST include token 'Upgrade' when Upgrade header is present"/>
+    <!-- Value of Connection header: list of connection options. For 426 responses containing Upgrade, the Connection value MUST include 'Upgrade' to signal hop-by-hop significance. -->
+
+    <field name="CRLF_after_Connection" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Connection header line. -->
+
+    <field name="Header-Content-Length-Name" type="constant" length="14B" value="Content-Length"/>
+    <!-- Header field name 'Content-Length'. When present indicates size in octets of the message body that follows. For 426 responses a body is allowed and its length MUST match this header if present. -->
+
+    <field name="Header-Colon3" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' delimiter for Content-Length header. -->
+
+    <field name="Header-SP3" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after colon for Content-Length header. -->
+
+    <field name="Header-Content-Length-Value" type="variable" length="undefined" value="1*DIGIT (decimal digits) representing octet count of message body"/>
+    <!-- Decimal ASCII digits indicating the number of octets in the message body. The Message-Body field length MUST equal this value. -->
+
+    <field name="CRLF_after_Content-Length" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Length header line. -->
+
+    <field name="Header-Content-Type-Name" type="constant" length="12B" value="Content-Type"/>
+    <!-- Header field name 'Content-Type' indicating the media type of the message body. -->
+
+    <field name="Header-Colon4" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' delimiter for Content-Type header. -->
+
+    <field name="Header-SP4" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after colon for Content-Type header. -->
+
+    <field name="Header-Content-Type-Value" type="variable" length="undefined" value="media-type (e.g., 'text/plain' with optional parameters); token characters per media-type grammar"/>
+    <!-- Media type of the body (e.g., text/plain). Interprets the octet content accordingly (character encoding may be further specified by parameters or defaults). -->
+
+    <field name="CRLF_after_Content-Type" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Type header line. -->
+
+    <field name="Additional-Headers" type="variable" length="undefined" value="zero or more header-lines (field-name ':' OWS field-value CRLF)"/>
+    <!-- Placeholder for any additional header fields that may be present. Each header-line ends with CRLF. If none, this is empty. -->
+
+    <field name="Header-Section-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF that separates header section from the message body (i.e., CRLF after the last header produces the blank line). -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="OCTETs; length in bytes MUST equal the numeric value of Content-Length header; content interpreted per Content-Type"/>
+    <!-- Application payload that follows headers. For the 426 example this is a short human-readable text (e.g., 'This service requires use of the HTTP/3.0 protocol.'). The length is governed by Content-Length; if Content-Length is absent and transfer coding absent, length determination follows HTTP rules (not modeled here). -->
+</message>
+  <message name="415">
+    <!-- 415 Unsupported Media Type: response indicating the server refuses to service the request because the request content (media type or content coding) is not supported for the target resource. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- The HTTP version token in the status line. Constant inferred as "HTTP/1.1" for this model (protocol version may vary in actual messages). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating version and status code in the status line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="415"/>
+    <!-- Three-digit status code indicating "Unsupported Media Type". -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating status code and reason phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="22B" value="Unsupported Media Type"/>
+    <!-- Human-readable reason phrase for the status code. Length set to 22 bytes for the canonical phrase; actual servers may vary. -->
+
+    <field name="StatusLine-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line. -->
+
+    <field name="Accept-Encoding" type="variable" length="undefined" value="( codings / '*' / 'identity' ) with optional qvalues; US-ASCII"/>
+    <!-- Optional response header used by servers in a 415 when the failure was caused by an unsupported content coding.
+         Value is a comma-separated list of codings (content-coding names), 'identity', or '*', each optionally with a weight (q=0..1).
+         Example values: 'gzip', 'compress;q=0.5', '*;q=0'. -->
+
+    <field name="Accept" type="variable" length="undefined" value="media-range list with optional qvalues; US-ASCII"/>
+    <!-- Optional response header a server MAY include in a 415 when the failure was caused by an unsupported media type.
+         Value is a comma-separated list of media ranges (type/subtype or type/* or */*) with optional quality (q) parameters.
+         Indicates which media types would have been accepted in the request. -->
+
+    <field name="Content-Encoding" type="variable" length="undefined" value="1#content-coding (token list); US-ASCII"/>
+    <!-- Optional response header that lists content-coding(s) applied to the response body.
+         If the response body is encoded (non-identity), this header MUST be present and lists codings in order applied (e.g., 'gzip'). -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="media-type per RFC 6838; US-ASCII or encoded per charset parameter"/>
+    <!-- Optional header indicating the media type of the response payload (e.g., text/html; charset=utf-8).
+         Useful for error bodies describing the 415 response. -->
+
+    <field name="Vary" type="variable" length="undefined" value="#( '*' / field-name ); US-ASCII"/>
+    <!-- Optional header indicating which request header fields (e.g., Accept-Encoding, Accept-Language) might have influenced selection of the response.
+         If present, informs caches about the request fields that must match for reuse. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT (decimal)"/>
+    <!-- Optional header that, when present, gives the size in octets of the message body.
+         If omitted, Transfer-Encoding or other framing rules determine body length. The MessageBody length depends on this field when present. -->
+
+    <field name="HeaderSection-CRLF" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Empty line (CRLF CRLF) terminating the header section and preceding the message body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="opaque octets; interpretation per Content-Type and Content-Encoding"/>
+    <!-- Optional entity body containing an explanatory representation (e.g., human-readable or machine-parsable error description).
+         The contents and decoding depend on Content-Type and Content-Encoding headers. Length determined by Content-Length or transfer framing. -->
+</message>
+  <message name="505">
+    <!-- HTTP Response message for status code 505 (HTTP Version Not Supported).
+         Models the HTTP/1.x start-line (control data) and the following message structure
+         as conveyed when control data is sent as the first line (HTTP/1.1 and earlier). -->
+
+    <field name="ProtocolVersion" type="variable" length="undefined" value="ASCII token matching 'HTTP/&lt;major&gt;.&lt;minor&gt;' (e.g., HTTP/1.1); characters: ALPHA DIGIT '/' '.'"/>
+    <!-- Protocol version of the message (control data). Form is "HTTP/<major>.<minor>".
+         Recipients use this to determine conformance and processing rules. Length varies;
+         in HTTP/2+ the version may be conveyed out-of-band or via pseudo-headers instead.
+         If present in the start-line, this field appears as the first token. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating protocol version and status code in the start-line. -->
+
+    <field name="StatusCode" type="constant" length="3B" value="505"/>
+    <!-- Three-digit numeric status code indicating HTTP Version Not Supported.
+         Modeled as a constant for this message (magic/status number). -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating status code and reason phrase in the start-line. -->
+
+    <field name="ReasonPhrase" type="variable" length="undefined" value="Optional human-readable text; VCHAR / obs-text excluding CR LF"/>
+    <!-- Optional reason phrase (text) describing the status code for human readers.
+         May be empty or omitted; if present, uses printable characters excluding CR and LF.
+         This field is informational only and not relied upon for programmatic semantics. -->
+
+    <field name="StatusLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the start-line (carriage return + line feed).
+         In HTTP/1.x the control data (status-line) is the first line and is terminated by CRLF. -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="Zero or more header field lines: (field-name ':' OWS field-value OWS CRLF)"/>
+    <!-- Zero or more header fields (name:value pairs) following the start-line.
+         Each header field line ends with CRLF. Presence and length are determined by the sender.
+         Header content and semantics follow HTTP header-field rules (e.g., Host, Via, Content-Length). -->
+
+    <field name="HeaderTerminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Sequence CRLF CRLF (0x0D0A0x0D0A) that denotes the empty line separating headers and body.
+         Modeled as 4 bytes to represent the header-section terminator (blank line). -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Octet sequence governed by headers (Content-Length, Transfer-Encoding, etc.); octets 0x00-0xFF"/>
+    <!-- Optional message body (entity body/content). Presence and length are determined by header fields
+         such as Content-Length or Transfer-Encoding. If absent, length is zero. This field's length
+         depends on header values (documented dependency). -->
+</message>
+  <message name="403">
+    <!-- 403 Forbidden response: server understood the request but refuses to fulfill it.
+         Typically returned when authorization will not help; when method is not HEAD the
+         server MAY include an entity body explaining the refusal. This models the
+         HTTP/1.x response serialization for the 403 status. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="token 'HTTP' '/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token (e.g., "HTTP/1.1"). Variable because implementations may use different HTTP versions.
+         Syntax constrained to the HTTP-version production (HTTP '/' digit '.' digit). -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single ASCII space (0x20) separating start-line elements. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="403"/>
+    <!-- Three-digit status code identifying the response class and specific condition: 403 = Forbidden.
+         Represented as the ASCII digits '4','0','3'. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Space separating status-code and reason-phrase in the status-line. -->
+
+    <field name="Reason-Phrase" type="constant" length="9B" value="Forbidden"/>
+    <!-- Reason phrase associated with the status code. Inferred here as the conventional "Forbidden".
+         Note: HTTP implementations may vary or omit a human-readable reason; this is the common value. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for the status-line (carriage return + line feed). -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="zero or more header-field lines: field-name ':' OWS field-value OWS CRLF"/>
+    <!-- Sequence of header-field lines forming the header section. Each header line follows RFC syntax (name: value).
+         This container is variable-length and may include Date, Server, Content-Type, Content-Length, etc.
+         Specific optional headers commonly present for a 403 are modeled separately below for clarity. -->
+
+    <field name="Date" type="variable" length="undefined" value="HTTP-date (IMF-fixdate / obs-date)"/>
+    <!-- Optional Date header giving the origin server time when the response was generated.
+         If present, follows the HTTP-date grammar. Resides within the HeaderSection. -->
+
+    <field name="Server" type="variable" length="undefined" value="product *( RWS ( product / comment ) ) ; token and optional product-version"/>
+    <!-- Optional Server header identifying the server software. Value is a product token and optional version/comment.
+         Present in HeaderSection when the origin chooses to identify itself. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="media-type (e.g., 'text/html; charset=UTF-8')"/>
+    <!-- Optional Content-Type header describing the media type of the entity-body (if any).
+         Present when an entity body is sent to explain the refusal. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT (decimal)"/>
+    <!-- Optional Content-Length header giving the size in octets of the EntityBody.
+         If present it MUST equal the byte length of the following EntityBody; if absent transfer-length is determined by other framing. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="other header-field lines permitted by HTTP grammar"/>
+    <!-- Placeholder for any additional header fields (e.g., ETag, Vary). These are optional and follow the header-field grammar.
+         Do not invent headers beyond those implied by implementation; their presence/semantics depend on server behavior. -->
+
+    <field name="HeaderTerminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Empty-line (CRLF CRLF) marking end of header section and beginning of the entity body (if any).
+         This is two consecutive CRLF sequences as mandated by HTTP/1.x textual framing. -->
+
+    <field name="EntityBody" type="variable" length="undefined" value="OCTET sequence; typically a human-readable explanation (e.g., text/html or text/plain)"/>
+    <!-- Optional entity body providing an explanation of the refusal (recommended unless the request was HEAD).
+         Length is determined by Content-Length header when present (see dependency in Content-Length comment).
+         Content media-type should match Content-Type header when provided. -->
+</message>
+  <message name="404">
+    <!-- HTTP Response: 404 Not Found - indicates the server has not found anything matching the Request-URI. Includes status-line, header section, and optional entity body with an explanation. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="HTTP/1.0 | HTTP/1.1 | HTTP/2 | HTTP/3; token format 'HTTP/major.minor' in ASCII"/>
+    <!-- Protocol version token sent by the origin server. Typically echoes the request's version; legal form per RFC (ASCII token). Length varies with version string. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single ASCII space character separating version, status code, and reason-phrase in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="404"/>
+    <!-- Three-digit decimal status code identifying the result class. For this message it is the fixed client-error code 404 (Not Found). -->
+
+    <field name="SP_afterStatus" type="constant" length="1B" value="0x20"/>
+    <!-- Single ASCII space separating status-code and reason-phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="9B" value="Not Found"/>
+    <!-- Human-readable reason phrase corresponding to 404. For this status code the conventional phrase is "Not Found". Sent as US-ASCII or ISO-8859-1 octets. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the status-line. -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="sequence of header-field lines: field-name ':' OWS field-value OWS CRLF; field-name token, field-value per RFC (ISO-8859-1 / obs-text)"/>
+    <!-- Zero or more header fields following the status-line. Common headers for 404 responses include Date (HTTP-date), Server (product), Content-Type (media-type), Content-Length (1*DIGIT), ETag (entity-tag). Each header line ends with CRLF. Header section length is variable. -->
+
+    <field name="Header-Date" type="variable" length="undefined" value="IMF-fixdate / obs-date (HTTP-date)"/>
+    <!-- Optional Date header giving origin server time. If present, must follow HTTP-date grammar (IMF-fixdate preferred). Included in HeaderFields; presence optional but common. -->
+
+    <field name="Header-Server" type="variable" length="undefined" value="product *( RWS ( product / comment ) ) ; token and optional version/comment"/>
+    <!-- Optional Server header identifying server software (product tokens). Used for diagnostics; contents are implementation-defined tokens/comments. -->
+
+    <field name="Header-Content-Type" type="variable" length="undefined" value="media-type ; e.g., text/html; charset=UTF-8"/>
+    <!-- Optional Content-Type header describing the media type of the entity body. For 404 responses servers commonly send text/html explaining the error. -->
+
+    <field name="Header-Content-Length" type="variable" length="undefined" value="1*DIGIT ; decimal octet count if present"/>
+    <!-- Optional Content-Length header indicating the octet length of the entity-body. If present, entity-body length must equal this value. If absent, length may be determined by Transfer-Encoding or connection close. -->
+
+    <field name="Header-ETag" type="variable" length="undefined" value="entity-tag ; quoted-string with optional weak prefix 'W/'"/>
+    <!-- Optional ETag header identifying a specific representation (opaque-tag). May be weak (W/) or strong; useful for caching but optional for 404. -->
+
+    <field name="Header-Connection" type="variable" length="undefined" value="token *( OWS ',' OWS token ) ; e.g., close or keep-alive"/>
+    <!-- Optional Connection header indicating hop-by-hop options. Servers may send 'close' to indicate connection will be closed after response. -->
+
+    <field name="HeaderSectionTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Blank CRLF that terminates the header section (i.e., an empty line). This separates headers from the entity-body. -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octet stream; typical content is human-readable explanation (text/html or text/plain). If Content-Length present, size equals that value; otherwise delimited per Transfer-Encoding or connection close"/>
+    <!-- Optional response entity explaining the error condition. Per RFC, except for HEAD requests a server SHOULD include an entity describing the error and whether temporary or permanent. Encoding/charset governed by Content-Type; length depends on Content-Length or transfer encoding. -->
+</message>
+  <message name="407">
+    <!-- 407 Proxy Authentication Required: Response indicating the client must authenticate with a proxy.
+         The proxy MUST send at least one Proxy-Authenticate header containing a challenge appropriate for the proxy. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII 'HTTP' '/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token appearing in the status line (e.g., "HTTP/1.1"); ASCII token identifying HTTP version. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating version and status code in the status line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="407"/>
+    <!-- Three-digit status code indicating Proxy Authentication Required. -->
+
+    <field name="SP_after_Status" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status code and reason phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="29B" value="Proxy Authentication Required"/>
+    <!-- Human-readable reason phrase for status code 407 (RFC standard text). -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line. -->
+
+    <field name="Proxy-Authenticate-Header" type="variable" length="undefined" value="1#challenge (ASCII)"/>
+    <!-- One or more Proxy-Authenticate header field values (RFC: Proxy-Authenticate = #challenge).
+         Each challenge = auth-scheme [ 1*SP ( token68 / #auth-param ) ].
+         The proxy MUST include at least one Proxy-Authenticate header in a 407 response.
+         Note: clients may fail to parse challenges with unknown schemes; listing well-known schemes first (e.g., 'Basic') is recommended. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="ASCII header fields (each terminated by CRLF)"/>
+    <!-- Any additional response header fields. Header block may include typical headers (Date, Server, Content-Length, etc.).
+         The header block length and presence of entity-body are governed by these headers (e.g., Content-Length, Transfer-Encoding). -->
+
+    <field name="Header-Terminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Blank line (CRLF CRLF) terminating the header section and preceding the message body. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="opaque octets; governed by Content-Length or Transfer-Encoding; may be empty"/>
+    <!-- Optional entity body for the response. Its length and framing are determined by Transfer-Encoding and/or Content-Length headers.
+         If no body is present, this field is empty. -->
+</message>
+  <message name="408">
+    <!-- HTTP/1.1 408 (Request Timeout) response message: indicates that the server
+         did not receive a complete request message within the time that it was prepared
+         to wait. This model captures the generic HTTP response wire format (start-line,
+         header block, CRLF separator, optional message body). -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="US-ASCII 'HTTP/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token identifying the HTTP version used for this response.
+         Syntax: US-ASCII characters of the form "HTTP/<major>.<minor>" (e.g., "HTTP/1.1").
+         Length varies by version string. -->
+
+    <field name="SP_after_version" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the HTTP-version and status-code in the start-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="408"/>
+    <!-- Three-digit numeric status code. For this message the value is the fixed
+         "408" (Request Timeout). Represented as three ASCII digits. -->
+
+    <field name="SP_after_status" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the status-code and reason-phrase in the start-line. -->
+
+    <field name="Reason-Phrase" type="variable" length="undefined" value="US-ASCII excluding CR LF; e.g., 'Request Timeout'"/>
+    <!-- Human-readable reason phrase describing the status code. Common default for 408 is
+         "Request Timeout". This field is advisory; servers may send other phrasing.
+         Must not contain CR or LF. Length is variable. -->
+
+    <field name="CRLF_after_startline" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the response start-line. -->
+
+    <field name="Header-Block" type="variable" length="undefined" value="*( field-name ':' OWS field-value CRLF )"/>
+    <!-- Zero or more header field lines. Each header field: token (field-name), ':',
+         optional whitespace (OWS), field-value (field-content), terminated by CRLF.
+         Header-block length is variable and may be zero. The presence and semantics of
+         specific headers (e.g., Content-Length, Transfer-Encoding) affect message-body handling. -->
+
+    <field name="CRLF_header_body_separator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that separates header section from the message body (an empty
+         line indicates the end of header fields). Always present even when there is no body. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="OCTET* or as indicated by Content-Length / Transfer-Encoding"/>
+    <!-- Optional message payload (representation). Its presence and length are determined
+         by header fields (e.g., Content-Length, Transfer-Encoding, or connection semantics).
+         If Content-Length is present, body length depends on that value (note dependency).
+         If Transfer-Encoding indicates chunked, body is in chunked format. If absent, body
+         may be empty. Encoded bytes are arbitrary octets. -->
+</message>
+  <message name="308">
+    <!-- HTTP response message with Status-Code 308 (Permanent Redirect).
+         Indicates the target resource has a new permanent URI; server SHOULD
+         include a Location header with the preferred new URI. This message
+         models the HTTP/1.x status-line, optional Location header, general
+         headers, and optional message body (typically a short hypertext note). -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII 'HTTP/' DIGIT '.' DIGIT (e.g., HTTP/1.1)"/>
+    <!-- Protocol version token identifying the HTTP version used for this response.
+         Format per RFC: the literal "HTTP/" followed by a major and minor digit.
+         Not fixed to a single value; represented as ASCII text. -->
+
+    <field name="SP_after_version" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) separating the HTTP-Version and the Status-Code. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="308"/>
+    <!-- Three-digit numeric status code. For this message it is the constant 308
+         (Permanent Redirect), indicating a permanent URI relocation. -->
+
+    <field name="SP_after_status" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) separating the Status-Code and the Reason-Phrase. -->
+
+    <field name="Reason-Phrase" type="variable" length="undefined" value="ASCII visible chars excluding CR, LF (typical: 'Permanent Redirect')"/>
+    <!-- Human-readable reason phrase giving a short description of the status code.
+         Optional and not semantically significant for protocol parsing; commonly
+         "Permanent Redirect" for 308 but implementations may vary. -->
+
+    <field name="CRLF_status_line_end" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line. -->
+
+    <field name="Location-Header-Name" type="constant" length="8B" value="Location"/>
+    <!-- Header field name 'Location' (case-insensitive). The server SHOULD supply
+         this header with a preferred URI-reference for the new permanent URI.
+         This header is OPTIONAL for the response but recommended by the RFC. -->
+
+    <field name="Header-Name-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- Colon character ':' separating header field name and field value (0x3A). -->
+
+    <field name="Header-Value-Separating-Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) following the ':' before the header field value. -->
+
+    <field name="Location-Header-Value" type="variable" length="undefined" value="URI-reference (per RFC 3986)"/>
+    <!-- The value for the Location header: a URI-reference indicating the new
+         permanent URI. Value should be a valid URI-reference; server SHOULD
+         provide this to enable user agents to redirect. This header line is optional
+         in message instances but semantically recommended for 308 responses. -->
+
+    <field name="CRLF_after_Location" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Location header line. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero or more header-field lines; each: field-name ':' SP field-value CRLF; field-name = token (tchar), field-value = field-content (OBS-safe)"/>
+    <!-- Any additional header fields (e.g., Content-Type, Content-Length, Cache-Control).
+         This models zero-or-more header lines following the Location header; each header
+         line must be terminated by CRLF. Header presence and semantics governed by RFCs.
+         Do NOT invent specific headers here; they are represented generically. -->
+
+    <field name="Header-Section-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF sequence separating header section from message body (i.e., the blank line).
+         Indicates end of header fields. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="opaque octets or textual representation (commonly short HTML with hyperlink(s)); encoding and length as indicated by headers (Content-Type, Content-Length, Transfer-Encoding)"/>
+    <!-- Optional entity body for the response. RFC notes servers usually include a short
+         hypertext note containing a hyperlink to the new URI(s). The exact bytes,
+         charset, and length depend on accompanying headers; when present, body carries
+         human-visible information and may be used by user agents for redirection aids.
+         If no body is present, this field is empty. -->
+</message>
+  <message name="406">
+    <!-- HTTP/1.1 406 Not Acceptable response: returned when the server cannot supply a representation acceptable according to the client's Accept* headers. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token. Inferred constant "HTTP/1.1" for this message model; other versions MAY appear in practice (token is ASCII, variable length). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between HTTP-Version and Status-Code. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="406"/>
+    <!-- Three-digit numeric status code indicating Not Acceptable. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between Status-Code and Reason-Phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="14B" value="Not Acceptable"/>
+    <!-- Short textual description of the status code. ASCII characters excluding CR and LF. Length inferred as 14 bytes for "Not Acceptable". -->
+
+    <field name="Status-Line-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line. -->
+
+    <field name="Header-Fields" type="variable" length="undefined" value="ASCII header-field lines (sequence of 'Name: SP Value' terminated by CRLF); characters 0x20-0x7E, HT allowed; exclude bare CR/LF except as terminators"/>
+    <!-- Zero or more HTTP header fields. May include Date, Server, Content-Type, Content-Length, Vary, etc. Each header line ends with CRLF. Content negotiation related headers (e.g., Vary) may include wildcard '*' tokens. If present, Content-Length or Transfer-Encoding determines entity length. -->
+
+    <field name="End-Of-Headers" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line separating header block from the entity body (CRLF that follows the final header's terminating CRLF). -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="OCTETs; typical content is human-readable diagnostic (e.g., text/html or text/plain) encoded per Content-Type header; if absent, length 0"/>
+    <!-- Optional response entity carrying an explanation or list of alternatives. Servers SHOULD include an entity describing why the resource is not acceptable; its exact length and encoding depend on headers (Content-Length, Transfer-Encoding, Content-Type). -->
+</message>
+  <message name="421">
+    <!-- HTTP response with status code 421 (Misdirected Request): indicates the server believes the request was directed at a server that is not able to produce a response for the combination of scheme and authority. This representation models an HTTP/1.x-style response status-line, headers, and optional body. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="HTTP/1.0 | HTTP/1.1">
+    </field>
+    <!-- Protocol version token as sent in the status line. For HTTP/1.x responses this is the literal "HTTP/1.0" or "HTTP/1.1". Note: HTTP/2 and HTTP/3 do not use a textual status-line on the wire (they use different framing); if this message is carried over HTTP/2/3 the framing and presence of this field is implementation-dependent. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20">
+    </field>
+    <!-- Single space character separating HTTP-Version and Status-Code in the status line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="421">
+    </field>
+    <!-- Numeric status code indicating "Misdirected Request". This is fixed for this message type. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20">
+    </field>
+    <!-- Single space character separating Status-Code and Reason-Phrase in the status line. -->
+
+    <field name="Reason-Phrase" type="constant" length="19B" value="Misdirected Request">
+    </field>
+    <!-- Human-readable reason phrase for status code 421. Length is 19 bytes (US-ASCII). Reason phrases are conventional and not used to determine program logic; in HTTP/2+ the phrase is not transmitted. -->
+
+    <field name="StatusLine-CRLF" type="constant" length="2B" value="0x0D0A">
+    </field>
+    <!-- CRLF terminating the status line (Carriage Return + Line Feed). -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="*( field-name ':' OWS field-value CRLF )">
+    </field>
+    <!-- Zero or more header field lines. Each header line is a token field-name, a colon, optional whitespace (OWS), a field-value (VCHAR/obs-text excluding CRLF), then CRLF. Semantics of particular headers (e.g., Date, Content-Length, Transfer-Encoding, Cache-Control) follow HTTP rules. Note: because 421 is connection-specific, recipients SHOULD treat cacheability as non-heuristic; header interpretation may affect body framing (Content-Length or Transfer-Encoding). -->
+
+    <field name="HeaderTerminator" type="constant" length="2B" value="0x0D0A">
+    </field>
+    <!-- Empty line (single CRLF) that terminates the header section and precedes the message body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="OCTET* (subject to Content-Length / Transfer-Encoding) ">
+    </field>
+    <!-- Optional message body (payload octets). Presence and length are determined by headers (e.g., Content-Length, Transfer-Encoding). For 421 responses body is optional; semantics are connection-specific and caching should not assume the body is a representation suitable for reuse on other connections. -->
+</message>
+  <message name="301">
+    <!-- HTTP/1.1 response with status code 301 (Moved Permanently): indicates the target resource has been assigned a new permanent URI and clients SHOULD use one of the enclosed URIs. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- The HTTP protocol version used in the Status-Line. Inferred as HTTP/1.1 from the specification excerpts; a different version may appear in practice. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the HTTP-Version and the Status-Code in the Status-Line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="301"/>
+    <!-- Three-digit numeric status code indicating "Moved Permanently". This is the primary identifier for this response type. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the Status-Code and the Reason-Phrase in the Status-Line. -->
+
+    <field name="Reason-Phrase" type="constant" length="17B" value="Moved Permanently"/>
+    <!-- Human-readable reason phrase that describes the status code; "Moved Permanently" per standard. Length counted as ASCII characters (17 bytes). -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for the Status-Line (carriage return + line feed). -->
+
+    <field name="Location-Header-Name" type="constant" length="8B" value="Location"/>
+    <!-- Header field name that indicates the preferred target URI for redirection. This header SHOULD be generated for 3xx responses with a redirection target. -->
+
+    <field name="Header-Name-Value-Separator" type="constant" length="2B" value="0x3A20"/>
+    <!-- Separator between header field name and header field value (": " i.e., colon + space). -->
+
+    <field name="Location-Value" type="variable" length="undefined" value="URI-reference per RFC 3986 (absolute or relative)"/>
+    <!-- The Location header field value: a single URI-reference (absolute or relative). If relative, it MUST be resolved against the request's target URI. If the Location lacks a fragment, the fragment from the original reference is inherited per spec. Receivers SHOULD treat this as one URI-reference (no comma-separated lists). -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="Zero or more header fields; each 'field-name: field-value' terminated by CRLF; examples: Date, Server, Expires, Cache-Control, Content-Length, Content-Type"/>
+    <!-- Zero or more additional header fields relevant to caching, entity metadata, or server identification. The specification mentions Date, Server, and Expires as examples; Cache-Control and Content-* headers may control cacheability and describe the entity. Each header line is terminated by CRLF. Do not assume presence of any specific header unless provided. -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that terminates the header section (i.e., the blank line separating headers from the entity-body). -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="If present: short HTML hypertext note (text/html) with hyperlink(s) to the new URI(s); absent for HEAD requests"/>
+    <!-- Optional response entity. For non-HEAD requests the body SHOULD contain a short hypertext note with a hyperlink to the new URI(s). The character set is implementation-defined (commonly UTF-8 or ISO-8859-1). Presence and length depend on the request method and server. -->
+</message>
+  <message name="202">
+    <!-- 202 Accepted HTTP response message: indicates the request has been accepted for processing but processing is not yet complete.
+         This message models an HTTP/1.1 style response composed of a status-line, header section, a header-body separator, and an optional entity body.
+         HTTP version is inferred as HTTP/1.1 for this model (see comment on HTTPVersion). -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token. Inferred as "HTTP/1.1" for this message model (characters: 'H''T''T''P''/''1''.''1' = 8 bytes).
+         In practice this field may vary (e.g., "HTTP/1.0", "HTTP/2.0"); the model documents this inference. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the HTTP-version and the status-code in the status-line (ASCII 0x20). -->
+
+    <field name="StatusCode" type="constant" length="3B" value="202"/>
+    <!-- Numeric status code indicating "Accepted" (three ASCII digits). This model is specifically for status code 202. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the status-code and the reason-phrase in the status-line (ASCII 0x20). -->
+
+    <field name="ReasonPhrase" type="constant" length="8B" value="Accepted"/>
+    <!-- Standard reason phrase associated with 202. Represented as the ASCII string "Accepted" (8 bytes).
+         Note: servers may provide different reason-phrases, but this model uses the registered default. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line (CRLF). -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="field-name ':' OWS field-value OWS CRLF ; ISO-8859-1 / obs-text allowed"/>
+    <!-- Zero or more HTTP header fields serialized as lines. Each header field follows the grammar: field-name ':' [OWS] field-value [OWS] CRLF.
+         Character set per HTTP message headers (historically ISO-8859-1 with obs-text allowances); header names are tokens (ASCII tchar set).
+         This block may include headers relevant to 202 responses such as Date, Server, Content-Type, Content-Length, Retry-After, Location, etc.
+         Specific headers are optional and are not enumerated here to avoid inventing non-implied fields. -->
+
+    <field name="HeaderTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF that separates the header section from the message body (i.e., the final CRLF after the last header line).
+         Together with the CRLF that terminated the previous header line, this produces the blank line that delimits headers from the entity body. -->
+
+    <field name="EntityBody" type="variable" length="undefined" value="octets (0x00-0xFF); length governed by Content-Length or Transfer-Encoding"/>
+    <!-- Optional message body containing information about the accepted request's status (e.g., current status, pointer to a status monitor, or estimate of completion).
+         The byte length is not fixed and MUST be determined by the presence and value of Content-Length header or by Transfer-Encoding (e.g., chunked).
+         Media type and encoding are governed by the Content-Type and Content-Encoding header fields if present. -->
+</message>
+  <message name="416">
+    <!-- HTTP/1.1 416 Range Not Satisfiable response: indicates the server rejected the request's Range header because none of the requested ranges are satisfiable or the ranges are excessive/overlapping. Content-Range is used to convey the current length of the selected representation. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token identifying HTTP/1.1 -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating version and status code -->
+
+    <field name="Status-Code" type="constant" length="3B" value="416"/>
+    <!-- Numeric status code for "Range Not Satisfiable" -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status code and reason phrase -->
+
+    <field name="Reason-Phrase" type="constant" length="21B" value="Range Not Satisfiable"/>
+    <!-- Human-readable reason phrase corresponding to the status code -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line -->
+
+    <field name="Date-Header-Name" type="constant" length="4B" value="Date"/>
+    <!-- Header field name for response date (example header; presence optional) -->
+
+    <field name="Colon1" type="constant" length="1B" value=":"/>
+    <!-- Header field separator colon -->
+
+    <field name="SP3" type="constant" length="1B" value="0x20"/>
+    <!-- Space after header-name colon -->
+
+    <field name="Date-Header-Value" type="variable" length="undefined" value="HTTP-date (e.g., 'Fri, 20 Jan 2012 15:41:54 GMT')"/>
+    <!-- Date header value in IMF-fixdate or other allowed HTTP-date formats; optional but commonly present -->
+
+    <field name="CRLF_Date" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Date header line -->
+
+    <field name="Content-Range-Header-Name" type="constant" length="13B" value="Content-Range"/>
+    <!-- Header field name that conveys the byte-range information for 206/416 responses -->
+
+    <field name="Colon2" type="constant" length="1B" value=":"/>
+    <!-- Header field separator colon -->
+
+    <field name="SP4" type="constant" length="1B" value="0x20"/>
+    <!-- Space after header-name colon -->
+
+    <field name="Content-Range-Value" type="variable" length="undefined" value="range-unit SP ( range-resp / unsatisfied-range )   where:     range-unit = 'bytes' (most common)     range-resp = first-pos '-' last-pos '/' ( complete-length | '*' )       first-pos, last-pos, complete-length = 1*DIGIT     unsatisfied-range = '*' '/' complete-length   Example for 416 (recommended): 'bytes */1234' (unsatisfied-range)"/>
+    <!-- Content-Range field value per RFC: for 416 responses a sender SHOULD use an unsatisfied-range ('*/<instance-length>') to indicate current resource length; when sent in 206 it must specify a single byte-range 'first-last/length'. Value must follow the digit and ordering constraints (last >= first, etc.). Length unspecified here (text header). -->
+
+    <field name="CRLF_ContentRange" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Range header line -->
+
+    <field name="Optional-Content-Length-Header-Name" type="constant" length="14B" value="Content-Length"/>
+    <!-- Optional Content-Length header name (may be present to indicate entity-body length, often 0 for no body) -->
+
+    <field name="Colon3" type="constant" length="1B" value=":"/>
+    <!-- Header field separator colon -->
+
+    <field name="SP5" type="constant" length="1B" value="0x20"/>
+    <!-- Space after header-name colon -->
+
+    <field name="Content-Length-Value" type="variable" length="undefined" value="1*DIGIT (decimal number of octets in the message-body; optional for 416)"/>
+    <!-- Decimal content length of entity-body. For many 416 responses this may be '0' or omitted. If present, must match the body octet count. -->
+
+    <field name="CRLF_ContentLength" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Length header line -->
+
+    <field name="Optional-Content-Type-Header-Name" type="constant" length="12B" value="Content-Type"/>
+    <!-- Optional Content-Type header name for any explanatory entity-body; note 416 MUST NOT use multipart/byteranges content-type. -->
+
+    <field name="Colon4" type="constant" length="1B" value=":"/>
+    <!-- Header field separator colon -->
+
+    <field name="SP6" type="constant" length="1B" value="0x20"/>
+    <!-- Space after header-name colon -->
+
+    <field name="Content-Type-Value" type="variable" length="undefined" value="media-type (e.g., 'text/plain; charset=UTF-8'); MUST NOT be 'multipart/byteranges' for 416 responses"/>
+    <!-- MIME type describing the optional entity-body; servers MUST NOT use multipart/byteranges for 416. -->
+
+    <field name="CRLF_ContentType" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Type header line -->
+
+    <field name="Header-Block-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF indicating end of header section and start of optional message-body -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octets (optional explanatory entity; length must match Content-Length if present)"/>
+    <!-- Optional message body providing an explanation or representation; may be empty. If present, its size and semantics follow normal HTTP entity rules. For 416, the body is not multipart/byteranges. -->
+</message>
+  <message name="307">
+    <!-- 307 Temporary Redirect: HTTP response indicating the target resource resides temporarily under a different URI.
+         User agent SHOULD NOT change the request method when automatically redirecting. Location header SHOULD provide the
+         temporary URI. Response body usually contains a short hypertext note linking to the new URI(s). -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token identifying the HTTP version used in the response (token "HTTP/1.1"). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating version and status code in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="307"/>
+    <!-- Three-digit numeric status code indicating Temporary Redirect. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating status code and reason-phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="18B" value="Temporary Redirect"/>
+    <!-- Human-readable reason phrase associated with the status code. (RFC-specified phrase; implementations may vary.) -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line. -->
+
+    <field name="Header:Location-Name" type="constant" length="9B" value="Location:"/>
+    <!-- Header field name "Location" (case-insensitive per HTTP); followed by a space and a URI reference in the value field below. -->
+
+    <field name="Header:Location-Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after the header name before the header field-value. -->
+
+    <field name="Header:Location-URI" type="variable" length="undefined" value="URI-reference (absolute or relative), ASCII excluding CR, LF"/>
+    <!-- The URI reference indicating the temporary location of the target resource. SHOULD be present for 307 responses; optional in general. -->
+
+    <field name="Header:Location-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Location header field. -->
+
+    <field name="Header:Cache-Control-Name" type="constant" length="13B" value="Cache-Control:"/>
+    <!-- Header field name "Cache-Control" which can indicate cacheability directives for this response. Presence controls whether the response is cacheable. -->
+
+    <field name="Header:Cache-Control-Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after the header name before the header field-value. -->
+
+    <field name="Header:Cache-Control-Value" type="variable" length="undefined" value="token list (e.g., 'no-store', 'no-cache', 'max-age=...'), ASCII excluding CR, LF"/>
+    <!-- Cache directives that, if present, determine whether this 307 response is cacheable. Optional. -->
+
+    <field name="Header:Cache-Control-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Cache-Control header field. -->
+
+    <field name="Header:Expires-Name" type="constant" length="8B" value="Expires:"/>
+    <!-- Header field name "Expires" which can indicate an absolute expiry time for caching. -->
+
+    <field name="Header:Expires-Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after the header name before the header field-value. -->
+
+    <field name="Header:Expires-Value" type="variable" length="undefined" value="HTTP-date (e.g., RFC1123 date), ASCII excluding CR, LF"/>
+    <!-- Expires header value indicating when the response should be considered stale. Optional; used to indicate cacheability. -->
+
+    <field name="Header:Expires-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Expires header field. -->
+
+    <field name="Header:Content-Type-Name" type="constant" length="13B" value="Content-Type:"/>
+    <!-- Header field name "Content-Type" indicating media type of the response entity (the hypertext note). Optional if no body. -->
+
+    <field name="Header:Content-Type-Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after the header name before the header field-value. -->
+
+    <field name="Header:Content-Type-Value" type="variable" length="undefined" value="media-type (e.g., 'text/html; charset=UTF-8'), ASCII excluding CR, LF"/>
+    <!-- Media type describing the representation format of the response body (commonly text/html for redirect note). Optional. -->
+
+    <field name="Header:Content-Type-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Type header field. -->
+
+    <field name="Header:Content-Length-Name" type="constant" length="15B" value="Content-Length:"/>
+    <!-- Header field name "Content-Length" indicating the size in octets of the message-body. Optional if chunked encoding or absent. -->
+
+    <field name="Header:Content-Length-Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after the header name before the header field-value. -->
+
+    <field name="Header:Content-Length-Value" type="variable" length="undefined" value="decimal digits representing octet count (&gt;= 0)"/>
+    <!-- Decimal numeric byte count of the message-body. If present, Entity length in bytes MUST equal this value. Optional; when present, Entity length depends on this field. -->
+
+    <field name="Header:Content-Length-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Length header field. -->
+
+    <field name="Header:Other-Headers" type="variable" length="undefined" value="zero or more header fields: (field-name ':' OWS field-value OWS CRLF), ASCII excluding lone CR/LF in values"/>
+    <!-- Placeholder for any additional header fields (e.g., Server, Date, Set-Cookie). Not invented beyond allowance; modeled as generic optional headers. -->
+
+    <field name="End-Of-Headers" type="constant" length="4B" value="0x0D0A0x0D0A"/>
+    <!-- Empty line (CRLF CRLF) signaling end of header-section and start of message-body (entity). -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octets; typically short HTML with a hyperlink to Location URI; if present, length governed by Content-Length or transfer encoding"/>
+    <!-- The response payload (entity). For 307 responses, SHOULD contain a short hypertext note with a hyperlink to the Location URI unless the request method was HEAD. Length may be zero. If Content-Length header is present, this field's byte length MUST match that header. -->
+</message>
+  <message name="412">
+    <!-- HTTP 412 Precondition Failed response: indicates that a server refused to perform the request because one or more preconditions (such as If-Match / If-Unmodified-Since / If-None-Match) evaluated to false. -->
+
+    <field name="ProtocolVersion" type="variable" length="undefined" value="token: e.g., 'HTTP/1.1', 'HTTP/1.0'"/>
+    <!-- The HTTP protocol version token of the status-line. Inferred as variable because responses may use different HTTP versions. ASCII token (letters, digits, '/', '.'), no CR or LF. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating protocol version and status code in the status-line. -->
+
+    <field name="StatusCode" type="constant" length="3B" value="412"/>
+    <!-- Three-digit numeric status code indicating 'Precondition Failed'. Value is the fixed literal "412". -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status code and reason-phrase in the status-line. -->
+
+    <field name="ReasonPhrase" type="constant" length="undefined" value="Precondition Failed"/>
+    <!-- Human-readable reason phrase for status code 412. Treated as constant text 'Precondition Failed' (case as shown); length is server-dependent so set undefined. -->
+
+    <field name="CRLF_after_statusline" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the status-line. -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="zero or more header-field lines (ASCII): 'Field-Name: OWS Field-Value OWS'"/>
+    <!-- Zero or more header fields. Relevant headers related to 412 semantics (from requests) include If-Unmodified-Since, If-Match, If-None-Match on the request side; response headers such as ETag or Date MAY appear. Each header line ends with CRLF. Length and presence are determined by sender. -->
+
+    <field name="CRLF_headers_body_separator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF indicating end of header block and start of message body (per HTTP). -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="opaque octets; length determined by headers (e.g., Content-Length, Transfer-Encoding)"/>
+    <!-- Optional response body containing human-readable explanation or diagnostics. Its length and encoding are governed by headers (dependency: Content-Length or Transfer-Encoding). May be empty for many 412 responses. -->
+</message>
+  <message name="414">
+    <!-- HTTP response message for status 414 "URI Too Long" indicating that the target URI is longer than the server is willing to interpret -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII 'HTTP/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token identifying the HTTP version (e.g., "HTTP/1.1"). ASCII characters only; follows the ABNF HTTP-version = 'HTTP/' DIGIT '.' DIGIT. Length varies with version and is therefore undefined. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating HTTP-Version and Status-Code (0x20). -->
+
+    <field name="Status-Code" type="constant" length="3B" value="414"/>
+    <!-- Three-digit numeric status code indicating "URI Too Long". Constant for this message type. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating Status-Code and Reason-Phrase (0x20). -->
+
+    <field name="Reason-Phrase" type="constant" length="12B" value="URI Too Long"/>
+    <!-- Human-readable reason phrase corresponding to status 414. Treated as constant here per standard phrase; encoded in ISO-8859-1 / US-ASCII. Length 12 bytes ("URI Too Long"). -->
+
+    <field name="CRLF_after_status" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line (CR LF). -->
+
+    <field name="HeaderBlock" type="variable" length="undefined" value="*(field-name ':' OWS field-value CRLF)"/>
+    <!-- Zero or more header fields. Each header line uses the form "field-name: [OWS] field-value" followed by CRLF per RFC. Character set: field-name is token (tchar), field-value is field-content (VCHAR / obs-text with optional SP/HTAB). Length undefined; actual length determined by headers present. -->
+
+    <field name="HeaderTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) that terminates the header section and precedes the message body. This is required to separate headers from body. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="OCTET* (as indicated by Transfer-Encoding or Content-Length)"/>
+    <!-- Optional entity body carrying a representation describing the error. Presence, length, and framing depend on headers: Content-Length (decimal digits) or Transfer-Encoding chunked. Content encoding and media type determined by Content-Type and related headers. -->
+</message>
+  <message name="304">
+    <!-- 304 Not Modified HTTP response: indicates a conditional GET/HEAD resulted in no new representation; no message-body is sent and the client should use its cached representation. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="HTTP/1.0 | HTTP/1.1 | HTTP/2.0 token (ASCII)"/>
+    <!-- Protocol version token as sent in the status-line (e.g., "HTTP/1.1"). Server may use different HTTP versions; recorded here as a variable ASCII token. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating version and status code in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="304"/>
+    <!-- Three-digit status code indicating Not Modified. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status code and reason-phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="12B" value="Not Modified"/>
+    <!-- Human-readable reason phrase for status 304. Exact phrase "Not Modified" per specification. -->
+
+    <field name="StatusLine-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line. -->
+
+    <field name="Date" type="variable" length="undefined" value="HTTP-date (IMF-fixdate) ASCII"/>
+    <!-- Date header (recommended MUST be present unless omission required): the HTTP-date indicating response time; used by caches and proxies. Optional if other rules require omission. -->
+
+    <field name="ETag" type="variable" length="undefined" value="entity-tag: either quoted-string or weak W/quoted-string (ASCII)"/>
+    <!-- Entity tag header that would have been sent in a 200 response; one or more ETag values may be present. May be omitted if not applicable. -->
+
+    <field name="Content-Location" type="variable" length="undefined" value="absolute-URI or relative-URI (ASCII)"/>
+    <!-- Content-Location header if it would have been sent in a 200 response; identifies the direct URI for the representation. Optional and may be present alongside ETag. -->
+
+    <field name="Cache-Control" type="variable" length="undefined" value="cache-directive *( ',' SP? cache-directive ) (ASCII)"/>
+    <!-- Cache-Control header(s) that would have been sent in a 200 response; directives guiding caching behavior (e.g., max-age). Optional. -->
+
+    <field name="Expires" type="variable" length="undefined" value="HTTP-date (IMF-fixdate) ASCII"/>
+    <!-- Expires header indicating expiry time for the representation; may be present if it would differ from previously cached variant. Optional. -->
+
+    <field name="Vary" type="variable" length="undefined" value="header-field-name *( ',' SP? header-field-name ) (ASCII)"/>
+    <!-- Vary header listing request-header fields that affect the selected representation; may be included if applicable. Optional. -->
+
+    <field name="Warning" type="variable" length="undefined" value="Warning: warn-code SP warn-agent SP quoted-text (ASCII)"/>
+    <!-- Optional Warning header(s). Note RFC rules: warn-code 1xx should be deleted by caches when forwarding; 2xx retained. Presence affects cache handling. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero-or-more header-field lines (field-name ':' OWS field-value OWS) (ASCII excluding CR, LF)"/>
+    <!-- Any additional header fields; sender SHOULD NOT generate representation metadata other than the listed fields unless required for cache updates. These are preserved/replaced by caches per rules. -->
+
+    <field name="End-Of-Header-Section" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line terminating the header section. The 304 response is terminated by this first empty line after headers. -->
+
+    <field name="Message-Body-Absence" type="constant" length="0B" value=""/>
+    <!-- 304 responses MUST NOT contain a message-body; length is zero and no entity-body or trailers are present. -->
+</message>
+  <message name="302">
+    <!-- HTTP/1.1 response message with status code 302 (Found) indicating a temporary redirection -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="ASCII 'HTTP/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token (e.g., HTTP/1.1). Indicates the HTTP version of the response. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE separating version and status code -->
+
+    <field name="StatusCode" type="constant" length="3B" value="302"/>
+    <!-- Three-digit numeric status code indicating 'Found' / temporary redirect -->
+
+    <field name="SP_afterStatus" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE separating status code and reason phrase -->
+
+    <field name="ReasonPhrase" type="constant" length="5B" value="Found"/>
+    <!-- Short textual description of the status code (standard reason phrase: "Found") -->
+
+    <field name="StatusLineCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line -->
+
+    <field name="LocationHeader" type="variable" length="undefined" value="ASCII URI-reference (absolute-URI or relative) excluding CRLF"/>
+    <!-- Optional but SHOULD be provided: Location header giving the temporary URI for redirection.
+         If present, occurs as a header-line within the header section: 'Location: <URI>'. -->
+
+    <field name="CacheControlHeader" type="variable" length="undefined" value="ASCII comma-separated cache-directives (tokens)"/>
+    <!-- Optional Cache-Control header; controls cacheability. 302 responses are cacheable only if indicated here. -->
+
+    <field name="ExpiresHeader" type="variable" length="undefined" value="ASCII HTTP-date (e.g., RFC1123)"/>
+    <!-- Optional Expires header giving an absolute expiration time for caches. -->
+
+    <field name="ContentLengthHeader" type="variable" length="undefined" value="ASCII non-negative decimal digits"/>
+    <!-- Optional Content-Length header indicating the length in octets of the following entity-body.
+         If present, indicates exact length of EntityBody. -->
+
+    <field name="OtherHeaderFields" type="variable" length="undefined" value="Sequence of header-field lines: field-name ':' SP field-value (ASCII) each terminated by CRLF"/>
+    <!-- Any other header fields present in the response (e.g., Date, Server). These occur within the header section.
+         Header fields are separated by CRLF; header-field values exclude CRLF. -->
+
+    <field name="HeaderSectionTerminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Empty line (CRLF CRLF) marking end of header section and start of the entity-body (if any). -->
+
+    <field name="EntityBody" type="variable" length="undefined" value="opaque octets (typically short HTML note with hyperlink); encoding per headers; absent for HEAD requests"/>
+    <!-- Optional entity-body carrying representation (usually a short hypertext note with a hyperlink to the Location URI).
+         Length and presence depend on request method (absent for HEAD) and Content-Length/Transfer-Encoding headers. -->
+</message>
+  <message name="502">
+    <!-- HTTP response message for status code 502 (Bad Gateway): sent by a server acting as a gateway when it receives an invalid response from an upstream server -->
+
+    <field name="HTTP_VersionPrefix" type="constant" length="5B" value="HTTP/"/>
+    <!-- Literal prefix indicating HTTP version token; fixed ASCII characters 'H','T','T','P','/' -->
+
+    <field name="HTTP_Version" type="variable" length="undefined" value="DIGIT '.' DIGIT (e.g., 1.1); ASCII digits and '.'"/>
+    <!-- HTTP version number (major.minor). Variable length; grammar per HTTP (DIGIT '.' DIGIT). Could be '1.1', '2.0', etc. -->
+
+    <field name="SP_after_version" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the version and the status code -->
+
+    <field name="Status_Code" type="constant" length="3B" value="502"/>
+    <!-- Three-digit decimal status code identifying 'Bad Gateway' class. Constant for this message type -->
+
+    <field name="SP_after_status" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the status code and reason-phrase -->
+
+    <field name="Reason_Phrase" type="constant" length="11B" value="Bad Gateway"/>
+    <!-- Human-readable reason phrase for status 502. Standard phrase is "Bad Gateway"; implementations may vary (variable in other implementations) -->
+
+    <field name="StartLine_CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF ending the response start-line (Carriage Return + Line Feed) -->
+
+    <field name="Header_Section" type="variable" length="undefined" value="*( field-name ':' OWS field-value CRLF ); field-name = token; field-value = field-content"/>
+    <!-- Zero or more header fields. Each header line: token ':' optional-whitespace field-value CRLF. Header-section is text-based and may include known headers (Date, Server, Content-Length, Transfer-Encoding, Connection, etc.). Length is undefined and depends on number/length of headers. -->
+
+    <field name="Header_Section_Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF that separates header section from the message body (i.e., final CRLF after headers). -->
+
+    <field name="Message_Body" type="variable" length="undefined" value="OCTET stream; length determined by Transfer-Encoding (e.g., chunked) or Content-Length header or connection-close semantics"/>
+    <!-- Optional message body containing a representation (e.g., HTML error page or diagnostic). Length and framing depend on headers: if Content-Length present, body length == that value; if Transfer-Encoding: chunked, body is chunked; otherwise body may be absent or until connection close. -->
+</message>
+  <message name="422">
+    <!-- HTTP Response message conveying status code 422 (Unprocessable Content) used to indicate that the server understands the content type and syntax of the request entity but was unable to process the contained instructions. Modeled as an HTTP/1.1-style response start-line, header section, and optional message body. -->
+
+    <field name="HTTP_Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token in the response start-line. Chosen as HTTP/1.1 for this message model; other versions (e.g., HTTP/2, HTTP/3) are possible in real deployments. -->
+
+    <field name="SP_after_version" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP, 0x20) separating the HTTP-version and the status-code in the start-line. -->
+
+    <field name="StatusCode" type="constant" length="3B" value="422"/>
+    <!-- Three-digit numeric status code indicating "Unprocessable Content". Fixed numeric token "422". -->
+
+    <field name="SP_after_status" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the status-code and the reason-phrase in the start-line. -->
+
+    <field name="ReasonPhrase" type="variable" length="undefined" value="HTAB / SP / VCHAR / obs-text (sequence of visible chars, HTAB, or obs-text until CRLF)"/>
+    <!-- Human-readable reason phrase describing the status code. Content is the reason-phrase production from HTTP: zero or more of HTAB, SP, VCHAR, or obs-text until the terminating CRLF. Length is protocol-dependent and not fixed. -->
+
+    <field name="CRLF_startline" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the start-line (Carriage Return + Line Feed). -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="*( field-name ':' OWS field-value CRLF ) ; ASCII token and field-value syntax per HTTP"/>
+    <!-- Zero or more header fields forming the header section. Each header field is a name:value pair (token ':' OWS field-value) terminated by CRLF. Allowed characters follow HTTP header grammar (tokens, OWS, field-content). Length and presence of specific headers are dynamic. -->
+
+    <field name="CRLF_headers_end" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF marking end of header section (i.e., the CRLF that follows the last header line, producing an empty line). Presence of this delimiter indicates start of an optional message body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="OCTET* ; content bytes as indicated by Content-Length or Transfer-Encoding"/>
+    <!-- Optional message body (representation data). The actual length and framing depend on headers such as Content-Length, Transfer-Encoding, or multipart encodings; this field is variable and its length is therefore undefined here. -->
+</message>
+  <message name="303">
+    <!-- 303 See Other: HTTP/1.1 response indicating the effective result is available at a different URI (preferred retrieval via GET/HEAD); response entity (unless HEAD) SHOULD contain a short hypertext note linking to the Location URI. -->
+
+    <field name="Status-Line_HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token for the response (fixed by this model to HTTP/1.1 as per RFC 2616). -->
+
+    <field name="Status-Line_SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE separating the version token and the status code in the Status-Line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="303"/>
+    <!-- Three-digit numeric status code indicating "See Other". -->
+
+    <field name="Status-Line_SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE separating the status code and the reason phrase in the Status-Line. -->
+
+    <field name="Reason-Phrase" type="constant" length="9B" value="See Other"/>
+    <!-- Human-readable reason phrase corresponding to the status code; conventional text for 303. -->
+
+    <field name="Status-Line_CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for the Status-Line. -->
+
+    <field name="Header_Location_Name" type="constant" length="8B" value="Location"/>
+    <!-- Header field name indicating the URI of the resource that provides an indirect response to the original request. The Location field SHOULD be present for a 303 response. -->
+
+    <field name="Header_Separator_ColonSP" type="constant" length="2B" value="0x3A0x20"/>
+    <!-- Colon and single SPACE separating header name and header value (": "). -->
+
+    <field name="Header_Location_Value" type="variable" length="undefined" value="URI-reference (absolute or relative; per RFC)"/>
+    <!-- The target URI that the user agent MAY retrieve (recommended to be provided). Not considered a substitute for the original request URI. -->
+
+    <field name="Header_Location_CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Location header field line. -->
+
+    <field name="Header_Cache-Control_Name" type="constant" length="13B" value="Cache-Control"/>
+    <!-- Optional header field name used to express caching directives; included here because RFC requires that a 303 response MUST NOT be cached (this model represents how that intent is usually communicated). -->
+
+    <field name="Header_Separator_ColonSP_2" type="constant" length="2B" value="0x3A0x20"/>
+    <!-- Colon and single SPACE separating header name and header value (": "). -->
+
+    <field name="Header_Cache-Control_Value" type="variable" length="undefined" value="directive-list (should indicate non-cacheable, e.g., 'no-store', 'no-cache')"/>
+    <!-- Recommended cache-control directives to enforce the RFC requirement that the 303 response MUST NOT be cached. This field is an inference to model the 'MUST NOT be cached' requirement; actual presence and exact directive values are implementation-dependent. -->
+
+    <field name="Header_Cache-Control_CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Cache-Control header line. -->
+
+    <field name="Header_Content-Type_Name" type="constant" length="12B" value="Content-Type"/>
+    <!-- Optional header field name indicating media type of the response representation (recommended when an entity-body is present). -->
+
+    <field name="Header_Separator_ColonSP_3" type="constant" length="2B" value="0x3A0x20"/>
+    <!-- Colon and single SPACE separating header name and header value (": "). -->
+
+    <field name="Header_Content-Type_Value" type="variable" length="undefined" value="media-type (e.g., text/html; charset=UTF-8)"/>
+    <!-- Media type of the representation; by convention a short HTML note is used (text/html) unless the request was HEAD. -->
+
+    <field name="Header_Content-Type_CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Type header line. -->
+
+    <field name="Header_Content-Length_Name" type="constant" length="14B" value="Content-Length"/>
+    <!-- Optional header field name indicating the size of the message-body in octets. -->
+
+    <field name="Header_Separator_ColonSP_4" type="constant" length="2B" value="0x3A0x20"/>
+    <!-- Colon and single SPACE separating header name and header value (": "). -->
+
+    <field name="Header_Content-Length_Value" type="variable" length="undefined" value="decimal-digits (octet count)"/>
+    <!-- Decimal ASCII representation of the entity-body length in octets. If present, the entity-body length MUST match this value. If absent, bodies may be delimited by connection closure or chunked encoding (not modeled here). -->
+
+    <field name="Header_Content-Length_CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Length header line. -->
+
+    <field name="Header_EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) separating header fields from the message body (end of header section). -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="short HTML hypertext note containing a hyperlink to the Location URI; charset and length as indicated by headers"/>
+    <!-- Representation payload that SHOULD contain a brief hypertext note with a hyperlink to the Location URI, unless the original request method was HEAD (in which case no entity-body is present). Length is governed by Content-Length if provided. -->
+</message>
+  <message name="101">
+    <!-- 101 Switching Protocols response: server agrees to change the application protocol on this connection (e.g., upgrade to HTTP/2 via h2c). -->
+
+    <field name="ProtocolVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- The HTTP protocol version used to send this response; for a 101 response carried in HTTP/1.1 this is "HTTP/1.1". -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating protocol version and status code. -->
+
+    <field name="StatusCode" type="constant" length="3B" value="101"/>
+    <!-- Numeric status code indicating "Switching Protocols". -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating status code and reason phrase. -->
+
+    <field name="ReasonPhrase" type="constant" length="19B" value="Switching Protocols"/>
+    <!-- Human-readable reason phrase typically sent with the status code. Exact phrase "Switching Protocols" (19 bytes). -->
+
+    <field name="CRLF_StartLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line. -->
+
+    <field name="HeaderName_Connection" type="constant" length="10B" value="Connection"/>
+    <!-- Header field name "Connection" (case-insensitive) that carries connection-focused options. -->
+
+    <field name="HeaderColon_Connection" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' character separating header name and header value. -->
+
+    <field name="HeaderSP_Connection" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after ':' in header field. -->
+
+    <field name="ConnectionValue" type="constant" length="7B" value="Upgrade"/>
+    <!-- Header value token "Upgrade" indicating this response carries an Upgrade connection option; required when sending Upgrade. -->
+
+    <field name="CRLF_Header1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Connection header field line. -->
+
+    <field name="HeaderName_Upgrade" type="constant" length="7B" value="Upgrade"/>
+    <!-- Header field name "Upgrade" (case-insensitive) that lists protocol(s) to switch to. -->
+
+    <field name="HeaderColon_Upgrade" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' character separating the Upgrade header name and its value. -->
+
+    <field name="HeaderSP_Upgrade" type="constant" length="1B" value="0x20"/>
+    <!-- Single space after ':' in the Upgrade header field. -->
+
+    <field name="UpgradeProtocolList" type="variable" length="undefined" value="comma-separated tokens: protocol-name [ '/' protocol-version ] where token chars = RFC tchar (ALPHA / DIGIT / '!' / '#' / '$' / '%' / &amp; / ''' / '*' / '+' / '-' / '.' / '^' / '_' / '`' / '|' / '~')"/>
+    <!-- List of protocol names (and optional versions) the server is switching to (e.g., "h2c"). Server MUST send this header; if multiple layers, list in layer-ascending order. Length undefined because number/length of tokens vary. -->
+
+    <field name="CRLF_Header2" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Upgrade header field line. -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) marking end of header section. After this, the connection switches to the new protocol payload. -->
+
+    <field name="ProtocolSwitchPayload" type="variable" length="undefined" value="protocol-specific bytes (e.g., for h2c: HTTP/2 connection preface frames beginning with a SETTINGS frame)"/>
+    <!-- Payload sent immediately after the empty line when the protocol is switched. For HTTP/2 upgrade (h2c) the server MUST begin sending HTTP/2 frames (first a SETTINGS frame / server connection preface). Length undefined and semantics depend on the selected protocol. -->
+</message>
+  <message name="417">
+    <!-- 417 Expectation Failed: HTTP response indicating that one or more expectations in the request's Expect header field cannot be met. Typically sent by origin servers or proxies when an Expect header contains unsupported expectation-extensions or other expectations besides "100-continue". -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="US-ASCII pattern: 'HTTP/' DIGIT '.' DIGIT (e.g., HTTP/1.1)"/>
+    <!-- Protocol version token from the response status-line.  Must follow HTTP-version syntax (e.g., "HTTP/1.1"). Kept variable because implementations may advertise different minor versions; legal character set is US-ASCII letters, digits, '/' and '.' per HTTP grammar. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between HTTPVersion and StatusCode in the status-line (ASCII SP). -->
+
+    <field name="StatusCode" type="constant" length="3B" value="417"/>
+    <!-- Three-digit numeric status code identifying the response class and specific condition. Constant 417 indicates "Expectation Failed". Represented as three ASCII digits in the status-line. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between StatusCode and ReasonPhrase in the status-line (ASCII SP). -->
+
+    <field name="ReasonPhrase" type="constant" length="undefined" value="Expectation Failed"/>
+    <!-- The human-readable reason phrase associated with the status code. For 417 responses the customary phrase is "Expectation Failed". Field is primarily informational and may vary; length is undefined. -->
+
+    <field name="CRLF_statusline" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line per HTTP message syntax. -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="*( field-name ':' OWS field-value OWS CRLF )"/>
+    <!-- Zero or more header fields encoded as lines. Headers use US-ASCII token sets with possible obs-text; allowed headers include Date, Server, Content-Type, Content-Length, Connection, etc. This section may include information about the 417 response (e.g., Retry-After) or explanatory headers. The Expect header itself appears in requests; proxies/origin servers may mention handling of Expect in diagnostics. -->
+
+    <field name="CRLF_headers_end" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF that terminates the header section (i.e., blank line separating headers and optional body). -->
+
+    <field name="OptionalEntityBody" type="variable" length="undefined" value="opaque octets indicated by Content-Length or Transfer-Encoding; octet stream (binary/US-ASCII)"/>
+    <!-- Optional response entity body. A 417 response MAY include an entity describing the failure. The length and framing depend on headers: if Content-Length present, body length equals that value; if Transfer-Encoding: chunked, body is chunked. If absent, no body is present. Note: body content is protocol-dependent and may use any media type signaled by Content-Type. -->
+</message>
+  <message name="504">
+    <!-- HTTP response message with status code 504 (Gateway Timeout).
+         Used by a gateway or proxy to indicate that it did not receive a timely response
+         from an upstream server; per RFC, caches MAY generate 504 when only-if-cached
+         requests cannot be satisfied or when must-revalidate revalidation fails. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII: 'HTTP' '/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token identifying the HTTP version (e.g., HTTP/1.1). 
+         Textual ASCII form "HTTP/<major>.<minor>". Length varies; present in the status line. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating version and status code in the status line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="504"/>
+    <!-- Three-digit numeric status code indicating Gateway Timeout. Fixed semantic value for this message. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating status code and reason phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="15B" value="Gateway Timeout"/>
+    <!-- Human-readable reason phrase typically sent with the status code. 
+         For 504 the conventional phrase is "Gateway Timeout" (15 bytes in ASCII). -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line. -->
+
+    <field name="DateHeader" type="variable" length="undefined" value="IMF-fixdate (ASCII, e.g., 'Sun, 06 Nov 1994 08:49:37 GMT')"/>
+    <!-- Date header field (Date: HTTP-date) indicating message origination time. 
+         Uses IMF-fixdate format per RFC; presence customary in responses. -->
+
+    <field name="ServerHeader" type="variable" length="undefined" value="token *( RWS ( token / comment ) ), ASCII"/>
+    <!-- Server header field identifying server software (e.g., 'Server: nginx/1.18').
+         Optional; textual product tokens / comments as defined by HTTP grammar. -->
+
+    <field name="Content-TypeHeader" type="variable" length="undefined" value="media-type (e.g., text/html; charset=UTF-8)"/>
+    <!-- Content-Type header indicating the media type of the optional response body.
+         If absent and body present, recipient infers or treats as 'application/octet-stream' per implementation. -->
+
+    <field name="Content-LengthHeader" type="variable" length="undefined" value="decimal digits representing octet count (&gt;=0)"/>
+    <!-- Content-Length header giving the size in octets of the message body.
+         If present, its numeric value MUST equal the number of bytes in MessageBody; otherwise length is determined by transfer coding. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero or more header lines: field-name ':' OWS field-value OWS"/>
+    <!-- Placeholder for any additional response header fields (e.g., Cache-Control, Retry-After).
+         Headers follow HTTP list/field grammar; specific directives (must-revalidate, etc.) may appear here. -->
+
+    <field name="Header-Section-Terminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Blank line (CRLF CRLF) separating header section from optional message body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="opaque octets (length = Content-Length if present); recommended charset UTF-8 or ISO-8859-1"/>
+    <!-- Optional response payload (human-readable diagnostics or HTML error page). 
+         Length in bytes is determined by Content-Length header or by transfer coding. 
+         If Content-LengthHeader is present, MessageBody length MUST equal that value (dependency). -->
+</message>
+  <message name="501">
+    <!-- HTTP/1.1 Response with status code 501 (Not Implemented) indicating the origin server does not recognize or implement the request method -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token identifying HTTP/1.1 -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE separator between version and status code -->
+
+    <field name="StatusCode" type="constant" length="3B" value="501"/>
+    <!-- Numeric status code indicating 'Not Implemented' (unrecognized or unimplemented method) -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE separator between status code and reason-phrase -->
+
+    <field name="ReasonPhrase" type="variable" length="undefined" value="US-ASCII excluding CR, LF; recommended value: 'Not Implemented'"/>
+    <!-- Human-readable reason phrase; advisory only and may be replaced or omitted; status-code is authoritative -->
+
+    <field name="StatusLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="US-ASCII header-field lines: 'field-name: field-value' each terminated by CRLF; may be empty"/>
+    <!-- Zero or more header fields conveying metadata (e.g., Allow, Content-Length, Transfer-Encoding, Cache controls); each header-line ends with CRLF; the set of headers may be used to determine body length or caching behavior -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF marking end of header section (final blank line before message-body) -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="opaque octets; length determined by Content-Length, Transfer-Encoding (e.g., chunked), or connection close; may be empty for 501 responses"/>
+    <!-- Entity-body containing payload; actual length and encoding depend on headers (Content-Length, Transfer-Encoding). If Transfer-Encoding is present and unknown to server/client, RFC recommends responding with 501. -->
+</message>
+  <message name="200">
+    <!-- HTTP/1.1 200 (OK) response message: start-line, header fields, and optional message body for successful GET/HEAD responses -->
+
+    <field name="ProtocolPrefix" type="constant" length="5B" value="HTTP/"/>
+    <!-- The literal protocol name and separator indicating an HTTP response version token ("HTTP/") -->
+
+    <field name="Version" type="variable" length="undefined" value="DIGIT '.' DIGIT (e.g., 1.1); US-ASCII"/>
+    <!-- HTTP version number (e.g., "1.1"). Length depends on version token; format is major '.' minor as per HTTP-version. -->
+
+    <field name="SP_after_Version" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating version and status code -->
+
+    <field name="StatusCode" type="constant" length="3B" value="200"/>
+    <!-- Three-digit numeric status code indicating success (200 = OK) -->
+
+    <field name="SP_after_Status" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating status code and reason phrase -->
+
+    <field name="ReasonPhrase" type="variable" length="undefined" value="US-ASCII excluding CR, LF (commonly 'OK')"/>
+    <!-- Human-readable reason phrase for the status code. Optional for processing; not relied upon for semantics. -->
+
+    <field name="StartLineTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the response start-line -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="Sequence of header-field lines: US-ASCII 'field-name: OWS field-value OWS' each terminated by CRLF"/>
+    <!--
+        Message header fields block. May include (but is not limited to) Date, ETag, Vary, Content-Length, Content-Type,
+        Content-Encoding, Content-Range, Content-Location, Cache-Control, Expires, Transfer-Encoding, Trailer, etc.,
+        as implied by the RFC text. Presence and semantics of specific headers affect body handling:
+         - Content-Length (decimal) => determines message-body length.
+         - Transfer-Encoding: chunked => chunked framing applies.
+         - Content-Range => used for partial responses; union/combination rules apply when assembling ranges.
+         - For combined partial responses, header selection rules (most-recent 200, or most-recent headers among 206s)
+           determine which header fields should be used (see RFC text). Header-field character set is US-ASCII.
+    -->
+
+    <field name="HeaderSectionTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) that separates header fields from the message body, marking end of header section -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Octet sequence (binary); length determined by Content-Length, Transfer-Encoding, or connection close"/>
+    <!--
+        Optional payload (representation data). Interpretation and framing depend on header fields:
+         - If Content-Length present, body length == decimal value.
+         - If Transfer-Encoding: chunked, body is chunked and terminated by zero-length chunk and optional trailers.
+         - If neither present, body may be terminated by connection closure.
+         - For combined partial responses: if union of ranges equals entire representation, client MUST treat as complete 200 and Content-Length
+           MUST reflect full representation length; otherwise body may be multipart/byteranges or multiple partial ranges indicated by Content-Range headers.
+    -->
+</message>
+  <message name="201">
+    <!-- 201 Created response: indicates the request has been fulfilled and resulted in one or more new resources being created. The primary resource is identified by the Location header (or by the request target if no Location is provided). Response may include an entity describing the created resource(s) and validator headers such as ETag/Last-Modified. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII: 'HTTP' '/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token (e.g., HTTP/1.1). Syntax: ASCII characters 'HTTP' '/' major '.' minor. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) separating version and status code -->
+
+    <field name="Status-Code" type="constant" length="3B" value="201"/>
+    <!-- Three-digit numeric status code indicating 'Created' -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP separating status code and reason phrase -->
+
+    <field name="Reason-Phrase" type="constant" length="7B" value="Created"/>
+    <!-- Human-readable reason phrase corresponding to status code 201 -->
+
+    <field name="CRLF-StartLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line -->
+
+    <!-- Header fields (each header line: Name ':' SP Value CRLF) -->
+
+    <field name="Location-Name" type="constant" length="8B" value="Location"/>
+    <!-- Header field name identifying URI of the primary resource created by the request -->
+
+    <field name="Location-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator between header name and value -->
+
+    <field name="Location-SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP after ':' as customary in header fields -->
+
+    <field name="Location-Value" type="variable" length="undefined" value="URI-reference (for 201: primary resource; absoluteURI recommended)"/>
+    <!-- Location header value: a single URI-reference identifying the new resource. For 201 responses this refers to the created resource; RFC recommends an absolute URI. -->
+
+    <field name="CRLF-Location" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Location header line -->
+
+    <field name="ETag-Name" type="constant" length="4B" value="ETag"/>
+    <!-- Header field name for opaque entity tag validator -->
+
+    <field name="ETag-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator for ETag header -->
+
+    <field name="ETag-SP" type="constant" length="1B" value="0x20"/>
+    <!-- SP after ':' in ETag header -->
+
+    <field name="ETag-Value" type="variable" length="undefined" value="opaque-tag (quoted-string) or weakness-prefixed (e.g., W/&quot;etag&quot;)"/>
+    <!-- Optional ETag header conveying the entity tag for the representation created; usable as a validator in later conditional requests. -->
+
+    <field name="CRLF-ETag" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the ETag header line -->
+
+    <field name="Content-Type-Name" type="constant" length="12B" value="Content-Type"/>
+    <!-- Header field name indicating media type of entity body -->
+
+    <field name="Content-Type-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator for Content-Type header -->
+
+    <field name="Content-Type-SP" type="constant" length="1B" value="0x20"/>
+    <!-- SP after ':' in Content-Type header -->
+
+    <field name="Content-Type-Value" type="variable" length="undefined" value="media-type (e.g., 'application/json', defined per RFC 2616)"/>
+    <!-- Media type specifying format of the response entity; the entity format is specified by this header. -->
+
+    <field name="CRLF-ContentType" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Type header line -->
+
+    <field name="Content-Length-Name" type="constant" length="14B" value="Content-Length"/>
+    <!-- Header field name indicating size of the entity-body in bytes -->
+
+    <field name="Content-Length-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator for Content-Length header -->
+
+    <field name="Content-Length-SP" type="constant" length="1B" value="0x20"/>
+    <!-- SP after ':' in Content-Length header -->
+
+    <field name="Content-Length-Value" type="variable" length="undefined" value="1*DIGIT (decimal number of octets in entity-body)"/>
+    <!-- Decimal ASCII representation of the entity-body length in octets. Entity length determines EntityBody length. -->
+
+    <field name="CRLF-ContentLength" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Length header line -->
+
+    <field name="Content-Location-Name" type="constant" length="16B" value="Content-Location"/>
+    <!-- Optional header name that identifies the original location of the enclosed representation (distinct from Location). -->
+
+    <field name="Content-Location-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator for Content-Location header -->
+
+    <field name="Content-Location-SP" type="constant" length="1B" value="0x20"/>
+    <!-- SP after ':' in Content-Location header -->
+
+    <field name="Content-Location-Value" type="variable" length="undefined" value="URI-reference (identifies the original location of the enclosed entity)"/>
+    <!-- Optional value giving the most specific resource corresponding to the enclosed representation; may co-exist with Location. -->
+
+    <field name="CRLF-ContentLocation" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Content-Location header line -->
+
+    <field name="Last-Modified-Name" type="constant" length="13B" value="Last-Modified"/>
+    <!-- Optional header name for a modification-date validator -->
+
+    <field name="Last-Modified-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator for Last-Modified header -->
+
+    <field name="Last-Modified-SP" type="constant" length="1B" value="0x20"/>
+    <!-- SP after ':' in Last-Modified header -->
+
+    <field name="Last-Modified-Value" type="variable" length="undefined" value="HTTP-date (e.g., RFC1123-date)"/>
+    <!-- Optional Last-Modified value indicating the modification date for the created resource representation; used as a validator. -->
+
+    <field name="CRLF-LastModified" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Last-Modified header line -->
+
+    <field name="Header-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line separating header section from optional entity-body (end of header block) -->
+
+    <field name="EntityBody" type="variable" length="undefined" value="opaque octet sequence; length determined by Content-Length; format determined by Content-Type"/>
+    <!-- Optional message body describing and/or providing URIs for the created resource(s). The actual byte length MUST match Content-Length. If Content-Length absent, body presence/length must be inferred by other rules (not modeled here). -->
+
+</message>
+  <message name="500">
+    <!-- HTTP/1.1 500 Internal Server Error response message.
+         Represents a server error response; per RFC, Date header MAY be omitted for server errors
+         if generating a valid Date is inconvenient. This message models the Status-Line, an optional
+         Date header, header terminator, and an optional entity-body containing error details. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token identifying HTTP/1.1 -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP separating version and status code -->
+
+    <field name="Status-Code" type="constant" length="3B" value="500"/>
+    <!-- Three-digit numeric status code indicating Internal Server Error -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP separating status code and reason phrase -->
+
+    <field name="Reason-Phrase" type="constant" length="21B" value="Internal Server Error"/>
+    <!-- Standard reason phrase for 500; implementations may vary (reason-phrase is a human-readable token) -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Status-Line -->
+
+    <field name="Date-Header-Name" type="constant" length="4B" value="Date"/>
+    <!-- Header field name for Date (may be omitted for server error responses per RFC guidance) -->
+
+    <field name="Header-Name-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator between header name and header value -->
+
+    <field name="Header-Value-Space" type="constant" length="1B" value="0x20"/>
+    <!-- SP after ':' per header field syntax -->
+
+    <field name="Date-Value" type="variable" length="undefined" value="HTTP-date as RFC1123-date (e.g. 'Tue, 15 Nov 1994 08:12:31 GMT')"/>
+    <!-- The Date header field value in RFC1123 format.
+         Note: origin servers SHOULD include Date in responses, but per RFC may omit for 500 when inconvenient.
+         If present, used to indicate message origination time; ASCII characters per HTTP-date specification. -->
+
+    <field name="CRLF-after-Date" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Date header line (absent if Date header omitted) -->
+
+    <field name="Header-Block-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF marking end of header section and start of entity-body.
+         Presence indicates start of message-body per HTTP message structure. -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octet sequence (application/octet-stream / text/html / others)"/>
+    <!-- Optional entity-body containing diagnostic or error payload (HTML, plain text, JSON, etc.).
+         Length and encoding determined by accompanying headers (e.g., Content-Length, Transfer-Encoding) if present.
+         Field models raw sequence of bytes of the entity-body; length is undefined here since it depends on headers. -->
+</message>
+  <message name="402">
+    <!-- HTTP Response message for status code 402 (Payment Required) -->
+
+    <field name="ProtocolPrefix" type="constant" length="5B" value="HTTP/"/>
+    <!-- ASCII prefix identifying the protocol token used in the status-line ("HTTP/") -->
+
+    <field name="Version" type="variable" length="undefined" value="DIGIT '.' DIGIT (e.g., 1.1, 1.0)">
+    </field>
+    <!-- Protocol version number (major.minor). Variable because implementations may use different minor versions.
+         This appears immediately after ProtocolPrefix (i.e., produces tokens like "HTTP/1.1"). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) separating the protocol version and status code in the status-line -->
+
+    <field name="StatusCode" type="constant" length="3B" value="402"/>
+    <!-- Three-digit status code indicating Payment Required (numeric digits '4','0','2') -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) separating the status code and reason-phrase in the status-line -->
+
+    <field name="ReasonPhrase" type="constant" length="16B" value="Payment Required"/>
+    <!-- Recommended reason-phrase for 402. This is textual status description; implementations may vary.
+         Length given as bytes for the canonical phrase "Payment Required" (16 octets ASCII). -->
+
+    <field name="CRLF_after_status_line" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line (Carriage Return 0x0D followed by Line Feed 0x0A) -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="*( field-name ':' OWS field-value OWS CRLF ); field-name=token; field-value=VCHAR / obs-text">
+    </field>
+    <!-- Zero or more header field lines. Each header line is 'field-name: field-value' terminated by CRLF.
+         Header block may include Content-Length, Transfer-Encoding, etc. HeaderFields length and semantics
+         are variable and determine how the message body is delimited. -->
+
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF separating header section and message body (header section terminator). Present even if no headers. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="octet-stream; length determined by Content-Length header or Transfer-Encoding (chunked) or connection close">
+    </field>
+    <!-- Optional message payload for the response. The actual length depends on header semantics:
+         - If Content-Length present: MessageBody holds exactly that many octets (dependency on Content-Length).
+         - If Transfer-Encoding: chunked, body uses chunked encoding.
+         - Otherwise, body length may be determined by connection closure per HTTP rules.
+         The character set and media type are indicated by the Content-Type header (if present). -->
+</message>
+  <message name="405">
+    <!-- HTTP/1.1 405 Method Not Allowed response: indicates the request method is known
+         by the server but not supported for the target resource. An Allow header MUST be present. -->
+
+    <field name="ProtocolVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- HTTP version token for the response status-line; RFC example uses "HTTP/1.1". This may vary in other exchanges. -->
+
+    <field name="SP_after_Version" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating version and status code in the status-line -->
+
+    <field name="StatusCode" type="constant" length="3B" value="405"/>
+    <!-- Three-digit numeric status code indicating Method Not Allowed -->
+
+    <field name="SP_after_StatusCode" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating status code and reason-phrase in the status-line -->
+
+    <field name="ReasonPhrase" type="constant" length="18B" value="Method Not Allowed"/>
+    <!-- Human-readable reason-phrase corresponding to the status code; standard text "Method Not Allowed" per RFC 2616.
+         Note: reason-phrase may vary, but RFC example uses this exact phrase. -->
+
+    <field name="StatusLine_EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line -->
+
+    <field name="AllowHeaderName" type="constant" length="5B" value="Allow"/>
+    <!-- Header field name indicating the set of methods allowed by the target resource; MUST be present in a 405 response -->
+
+    <field name="AllowHeader_Colon" type="constant" length="1B" value=":"/>
+    <!-- Colon separating header field name and field value -->
+
+    <field name="AllowHeader_Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) after the colon before the header field value (common formatting) -->
+
+    <field name="AllowHeader_Value" type="variable" length="undefined" value="Comma-separated list of method tokens (e.g., GET, HEAD, PUT). Each method is a token per RFC: standard methods (OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE, CONNECT) or extension-method (token characters: ALPHA / DIGIT / hyphen / other token chars). An empty value is allowed and indicates no methods are allowed."/>
+    <!-- The Allow header's value: a #method list describing methods currently supported by the resource.
+         Presence of this header is REQUIRED in a 405 response. Length is undefined and may be zero (empty). -->
+
+    <field name="AllowHeader_EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Allow header line -->
+
+    <field name="OtherHeaders" type="variable" length="undefined" value="Zero or more additional header lines formatted as field-name: field-value CRLF; each field-value is ASCII excluding CRLF.">
+    </field>
+    <!-- Optional other header fields (e.g., Date, Server, Content-Type). Each header line ends with CRLF. This field may be empty.
+         If present, header semantics (e.g., Content-Length, Transfer-Encoding) determine entity body handling. -->
+
+    <field name="HeaderSection_Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line marking end of the header section (i.e., CRLF following the last header line). -->
+
+    <field name="EntityBody" type="variable" length="undefined" value="Opaque octets; presence and length determined by Transfer-Encoding or Content-Length headers. If absent, this field is empty."/>
+    <!-- Optional response body (entity) carrying representation or explanation. Length and presence depend on headers (Content-Length, Transfer-Encoding).
+         If present, content encoding and type are indicated by corresponding headers. -->
+</message>
+  <message name="305">
+    <!-- HTTP/1.1 response message for status code 305 (Use Proxy): instructs the client to repeat the request via the proxy given in the Location header. 305 responses MUST be generated by origin servers only. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- The HTTP version token indicating protocol version used for this response. Modeled as constant "HTTP/1.1" per RFC context. -->
+
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) character separating the HTTP-version and status-code in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="305"/>
+    <!-- Three-digit numeric status code identifying the response class and specific result: 305 == Use Proxy. -->
+
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) character separating the status-code and reason-phrase in the status-line. -->
+
+    <field name="Reason-Phrase" type="constant" length="9B" value="Use Proxy"/>
+    <!-- Human-readable reason phrase for the status code. For 305 this is "Use Proxy". Treated as constant text in this model. -->
+
+    <field name="StatusLine-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line (Carriage Return + Line Feed). -->
+
+    <field name="Header-Name-Location" type="constant" length="8B" value="Location"/>
+    <!-- Header field name that MUST appear in a 305 response; indicates the proxy URI to be used. -->
+
+    <field name="Header-Colon" type="constant" length="1B" value="0x3A"/>
+    <!-- Colon (':') separator between header field name and field value. -->
+
+    <field name="Header-Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP after the colon before the header field value. -->
+
+    <field name="Location-Value" type="variable" length="undefined" value="URI-reference (ASCII / pct-encoded; per RFC 3986)"/>
+    <!-- The URI (proxy) given by the Location header. Semantically: the client MUST access the requested resource through this proxy and repeat the single request to that proxy.
+         Allowed characters: US-ASCII with percent-encoding as needed; must not contain CR or LF. Length is variable (depends on URI length). Note: 305 responses MUST be generated by origin servers only — security implications if generated elsewhere. -->
+
+    <field name="HeaderLine-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Location header line. -->
+
+    <field name="Header-Section-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF indicating end of header section (i.e., an additional CRLF producing CRLF CRLF after the last header line). Marks boundary before optional message body. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="opaque octets (optional)"/>
+    <!-- Optional entity-body for the response. For redirection 3xx responses this is commonly empty or contains human-readable diagnostics; treated as an opaque octet sequence. Length is determined by transfer semantics (e.g., Content-Length or chunked encoding) if present. -->
+</message>
+  <message name="410">
+    <!-- HTTP Response message for status code 410 (Gone): indicates the target resource is no longer available and will not be available again -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII: 'HTTP/' DIGIT '.' DIGIT (e.g., HTTP/1.1)"/>
+    <!-- Protocol version token from the status-line indicating the HTTP version used for the response (syntax: 'HTTP/' DIGIT '.' DIGIT). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating the HTTP-Version and Status-Code in the status-line. -->
+
+    <field name="StatusCode" type="constant" length="3B" value="410"/>
+    <!-- Three-digit numeric status code indicating the response class and specific condition. '410' means the resource is Gone. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating the Status-Code and Reason-Phrase in the status-line. -->
+
+    <field name="Reason-Phrase" type="variable" length="undefined" value="Printable ASCII/obs-text excluding CR and LF (typical: 'Gone')"/>
+    <!-- Human-readable reason phrase corresponding to the status code. Not used for protocol semantics; often 'Gone' for 410. May be customized by implementations. -->
+
+    <field name="StatusLine-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status-line. -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="0 or more header fields; each: field-name ':' OWS field-value OWS CRLF; field-name token (tchar characters); field-value: field-content (VCHAR / obs-text)"/>
+    <!-- Zero or more header fields that convey metadata about the response. Each header line is 'field-name: field-value' and ends with CRLF. Typical headers for 410 responses may include Date, Content-Type, Content-Length, Cache-Control, etc. -->
+
+    <field name="HeaderSection-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF marking the end of the header section (i.e., the blank line separating headers and message body). Depends on HeaderSection being present or empty. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="opaque octets (0x00-0xFF); length determined by Content-Length header or Transfer-Encoding (e.g., chunked) or connection closure"/>
+    <!-- Optional message body containing a representation describing the 410 condition (e.g., HTML page). The actual byte length is determined by headers (Content-Length, Transfer-Encoding) or the connection semantics; note dependency on those header fields. -->
+</message>
+  <message name="205">
+    <!-- HTTP response message for status code 205 (Reset Content): indicates the server has fulfilled the request and the user agent SHOULD reset the document view; response MUST NOT include an entity body -->
+
+    <field name="HTTP-Version" type="constant" length="undefined" value="HTTP/1.1"/>
+    <!-- Protocol version token identifying the HTTP version used for the response. Inference: commonly "HTTP/1.1"; other HTTP versions (e.g., HTTP/2, HTTP/3) may be used in practice. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the version token and the status code in the status line -->
+
+    <field name="Status-Code" type="constant" length="3B" value="205"/>
+    <!-- Three-digit numeric status code indicating "Reset Content" -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the status code and reason phrase -->
+
+    <field name="Reason-Phrase" type="constant" length="undefined" value="Reset Content"/>
+    <!-- Human-readable reason phrase associated with the status code. Optional in some HTTP versions; here represented as the conventional phrase "Reset Content" -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status line -->
+
+    <field name="Header-Fields" type="variable" length="undefined" value="zero or more header lines: field-name ':' OWS field-value OWS ; US-ASCII / obs-text as allowed by RFCs"/>
+    <!-- Sequence of header field lines (0 or more). Headers convey metadata (Date, Server, Vary, etc.). For a 205 response headers are allowed, but they describe the response and MUST NOT carry a message entity. Header fields are each terminated by CRLF. -->
+
+    <field name="Content-Length-Header" type="variable" length="undefined" value="digits (0..n)"/>
+    <!-- Optional Content-Length header field (decimal digits). Semantics for 205: response MUST NOT include an entity; if a Content-Length header appears it MUST be 0 (or be absent). Note: presence/length must be consistent with absence of a message body; dependency: message-body length must be 0 if Content-Length is present. -->
+
+    <field name="Other-Common-Headers" type="variable" length="undefined" value="examples: Date, Server, ETag, Cache-Control, Vary, Location (header-value syntax per RFC)"/>
+    <!-- Other header fields commonly used in HTTP responses. Included here as a symbolic set; any header present must follow header-field grammar. None of these imply a response entity body for status 205. -->
+
+    <field name="End-Of-Headers" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Blank line (CRLF CRLF) marking the end of the header section and separation from any message body. For 205 responses this is immediately followed by no entity-body. -->
+
+    <field name="Message-Body" type="variable" length="0B" value="empty"/>
+    <!-- Response message payload (entity). For status 205 the response MUST NOT include an entity; modeled as zero-length. If any bytes were present, that would violate the "MUST NOT include an entity" requirement. -->
+</message>
+  <message name="306">
+    <!-- HTTP response status message for status code 306 (Unused). 
+         This models the HTTP/1.x textual status-line and the generic response structure for the reserved 306 code. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII 'HTTP/' DIGIT '.' DIGIT"/>
+    <!-- The HTTP-version token in the status-line (e.g., "HTTP/1.1"). 
+         Variable-length textual token using ASCII characters matching the pattern "HTTP/" DIGIT "." DIGIT.
+         Applies to HTTP/1.x textual framing; undefined length because multiple protocol versions exist. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (ASCII SP, 0x20) separating the HTTP-Version and the Status-Code in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="306"/>
+    <!-- Three-digit numeric status code. 306 is reserved/unused per the specification; implementations SHOULD NOT use it for new responses.
+         Represented here as the ASCII digits "306". -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (ASCII SP, 0x20) separating the Status-Code and the Reason-Phrase in the status-line. -->
+
+    <field name="Reason-Phrase" type="constant" length="undefined" value="Unused"/>
+    <!-- Human-readable reason-phrase for the status-code. For 306 the conventional phrase is "Unused" indicating the code is reserved.
+         Reason-phrases are informational/diagnostic only and may vary; length undefined. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the status-line as required by HTTP/1.x textual messages. -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="*( field-name ':' OWS field-value OWS CRLF ); ASCII header lines"/>
+    <!-- Zero or more header-field lines forming the header section of the response.
+         Each header line conforms to HTTP header-field syntax (field-name ':' OWS field-value OWS) and is ASCII-based.
+         Length and content determined by included headers; do not assume presence of any particular header. -->
+
+    <field name="CRLF-After-Headers" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that separates the header section from the message body when headers are present.
+         Present even if there are zero header fields (i.e., status-line CRLF followed immediately by this CRLF). -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="opaque octet sequence; governed by Content-Length or Transfer-Encoding; bytes"/>
+    <!-- Optional message body (payload). Presence and length are governed by header fields such as Content-Length or Transfer-Encoding.
+         For status code 306 (reserved/unused) bodies are typically not used; implementers SHOULD follow header-driven framing rules. -->
+</message>
+  <message name="100">
+    <!-- Informational HTTP/1.1 100 (Continue) response indicating the server has received the request headers and the client may continue sending the request body. Consists of a Status-Line and optional header fields, terminated by an empty line. -->
+
+    <field name="HTTP-Version" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token in the Status-Line. Literal "HTTP/1.1" used for typical HTTP/1.1 100 responses. -->
+
+    <field name="SP_after_version" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating HTTP-Version and Status-Code in the Status-Line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="100"/>
+    <!-- Three-digit numeric status code indicating 100 (Continue). -->
+
+    <field name="SP_after_status" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Status-Code and Reason-Phrase in the Status-Line. -->
+
+    <field name="Reason-Phrase" type="constant" length="8B" value="Continue"/>
+    <!-- Human-readable reason phrase corresponding to the 100 status code ("Continue"). -->
+
+    <field name="CRLF_StatusLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Status-Line. -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="ASCII header-field sequences; each 'field-name: SP field-value' terminated by CRLF; zero or more occurrences allowed"/>
+    <!-- Optional header fields for the 1xx response. There are no required headers for 1xx responses. Header-field syntax follows HTTP header rules; the block is terminated by an empty line. -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) marking the end of the header block and termination of this informational response. A 100 response has no message body following this termination. -->
+</message>
+  <message name="418">
+    <!-- HTTP/1.x response message with status code 418 ("Unused") -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII matching 'HTTP/' DIGIT '.' DIGIT (e.g., HTTP/1.1)"/>
+    <!-- Response start-line HTTP version token; indicates protocol version used for framing and semantics; variable length (depends on version string) -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) separator between HTTP-Version and Status-Code -->
+
+    <field name="Status-Code" type="constant" length="3B" value="418"/>
+    <!-- Three-digit numeric status code; constant 418 for this message (class 4xx) -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SPACE (0x20) separator between Status-Code and Reason-Phrase -->
+
+    <field name="Reason-Phrase" type="constant" length="6B" value="Unused"/>
+    <!-- Short textual description of the Status-Code as presented in the status line; RFC indicates "Unused" for 418 here. (Note: in general reason-phrase is implementation-provided and therefore variable) -->
+
+    <field name="CRLF-StartLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the response start-line -->
+
+    <field name="Header-Section" type="variable" length="undefined" value="zero or more header-field lines: field-name ':' OWS field-value OWS CRLF; field-name = token (tchar); field-value = field-content (VCHAR / obs-text)"/>
+    <!-- Sequence of header fields (metadata) following the start-line. May be empty. Each header-field follows RFC syntax; headers are terminated by an empty line. -->
+
+    <field name="Header-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF marking end of header section (i.e., CRLF after last header line or immediate CRLF if no headers). -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="opaque octet sequence; length determined by Transfer-Encoding or Content-Length; encoding/content-type per headers"/>
+    <!-- Optional payload (representation body). Presence and length depend on headers: if Transfer-Encoding chunked then chunk framing applies; if Content-Length present, body length equals that value (dependency on Header-Section). The body octets follow the header-terminator. -->
+
+</message>
+  <message name="206">
+    <!-- 206 Partial Content HTTP/1.1 response used to transfer one or more subranges of a selected representation in response to a Range request -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Protocol version token. Here modeled as the HTTP/1.1 literal per RFC 2616. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating version and status code. -->
+
+    <field name="StatusCode" type="constant" length="3B" value="206"/>
+    <!-- Three-digit numeric status code indicating Partial Content. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status code and reason phrase. -->
+
+    <field name="ReasonPhrase" type="constant" length="15B" value="Partial Content"/>
+    <!-- Reason phrase associated with 206; modeled as the standard literal "Partial Content". -->
+
+    <field name="StatusLineCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line. -->
+
+    <field name="Header_Date" type="variable" length="undefined" value="HTTP-date (e.g., RFC1123)"/>
+    <!-- Date header: required if it would have been sent in a 200 response; contains the origin server date/time. -->
+
+    <field name="Header_Cache-Control" type="variable" length="undefined" value="Cache-directives (token list)"/>
+    <!-- Cache-Control header: present if applicable; controls caching semantics and may affect cacheability of this 206 response. -->
+
+    <field name="Header_ETag" type="variable" length="undefined" value="Quoted-string or weak/strong validator token"/>
+    <!-- ETag header: entity tag validator; included if it would have been sent with a 200 response. Used for exact-match validation when combining partial responses. -->
+
+    <field name="Header_Expires" type="variable" length="undefined" value="HTTP-date"/>
+    <!-- Expires header: present if it would have been sent in 200 response; indicates expiration time for caches. -->
+
+    <field name="Header_Content-Location" type="variable" length="undefined" value="URI-reference"/>
+    <!-- Content-Location header: optional; identifies the direct URI for the enclosed representation, included if it would have been sent with a 200 response. -->
+
+    <field name="Header_Vary" type="variable" length="undefined" value="Header-name list"/>
+    <!-- Vary header: optional; indicates which request-headers were used to select the representation variant. -->
+
+    <field name="Header_Content-Range" type="variable" length="undefined" value="bytes SP &lt;first&gt;-&lt;last&gt;/&lt;instance-length or *&gt;"/>
+    <!-- Content-Range header: MUST be present for single-part 206 responses; describes the byte range enclosed and the selected representation's complete length (or * if unknown). Format example: 'bytes 21010-47021/47022'. -->
+
+    <field name="Header_Content-Length" type="variable" length="undefined" value="decimal-octet-count"/>
+    <!-- Content-Length header: if present, value MUST equal the actual number of octets in the message-body (typically the size of the enclosed range or multipart body). -->
+
+    <field name="Header_Content-Type" type="variable" length="undefined" value="MIME-type (e.g., image/gif or multipart/byteranges; boundary=...)"/>
+    <!-- Content-Type header: indicates media type of the message-body. For multiple ranges, this will be 'multipart/byteranges; boundary=...' and each part contains its own Content-Range. -->
+
+    <field name="Header_If-Range_Consideration" type="variable" length="undefined" value="Presence/validator semantics (If-Range usage)"/>
+    <!-- Semantic note field (variable): If the request included If-Range, the server SHOULD restrict entity-headers in the 206 response depending on whether a strong or weak validator was used. This field documents that conditional behavior but does not emit a literal header. -->
+
+    <field name="Header_Terminator" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- CRLF CRLF separating header section from the message-body. -->
+
+    <field name="MessageBody_SingleRange" type="variable" length="undefined" value="octet-sequence (size matches Content-Length)"/>
+    <!-- Message-body for a single-part 206 response: contains the exact range of bytes described by Content-Range. Length should equal Content-Length if that header is present. -->
+
+    <field name="MessageBody_MultipartByteranges" type="variable" length="undefined" value="multipart body composed of boundary-delimited parts; each part: CRLF--boundary CRLF Part-Headers CRLF Part-Body ... --boundary--"/>
+    <!-- Message-body for multi-part responses: when multiple ranges are returned, body uses 'multipart/byteranges' with a boundary parameter. Each part includes its own Content-Type (optional) and a Content-Range header describing that part. The overall Content-Length, if present, is the octet count of the entire multipart body. -->
+
+    <field name="Combining_Cache_Behavior" type="variable" length="undefined" value="Policy notes: ETag/Last-Modified exact-match required to combine ranges"/>
+    <!-- Semantic note describing cache behavior: caches MAY combine stored responses with new 206 responses only if ETag or Last-Modified match exactly; rules for replacing header fields when combining are specified by RFC (not a literal wire field). -->
+</message>
+  <message name="400">
+    <!-- HTTP 400 Bad Request response: indicates the server could not understand the request due to malformed syntax or failed preconditions (e.g., missing Host header, invalid/missing Content-Length, unsupported Content-Range on PUT). -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII: 'HTTP/1.0' | 'HTTP/1.1'"/>
+    <!-- Protocol version token from the Status-Line. Server implementations commonly use HTTP/1.1 for 400 responses; older servers may use HTTP/1.0. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating version and status code in the Status-Line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="400"/>
+    <!-- Three-digit status code indicating "Bad Request". This is fixed for this message definition. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status code and reason phrase in the Status-Line. -->
+
+    <field name="Reason-Phrase" type="constant" length="11B" value="Bad Request"/>
+    <!-- Reason phrase accompanying the status code. Exact ASCII text "Bad Request" as commonly used for 400. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Status-Line. -->
+
+    <field name="Header-Fields" type="variable" length="undefined" value="sequence of header-field lines; each: field-name ':' SP field-value CRLF ; ASCII"/>
+    <!-- HTTP header block. May include diagnostic or standard response headers. Semantically important request-side headers that can trigger a 400 are:
+         - Host (absent in an HTTP/1.1 request → server MUST respond 400)
+         - Content-Length (missing on an HTTP/1.0 request with an entity body → server SHOULD respond 400)
+         - Other malformed header syntax or inconsistent values also justify 400.
+         Note: the presence/absence or contents of certain request headers (e.g., Content-Range on a PUT that the server does not support for partial PUT) are causes for issuing this 400 response; those request headers are reflected here only as metadata in the server's decision, not as fields of the response. -->
+
+    <field name="Header-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF that terminates the header section (i.e., the CRLF that follows the final header line, forming the CRLF-CRLF separator before the entity-body). -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="OCTETs; length indicated by Content-Length response header if present; otherwise connection-close delimits"/>
+    <!-- Optional response payload providing human- or machine-readable explanation of the 400 error. Its length is determined by the response's Content-Length header (if present) or by connection close. Note: when the server sends 400 in reply to a malformed request, the entity-body is optional; servers often include diagnostic text. -->
+</message>
+  <message name="203">
+    <!-- HTTP Response message with status code 203 (Non-Authoritative Information).
+         Used by an intermediary to indicate the enclosed representation is a potentially
+         modified/enhanced representation of the target resource. -->
+
+    <field name="StatusLine" type="variable" length="undefined" value="HTTP-version SP Status-Code SP Reason-Phrase CRLF"/>
+    <!-- The start-line of the response. Composed of HTTP-version, a space, the 3-digit status code, a space, a human-readable reason phrase, and CRLF.
+         Modeled here as a single logical field; subfields follow for explicit parts. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII: 'HTTP/' DIGIT '.' DIGIT (e.g., HTTP/1.1, HTTP/2.0)"/>
+    <!-- Protocol version token indicating the semantics of the message. Variable because multiple HTTP versions are valid.
+         Preferentially used by the recipient to select semantics and parsing rules. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating components in the status line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="203"/>
+    <!-- Numeric status code (3 digits). For this message, fixed to '203' (Non-Authoritative Information).
+         A proxy may use 203 to indicate it transformed a 200 response. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status code and reason phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="undefined" value="Non-Authoritative Information"/>
+    <!-- Human-readable description of the status code. For 203 responses this phrase is standardized.
+         Represented as printable ASCII text; length is variable. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the status line. -->
+
+    <field name="HeaderFields" type="variable" length="undefined" value="*( header-field-name ':' OWS header-field-value OWS CRLF )"/>
+    <!-- Zero or more header fields. Each header-field line is 'Name: value' terminated with CRLF. Specific headers of interest (modeled individually below)
+         may appear within this section. Length is undefined because header count and sizes vary. -->
+
+    <field name="Content-Location" type="variable" length="undefined" value="absolute-URI / partial-URI (ASCII URI syntax)"/>
+    <!-- Optional header. If present the sender asserts that the response content is a representation of the resource identified by this URI.
+         Per RFC, such an assertion cannot be fully trusted unless verified by other means; useful for revision-history/bookmarking. -->
+
+    <field name="Content-Range" type="variable" length="undefined" value="range-unit SP ( range-resp / unsatisfied-range )"/>
+    <!-- Optional header used when the response contains one or more parts of a representation (e.g., for 206 Partial Content).
+         Syntax follows 'range-unit <space> range-resp' or unsatisfied-range. May be absent for full-body 203 responses. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="media-type (type '/' subtype *( ';' parameter ))"/>
+    <!-- Optional header indicating the media type of the representation in the message body (e.g., text/html; charset=UTF-8).
+         Value follows media-type grammar per RFC. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT (decimal number of octets)"/>
+    <!-- Optional header giving the decimal number of octets in the message body. If present, the MessageBody length MUST match this value.
+         If absent, body framing is determined by Transfer-Encoding or connection semantics. -->
+
+    <field name="Cache-Control" type="variable" length="undefined" value="*( directive [ '=' value ] *( ',' directive ) ) ; may include 'no-transform'"/>
+    <!-- Optional cache directives controlling caching and transformation behavior.
+         If the representation contains a 'no-transform' directive, intermediaries MUST NOT transform the content. -->
+
+    <field name="ETag" type="variable" length="undefined" value="entity-tag (weak or strong)"/>
+    <!-- Optional entity tag header that acts as a validator for the representation.
+         May be used to compare representations and support cache validation; format per entity-tag grammar. -->
+
+    <field name="Via" type="variable" length="undefined" value="received-protocol RWS received-by [ RWS comment ] *( ',' received-protocol RWS received-by [ RWS comment ] )"/>
+    <!-- Optional header identifying intermediate protocols and recipients between client and server.
+         Useful for tracing message path, and for behavior decisions by intermediaries (e.g., transforming proxies). -->
+
+    <field name="EndOfHeaderSection" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- CRLF CRLF sequence marking end of the header section and start of the message body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="OCTETS; length determined by Content-Length or Transfer-Encoding; media as indicated by Content-Type"/>
+    <!-- The representation bytes of the response. May be absent for responses with no content (e.g., specific status codes).
+         The actual length depends on Content-Length, Transfer-Encoding (chunked), or connection framing. If Content-Location references a URI different
+         from the target URI, the sender asserts the body is a representation of that referenced resource (but this assertion may be untrusted). -->
+</message>
+  <message name="300">
+    <!-- HTTP 300 Multiple Choices response: indicates the target resource has multiple representations and provides information (headers and optional entity) about the alternatives so the user agent can select one. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII string of form 'HTTP/&lt;major&gt;.&lt;minor&gt;' (e.g., HTTP/1.1)"/>
+    <!-- Protocol version token identifying the HTTP version used for this response. Textual form per RFC (HTTP/<major>.<minor>). -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (ASCII 0x20) separating elements in the status-line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="300"/>
+    <!-- Three-digit decimal status code indicating 'Multiple Choices'. -->
+
+    <field name="SP-after-status" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating status-code and reason-phrase. -->
+
+    <field name="Reason-Phrase" type="constant" length="16B" value="Multiple Choices"/>
+    <!-- Human-readable reason phrase for the status code. Standard phrase used for 300; may vary in implementations. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status-line. -->
+
+    <!-- Header fields follow: zero or more header lines. Each header line is: Field-Name ':' SP Field-Value CRLF. Only headers implied by the 300 description are modeled below. -->
+
+    <field name="Location-Header-Name" type="constant" length="8B" value="Location"/>
+    <!-- Header field name used when the server has a preferred choice; SHOULD contain a preferred representation's URI-reference. -->
+
+    <field name="Header-Name-Separator" type="constant" length="2B" value="0x3A20"/>
+    <!-- ':' (0x3A) followed by SP (0x20) that separates header name and header value. -->
+
+    <field name="Location-Header-Value" type="variable" length="undefined" value="URI-reference (per RFC 3986); e.g., absolute- or relative-URI"/>
+    <!-- If present, contains the preferred choice's URI-reference. User agents MAY use this for automatic redirection. -->
+
+    <field name="CRLF-after-Location" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF ending the Location header line. -->
+
+    <field name="Content-Type-Header-Name" type="constant" length="12B" value="Content-Type"/>
+    <!-- Header field name indicating the media type of the entity-body. For 300 responses SHOULD be present when an entity is provided. -->
+
+    <field name="Header-Name-Separator-2" type="constant" length="2B" value="0x3A20"/>
+    <!-- ':' and space separating header name and value (reused separator instance). -->
+
+    <field name="Content-Type-Header-Value" type="variable" length="undefined" value="media-type (e.g., text/html, application/json); may include parameters (charset, etc.)"/>
+    <!-- Declares the representation format of the entity-body which contains the list of alternatives; selection/automatic handling depends on this media type. -->
+
+    <field name="CRLF-after-Content-Type" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF ending the Content-Type header line. -->
+
+    <field name="Content-Length-Header-Name" type="constant" length="14B" value="Content-Length"/>
+    <!-- Header field name indicating the decimal byte length of the entity-body when known. -->
+
+    <field name="Header-Name-Separator-3" type="constant" length="2B" value="0x3A20"/>
+    <!-- ':' and space between header name and value. -->
+
+    <field name="Content-Length-Header-Value" type="variable" length="undefined" value="1*DIGIT (decimal number of octets)"/>
+    <!-- Decimal byte-count of the entity-body. If present, recipients use this to delimit the entity-body. Entity-body length depends on this value (dependency noted). -->
+
+    <field name="CRLF-after-Content-Length" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF ending the Content-Length header line. -->
+
+    <field name="Link-Header-Name" type="constant" length="4B" value="Link"/>
+    <!-- Optional header name that can be used to communicate a list of alternatives (e.g., members with rel=\"alternate\") per RFC 8288. -->
+
+    <field name="Header-Name-Separator-4" type="constant" length="2B" value="0x3A20"/>
+    <!-- ':' and space separating Link header name and value. -->
+
+    <field name="Link-Header-Value" type="variable" length="undefined" value="Link-value per RFC 8288; may include one or more comma-separated link-values with rel='alternate'"/>
+    <!-- Optional Link header carrying alternative URIs with relationship info. Deployment may vary; useful to advertise alternatives without entity-body. -->
+
+    <field name="CRLF-after-Link" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF ending the Link header line. -->
+
+    <field name="Date-Header-Name" type="constant" length="4B" value="Date"/>
+    <!-- Header field name indicating the date/time at which the message was originated. Useful for caches. -->
+
+    <field name="Header-Name-Separator-5" type="constant" length="2B" value="0x3A20"/>
+    <!-- ':' and space separating Date header name and value. -->
+
+    <field name="Date-Header-Value" type="variable" length="undefined" value="HTTP-date (e.g., IMF-fixdate)"/>
+    <!-- Date/time stamp of the response in HTTP-date format; relevant to caching and freshness semantics. -->
+
+    <field name="CRLF-after-Date" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF ending the Date header line. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="Zero or more additional header fields (e.g., Cache-Control, Expires, ETag) as allowed by HTTP"/>
+    <!-- Placeholder for other headers that may be present; not invented beyond RFC implications. These follow 'Field-Name: SP Field-Value CRLF' syntax. -->
+
+    <field name="End-of-Headers" type="constant" length="4B" value="0x0D0A0D0A"/>
+    <!-- Empty CRLF pair separating the header section and the message body (entity). -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="Opaque octet sequence whose semantics are given by Content-Type; for 300 typically contains a list of representation metadata and URI references in the indicated media type (e.g., HTML, JSON)"/>
+    <!-- Response payload containing the alternatives (unless the request was HEAD). Length determined by Content-Length or transfer-encoding; recipients MUST consult headers to determine body length. The format is not standardized by HTTP; chosen via content negotiation or shared design. -->
+
+</message>
+  <message name="413">
+    <!-- HTTP response message for status code 413 (Content Too Large): server refuses to process a request because the request content is larger than the server is willing or able to process. May include a Retry-After header if the condition is temporary. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="HTTP/1.0 | HTTP/1.1 | HTTP/2 | HTTP/3"/>
+    <!-- Protocol version token identifying the HTTP version used for this response (e.g., "HTTP/1.1"). Not fixed by this message; implementations choose one of the allowed HTTP versions. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between version and status code in the status line. -->
+
+    <field name="Status-Code" type="constant" length="3B" value="413"/>
+    <!-- Three-digit numeric status code indicating "Content Too Large". Fixed value for this response message. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between status code and reason-phrase in the status line. -->
+
+    <field name="Reason-Phrase" type="constant" length="17B" value="Content Too Large"/>
+    <!-- Human-readable reason phrase corresponding to status code 413. Included in the status line; exact phrase per specification. Length is number of ASCII bytes in the phrase. -->
+
+    <field name="CRLF_StatusLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the status line. -->
+
+    <field name="Header-Name-RetryAfter" type="constant" length="13B" value="Retry-After: "/>
+    <!-- Header field name and following colon+space for the Retry-After header. This header is OPTIONAL; servers SHOULD generate it when the condition is temporary to indicate when the client MAY retry. -->
+
+    <field name="Retry-After-Value" type="variable" length="undefined" value="HTTP-date / delay-seconds (1*DIGIT)"/>
+    <!-- Value of the Retry-After header: either an HTTP-date (IMF-fixdate / obs-date) or a decimal delay-seconds integer indicating number of seconds to wait. Length depends on chosen representation. If absent, the header is not present. -->
+
+    <field name="CRLF_HeaderLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the Retry-After header line. If the header is omitted, this field would not appear. -->
+
+    <field name="EndOfHeaderSection" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) marking end of header section and start of optional message body. Represents the required separator between headers and entity-body. -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octets (optional explanatory payload)"/>
+    <!-- Optional response body containing an explanatory representation (e.g., human-readable HTML or JSON). If present, its length MUST be determined by the presence of a Content-Length header or transfer encoding; length dependency noted here. The body may be empty. -->
+</message>
+  <message name="401">
+    <!-- 401 Unauthorized response: indicates the request lacks valid authentication credentials; server MUST supply a WWW-Authenticate challenge. -->
+
+    <field name="HTTP-Version" type="variable" length="undefined" value="ASCII 'HTTP/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version token for the Status-Line (e.g., "HTTP/1.1"); textual ASCII token identifying HTTP version -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) separating HTTP-Version and Status-Code -->
+
+    <field name="Status-Code" type="constant" length="3B" value="401"/>
+    <!-- 3-digit status code indicating 'Unauthorized' -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) separating Status-Code and Reason-Phrase -->
+
+    <field name="Reason-Phrase" type="variable" length="undefined" value="ASCII characters excluding CR and LF"/>
+    <!-- Human-readable reason phrase describing the status (e.g., "Unauthorized"); not significant for protocol processing -->
+
+    <field name="CRLF_StatusLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Status-Line -->
+
+    <field name="WWW-Authenticate-Header-Name" type="constant" length="16B" value="WWW-Authenticate"/>
+    <!-- Header field name that MUST be present in a 401 response; identifies authentication challenge(s) -->
+
+    <field name="Header-Separator" type="constant" length="1B" value="0x3A"/>
+    <!-- ':' separator between header name and header value -->
+
+    <field name="Header-SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP after ':' before header value -->
+
+    <field name="WWW-Authenticate-Challenge" type="variable" length="undefined" value="auth-scheme [ 1*SP ( token68 / #auth-param ) ] ; ASCII-visible characters per challenge syntax"/>
+    <!-- Challenge value applied to the target resource. Follows grammar: auth-scheme token (e.g., "Basic", "Digest") optionally followed by one or more SP and either token68 or a comma-separated list of auth-params. Many clients expect well-known schemes first. -->
+
+    <field name="CRLF_HeaderLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the WWW-Authenticate header line -->
+
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Blank line (CRLF) separating header section from message body (end of header octets) -->
+
+    <field name="Entity-Body" type="variable" length="undefined" value="opaque octets; representation (e.g., diagnostic HTML); length governed by headers such as Content-Length or Transfer-Encoding"/>
+    <!-- Optional message body containing a representation (often diagnostic) that user agents SHOULD present if prior authentication attempts used the same challenge; presence and length depend on other headers not shown here -->
+</message>
+</ir>
