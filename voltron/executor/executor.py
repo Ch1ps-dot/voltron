@@ -643,14 +643,14 @@ class Executor:
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
-                        resp_code = None
+                        resp_code = 'UNKOWN'
                         resp_byte: bytes = self.parser_func(buf)
                         try_times = 3
                         if resp_byte == b'' and msg_type not in self.unable_parse_request:
                             while try_times > 0:
                                 try_times -= 1
-                                resp_code = self.parser_func(buf)
-                                if resp_code == b'':
+                                resp_byte = self.parser_func(buf)
+                                if resp_byte == b'':
                                     logger.debug(f'parse error:{buf}')
                                     new_parser = self.mapper.update_parser(buf)
                                     self.load_parser(new_parser)
@@ -661,7 +661,6 @@ class Executor:
                         if resp_byte == b'':
                             self.unable_parse_request.add(msg_type)
                             logger.debug('Parse Error')
-                            resp_code = 'UNKOWN'
                         else:
                             resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
                         # update some analysis data
