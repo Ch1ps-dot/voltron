@@ -53,6 +53,7 @@ class Executor:
         self.mapper = mapper # mapper between symbol and message
         self.analyzer = analyzer # runtime analyzer
         self.crash_testcases: dict[str, list[bytes]] = {}
+        self.unable_parse_request: set[str] = set()
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
@@ -270,7 +271,7 @@ class Executor:
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
-                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms)
+                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms, msg_type=msg_type)
 
                 if resp_code == 'POLLERR':
                     return_code = proc.poll()
@@ -580,7 +581,8 @@ class Executor:
     def net_recv(
             self, 
             sock: socket.socket,
-            poll_timeout_ms = 0
+            poll_timeout_ms = 0,
+            msg_type = '-'
     ) -> Tuple[str | None, bytes | None]:
         """Recv message over network
 
@@ -644,7 +646,7 @@ class Executor:
                         resp_code = None
                         resp_byte: bytes = self.parser_func(buf)
                         try_times = 3
-                        if resp_byte == b'':
+                        if resp_byte == b'' and msg_type not in self.unable_parse_request:
                             while try_times > 0:
                                 try_times -= 1
                                 resp_code = self.parser_func(buf)
@@ -657,6 +659,7 @@ class Executor:
                                     break
                             
                         if resp_byte == b'':
+                            self.unable_parse_request.add(msg_type)
                             logger.debug('Parse Error')
                             resp_code = 'UNKOWN'
                         else:
