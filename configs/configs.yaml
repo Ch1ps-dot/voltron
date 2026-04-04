@@ -1,4 +1,12 @@
 tinydtls:
+  protocol: coap
+  host: 127.0.0.1
+  port: 5683
+  rfc_name: ["rfc7252", "rfc7641", "rfc7390", "rfc7641", "rfc7959", "rfc7967", "rfc8132", "rfc8323", "rfc8516", "rfc8613", "rfc8768", "rfc8974", "rfc9175", "rfc9177"]
+  trans_layer: udp
+  server: parent
+
+tinydtls:
   protocol: dtls
   host: 127.0.0.1
   port: 20220
