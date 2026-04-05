@@ -1,1 +1,2 @@
+#!/bin/bash
 /home/ubuntu/experiments/lighttpd1/src/lighttpd -D -f /home/ubuntu/experiments/lighttpd.conf -m /home/ubuntu/experiments/lighttpd1/src/.libs
