@@ -1,1 +1,1 @@
-/home/ubuntu/experiments/ftp
+/home/ubuntu/experiments/ftp/ftp
