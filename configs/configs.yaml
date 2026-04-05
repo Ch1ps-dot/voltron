@@ -23,7 +23,7 @@ FTP:
   server: parent
 
 forked-daapd:
-  protocol: http
+  protocol: daapd
   host: 127.0.0.1
   port: 3689
   rfc_name: ["rfc7230","rfc7231","rfc7232","rfc7233","rfc7234","rfc7235"]

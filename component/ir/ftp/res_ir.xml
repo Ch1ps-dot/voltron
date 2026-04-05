@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="response message of ftp protocol">
+    <!-- FTP server/client response message carrying a three-digit status code, human-readable text, and CRLF-terminated lines; supports single-line and multi-line (continued) replies as per RFC 959 -->
+
+    <field name="ReplyCode" type="variable" length="3B" value="three ASCII digits '0'-'9' (e.g., 100-599)"/>
+    <!-- Three-digit numeric status code indicating the reply class and detail (per RFC 959). Semantic range typically 100-599; stored as three ASCII digits. -->
+
+    <field name="Separator" type="variable" length="1B" value="0x20 | 0x2D"/>
+    <!-- Single byte separating the code and text: 0x20 (space) for a single-line reply, 0x2D (hyphen) when this is the first line of a multi-line (continued) reply. If 0x2D (hyphen), a multi-line reply follows and the final line must begin with the same ReplyCode and a space. -->
+
+    <field name="FirstLineText" type="variable" length="undefined" value="ASCII printable characters excluding CR and LF"/>
+    <!-- Human-readable text following the ReplyCode and Separator on the first line. For single-line replies (Separator=0x20) this is the full reply text for the message. Text is terminated by CRLF and must not contain CR or LF. Replies are limited to 512 octets per line including CRLF (implementation note). -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF (Carriage Return + Line Feed) terminating the first line (and every subsequent reply line). RFC-required line terminator for FTP replies. -->
+
+    <field name="MultilineBody" type="variable" length="undefined" value="zero or more lines; each line: ASCII printable excluding CR/LF, terminated by 0x0D0A"/>
+    <!-- Represents the sequence of continuation lines present when Separator = 0x2D (hyphen). Each intermediate line does NOT start with the ReplyCode; the sequence ends with a terminating line that begins with the same three-digit ReplyCode followed by a space (0x20) and then final line text, terminated by CRLF. If Separator = 0x20 (space) this field is empty. Each line must respect the 512-octet-per-line limit (including CRLF) as an implementation note. -->
+</message>
+</ir>
