@@ -34,8 +34,8 @@ class Executor:
         ) -> None:
 
         # some attributes for sut
-        self.pre_script: Path = configs.pre_script
-        self.post_script: Path = configs.post_script
+        self.run_script: Path = configs.run_script
+        self.setup_script: Path = configs.setup_script
         self.cmdline: list[str] = cmdline
         self.host = configs.host
         self.port = configs.port
@@ -96,13 +96,13 @@ class Executor:
             logger.debug(f'[SUT Setup Failure]: {e}')
             return None
 
-    def post_exe(
+    def setup_exe(
             self
     ) -> subprocess.Popen | None:
-        if (self.post_script.is_file() and configs.fuzz_mode != 'replay'):
+        if (self.setup_script.is_file() and configs.fuzz_mode != 'replay'):
             try:
                 proc = subprocess.Popen(
-                    [self.post_script],
+                    [self.setup_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     preexec_fn=os.setpgrp
@@ -114,16 +114,16 @@ class Executor:
         else:
             return None
 
-    def pre_exe(
+    def run_exe(
         self
     ) -> subprocess.Popen | None:
-        if (self.pre_script.is_file()):
+        if (self.run_script.is_file()):
             try:
                 if configs.fuzz_mode == 'replay':
-                    cmd = ['bash', '-c']
-                    cmd.append(' '.join(self.cmdline))
+                    # cmd = ['bash', '-c']
+                    # cmd.append(' '.join(self.cmdline))
                     proc = subprocess.Popen(
-                        cmd,
+                        [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         preexec_fn=os.setpgrp
@@ -133,7 +133,7 @@ class Executor:
                     return proc
                 elif configs.server == 'parent':
                     proc = subprocess.Popen(
-                        self.cmdline,
+                        [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         preexec_fn=os.setpgrp
@@ -143,7 +143,7 @@ class Executor:
                     return proc
                 elif configs.server == 'child':
                     proc = subprocess.Popen(
-                        self.cmdline,
+                        [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE
                     )
@@ -168,8 +168,8 @@ class Executor:
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
         self.kill_listeners(self.port)
-        clean = self.post_exe()
-        proc = self.pre_exe()
+        clean = self.setup_exe()
+        proc = self.run_exe()
         
         
         # if proc is None:
@@ -184,7 +184,7 @@ class Executor:
         for _ in range(100):
             if proc is not None and proc.poll() is not None:
                 logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
-                proc = self.pre_exe()
+                proc = self.run_exe()
                 time.sleep(self.setup_time_s)
             else:
                 break
@@ -201,7 +201,7 @@ class Executor:
             if sock == None:
                 if proc != None and proc.poll() is not None:
                     logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
-                    proc = self.pre_exe()
+                    proc = self.run_exe()
                     self.kill_listeners(self.port)
                 logger.debug('Executor: Socket Setup Failure' )
                 continue

@@ -1,0 +1,1 @@
+server.cc is a minimal CoAP server that binds on ::5683, as well as the multicast IPs 224.0.1.187 and ff02::fd. It has two defined resources /hello and hello/my along with the inbuilt resource .well-known/core.

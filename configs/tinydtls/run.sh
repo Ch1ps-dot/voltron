@@ -1,1 +1,2 @@
+#!/bin/bash
 /home/ubuntu/experiments/tinydtls/tests/dtls-server
