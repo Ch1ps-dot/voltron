@@ -22,6 +22,14 @@ lightftp:
   trans_layer: tcp
   server: parent
 
+ftp:
+  protocol: ftp
+  host: 127.0.0.1
+  port: 8021
+  rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
+  trans_layer: tcp
+  server: parent
+
 FTP:
   protocol: ftp
   host: 127.0.0.1
