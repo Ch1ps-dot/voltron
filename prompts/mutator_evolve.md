@@ -150,7 +150,7 @@ def mutate():
     - Output: bytes
     - Total message length ≤ 1400 bytes
     - Key fields are randomly generated with boundary coverage
-  - Designed to trigger deep parser/state-machine abnormal behaviors
+    - Designed to trigger deep parser/state-machine abnormal behaviors
     """
     
     message = b''
