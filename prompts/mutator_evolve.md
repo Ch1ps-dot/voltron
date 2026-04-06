@@ -148,7 +148,6 @@ def mutate():
   """Generate one complex error-triggering $msg_type message for the $pro_name protocol.
     - Input: none
     - Output: bytes
-    - Total message length ≤ 1400 bytes
     - Key fields are randomly generated with boundary coverage
     - Designed to trigger deep parser/state-machine abnormal behaviors
     """
