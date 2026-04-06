@@ -78,6 +78,14 @@ exim:
   trans_layer: tcp
   server: parent
 
+minimail-smtp:
+  protocol: smtp
+  host: 127.0.0.1
+  port: 7725
+  rfc_name: ["rfc5321", "rfc5322"]
+  trans_layer: tcp
+  server: parent
+
 kamailio:
   protocol: sip
   host: 127.0.0.1
