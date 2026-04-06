@@ -1,6 +1,6 @@
 You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for fault injection**.
 
-Your task is to **generate Python code that constructs a protocol message specifically designed to trigger edge cases, invalid states, and unexpected program behaviors** in the Server Under Test (SUT). The message must be **syntactically compliant with the protocol structure (to bypass basic validation)** but contain **extreme, chaotic, and malicious semantic content** (including garbled characters, tampered message types, and invalid encodings) to reach and break deeper logic.
+Your task is to **generate Python code that constructs a protocol message specifically designed to trigger deep parser and state-machine vulnerabilities** in the Server Under Test (SUT). The message must be **syntactically close enough to bypass shallow validation** but contain **compound, high-risk semantic conflicts** (including garbled characters, tampered message types, framing inconsistencies, and invalid encodings) to reach and break deeper logic.
 
 ---
 
@@ -36,21 +36,27 @@ You will be given:
       3. **Extreme boundary values**: Maximum/minimum allowed values ±1, negative values for unsigned fields, zero-length payloads with non-zero length fields, small but extreme payloads (avoid oversized data) to trigger memory/exhaustion issues without exceeding socket limits
       4. **Inconsistent field dependencies**: Length fields mismatching actual payload length (e.g., length=100 but payload=10 bytes, length=-5), invalid checksum/hash values (random bytes instead of valid checksums)
       5. **Chaotic repetitive patterns**: Short but dense sequences of identical garbage bytes (e.g., 0x41 repeated 50 times) or random mixed bytes in critical fields (keep total length ≤ 1400 bytes)
+      6. **Parser ambiguity patterns**: Duplicate critical fields with conflicting values, mixed delimiters/line endings, spacing ambiguities, or repeated separators
+      7. **Cross-field conflict chains**: At least one contradiction where a later field invalidates assumptions from an earlier field
+      8. **State confusion hints**: Reused stale identifiers/tokens, out-of-order semantics, or unsupported version-feature combinations
    - Ensure the message is **semantically invalid, chaotic, and extreme** (distinct from standard messages) to maximize fault exposure, AND **the total length of the final message must NOT exceed 1400 bytes** (safe socket transmission limit for both UDP and TCP)
+   - Build each test case as a **compound anomaly** by combining at least **2 to 4 mutation families** in one message (not a single isolated corruption)
 
 3. **Construct fault-inducing message logic**
-   - Preserve protocol-mandated field ordering and basic syntax (to avoid immediate rejection by SUT)
-   - Mandatorily inject:
-     - At least one type of garbled character/invalid encoding
-     - Tampered message type identifier (invalid/non-standard type value)
-     - At least one extreme boundary value (e.g., overflow, underflow, inconsistent length)
-   - Introduce intentional inconsistencies between dependent fields (e.g., length vs payload size)
-   - Use valid low-level encodings for malicious content (e.g., null bytes in string fields)
-   - **Strictly limit the total length of the final bytes object to ≤ 1400 bytes** (ensure compliance with socket send limits; avoid oversized payloads)
+    - Preserve protocol-mandated field ordering and basic syntax (to avoid immediate rejection by SUT)
+    - Mandatorily inject:
+       - At least one type of garbled character/invalid encoding
+       - Tampered message type identifier (invalid/non-standard type value)
+       - At least one extreme boundary value (e.g., overflow, underflow, inconsistent length)
+       - At least one parser-ambiguity or duplicate-conflict pattern
+    - Introduce intentional inconsistencies between dependent fields (e.g., length vs payload size)
+    - Use valid low-level encodings for malicious content (e.g., null bytes in string fields)
+    - **Strictly limit the total length of the final bytes object to ≤ 1400 bytes** (ensure compliance with socket send limits; avoid oversized payloads)
 
 4. Generate a **Python function** that constructs **extremely chaotic, fault-inducing instance** of the `$msg_type` message
    - The message must contain **garbled characters, tampered message type, and extreme semantic anomalies** designed to trigger crashes, hangs, or invalid state transitions in the SUT
    - All fields are concretely instantiated with values chosen to maximize chaos and fault exposure
+   - Use deterministic mutation templates with random parameterization; avoid pure random byte blobs
    - **The final returned bytes object must have a total length ≤ 1400 bytes** (critical constraint for socket transmission)
 
 ---
@@ -65,26 +71,27 @@ You will be given:
 * Do NOT include networking code
 * Pay attention to handling loop operations in functions and avoid infinite loops.
 * **CRITICAL**: The total length of the returned bytes object must be ≤ 1400 bytes (to comply with socket send limits)
+* Keep generation robust: no unhandled exceptions during message construction
 
 ---
 
 ### **Function Prototype (Must Match Exactly)**
 
 def havoc_${msg_type}():
-    """Generate one extremely chaotic, fault-inducing $msg_type message for the $pro_name protocol.
-    - Contains garbled characters, tampered message type, and extreme boundary values
-    - Total message length ≤ 1400 bytes (compliant with socket send limits)
-    - Input: none
-    - Output: bytes
-    """
-    
-    message = b''
-    
-    # Construct syntactically valid but semantically chaotic message
-    # with garbled encodings, tampered message type, and extreme values
-    # Ensure total length ≤ 1400 bytes
-    
-    return message
+   """Generate one complex, fault-inducing $msg_type message for the $pro_name protocol.
+   - Contains compound anomalies: garbled encodings, tampered type, and semantic conflicts
+   - Total message length <= 1400 bytes (compliant with socket send limits)
+   - Input: none
+   - Output: bytes
+   """
+
+   message = b''
+
+   # Construct syntactically plausible but semantically conflicting message
+   # with compound anomalies and boundary-heavy values.
+   # Ensure total length <= 1400 bytes.
+
+   return message
 
 ---
 
@@ -105,3 +112,4 @@ The generated message must:
 4. Include extreme boundary values or inconsistent field dependencies
 5. Be designed to trigger unexpected SUT behavior (crashes, hangs, logic errors)
 6. **Total length ≤ 1400 bytes** (non-negotiable, to comply with socket send limits)
+7. Include at least one parser ambiguity pattern and one cross-field contradiction

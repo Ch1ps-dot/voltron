@@ -1,7 +1,12 @@
 
-You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for triggering server-side responses and unexceptional behaviors**.
+You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for deep bug exposure**.
 
-Your task is to **regenerate Python code that mutates key protocol fields using randomized, boundary-covering, and controlled out-of-range values**, with the explicit goal of **eliciting more protocol-defined responses or abnormal server behaviors (e.g., 4xx/5xx responses, protocol error codes, or unexpected state transitions)** from the Server Under Test (SUT).
+Your task is to **regenerate Python code that creates complex, high-risk mutated protocol messages using structured randomness, boundary stress, and controlled semantic conflicts**, with the explicit goal of **triggering deeper parser/state-machine bugs and abnormal server behaviors** in the Server Under Test (SUT), including:
+
+* protocol error responses (4xx/5xx or equivalent)
+* unexpected state transitions
+* parser desynchronization
+* assertion-like failures, crashes, hangs, or logic corruption paths
 
 ---
 
@@ -68,13 +73,34 @@ You will be given:
   * each generated message should mutate only a subset of key fields to preserve parser reachability
   * ensure both "single-point extreme" and "multi-field conflict" mutation patterns appear across runs
 
-### 3. Message Generation Strategy
+### 3. Complexity-Driven Vulnerability Mutation Rules (Mandatory)
+
+Design each generated message as a **compound anomaly**, not a single simple corruption.
+
+For every message, combine at least **2 to 4 anomaly families** from the list below (when applicable to the protocol):
+
+* **Framing contradictions**: conflicting length/chunk/body boundaries, premature terminators, extra trailing data, duplicated terminators
+* **Parser ambiguity constructs**: duplicate critical headers/fields with conflicting values, mixed separators, mixed line endings (`\r\n`, `\n`, `\r`), whitespace edge forms
+* **Numeric exploitation patterns**: signed/unsigned confusion, wrap-like boundaries (`-1`, `2^n-1`, `2^n`, `2^n+1`), dense bit flags with reserved bits enabled
+* **State confusion markers**: stale/reused identifiers, out-of-order sequence semantics, incompatible version-feature combinations
+* **Encoding stress**: embedded NUL (`\x00`), high bytes (`\xff`), invalid UTF-8 byte sequences, control-byte injection in semantic fields
+* **Nested/stack pressure patterns**: repeated delimiters, deep token nesting, repeated parameter blocks, duplicate option sections
+
+Rules:
+
+* Keep the message **syntactically close enough** to pass shallow checks, but semantically contradictory in deeper validation.
+* Avoid fully random blobs; use **protocol-aware templates** and mutate only selected pivots.
+* Prefer mutations that create **cross-field and cross-layer inconsistency** rather than isolated invalid literals.
+
+### 4. Message Generation Strategy
 
 * Prefer generating messages that are:
 
   * **semantically invalid according to the protocol specification**
   * **likely to reach deep server-side validation logic**
   * **capable of triggering new types of responses**
+  * **likely to execute uncommon error-handling branches**
+  * **likely to expose parser edge bugs (desync, over-read assumptions, stale state reuse)**
 * For each critical field type, explicitly include candidate value families when applicable:
 
   * numeric fields: `0`, `1`, `-1` (if representable), `max-1`, `max`, `max+1`, and large unexpected magnitudes
@@ -83,12 +109,19 @@ You will be given:
   * identifier/version fields: missing, duplicated, stale/reused, malformed format, and unsupported version tags
 * **Total serialized message length MUST be ≤ 1400 bytes** to ensure successful socket transmission.
 
-### 4. Generate a Python Function
+Generation policy:
+
+* Use a small set of deterministic mutation templates and randomly pick one template per run.
+* Inside the chosen template, randomize concrete values from boundary-heavy candidate pools.
+* Ensure at least one run path keeps a mostly valid skeleton while injecting targeted contradictions.
+
+### 5. Generate a Python Function
 
 * Produce a single Python function that:
 
   * constructs **one mutated, error-triggering `$msg_type` message**
   * uses **randomized values, boundary-covering mutations, and controlled out-of-range values** for key fields
+  * implements **compound anomalies** (multiple coordinated mutations in one message)
   * returns a `bytes` object
   * **Do not raise exceptions during generation**
   * The program logic should not be overly complex to avoid excessively long execution times.
@@ -104,8 +137,7 @@ You will be given:
 * No input parameters
 * Do NOT include networking code
 * The function must be directly executable
-* **CRITICAL**: The returned `bytes` object must have a total length **≤ 1400 bytes**
-* Ensure generated data remains parse-attemptable: do not fill the entire message with meaningless random bytes.
+* If helper logic is needed, keep it inside the same function body
 
 ---
 
@@ -113,18 +145,18 @@ You will be given:
 
 ```python
 def mutate():
-    """Generate one error-triggering $msg_type message for the $pro_name protocol.
+  """Generate one complex error-triggering $msg_type message for the $pro_name protocol.
     - Input: none
     - Output: bytes
     - Total message length ≤ 1400 bytes
     - Key fields are randomly generated with boundary coverage
-    - Designed to elicit server-side error responses or abnormal behaviors
+  - Designed to trigger deep parser/state-machine abnormal behaviors
     """
     
     message = b''
     
-    # Construct a semantically invalid, boundary-covering protocol message
-    # using randomized critical fields to trigger error responses
+    # Construct a semantically inconsistent, compound-anomaly protocol message
+    # using boundary-heavy values to trigger deep error-handling paths
     
     return message
 ```
@@ -136,5 +168,6 @@ def mutate():
 * Output **only** the completed Python function code
 * Do NOT include explanations, markdown, or text outside the function
 * Do NOT include comments outside the function body
+* The generated function should prioritize vulnerability-relevant complexity over trivial random corruption
 
 ---
