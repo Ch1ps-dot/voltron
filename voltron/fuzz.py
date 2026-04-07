@@ -9,19 +9,19 @@ from voltron.llm.chatter import AsyncChater
 
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 
-from voltron.producer.producer import AsyncProducer
+from voltron.synthesizer.producer import AsyncProducer
 
 from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
-from voltron.mapper.mapper import Mapper
+from voltron.executor.mapper import Mapper
 from voltron.scheduler.havoc import Havoc
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
 
-from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
-from voltron.scheduler.automata import MealyMachine
+from voltron.learner.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
+from voltron.learner.automata import MealyMachine
 
 def exit_handler():
     for thread in threading.enumerate():
@@ -66,13 +66,13 @@ class Fuzzer:
         configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
 
         # some file path 
-        configs.run_script = configs.base_path / 'configs' / configs.target_name / 'run.sh'
-        configs.setup_script = configs.base_path / 'configs' / configs.target_name / 'setup.sh'
+        configs.run_script = configs.base_path / 'config' / configs.target_name / 'run.sh'
+        configs.setup_script = configs.base_path / 'config' / configs.target_name / 'setup.sh'
         configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
-        configs.info_path = configs.base_path / 'configs' / configs.target_name / f'{configs.target_name}.md'
+        configs.info_path = configs.base_path / 'config' / 'subjects' / configs.target_name / f'{configs.target_name}.md'
         for rfc in configs.rfc_name:
             configs.doc_paths.append(configs.base_path / 'rfcs' / f'{rfc}.txt')
-        configs.pmp_path = configs.base_path / 'prompts'
+        configs.pmp_path = configs.base_path / 'skills'
         configs.base_url = configs_yaml['llm']['base_url']
         configs.api_key = configs_yaml['llm']['api_key']
         configs.model = configs_yaml['llm']['model']
