@@ -71,7 +71,7 @@ class Fuzzer:
         configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
         configs.info_path = configs.base_path / 'config' / 'subjects' / configs.target_name / f'{configs.target_name}.md'
         for rfc in configs.rfc_name:
-            configs.doc_paths.append(configs.base_path / 'rfcs' / f'{rfc}.txt')
+            configs.doc_paths.append(configs.base_path / 'config' / 'rfcs' / f'{rfc}.txt')
         configs.pmp_path = configs.base_path / 'skills'
         configs.base_url = configs_yaml['llm']['base_url']
         configs.api_key = configs_yaml['llm']['api_key']

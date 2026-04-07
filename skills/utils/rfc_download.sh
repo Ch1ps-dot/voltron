@@ -4,11 +4,11 @@ set -euo pipefail
 
 usage() {
 	cat <<'EOF'
-Usage: ./utils/rfcdown.sh <rfc-id> [<rfc-id> ...]
+Usage: ./rfc_download.sh <rfc-id> [<rfc-id> ...]
 
 Examples:
-  ./utils/rfcdown.sh rfc9041
-  ./utils/rfcdown.sh 9041 rfc959 RFC9110
+  ./rfc_download.sh rfc9041
+  ./rfc_download.sh 9041 rfc959 RFC9110
 EOF
 }
 
@@ -18,8 +18,8 @@ if [[ $# -lt 1 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-RFC_DIR="${PROJECT_DIR}/rfcs"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+RFC_DIR="${PROJECT_DIR}/config/rfcs"
 mkdir -p "${RFC_DIR}"
 
 download_file() {
@@ -55,6 +55,11 @@ for raw in "$@"; do
 	file_name="rfc${rfc_num}.txt"
 	url="https://www.rfc-editor.org/rfc/${file_name}"
 	target="${RFC_DIR}/${file_name}"
+
+	if [[ -f "${target}" ]]; then
+		echo "Skip: already exists -> ${target}"
+		continue
+	fi
 
 	tmp_file="${target}.tmp"
 	echo "Downloading ${url} ..."

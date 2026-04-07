@@ -1,4 +1,4 @@
-import pickle, json, re, asyncio, sys
+import pickle, json, re, asyncio, sys, subprocess
 from pathlib import Path
 from typing import Tuple
 from lxml import etree # type: ignore
@@ -66,6 +66,31 @@ class AsyncRFCParser:
     def run(
         self
     ):
+        # Ensure RFC documents are available before parsing.
+        dl_script = configs.base_path / 'skills' / 'utils' / 'rfc_download.sh'
+        if dl_script.is_file():
+            rfc_args: list[str] = []
+            rfc_list = self.rfc_name if isinstance(self.rfc_name, list) else [self.rfc_name]
+            for rfc in rfc_list:
+                raw = str(rfc).strip()
+                if not raw:
+                    continue
+                raw_lower = raw.lower()
+                rfc_args.append(raw_lower if raw_lower.startswith('rfc') else f'rfc{raw_lower}')
+
+            if len(rfc_args) > 0:
+                try:
+                    subprocess.run(
+                        ['bash', str(dl_script), *rfc_args],
+                        cwd=str(configs.base_path),
+                        check=True,
+                    )
+                    logger.debug(f'RFCParser: downloaded RFC docs via {dl_script.name}: {rfc_args}')
+                except subprocess.CalledProcessError as e:
+                    logger.warning(f'RFCParser: failed to download RFC docs with {dl_script}: {e}')
+        else:
+            logger.warning(f'RFCParser: download script not found: {dl_script}')
+        
         # sectiontree parse pass
         for i in range(len(self.doc_paths)):
             name=configs.rfc_name[i]
