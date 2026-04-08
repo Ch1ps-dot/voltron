@@ -43,10 +43,6 @@ class Prompter:
             with self._path_ir_repair.open('r+') as f:
                 self._tem_ir_repair = Template(f.read())
             
-            self._path_initial_symbols = dir / "builder" / "initial_symbols.md"
-            with self._path_initial_symbols.open('r+') as f:
-                self._tem_initial_symbols = Template(f.read())
-            
             self._path_possible_response = dir / "builder" / "possible_response.md"
             with self._path_possible_response.open('r+') as f:
                 self._tem_possible_response = Template(f.read())
