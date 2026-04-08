@@ -16,7 +16,7 @@ def main(
     cmdline: str
 ):
     if cmdline == 'auto':
-        with open(configs.base_path / 'configs' / sut / 'run.sh', 'r') as f:
+        with open(configs.base_path / 'config' / 'subjects' / sut / 'run.sh', 'r') as f:
             cmdline = f.read()
     fuzzer = Fuzzer(
         target_name=sut,
