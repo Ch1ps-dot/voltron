@@ -66,8 +66,8 @@ class Fuzzer:
         configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
 
         # some file path 
-        configs.run_script = configs.base_path / 'config' / configs.target_name / 'run.sh'
-        configs.setup_script = configs.base_path / 'config' / configs.target_name / 'setup.sh'
+        configs.run_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'run.sh'
+        configs.setup_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'setup.sh'
         configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
         configs.info_path = configs.base_path / 'config' / 'subjects' / configs.target_name / 'info.md'
         for rfc in configs.rfc_name:
