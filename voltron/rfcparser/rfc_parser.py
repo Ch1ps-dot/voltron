@@ -286,7 +286,7 @@ class AsyncRFCParser:
         st: SectionTree
     ):
         logger.debug(f'spe parse: {st}')
-        st.debug_tree()
+        # st.debug_tree()
         sem = asyncio.Semaphore(configs.async_sem)
         tasks = [
             self._spe_parse_one(node, sem, st)
