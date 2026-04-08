@@ -1,5 +1,5 @@
 #!/bin/bash
-/home/ubuntu/experiments/atftpd/atftpd \
+/home/ubuntu/experiments/atftp/atftpd \
   --daemon \
   --no-fork \
   --port 6969 \
