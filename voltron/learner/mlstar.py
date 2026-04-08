@@ -1,5 +1,5 @@
 from voltron.executor.mapper import Mapper
-from voltron.synthesizer.producer import Generator, Parser
+from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.learner.automata import MealyMachine
 from voltron.learner.equ_oracle import EquOracle
 from voltron.learner.mem_oracle import MembershipOracle

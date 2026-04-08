@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from voltron.synthesizer.producer import AsyncProducer
+from voltron.synthesizer.synthesizer import AsyncProducer
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.learner.automata import MealyMachine
