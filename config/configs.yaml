@@ -6,6 +6,14 @@ libcoap:
   trans_layer: udp
   server: parent
 
+atftp:
+  protocol: tftp
+  host: 127.0.0.1
+  port: 6969
+  rfc_name: ["rfc1350", "rfc2090", "rfc2347", "rfc2348", "rfc2349", "rfc7440"]
+  trans_layer: udp
+  server: parent
+
 tinydtls:
   protocol: dtls
   host: 127.0.0.1

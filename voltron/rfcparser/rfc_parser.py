@@ -258,7 +258,7 @@ class AsyncRFCParser:
         concatenate the sections of document with the same type as one augmentation info
         """
         logger.debug(f'query: {self.tree_dict[name]}')
-        self.tree_dict[name].debug_tree()
+        # self.tree_dict[name].debug_tree()
         for node in self.tree_dict[name].leafs:
             match node.content_type:
                 case "request":
