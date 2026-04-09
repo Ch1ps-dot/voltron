@@ -36,11 +36,13 @@ class Fuzzer:
             self, 
             target_name: str,
             cmdline: list[str],
-            mode='fuzz'
+            mode='fuzz',
+            output='default'
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
         self.mode = mode
+        self.output = output
         
         self.load_configs()
         self.module_init()
@@ -82,6 +84,8 @@ class Fuzzer:
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
         results_dir = configs.base_path / f'results-{self.target_name}-voltron-{formatted_time}'
+        if self.output != 'default':
+            results_dir = configs.base_path / self.output
         if not results_dir.is_dir() and self.mode != 'replay':
             results_dir.mkdir()
             
