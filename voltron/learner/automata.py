@@ -67,6 +67,11 @@ class MealyMachine:
             filename=f'automata_{name}',
             directory=configs.results_path
         )
+
+        g.save(
+            filename=f'automata_{name}',
+            directory=configs.models_path
+        )
         
     def get_relation(
         self,
