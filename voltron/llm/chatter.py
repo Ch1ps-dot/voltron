@@ -236,32 +236,6 @@ class AsyncChater:
         )
 
         return self.code_extract(ans)
-    
-    async def llm_mutator_havoc(
-            self,
-            pro_name: str,
-            msg_type: str,
-            code: str,
-            info: str
-    ) -> str:
-        """Repair teh python code
-
-        Args:
-            pro_name: name of protocol
-            msg_type: required protocol message type
-
-        Returns:
-            generated generator
-        """
-        tmp = self.pmp._tem_mutator_havoc
-        # logger.debug(trace)
-        pmp = tmp.substitute(pro_name=pro_name, msg_type=msg_type, code=code, info=info)
-        ans = await self.chat_llm(
-            prompt=pmp,
-            usage = "mutator_havoc"
-        )
-
-        return self.code_extract(ans)
         
     async def llm_parser_gen(
             self,

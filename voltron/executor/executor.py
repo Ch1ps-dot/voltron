@@ -5,8 +5,8 @@ from typing import Callable, Tuple
 
 from voltron.configs import configs
 from voltron.utils.logger import logger
-from voltron.mapper.mapper import Mapper
-from voltron.producer.producer import Generator, Parser
+from voltron.executor.mapper import Mapper
+from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback, sys, os, signal
@@ -676,7 +676,7 @@ class Executor:
                         return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):
-                events = poller.poll(time_out_ms)
+                events = poller.poll(100) # poll timeout will influence the performance, need to adjust
                 if not events:
                     logger.debug('recv: poll timeout')
                     return 'TIMEOUT', None
@@ -685,7 +685,7 @@ class Executor:
                 if event & select.POLLIN:
                     buf = b''
                     while True:
-                        events = poller.poll(time_out_ms)
+                        events = poller.poll(100)
                         if not events:
                             break
                         chunk, _ = sock.recvfrom(2048)

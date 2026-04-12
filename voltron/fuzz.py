@@ -9,19 +9,19 @@ from voltron.llm.chatter import AsyncChater
 
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 
-from voltron.producer.producer import AsyncProducer
+from voltron.synthesizer.synthesizer import AsyncProducer
 
 from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
-from voltron.mapper.mapper import Mapper
+from voltron.executor.mapper import Mapper
 from voltron.scheduler.havoc import Havoc
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
 
-from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
-from voltron.scheduler.automata import MealyMachine
+from voltron.learner.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
+from voltron.learner.automata import MealyMachine
 
 def exit_handler():
     for thread in threading.enumerate():
@@ -36,11 +36,13 @@ class Fuzzer:
             self, 
             target_name: str,
             cmdline: list[str],
-            mode='fuzz'
+            mode='fuzz',
+            output='default'
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
         self.mode = mode
+        self.output = output
         
         self.load_configs()
         self.module_init()
@@ -50,7 +52,7 @@ class Fuzzer:
     ) -> None:
         self.configs_yaml: str
         try:
-            with open(configs.base_path / 'configs' /'configs.yaml', 'r', encoding='utf-8') as f:
+            with open(configs.base_path / 'config' /'configs.yaml', 'r', encoding='utf-8') as f:
                 configs_yaml = yaml.safe_load(f)
                 if self.target_name not in configs_yaml.keys():
                     raise Exception(f'Fuzzer: unknown target {self.target_name}')
@@ -66,13 +68,13 @@ class Fuzzer:
         configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
 
         # some file path 
-        configs.run_script = configs.base_path / 'configs' / configs.target_name / 'run.sh'
-        configs.setup_script = configs.base_path / 'configs' / configs.target_name / 'setup.sh'
+        configs.run_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'run.sh'
+        configs.setup_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'setup.sh'
         configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
-        configs.info_path = configs.base_path / 'configs' / configs.target_name / f'{configs.target_name}.md'
+        configs.info_path = configs.base_path / 'config' / 'subjects' / configs.target_name / 'info.md'
         for rfc in configs.rfc_name:
-            configs.doc_paths.append(configs.base_path / 'rfcs' / f'{rfc}.txt')
-        configs.pmp_path = configs.base_path / 'prompts'
+            configs.doc_paths.append(configs.base_path / 'config' / 'rfcs' / f'{rfc}.txt')
+        configs.pmp_path = configs.base_path / 'skills'
         configs.base_url = configs_yaml['llm']['base_url']
         configs.api_key = configs_yaml['llm']['api_key']
         configs.model = configs_yaml['llm']['model']
@@ -82,6 +84,8 @@ class Fuzzer:
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
         results_dir = configs.base_path / f'results-{self.target_name}-voltron-{formatted_time}'
+        if self.output != 'default':
+            results_dir = configs.base_path / self.output
         if not results_dir.is_dir() and self.mode != 'replay':
             results_dir.mkdir()
             
