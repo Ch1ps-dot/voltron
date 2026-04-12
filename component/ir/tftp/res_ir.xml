@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="response message of tftp protocol">
+    <!-- TFTP DATA packet used by a server to send file data in response to a Read Request (RRQ) or to an ACK -->
+
+    <field name="Opcode" type="constant" length="2B" value="0x0003"/>
+    <!-- Two-byte opcode identifying this packet as a DATA packet (decimal 3). Network byte order (big-endian). -->
+
+    <field name="BlockNumber" type="variable" length="2B" value="0..65535"/>
+    <!-- Sequence block number for this DATA packet. Two-byte unsigned integer (wraps 65535→0). Used by the receiver to acknowledge and detect duplicates. -->
+
+    <field name="Data" type="variable" length="0-512B" value="opaque octets (0x00-0xFF)"/>
+    <!-- File data payload: 0 to 512 bytes of raw octets. A Data length of less than 512 bytes signals the final block (end-of-file). Actual length depends on remaining file bytes. -->
+</message>
+</ir>
