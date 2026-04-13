@@ -120,7 +120,7 @@ Generation policy:
 * Produce a single Python function that:
 
   * constructs **one mutated, error-triggering `$msg_type` message**
-  * uses **randomized values, boundary-covering mutations, and controlled out-of-range values** for key fields
+  * uses **randomized values, boundary-covering mutations, and out-of-range values** for key fields
   * implements **compound anomalies** (multiple coordinated mutations in one message)
   * returns a `bytes` object
   * **Do not raise exceptions during generation**
@@ -145,19 +145,20 @@ Generation policy:
 
 ```python
 def mutate():
-  """Generate one complex error-triggering $msg_type message for the $pro_name protocol.
+  """
+  Generate one complex error-triggering $msg_type message for the $pro_name protocol.
     - Input: none
     - Output: bytes
     - Key fields are randomly generated with boundary coverage
     - Designed to trigger deep parser/state-machine abnormal behaviors
-    """
+  """
     
-    message = b''
-    
-    # Construct a semantically inconsistent, compound-anomaly protocol message
-    # using boundary-heavy values to trigger deep error-handling paths
-    
-    return message
+  message = b''
+  
+  # Construct a semantically inconsistent, compound-anomaly protocol message
+  # using boundary-heavy values to trigger deep error-handling paths
+  
+  return message
 ```
 
 ---
