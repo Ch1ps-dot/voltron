@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="response message of smtp protocol">
+    <!-- SMTP response message: one or more reply lines from server to client, each line beginning with a 3-digit status code, a separator (space or hyphen), optional text, and terminated by CRLF. Hyphen indicates continuation lines; a space indicates the final line. -->
+
+    <field name="StatusCode" type="variable" length="3B" value="3 ASCII digits '0'-'9' (semantic range typically 100-599)"/>
+    <!-- Three ASCII digits representing the numeric SMTP reply code. Semantically indicates class and specific condition (e.g., 2xx success, 4xx temporary failure, 5xx permanent failure). -->
+
+    <field name="Separator" type="variable" length="1B" value="0x20 or 0x2D"/>
+    <!-- Single ASCII character after the status code: 0x2D ('-') indicates this line is continued and more reply lines with the same status code follow; 0x20 (space) indicates this is the final reply line for the response. -->
+
+    <field name="ReplyText" type="variable" length="undefined" value="ASCII printable characters (0x20-0x7E) and HT (0x09), excluding CR and LF"/>
+    <!-- Human-readable or machine-parsable text providing additional information about the status code. May be empty. For multi-line responses, this is the text for the current line. Length is not fixed and depends on the server's message. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the reply line as required by SMTP. -->
+</message>
+</ir>

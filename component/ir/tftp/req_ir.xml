@@ -1,0 +1,154 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="6">
+    <!-- Option Acknowledgment (OACK) message (TFTP opcode 6). Used by the server to acknowledge requested options;
+         in the multicast extension this includes the "multicast" option name and a value string containing
+         addr,port,mc (each option/value is NUL-terminated as ASCII). -->
+
+    <field name="Opcode" type="constant" length="2B" value="6"/>
+    <!-- 2-byte TFTP opcode in network byte order (value 6 = OACK). -->
+
+    <field name="OptionName_multicast" type="constant" length="9B" value="multicast"/>
+    <!-- ASCII option name string "multicast" (case-insensitive per spec). Fixed text identifying the multicast option. -->
+
+    <field name="OptionName_Terminator" type="constant" length="1B" value="0x00"/>
+    <!-- NUL (0x00) terminator ending the option name string. -->
+
+    <field name="McastAddr" type="variable" length="undefined" value="IPv4 dotted-decimal or empty (digits and '.'), e.g. 224.100.100.100"/>
+    <!-- Multicast IPv4 address in dotted-decimal ASCII form, terminated by a comma.
+         This field may be empty (zero-length) if the server omits the address; client should retain previously known address if applicable.
+         Length is undefined because ASCII string length varies; terminated by the following comma separator. -->
+
+    <field name="Addr_Comma_Separator" type="constant" length="1B" value="0x2C"/>
+    <!-- ASCII comma ',' (0x2C) used as delimiter after the multicast address. -->
+
+    <field name="McastPort" type="variable" length="undefined" value="Decimal port number or empty (ASCII digits), e.g. 1758"/>
+    <!-- Destination UDP port (in ASCII decimal) to which multicast data will be sent. Often 1758 recommended.
+         This field may be empty; length varies and is terminated by the following comma. -->
+
+    <field name="Port_Comma_Separator" type="constant" length="1B" value="0x2C"/>
+    <!-- ASCII comma ',' (0x2C) delimiter after the port field. -->
+
+    <field name="MC_Flag" type="variable" length="1B" value="'0' or '1' (ASCII)"/>
+    <!-- Single ASCII character indicating master-client responsibility:
+         '1' = this client should act as Master Client (send ACKs), '0' = not master.
+         This is a textual flag and is NUL-terminated below. -->
+
+    <field name="MC_Terminator" type="constant" length="1B" value="0x00"/>
+    <!-- NUL (0x00) terminator ending the multicast option value string. -->
+
+    <!-- Notes:
+         - The OACK format is a sequence of option-name (ASCII NUL-terminated) and option-value (ASCII NUL-terminated) pairs.
+         - This message models the multicast option pair specifically; other option pairs (e.g., blocksize) may follow similarly.
+         - The server is expected to use the same source port for the unicast OACK as it will use for sending multicast data
+           so clients can identify the transfer by source IP:port as well as multicast address/port. -->
+</message>
+  <message name="4">
+    <!-- ACK packet: acknowledges a DATA packet (or acknowledges WRQ with block number 0). -->
+
+    <field name="Opcode" type="constant" length="2B" value="0x0004"/>
+    <!-- 2-byte opcode identifying this packet as ACK (decimal 4). Fixed constant per TFTP specification. -->
+
+    <field name="BlockNumber" type="variable" length="2B" value="0..65535"/>
+    <!-- 16-bit unsigned block number echoed from the DATA packet being acknowledged.
+         Value 0 is used to acknowledge a WRQ (start of transfer). Valid range 0-65535.
+         Note: numbering in normal transfers starts at 1 and increments; transport behavior is modulo 65536 if wrap occurs. -->
+</message>
+  <message name="2">
+    <!-- TFTP Write Request (WRQ) packet - initiates a write (upload) to the server; opcode = 2 -->
+
+    <field name="Opcode" type="constant" length="2B" value="0x0002"/>
+    <!-- Two-byte opcode identifying this as a WRQ packet (decimal 2). Network byte order. -->
+
+    <field name="Filename" type="variable" length="undefined" value="netascii bytes; any octets except NUL; terminated by 0x00"/>
+    <!-- Name of the file to be written on the server, encoded in netascii. This is a NUL-terminated string; length is implicit until the following 0x00. -->
+
+    <field name="FilenameTerminator" type="constant" length="1B" value="0x00"/>
+    <!-- Single zero byte terminating the Filename field (0x00). -->
+
+    <field name="Mode" type="variable" length="undefined" value="ASCII case-insensitive: 'netascii' | 'octet' | 'mail'"/>
+    <!-- Transfer mode string (case-insensitive). Indicates how data should be interpreted/translated. NUL-terminated. -->
+
+    <field name="ModeTerminator" type="constant" length="1B" value="0x00"/>
+    <!-- Single zero byte terminating the Mode field (0x00). -->
+
+    <field name="Options" type="variable" length="undefined" value="zero or more option pairs: OptionName (ASCII) 0x00, OptionValue (ASCII) 0x00"/>
+    <!-- Optional TFTP option-extension area (per RFC 1782). Present only if client includes options. Each option is an ASCII name (case-insensitive) NUL-terminated, followed by an ASCII value NUL-terminated. -->
+
+    <field name="WindowsizeOption_Name" type="constant" length="9B" value="windowsize"/>
+    <!-- Optional option name literal 'windowsize' (ASCII). Appears as an OptionName in the Options area when negotiating window size. If not present, this field is absent. -->
+
+    <field name="WindowsizeOption_Terminator" type="constant" length="1B" value="0x00"/>
+    <!-- NUL terminator following the Windowsize option name. Present only if WindowsizeOption_Name is present. -->
+
+    <field name="WindowsizeOption_Value" type="variable" length="undefined" value="ASCII digits representing decimal 1..65535"/>
+    <!-- ASCII decimal string indicating number of blocks per window (1..65535). NUL-terminated. Only valid if windowsize option negotiated. -->
+
+    <field name="WindowsizeOption_ValueTerminator" type="constant" length="1B" value="0x00"/>
+    <!-- NUL terminator following the Windowsize option value. Present only if WindowsizeOption_Value is present. -->
+
+    <field name="OtherOptions" type="variable" length="undefined" value="ASCII option-name/value pairs; option names case-insensitive"/>
+    <!-- Placeholder for any other negotiated options (e.g., blocksize, as per RFC 1783). Each is encoded as OptionName NUL OptionValue NUL. Servers and clients must ignore unknown options or follow option negotiation rules. -->
+</message>
+  <message name="3">
+    <!-- TFTP DATA packet (opcode 3): carries a block of file data with a 2-byte opcode and 2-byte block number followed by 0-512 bytes of data. This representation covers the TFTP packet payload (excluding any underlying UDP/IP headers). -->
+
+    <field name="Opcode" type="constant" length="2B" value="3"/>
+    <!-- Opcode identifying this as a DATA packet. Fixed 16-bit value 3 (0x0003). Present as the first two bytes of the TFTP packet header. -->
+
+    <field name="BlockNumber" type="variable" length="2B" value="1..65535 (unsigned 16-bit)"/>
+    <!-- Sequence number of this data block. For DATA packets this normally starts at 1 and increments by 1 for each new block. Stored as an unsigned 16-bit integer. (Note: ACKs use block #0 to acknowledge a WRQ; block number range and wrap behavior are implementation dependent.) -->
+
+    <field name="Data" type="variable" length="0-512B" value="0..512 octets (8-bit binary)"/>
+    <!-- Payload bytes of this block. 0 to 512 octets allowed. A data field of 512 bytes indicates there are more blocks to follow; a data field of 0-511 bytes signals the final block and end of transfer. The exact length of this field is determined by the packet length. -->
+</message>
+  <message name="5">
+    <!-- TFTP ERROR packet (opcode 5).
+         Sent to indicate that a request cannot be granted or an error occurred during transfer.
+         ERROR packets contain an error code and a human-readable message (netascii). Per RFC 1350,
+         ERROR packets are a courtesy and may not be retransmitted or acknowledged. -->
+
+    <field name="Opcode" type="constant" length="2B" value="0x0005"/>
+    <!-- Opcode identifying this as an ERROR packet (decimal 5). 2-byte unsigned integer in network byte order. -->
+
+    <field name="ErrorCode" type="variable" length="2B" value="0..7"/>
+    <!-- Numeric error code indicating the nature of the error (2-byte unsigned integer, network byte order).
+         RFC1350 defined values: 0=Not defined; 1=File not found; 2=Access violation; 3=Disk full/allocation exceeded;
+         4=Illegal TFTP operation; 5=Unknown transfer ID; 6=File already exists; 7=No such user. -->
+
+    <field name="ErrMsg" type="variable" length="undefined" value="netascii (US-ASCII) string, may be empty"/>
+    <!-- Human-readable error message encoded in netascii (US-ASCII); intended for humans.
+         This field is variable-length and is terminated by a single 0x00 byte (the terminator below).
+         The message may be zero-length (i.e., no message). -->
+
+    <field name="ErrMsgTerminator" type="constant" length="1B" value="0x00"/>
+    <!-- Mandatory null byte (0x00) terminating the ErrMsg string per TFTP string encoding rules.
+         This field is dependent on ErrMsg (always present even if ErrMsg is zero-length). -->
+</message>
+  <message name="1">
+    <!-- Read Request (RRQ) packet: client requests a file from a TFTP server (opcode = 1) -->
+
+    <field name="Opcode" type="constant" length="2B" value="0x0001"/>
+    <!-- 2-byte TFTP opcode in network byte order identifying this as an RRQ (Read Request) -->
+
+    <field name="Filename" type="variable" length="undefined" value="netascii string (US-ASCII), zero-terminated (0x00)"/>
+    <!-- Name of the file to be read, encoded in netascii (US-ASCII with CR/LF conventions), terminated by a single 0x00 byte.
+         Variable length; receiver parses until the terminating 0x00.
+         The filename may contain printable ASCII bytes; exact semantics of netascii translation apply only when mode='netascii'. -->
+
+    <field name="Mode" type="variable" length="undefined" value="ASCII string: one of 'netascii', 'octet', or 'mail' (case-insensitive), zero-terminated (0x00)"/>
+    <!-- Transfer mode string identifying how data is to be interpreted.
+         Case-insensitive ASCII token; terminated by a single 0x00 byte.
+         'netascii' requires netascii translation, 'octet' is raw 8-bit, 'mail' is like netascii but indicates mail recipient and requires WRQ. -->
+
+    <field name="Options" type="variable" length="undefined" value="zero or more pairs of ASCII option-name (0x00-terminated) followed by ASCII option-value (0x00-terminated); option-name case-insensitive; option-value is ASCII textual representation"/>
+    <!-- Optional option negotiation (per RFC2347 and option-specific RFCs).
+         Encoded as a sequence: opt-name (ASCII) 0x00 opt-value (ASCII) 0x00 ... ; if no options present, packet ends after Mode 0x00.
+         Common option semantics (examples):
+           - 'windowsize': option-value = decimal ASCII string in range 1..65535 (number of blocks per window).
+           - 'tsize': option-value = decimal ASCII file size in octets (read request: '0' to ask server to return size).
+           - 'timeout': option-value = decimal ASCII seconds in range 1..255.
+           - 'multicast': option-value = empty string in the RRQ (server returns addr/port/mc in OACK).
+         A client MAY include any option names; server replies via OACK or ignores/rejects per negotiation rules. -->
+</message>
+</ir>
