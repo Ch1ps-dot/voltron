@@ -22,6 +22,14 @@ gotftp:
   trans_layer: udp
   server: parent
 
+dhcpserver:
+  protocol: dhcp
+  host: 127.0.0.1
+  port: 67
+  rfc_name: ["rfc2131", "rfc2132"]
+  trans_layer: udp
+  server: parent
+
 ftpserver:
   protocol: ftp
   host: 127.0.0.1
