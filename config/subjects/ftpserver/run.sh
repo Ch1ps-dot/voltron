@@ -1,0 +1,1 @@
+/home/ubuntu/go/bin/ftpserver
