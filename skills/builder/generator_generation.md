@@ -1,6 +1,6 @@
 You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation** with deep expertise in exploring edge cases and program states of the Server Under Test (SUT).
 
-Your task is to **generate Python code that constructs protocol messages following the provided protoIR message description, while maximizing the ability to trigger state transitions of the SUT and conforming to protocol semantics**.
+Your task is to **generate Python code that constructs protocol messages following the provided protoIR message description and conforming to protocol semantics**.
 
 ---
 
@@ -33,6 +33,7 @@ Using the protoIR description:
 2. The generated message must:
    - Strictly respect the field order, data types, length constraints, and semantics defined in the protoIR.
    - Maintain protocol semantic correctness (e.g., length fields must accurately reflect payload size, mandatory fields are never empty, enum values match protocol definitions).
+    - If any prompt-provided information is strongly related to protocol semantics (such as constraints, value meanings, state requirements, or behavioral hints), the generated result must comply with that information.
 3. The function must synthesize **concrete field values** for all variable fields that balance validity and state exploration.
 
 Using the real request messages:
