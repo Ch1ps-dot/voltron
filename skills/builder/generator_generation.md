@@ -89,18 +89,18 @@ For each `<field>` in `$msg_ir`:
 ### **Function Prototype (Must Match Exactly)**
 
 def generate():
-    """Generate one semantically valid, state-exploratory (field name: $field_name value: $msg_type) message for the $pro_name protocol.
-    - Input: none
-    - Output: bytes (valid message that explores edge cases/SUT states)
-    """
-    
-    message = b''
-    
-    # Python code that constructs the message
-    # strictly following protoIR + prioritizing state exploration
-    # (include edge-case values within legal constraints)
-    
-    return message
+  """Generate one semantically valid, state-exploratory (field name: $field_name value: $msg_type) message for the $pro_name protocol.
+  - Input: none
+  - Output: bytes (valid message that explores edge cases/SUT states)
+  """
+  
+  message = b''
+  
+  # Python code that constructs the message
+  # strictly following protoIR + prioritizing state exploration
+  # (include edge-case values within legal constraints)
+  
+  return message
 
 ---
 
