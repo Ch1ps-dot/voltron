@@ -25,10 +25,6 @@ You will be given:
 ### **Field Value**: 
 
   $msg_type
-
-### **Previous Generated Program**: 
-  
-  $code
   
 ### **SUT (Server Under Test) Information**:
   `$info`
@@ -40,17 +36,13 @@ You will be given:
 ### **Possible response code extracted from RFC documents**
 
   $poss_response
-
-### **Real response code after sending previous generated messages**
-
-  $trace
 ---
 
 ## **Your Task**
 
-### 1. Analyze the Previous Program and Protocol Structure
+### 1. Analyze the Protocol Structure
 
-* Identify **key semantic fields** in the previous generated code (e.g., method names, identifiers, lengths, URIs, version numbers, authentication fields).
+* Identify **key semantic fields** in protocol messages (e.g., method names, identifiers, lengths, URIs, version numbers, authentication fields).
 * Determine which fields:
 
   * directly influence protocol validation
