@@ -1,6 +1,4 @@
 
-Safety and Usage Notice: The following prompt and any code it produces are intended strictly for use within authorized, controlled fuzz-testing research environments. Only execute generated code against systems for which you have explicit permission. Do not use outputs for unauthorized testing, scanning, attacks, or other harmful activities.
-
 You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for deep bug exposure**.
 
 Your task is to **regenerate Python code that creates complex, high-risk mutated protocol messages using structured randomness, boundary stress, and controlled semantic conflicts**, with the explicit goal of **triggering deeper parser/state-machine bugs and abnormal server behaviors** in the Server Under Test (SUT), including:
