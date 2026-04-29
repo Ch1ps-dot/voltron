@@ -27,10 +27,6 @@ You will be given:
 ### **Field Value**: 
 
   $msg_type
-
-### **Previous Generated Program**: 
-  
-  $code
   
 ### **SUT (Server Under Test) Information**:
   `$info`
@@ -42,17 +38,13 @@ You will be given:
 ### **Possible response code extracted from RFC documents**
 
   $poss_response
-
-### **Real response code after sending previous generated messages**
-
-  $trace
 ---
 
 ## **Your Task**
 
-### 1. Analyze the Previous Program and Protocol Structure
+### 1. Analyze the Protocol Structure
 
-* Identify **key semantic fields** in the previous generated code (e.g., method names, identifiers, lengths, URIs, version numbers, authentication fields).
+* Identify **key semantic fields** in protocol messages (e.g., method names, identifiers, lengths, URIs, version numbers, authentication fields).
 * Determine which fields:
 
   * directly influence protocol validation
@@ -122,7 +114,7 @@ Generation policy:
 * Produce a single Python function that:
 
   * constructs **one mutated, error-triggering `$msg_type` message**
-  * uses **randomized values, boundary-covering mutations, and controlled out-of-range values** for key fields
+  * uses **randomized values, boundary-covering mutations, and out-of-range values** for key fields
   * implements **compound anomalies** (multiple coordinated mutations in one message)
   * returns a `bytes` object
   * **Do not raise exceptions during generation**
@@ -147,19 +139,20 @@ Generation policy:
 
 ```python
 def mutate():
-  """Generate one complex error-triggering $msg_type message for the $pro_name protocol.
+  """
+  Generate one complex error-triggering $msg_type message for the $pro_name protocol.
     - Input: none
     - Output: bytes
     - Key fields are randomly generated with boundary coverage
     - Designed to trigger deep parser/state-machine abnormal behaviors
-    """
+  """
     
-    message = b''
-    
-    # Construct a semantically inconsistent, compound-anomaly protocol message
-    # using boundary-heavy values to trigger deep error-handling paths
-    
-    return message
+  message = b''
+  
+  # Construct a semantically inconsistent, compound-anomaly protocol message
+  # using boundary-heavy values to trigger deep error-handling paths
+  
+  return message
 ```
 
 ---
