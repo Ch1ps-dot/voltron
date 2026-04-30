@@ -35,7 +35,7 @@ class Fuzzer:
     def __init__(
             self, 
             target_name: str,
-            cmdline: list[str],
+            cmdline: list[str] = [],
             mode='fuzz',
             output='default'
         ) -> None:
@@ -369,8 +369,8 @@ class Fuzzer:
         res_dir: Path,
         cov_folder: Path,
     ):
-        configs.cov_setup_path =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'cov_setup.sh'
-        configs.cov_collect_path =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'cov_collect.sh'
+        configs.cov_setup_path =  configs.base_path / 'config' / 'subjects' / configs.target_name / 'cov_setup.sh'
+        configs.cov_collect_path =  configs.base_path / 'config' / 'subjects' / configs.target_name / 'cov_collect.sh'
         
         in_dir = res_dir / 'replayable_testcases'
         cov_file = res_dir / 'cov_over_time.csv'
