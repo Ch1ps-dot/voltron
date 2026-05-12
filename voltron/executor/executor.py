@@ -12,6 +12,16 @@ from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback, sys, os, signal
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
+CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
+ASAN_CRASH_MARKERS = (
+    'ERROR: AddressSanitizer',
+    'AddressSanitizer:',
+    'SUMMARY: AddressSanitizer',
+    'LeakSanitizer',
+    'UndefinedBehaviorSanitizer',
+    'Sanitizer CHECK failed',
+    'DEADLYSIGNAL',
+)
 
 class Executor:
     """Executor for interacting with the SUT, sending requests and receiving responses, and recording the conversation.
@@ -238,27 +248,19 @@ class Executor:
             cons.add_data(bytes(), bytes())
 
         # send the message sequence and parse the response, record the conversation in cons
+        last_msg_type = '-'
+        last_msg = bytes()
         for msg_type, msg in msg_seq:
+            last_msg_type = msg_type
+            last_msg = msg if msg is not None else bytes()
             
             if self.stop_event.is_set():
                 break
             
             if proc.poll() is not None:
-                
-                return_code = proc.poll()
-                if return_code in CRASH_SIGNALS:
-                    self.handle_crash(cons, proc, msg_type, msg)
-                    # cons.add_state(msg_type, 'CRASH')
-                    # cons.add_data(req_data, bytes())
-                    # logger.debug(f'Program crash exitcode {return_code}')
-                    # with self.analyzer.lock:
-                    #     self.analyzer.crash_num += 1
-                    # if configs.fuzz_mode != 'replay':
-                    #     stderr_data = proc.communicate(timeout=1)
-                    #     self.save_cons(cons, str(stderr_data))
-                else:
+                if not self._handle_crash_if_detected(cons, proc, msg_type, last_msg):
                     cons.add_state(msg_type, 'TIMEOUR')
-                    cons.add_data(req_data, bytes())
+                    cons.add_data(bytes(), bytes())
                     logger.debug('server close')
                 break
             
@@ -277,22 +279,9 @@ class Executor:
                 resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms, msg_type=msg_type)
 
                 if resp_code == 'POLLERR':
-                    return_code = proc.poll()
-
                     # crash
-                    if return_code != None and return_code in CRASH_SIGNALS:
-                        self.handle_crash(cons, proc, msg_type, msg)
-                        # cons.add_state(msg_type, 'CRASH')
-                        # cons.add_data(req_data, bytes())
-                        # logger.debug(f'Program crash exitcode {return_code}')
-                        # with self.analyzer.lock:
-                        #     self.analyzer.crash_num += 1
-                        # if configs.fuzz_mode != 'replay':
-                        #     stdout, stderr_data = proc.communicate(timeout=1)
-                        #     self.save_cons(cons, str(stdout), str(stderr_data), True)
-
                     # normal
-                    else:
+                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
@@ -301,21 +290,9 @@ class Executor:
                     break
                 
                 elif resp_code == 'TIMEOUT':
-                    return_code = proc.poll()
-
                     # crash
-                    if return_code != None and return_code in CRASH_SIGNALS:
-                        self.handle_crash(cons, proc, msg_type, msg)
-                        # cons.add_state(msg_type, 'CRASH')
-                        # cons.add_data(req_data, bytes())
-                        # logger.debug(f'Program crash exitcode {return_code}')
-                        # with self.analyzer.lock:
-                        #     self.analyzer.crash_num += 1
-                        # if configs.fuzz_mode != 'replay':
-                        #     stdout, stderr_data = proc.communicate(timeout=1)
-                        #     self.save_cons(cons, str(stdout), str(stderr_data), True)
                     # noraml
-                    else:
+                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
@@ -324,20 +301,9 @@ class Executor:
                     break
                 
                 elif resp_code == 'RCLOSED':
-                    return_code = proc.poll()
                     # crash
-                    if return_code != None and return_code in CRASH_SIGNALS:
-                        self.handle_crash(cons, proc, msg_type, msg)
-                        # cons.add_state(msg_type, 'CRASH')
-                        # cons.add_data(req_data, bytes())
-                        # logger.debug(f'Program crash exitcode {return_code}')
-                        # with self.analyzer.lock:
-                        #     self.analyzer.crash_num += 1
-                        # if configs.fuzz_mode != 'replay':
-                        #     stdout, stderr_data = proc.communicate(timeout=1)
-                        #     self.save_cons(cons, str(stdout), str(stderr_data), True)
                     # normal
-                    else:
+                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
@@ -367,16 +333,7 @@ class Executor:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                if return_code != None and return_code in CRASH_SIGNALS:
-                    self.handle_crash(cons, proc, msg_type, msg)
-                    # cons.add_state('-', 'CRASH')
-                    # logger.debug(f'Program crash exitcode {return_code}')
-                    # with self.analyzer.lock:
-                    #     self.analyzer.crash_num += 1
-
-                    # if configs.fuzz_mode != 'replay':
-                    #     stdout, stderr_data = proc.communicate(timeout=1)
-                    #     self.save_cons(cons, str(stdout), str(stderr_data), True)
+                self._handle_crash_if_detected(cons, proc, msg_type, msg)
                         
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
@@ -390,6 +347,8 @@ class Executor:
             sock.close()
         except Exception as e:
             logger.debug(f'socket close error: {e}')
+        
+        self._handle_crash_if_detected(cons, proc, last_msg_type, last_msg)
         
         # close process
         try:
@@ -735,13 +694,14 @@ class Executor:
         cons: Conversation,
         proc: subprocess.Popen,
         msg_type: str,
-        msg: bytes
+        msg: bytes,
+        stdout: str = '',
+        stderr: str = ''
     ):
         if msg_type in self.crash_testcases.keys() and msg in self.crash_testcases[msg_type]:
             pass
         else:
-            if self.crash_testcases[msg_type] is None:
-                self.crash_testcases[msg_type] = []
+            self.crash_testcases.setdefault(msg_type, [])
 
             self.crash_testcases[msg_type].append(msg)
             cons.add_state('-', 'CRASH')
@@ -750,8 +710,64 @@ class Executor:
                 self.analyzer.crash_num += 1
 
             if configs.fuzz_mode != 'replay':
-                stdout, stderr_data = proc.communicate(timeout=1)
-                self.save_cons(cons, str(stdout), str(stderr_data), True)
+                if stdout == '' and stderr == '':
+                    stdout, stderr = self._read_process_output(proc)
+                self.save_cons(cons, stdout, stderr, True)
+    
+    def _handle_crash_if_detected(
+        self,
+        cons: Conversation,
+        proc: subprocess.Popen,
+        msg_type: str,
+        msg: bytes
+    ) -> bool:
+        return_code = proc.poll()
+        if return_code is None:
+            return False
+
+        stdout = ''
+        stderr = ''
+        if return_code != 0:
+            stdout, stderr = self._read_process_output(proc)
+
+        if self._is_crash(return_code, stderr):
+            self.handle_crash(cons, proc, msg_type, msg, stdout, stderr)
+            return True
+
+        return False
+    
+    def _is_crash(
+        self,
+        return_code: int | None,
+        stderr: str = ''
+    ) -> bool:
+        if return_code is None:
+            return False
+
+        if return_code in CRASH_SIGNALS or return_code in CRASH_EXIT_CODES:
+            return True
+
+        return return_code != 0 and any(marker in stderr for marker in ASAN_CRASH_MARKERS)
+    
+    def _read_process_output(
+        self,
+        proc: subprocess.Popen
+    ) -> tuple[str, str]:
+        try:
+            stdout, stderr = proc.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            return '', ''
+        return self._decode_process_output(stdout), self._decode_process_output(stderr)
+    
+    def _decode_process_output(
+        self,
+        data
+    ) -> str:
+        if data is None:
+            return ''
+        if isinstance(data, bytes):
+            return data.decode('utf-8', errors='backslashreplace')
+        return str(data)
         
     
     def load_parser(
