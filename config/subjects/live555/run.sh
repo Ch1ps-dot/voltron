@@ -1,0 +1,2 @@
+#!/bin/bash
+/home/ubuntu/experiments/live/testProgs/testOnDemandRTSPServer 8554

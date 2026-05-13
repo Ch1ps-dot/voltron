@@ -6,8 +6,8 @@ class Config:
     def __init__(self) -> None:
         self.base_path: Path
         self.info_path: Path
-        self.pre_script: Path
-        self.post_script: Path
+        self.run_script: Path
+        self.setup_script: Path
         self.models_path: Path
         self.doc_paths: list[Path] = []
         self.pmp_path: Path

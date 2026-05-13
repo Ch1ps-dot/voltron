@@ -14,22 +14,14 @@ def main(
     dir: str, 
     gcov_folder: str
 ):
-    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighthttpd'}
-    if sut in supported_sut:
-        cmdline = ''
-        with open(configs.base_path / 'input' / 'scripts' / sut / 'cov_run.txt', 'r') as f:
-            cmdline = f.read()
-        replayer = Fuzzer(
-            target_name=sut,
-            cmdline=cmdline.split(' '),
-            mode = 'replay'
-        )
-        replayer.replay(
-            res_dir=Path(dir),
-            cov_folder=Path(gcov_folder)
-        )
-    else:
-        print('Unkown Target')
+    replayer = Fuzzer(
+        target_name=sut,
+        mode = 'replay'
+    )
+    replayer.replay(
+        res_dir=Path(dir),
+        cov_folder=Path(gcov_folder)
+    )
 
 if __name__ == '__main__':
     main()

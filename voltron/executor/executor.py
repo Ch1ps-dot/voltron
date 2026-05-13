@@ -5,13 +5,23 @@ from typing import Callable, Tuple
 
 from voltron.configs import configs
 from voltron.utils.logger import logger
-from voltron.mapper.mapper import Mapper
-from voltron.producer.AsyncProducer import Generator, Parser
+from voltron.executor.mapper import Mapper
+from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback, sys, os, signal
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
+CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
+ASAN_CRASH_MARKERS = (
+    'ERROR: AddressSanitizer',
+    'AddressSanitizer:',
+    'SUMMARY: AddressSanitizer',
+    'LeakSanitizer',
+    'UndefinedBehaviorSanitizer',
+    'Sanitizer CHECK failed',
+    'DEADLYSIGNAL',
+)
 
 class Executor:
     """Executor for interacting with the SUT, sending requests and receiving responses, and recording the conversation.
@@ -34,8 +44,8 @@ class Executor:
         ) -> None:
 
         # some attributes for sut
-        self.pre_script: Path = configs.pre_script
-        self.post_script: Path = configs.post_script
+        self.run_script: Path = configs.run_script
+        self.setup_script: Path = configs.setup_script
         self.cmdline: list[str] = cmdline
         self.host = configs.host
         self.port = configs.port
@@ -52,6 +62,8 @@ class Executor:
        
         self.mapper = mapper # mapper between symbol and message
         self.analyzer = analyzer # runtime analyzer
+        self.crash_testcases: dict[str, list[bytes]] = {}
+        self.unable_parse_request: set[str] = set()
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
@@ -94,13 +106,13 @@ class Executor:
             logger.debug(f'[SUT Setup Failure]: {e}')
             return None
 
-    def post_exe(
+    def setup_exe(
             self
     ) -> subprocess.Popen | None:
-        if (self.post_script.is_file() and configs.fuzz_mode != 'replay'):
+        if (self.setup_script.is_file() and configs.fuzz_mode != 'replay'):
             try:
                 proc = subprocess.Popen(
-                    [self.post_script],
+                    [self.setup_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     preexec_fn=os.setpgrp
@@ -112,16 +124,16 @@ class Executor:
         else:
             return None
 
-    def pre_exe(
+    def run_exe(
         self
     ) -> subprocess.Popen | None:
-        if (self.pre_script.is_file()):
+        if (self.run_script.is_file()):
             try:
                 if configs.fuzz_mode == 'replay':
-                    cmd = ['bash', '-c']
-                    cmd.append(' '.join(self.cmdline))
+                    # cmd = ['bash', '-c']
+                    # cmd.append(' '.join(self.cmdline))
                     proc = subprocess.Popen(
-                        cmd,
+                        [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         preexec_fn=os.setpgrp
@@ -131,7 +143,7 @@ class Executor:
                     return proc
                 elif configs.server == 'parent':
                     proc = subprocess.Popen(
-                        self.cmdline,
+                        [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         preexec_fn=os.setpgrp
@@ -141,7 +153,7 @@ class Executor:
                     return proc
                 elif configs.server == 'child':
                     proc = subprocess.Popen(
-                        self.cmdline,
+                        [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE
                     )
@@ -166,23 +178,23 @@ class Executor:
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
         self.kill_listeners(self.port)
-        clean = self.post_exe()
-        proc = self.pre_exe()
+        clean = self.setup_exe()
+        proc = self.run_exe()
         
-        logger.debug(">>>Executor: interact start")
-        if proc is None:
-            logger.debug(f'Executor: SUT Setup Failure')
-            return False, None
         
-        if proc.poll() is not None: 
-            logger.debug(f'Executor: SUT Setup Failure: {proc.returncode}')
-            return False, None
+        # if proc is None:
+        #     logger.debug(f'Executor: SUT Setup Failure')
+        #     return False, None
+        
+        # if proc.poll() is not None: 
+        #     logger.debug(f'Executor: SUT Setup Failure: {proc.returncode}')
+        #     return False, None
         
         # avoid unexceptional crash of target
         for _ in range(100):
             if proc is not None and proc.poll() is not None:
                 logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
-                proc = self.pre_exe()
+                proc = self.run_exe()
                 time.sleep(self.setup_time_s)
             else:
                 break
@@ -198,8 +210,9 @@ class Executor:
             sock = self.setup_socket()
             if sock == None:
                 if proc != None and proc.poll() is not None:
-                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode}')
-                    proc = self.pre_exe()
+                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
+                    proc = self.run_exe()
+                    self.kill_listeners(self.port)
                 logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
@@ -214,7 +227,9 @@ class Executor:
             logger.debug('socket: setup failure')
             self.stop_event.set()
             sys.exit(0)
-            
+        
+        
+        logger.debug(">>>Executor: interact start")
         # keep request and response in Conversation
         cons: Conversation = Conversation()
         
@@ -233,26 +248,19 @@ class Executor:
             cons.add_data(bytes(), bytes())
 
         # send the message sequence and parse the response, record the conversation in cons
+        last_msg_type = '-'
+        last_msg = bytes()
         for msg_type, msg in msg_seq:
+            last_msg_type = msg_type
+            last_msg = msg if msg is not None else bytes()
             
             if self.stop_event.is_set():
                 break
             
             if proc.poll() is not None:
-                
-                return_code = proc.poll()
-                if return_code in CRASH_SIGNALS:
-                    cons.add_state(msg_type, 'CRASH')
-                    cons.add_data(req_data, bytes())
-                    logger.debug(f'Program crash exitcode {return_code}')
-                    with self.analyzer.lock:
-                        self.analyzer.crash_num += 1
-                    if configs.fuzz_mode != 'replay':
-                        stderr_data = proc.communicate(timeout=1)
-                        self.save_cons(cons, str(stderr_data))
-                else:
+                if not self._handle_crash_if_detected(cons, proc, msg_type, last_msg):
                     cons.add_state(msg_type, 'TIMEOUR')
-                    cons.add_data(req_data, bytes())
+                    cons.add_data(bytes(), bytes())
                     logger.debug('server close')
                 break
             
@@ -268,20 +276,12 @@ class Executor:
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
-                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms)
+                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms, msg_type=msg_type)
 
                 if resp_code == 'POLLERR':
-                    return_code = proc.poll()
-                    if return_code != None and return_code in CRASH_SIGNALS:
-                        cons.add_state(msg_type, 'CRASH')
-                        cons.add_data(req_data, bytes())
-                        logger.debug(f'Program crash exitcode {return_code}')
-                        with self.analyzer.lock:
-                            self.analyzer.crash_num += 1
-                        if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data), True)
-                    else:
+                    # crash
+                    # normal
+                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
@@ -290,17 +290,9 @@ class Executor:
                     break
                 
                 elif resp_code == 'TIMEOUT':
-                    return_code = proc.poll()
-                    if return_code != None and return_code in CRASH_SIGNALS:
-                        cons.add_state(msg_type, 'CRASH')
-                        cons.add_data(req_data, bytes())
-                        logger.debug(f'Program crash exitcode {return_code}')
-                        with self.analyzer.lock:
-                            self.analyzer.crash_num += 1
-                        if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data), True)
-                    else:
+                    # crash
+                    # noraml
+                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
@@ -309,17 +301,9 @@ class Executor:
                     break
                 
                 elif resp_code == 'RCLOSED':
-                    return_code = proc.poll()
-                    if return_code != None and return_code in CRASH_SIGNALS:
-                        cons.add_state(msg_type, 'CRASH')
-                        cons.add_data(req_data, bytes())
-                        logger.debug(f'Program crash exitcode {return_code}')
-                        with self.analyzer.lock:
-                            self.analyzer.crash_num += 1
-                        if configs.fuzz_mode != 'replay':
-                            stderr_data = proc.communicate(timeout=1)
-                            self.save_cons(cons, str(stderr_data), True)
-                    else:
+                    # crash
+                    # normal
+                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
@@ -349,15 +333,7 @@ class Executor:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                if return_code != None and return_code in CRASH_SIGNALS:
-                    cons.add_state('-', 'CRASH')
-                    logger.debug(f'Program crash exitcode {return_code}')
-                    with self.analyzer.lock:
-                        self.analyzer.crash_num += 1
-
-                    if configs.fuzz_mode != 'replay':
-                        stderr_data = proc.communicate(timeout=1)
-                        self.save_cons(cons, str(stderr_data), True)
+                self._handle_crash_if_detected(cons, proc, msg_type, msg)
                         
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
@@ -371,6 +347,8 @@ class Executor:
             sock.close()
         except Exception as e:
             logger.debug(f'socket close error: {e}')
+        
+        self._handle_crash_if_detected(cons, proc, last_msg_type, last_msg)
         
         # close process
         try:
@@ -440,7 +418,8 @@ class Executor:
         pids = []
         try:
             result = subprocess.check_output(
-                ["netstat", "-tulnp", "2>/dev/null"],  
+                f"netstat -tulnp 2>/dev/null | grep :{port}",
+                shell=True,
                 text=True,
                 stderr=subprocess.DEVNULL
             )
@@ -457,7 +436,7 @@ class Executor:
         try:
             for pid in pids:
                 logger.debug(f'kill {pid}')
-                os.kill(pid, signal.SIGTERM)
+                os.kill(pid, signal.SIGKILL)
 
         except Exception as e:
             logger.debug(f'kill execution failure {e}')
@@ -565,7 +544,8 @@ class Executor:
     def net_recv(
             self, 
             sock: socket.socket,
-            poll_timeout_ms = 0
+            poll_timeout_ms = 0,
+            msg_type = '-'
     ) -> Tuple[str | None, bytes | None]:
         """Recv message over network
 
@@ -626,14 +606,14 @@ class Executor:
                         return 'RCLOSED', None
                     else:
                         # recv response and parse it
-                        resp_code = None
+                        resp_code = 'UNKOWN'
                         resp_byte: bytes = self.parser_func(buf)
                         try_times = 3
-                        if resp_byte == b'':
+                        if resp_byte == b'' and msg_type not in self.unable_parse_request:
                             while try_times > 0:
                                 try_times -= 1
-                                resp_code = self.parser_func(buf)
-                                if resp_code == b'':
+                                resp_byte = self.parser_func(buf)
+                                if resp_byte == b'':
                                     logger.debug(f'parse error:{buf}')
                                     new_parser = self.mapper.update_parser(buf)
                                     self.load_parser(new_parser)
@@ -642,8 +622,8 @@ class Executor:
                                     break
                             
                         if resp_byte == b'':
+                            self.unable_parse_request.add(msg_type)
                             logger.debug('Parse Error')
-                            resp_code = 'UNKOWN'
                         else:
                             resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
                         # update some analysis data
@@ -655,7 +635,7 @@ class Executor:
                         return resp_code, buf
                 
             elif (self.trans_layer == 'udp'):
-                events = poller.poll(time_out_ms)
+                events = poller.poll(100) # poll timeout will influence the performance, need to adjust
                 if not events:
                     logger.debug('recv: poll timeout')
                     return 'TIMEOUT', None
@@ -664,7 +644,7 @@ class Executor:
                 if event & select.POLLIN:
                     buf = b''
                     while True:
-                        events = poller.poll(time_out_ms)
+                        events = poller.poll(100)
                         if not events:
                             break
                         chunk, _ = sock.recvfrom(2048)
@@ -709,6 +689,87 @@ class Executor:
     
         return None, None
     
+    def handle_crash(
+        self,
+        cons: Conversation,
+        proc: subprocess.Popen,
+        msg_type: str,
+        msg: bytes,
+        stdout: str = '',
+        stderr: str = ''
+    ):
+        if msg_type in self.crash_testcases.keys() and msg in self.crash_testcases[msg_type]:
+            pass
+        else:
+            self.crash_testcases.setdefault(msg_type, [])
+
+            self.crash_testcases[msg_type].append(msg)
+            cons.add_state('-', 'CRASH')
+            logger.debug(f'Program crash exitcode {proc.returncode}')
+            with self.analyzer.lock:
+                self.analyzer.crash_num += 1
+
+            if configs.fuzz_mode != 'replay':
+                if stdout == '' and stderr == '':
+                    stdout, stderr = self._read_process_output(proc)
+                self.save_cons(cons, stdout, stderr, True)
+    
+    def _handle_crash_if_detected(
+        self,
+        cons: Conversation,
+        proc: subprocess.Popen,
+        msg_type: str,
+        msg: bytes
+    ) -> bool:
+        return_code = proc.poll()
+        if return_code is None:
+            return False
+
+        stdout = ''
+        stderr = ''
+        if return_code != 0:
+            stdout, stderr = self._read_process_output(proc)
+
+        if self._is_crash(return_code, stderr):
+            self.handle_crash(cons, proc, msg_type, msg, stdout, stderr)
+            return True
+
+        return False
+    
+    def _is_crash(
+        self,
+        return_code: int | None,
+        stderr: str = ''
+    ) -> bool:
+        if return_code is None:
+            return False
+
+        if return_code in CRASH_SIGNALS or return_code in CRASH_EXIT_CODES:
+            return True
+
+        return return_code != 0 and any(marker in stderr for marker in ASAN_CRASH_MARKERS)
+    
+    def _read_process_output(
+        self,
+        proc: subprocess.Popen
+    ) -> tuple[str, str]:
+        try:
+            stdout, stderr = proc.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            return '', ''
+        return self._decode_process_output(stdout), self._decode_process_output(stderr)
+    
+    def _decode_process_output(
+        self,
+        data
+    ) -> str:
+        if data is None:
+            return ''
+        if isinstance(data, bytes):
+            return data.decode('utf-8', errors='backslashreplace')
+        return str(data)
+        
+    
     def load_parser(
         self,
         p: Parser
@@ -726,7 +787,8 @@ class Executor:
     def save_cons(
         self,
         cons: Conversation,
-        info: str = '',
+        stdout: str = '',
+        stderr: str = '',
         crash: bool = False
     ):
         """Use pickle to store section tree instance
@@ -782,4 +844,5 @@ class Executor:
         with open(info_file, 'a', encoding='utf-8') as f:
             f.write(file_count + '\n')
             f.write('-'.join(cons.res_seq) + '\n')
-            f.write(info)
+            f.write(f'stdout: {stdout}' + '\n')
+            f.write(f'stderr: {stderr}' + '\n')

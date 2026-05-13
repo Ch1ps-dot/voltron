@@ -5,23 +5,23 @@ from voltron.executor.conversation import Conversation
 
 from voltron.utils.logger import logger
 
-from voltron.llm.AsyncChat import AsyncChater
+from voltron.llm.chatter import AsyncChater
 
-from voltron.rfcparser.AsyncRFCparser import AsyncRFCParser
+from voltron.rfcparser.rfc_parser import AsyncRFCParser
 
-from voltron.producer.AsyncProducer import AsyncProducer
+from voltron.synthesizer.synthesizer import AsyncProducer
 
 from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
-from voltron.mapper.mapper import Mapper
+from voltron.executor.mapper import Mapper
 from voltron.scheduler.havoc import Havoc
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
 
-from voltron.scheduler.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
-from voltron.scheduler.automata import MealyMachine
+from voltron.learner.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
+from voltron.learner.automata import MealyMachine
 
 def exit_handler():
     for thread in threading.enumerate():
@@ -35,12 +35,14 @@ class Fuzzer:
     def __init__(
             self, 
             target_name: str,
-            cmdline: list[str],
-            mode='fuzz'
+            cmdline: list[str] = [],
+            mode='fuzz',
+            output='default'
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
         self.mode = mode
+        self.output = output
         
         self.load_configs()
         self.module_init()
@@ -50,8 +52,10 @@ class Fuzzer:
     ) -> None:
         self.configs_yaml: str
         try:
-            with open(configs.base_path / 'configs.yaml', 'r', encoding='utf-8') as f:
+            with open(configs.base_path / 'config' /'configs.yaml', 'r', encoding='utf-8') as f:
                 configs_yaml = yaml.safe_load(f)
+                if self.target_name not in configs_yaml.keys():
+                    raise Exception(f'Fuzzer: unknown target {self.target_name}')
         except Exception as e:
             logger.error(f'Fuzzer: config load failure {e}')
             
@@ -64,13 +68,13 @@ class Fuzzer:
         configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
 
         # some file path 
-        configs.pre_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'run.txt'
-        configs.post_script = configs.base_path / 'input' / 'scripts' / configs.target_name / 'post.sh'
-        configs.models_path = configs.base_path / 'output' / 'models' / configs.target_name
-        configs.info_path = configs.base_path / 'input' / 'infos' / f'{configs.target_name}.md'
+        configs.run_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'run.sh'
+        configs.setup_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'setup.sh'
+        configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
+        configs.info_path = configs.base_path / 'config' / 'subjects' / configs.target_name / 'info.md'
         for rfc in configs.rfc_name:
-            configs.doc_paths.append(configs.base_path / 'input' / 'rfcs' / f'{rfc}.txt')
-        configs.pmp_path = configs.base_path / 'input' / 'prompts'
+            configs.doc_paths.append(configs.base_path / 'config' / 'rfcs' / f'{rfc}.txt')
+        configs.pmp_path = configs.base_path / 'skills'
         configs.base_url = configs_yaml['llm']['base_url']
         configs.api_key = configs_yaml['llm']['api_key']
         configs.model = configs_yaml['llm']['model']
@@ -80,10 +84,12 @@ class Fuzzer:
         current_time_struct = time.localtime()
         formatted_time = time.strftime("%m%d_%H_%M_%S", current_time_struct)
         results_dir = configs.base_path / f'results-{self.target_name}-voltron-{formatted_time}'
+        if self.output != 'default':
+            results_dir = configs.base_path / self.output
         if not results_dir.is_dir() and self.mode != 'replay':
             results_dir.mkdir()
             
-        models_dir = configs.base_path / 'output' / 'models'
+        models_dir = configs.base_path / 'component' / 'models'
         if not models_dir.is_dir():
             models_dir.mkdir(parents=True, exist_ok=True)
             configs.models_path.mkdir(parents=True, exist_ok=True)
@@ -237,11 +243,14 @@ class Fuzzer:
                 with open(h_path, 'rb') as f:
                     hypothesis = pickle.load(f)
             
+            begin_time = time.time()
             if hypothesis is None:
                 hypothesis = self.model_learning(mq, eq, stop_event)
             else:
                 self.mapper.message_pool = hypothesis.map
-                
+            end_time = time.time()
+            with analyzer.lock:   
+                analyzer.model_learning_time_s = end_time - begin_time
             self.havoc_fuzz(hypothesis, stop_event)
                 
             self.stop_event.set()
@@ -360,8 +369,8 @@ class Fuzzer:
         res_dir: Path,
         cov_folder: Path,
     ):
-        configs.cov_setup_path =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'cov_setup.sh'
-        configs.cov_collect_path =  configs.base_path / 'input' / 'scripts' / configs.target_name / 'cov_collect.sh'
+        configs.cov_setup_path =  configs.base_path / 'config' / 'subjects' / configs.target_name / 'cov_setup.sh'
+        configs.cov_collect_path =  configs.base_path / 'config' / 'subjects' / configs.target_name / 'cov_collect.sh'
         
         in_dir = res_dir / 'replayable_testcases'
         cov_file = res_dir / 'cov_over_time.csv'

@@ -9,27 +9,26 @@ import click, random
 @click.option("-a", "--algorithm", type=str, default='state', help="fuzzing algorithm")
 @click.option("-t", "--time", type=str, required=True, help="fuzzing time (minute)")
 @click.option("-c", "--cmdline", type=str, default='auto', help="cmd line to invoke target")
+@click.option("-o", "--output", type=str, default='default', help="output path for fuzzing results")
 def main(
     sut: str, 
     algorithm: str, 
     time: str, 
-    cmdline: str
+    cmdline: str,
+    output: str
 ):
-    supported_sut = {'lightftp','pureftpd','kamailio', 'live555', 'exim', 'lighttpd', 'tinydtls', 'dnsmasq'}
-    if sut in supported_sut:
-        if cmdline == 'auto':
-            with open(configs.base_path / 'input' / 'scripts' / sut / 'run.txt', 'r') as f:
-                cmdline = f.read()
-        fuzzer = Fuzzer(
-            target_name=sut,
-            cmdline=cmdline.split(' ')
-        )
-        fuzzer.fuzz(
-            algo=algorithm,
-            time_limit_min=int(time)
-        )
-    else:
-        print('Unkown Target')
+    if cmdline == 'auto':
+        with open(configs.base_path / 'config' / 'subjects' / sut / 'run.sh', 'r') as f:
+            cmdline = f.read()
+    fuzzer = Fuzzer(
+        target_name=sut,
+        cmdline=cmdline.split(' '),
+        output=output
+    )
+    fuzzer.fuzz(
+        algo=algorithm,
+        time_limit_min=int(time)
+    )
 
 if __name__ == '__main__':
     main()

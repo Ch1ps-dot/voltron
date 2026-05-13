@@ -1,0 +1,221 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="RSET">
+    <!-- Abort the current mail transaction: discard sender, recipients, and mail data. Receiver MUST reply "250 OK" on success and MUST NOT close the connection as a result of RSET. Syntax per RFC 5321: "RSET" CRLF -->
+
+    <field name="Command" type="constant" length="4B" value="RSET"/>
+    <!-- ASCII command token indicating a reset of the current mail transaction. Per RFC 5321 this command accepts no arguments; servers SHOULD return 501 if arguments are supplied (unless an EHLO-advertised extension permits them). -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the command line (CR LF). Indicates end of the RSET command. -->
+</message>
+  <message name="MAIL">
+    <!-- Initiates an SMTP mail transaction by specifying the reverse-path (sender) and optional MAIL parameters; terminated by CRLF -->
+
+    <field name="CommandKeyword" type="constant" length="4B" value="MAIL"/>
+    <!-- Literal command token "MAIL" identifying the MAIL verb -->
+
+    <field name="SP_after_command" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (0x20) separating the command token and the FROM keyword -->
+
+    <field name="FromKeyword" type="constant" length="5B" value="FROM:"/>
+    <!-- Literal "FROM:" token immediately preceding the reverse-path; no spaces allowed on either side of the ':' -->
+
+    <field name="ReversePath_LeftAngle" type="constant" length="1B" value="0x3C"/>
+    <!-- Left angle bracket '<' that begins the reverse-path (visible as '<') -->
+
+    <field name="ReverseMailbox" type="variable" length="undefined" value="ASCII visible characters, dot-atom or quoted-string or source-route elements; may be empty to indicate null reverse-path"/>
+    <!-- Sender mailbox / reverse-path contents between '<' and '>'.
+         May be empty (i.e., MAIL FROM:<>) to indicate a null reverse-path used in delivery notifications.
+         Historically may contain source routes (deprecated); servers must accept source-route syntax but may ignore routes.
+         Length is constrained by SMTP command-line limits (512 octets including CRLF by default) and may be extended by EHLO-negotiated extensions — this dependency affects the maximum length of this field. CR and LF are not allowed within this field. -->
+
+    <field name="ReversePath_RightAngle" type="constant" length="1B" value="0x3E"/>
+    <!-- Right angle bracket '>' that terminates the reverse-path -->
+
+    <field name="ParamSeparator_SP" type="constant" length="1B" value="0x20"/>
+    <!-- Optional single space (0x20) present only if MAIL parameters follow; otherwise absent.
+         This space separates the reverse-path closing '>' and the mail-parameters. -->
+
+    <field name="MailParameters" type="variable" length="undefined" value="ASCII tokens and key=value pairs as defined by negotiated SMTP service extensions; space-separated; excludes CR and LF"/>
+    <!-- Optional sequence of parameters associated with MAIL (only those offered by the server in EHLO).
+         Clients MUST NOT send parameters not negotiated. Syntax and semantics are extension-specific.
+         If absent, this field is empty/omitted. The combined command length including these parameters is subject to the negotiated command-length limits. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the command (CR LF) -->
+</message>
+  <message name="NOOP">
+    <!-- NOOP command: a no-operation SMTP command that elicits a "250 OK" response and otherwise has no effect. -->
+
+    <field name="CommandToken" type="constant" length="4B" value="NOOP"/>
+    <!-- The literal command token (case-insensitive) identifying the NOOP command. Per RFC 5321 the command name is case-insensitive. -->
+
+    <field name="OptionalSpace" type="constant" length="1B" value="0x20"/>
+    <!-- Optional single SP (space, 0x20) separating the command token and an optional parameter string. This field is optional in the syntax [ SP String ]. -->
+
+    <field name="ParameterString" type="variable" length="undefined" value="ASCII printable characters excluding CR and LF (octets 0x20-0x7E and other allowed ASCII except CR/LF)"/>
+    <!-- Optional parameter string that servers SHOULD ignore if present. Length is undefined here; per RFC 5321 the entire command line is subject to the 512-octet limit including the terminating CRLF, so the practical maximum length of this field depends on that limit and preceding fields. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command line (Carriage Return + Line Feed). Required to end the SMTP command. -->
+</message>
+  <message name="RCPT">
+    <!-- Identifies an individual recipient for the SMTP mail transaction (RCPT command) -->
+
+    <field name="Command" type="constant" length="4B" value="RCPT"/>
+    <!-- The SMTP verb for the recipient command. SMTP verbs are case-insensitive; here modeled as the literal token "RCPT". -->
+
+    <field name="SpaceAfterCommand" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command verb and the "TO:" label. Required by syntax. -->
+
+    <field name="ToLabel" type="constant" length="3B" value="TO:"/>
+    <!-- The literal "TO:" label immediately following the space. Note: no spaces are permitted on either side of the colon. -->
+
+    <field name="LeftAngle" type="constant" length="1B" value="0x3C"/>
+    <!-- Left angle bracket '<' starting the forward-path or Postmaster form (0x3C). Required by syntax around the path. -->
+
+    <field name="PathContent" type="variable" length="undefined" value="Postmaster (case-insensitive) or Postmaster@Domain or Forward-path (optional source-route list + mailbox) ; printable ASCII excluding CR, LF, and angle brackets">
+    </field>
+    <!--
+        The forward-path contents between '<' and '>'.
+        Legal forms:
+          - "Postmaster" (case-insensitive)  - special required mailbox
+          - "Postmaster@Domain"               - Postmaster at a specific domain
+          - Forward-path: optionally a source-route (e.g., @hostA,@hostB:) followed by mailbox (local-part@domain or mailbox only)
+        Source-route syntax MUST be recognized by receivers but is normally stripped by relays.
+        Character set: printable US-ASCII excluding CR (0x0D), LF (0x0A), and the bracket characters; precise local-part and domain syntax is per RFC 5321/RFC 5322.
+        Length is implementation/recipient dependent, so marked undefined.
+    -->
+
+    <field name="RightAngle" type="constant" length="1B" value="0x3E"/>
+    <!-- Right angle bracket '>' ending the forward-path (0x3E). -->
+
+    <field name="ParamSeparatorSpace" type="constant" length="1B" value="0x20"/>
+    <!-- Optional single space (SP) preceding Rcpt-parameters. Present only if Rcpt-parameters are included. -->
+
+    <field name="RcptParameters" type="variable" length="undefined" value="Extension-specific parameters as advertised in server EHLO; ASCII excluding CR and LF">
+    </field>
+    <!--
+        Optional parameters associated with negotiated SMTP service extensions.
+        Clients MUST NOT send parameters not advertised by the server in its EHLO response.
+        Parameter syntax is extension-specific and therefore left undefined here; character set limited to ASCII excluding CR/LF.
+    -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End-of-line sequence (CR LF) terminating the command. -->
+</message>
+  <message name="VRFY">
+    <!-- VRFY command: client requests verification of a user name or mailbox (user or user@domain) -->
+
+    <field name="CommandKeyword" type="constant" length="4B" value="VRFY"/>
+    <!-- SMTP command keyword indicating a verify request.  Commands are case-insensitive in SMTP; canonical uppercase form shown. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command keyword and the argument. Required when an argument is present. -->
+
+    <field name="Argument" type="variable" length="undefined" value="local-part | local-part@domain ; ASCII printable excluding CR and LF; local-part is dot-atom or quoted-string per RFC 5322; domain is dot-atom (fully-qualified domain name recommended)"/>
+    <!-- The argument identifies the user name to be verified. For VRFY this is a user name or user@domain. Servers SHOULD accept local-part@domain and local local-parts; servers MAY accept other forms but MUST NOT return paths. Length is implementation-dependent; CR and LF are not allowed. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Command terminator CRLF marking the end of the VRFY command line -->
+</message>
+  <message name="DATA">
+    <!-- Initiates the transfer of mail data from client to server; the data (header + body) is sent on subsequent lines and terminated by a line containing only a single period (end-of-mail indicator). -->
+
+    <field name="CommandToken" type="constant" length="4B" value="DATA"/>
+    <!-- The literal ASCII command token that signals the start of the DATA protocol unit. Sent by the client as four characters "D","A","T","A". -->
+
+    <field name="CommandTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed (CRLF) terminating the DATA command line as required by SMTP. -->
+
+    <field name="MailData" type="variable" length="undefined" value="US-ASCII 0x00-0x7F (header fields + body); avoid control chars other than SP(0x20), HT(0x09), CR(0x0D), LF(0x0A)"/>
+    <!-- The mail content transmitted after a successful DATA command response (354). Includes the RFC5322 header section and message body (and MIME parts if used). Content uses US-ASCII repertoire; length is undefined and depends on message size. -->
+
+    <field name="DotTransparency" type="variable" length="undefined" value="Dot-stuffing per RFC5321: lines beginning with '.' are transmitted with an extra leading '.'; receiver removes the extra '.' on receipt"/>
+    <!-- Transparency procedure to prevent accidental end-of-data detection: any message line that begins with a period is prefixed with an additional period during transmission; the receiver MUST remove one leading '.' from such lines when reconstructing MailData. This is a transformation rule, not an extra transmitted field. -->
+
+    <field name="EndOfMailIndicator" type="constant" length="5B" value="0x0D0A2E0x0D0A"/>
+    <!-- The explicit end-of-data byte sequence CRLF '.' CRLF (bytes: 0x0D 0x0A 0x2E 0x0D 0x0A) that terminates the mail data and confirms the end of the DATA protocol unit. The first CRLF of this sequence is the terminator of the final data line. -->
+</message>
+  <message name="QUIT">
+    <!-- SMTP QUIT command: client signals termination of the SMTP session. The receiver MUST reply with a "221" reply and then close the transmission channel. The sender SHOULD wait for the reply before closing. -->
+
+    <field name="CommandToken" type="constant" length="4B" value="QUIT"/>
+    <!-- The literal command token "QUIT" (ASCII). Command names in SMTP are case-insensitive. QUIT takes no arguments; if arguments are supplied (and no EHLO-advertised extension accepts them) a 501 reply SHOULD be returned. This token indicates the client intends to terminate the session and abort any current uncompleted mail transaction. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF (Carriage Return + Line Feed) terminating the command line per SMTP syntax. Marks the end of the QUIT command. -->
+</message>
+  <message name="HELP">
+    <!-- SMTP HELP command: requests server help text; MAY include an argument naming a command for more specific help -->
+
+    <field name="Command" type="constant" length="4B" value="HELP"/>
+    <!-- The literal command verb "HELP" identifying this SMTP command -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Optional single SPACE (SP) separating the command and an argument. Present only if an argument is supplied. -->
+
+    <field name="Argument" type="variable" length="undefined" value="Printable US-ASCII, suggested %d33-126"/>
+    <!-- Optional argument (String) naming a command or topic for which help is requested.
+         Per RFC 5321 syntax: HELP = "HELP" [ SP String ] CRLF.
+         The precise definition of String is context-dependent; here we model it as visible ASCII characters (octets 33-126).
+         This field may be absent; if present its length is not fixed and must exclude CR and LF. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Mandatory CRLF terminating the command line -->
+</message>
+  <message name="EHLO">
+    <!-- EHLO command: identifies the SMTP client to the server by providing a fully-qualified domain name or an address-literal; client SHOULD issue EHLO to begin an SMTP session. -->
+
+    <field name="CommandName" type="constant" length="4B" value="EHLO"/>
+    <!-- The EHLO keyword identifying the Extended HELLO command. Per RFC 5321 this token is case-insensitive (clients may send upper, lower, or mixed case); servers MUST recognize it. It must appear as the first token of the command line. -->
+
+    <field name="Whitespace" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space, 0x20) separating the command keyword and the argument (domain or address-literal). Required by syntax "EHLO" SP argument. -->
+
+    <field name="Argument" type="variable" length="undefined" value="FQDN (labels: A-Z a-z 0-9 '-' separated by '.' ), OR address-literal (enclosed in '[' and ']' containing IPv4 or IPv6 textual form per RFC 5321 Section 4.1.3)"/>
+    <!-- The argument clause: normally a fully-qualified domain name (FQDN) of the SMTP client that resolves to an address RR (labels limited to letters, digits, hyphen). If the client has no meaningful domain name, an address-literal in square brackets MAY be used (e.g., [192.0.2.1] or IPv6 forms). Clients SHOULD NOT append additional identification text after an address-literal; such practice is discouraged. Local/unqualified names are NOT permitted on the public Internet. Length is unspecified (variable) and depends on domain/address-literal length. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF sequence terminating the command line (Carriage Return + Line Feed). Required to end the SMTP command. -->
+</message>
+  <message name="HELO">
+    <!-- Identifies the SMTP client to the SMTP server; carries the client's domain name.
+         Per RFC 5321: helo = "HELO" SP Domain CRLF. The client MUST issue HELO or EHLO
+         before starting a mail transaction. -->
+
+    <field name="CommandToken" type="constant" length="4B" value="HELO"/>
+    <!-- The HELO command token (request verb). SMTP command tokens are case-insensitive
+         though the canonical representation is uppercase. Represents the start of the command. -->
+
+    <field name="Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single SP (space) separating the command token and the Domain argument. -->
+
+    <field name="Domain" type="variable" length="undefined" value="LDH-labels separated by '.'; characters: ALPHA / DIGIT / '-'; labels 1..63 octets; total up to 255 octets; ASCII"/>
+    <!-- Fully-qualified domain name of the SMTP client as required by HELO.
+         Follows the DNS LDH-label rules: each label consists of letters, digits, and hyphen,
+         must not begin or end with a hyphen; labels 1-63 octets; overall domain name <=255 octets.
+         Uses ASCII characters; CR and LF are not permitted. If the client lacks a meaningful
+         domain name, RFC 5321 recommends using EHLO with an address-literal instead (HELO
+         syntax does not allow address-literal). -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed marking the end of the command line. -->
+</message>
+  <message name="EXPN">
+    <!-- EXPN command: request expansion of a mailing-list name or alias so the server returns the mailboxes on that list (used for diagnostics). -->
+
+    <field name="Command" type="constant" length="4B" value="EXPN"/>
+    <!-- SMTP verb identifying the EXPN (expand) command. Commands are US-ASCII letters and are case-insensitive per SMTP syntax. -->
+
+    <field name="Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the command verb from its argument as required by SMTP grammar. -->
+
+    <field name="Argument" type="variable" length="undefined" value="Printable US-ASCII excluding CR and LF (may include spaces, '@', local-part@domain forms, mailing-list names, or platform-specific filenames)"/>
+    <!-- Character string argument identifying the mailing list or mailbox to expand. RFC 5321 places no strict restriction on this string due to varying implementations; servers may expect local-part, local-part@domain, or other identifiers. If absent or syntactically invalid, servers typically return a 501/500 error. -->
+
+    <field name="EndOfLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CR LF terminator signaling end of the command line. -->
+</message>
+</ir>
