@@ -68,13 +68,13 @@ class ObTable:
                         sys.exit(0)
                         
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('CLOSED',)):
-                        self.T[s][e] = ('CLOSED',)
+                        self.T[s][e] = ('STOP',)
                         continue
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('CRASH',)):
-                        self.T[s][e] = ('CRASH',)
+                        self.T[s][e] = ('STOP',)
                         continue
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('TIMEOUT',)):
-                        self.T[s][e] = ('TIMEOUT',)
+                        self.T[s][e] = ('STOP',)
                         continue
                                     
                     out = self.mq.query(s + e)
