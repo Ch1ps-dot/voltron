@@ -183,7 +183,7 @@ class ObTable:
         for s in self.S:
             for a in self.alphabet:
                 sa = s + (a,)
-                if self.row(sa) not in rows:
+                if self.row(sa) not in rows or self.T[s][(a,)] != 'STOP':
                     return False, sa
        
         return True, None
