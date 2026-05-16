@@ -27,6 +27,7 @@ class ObTable:
         stop_event: threading.Event
     ) -> None:
         self.alphabet: list[str] = mq.alphabet # request symbol
+        self.abnormal_syembol = ['CRASH', 'TIMEOUT', 'CLOSED'] # special symbol for abnormal behavior, such as timeout and crash. It is used to fill the table when the SUT has no response due to abnormal behavior.
         
         self.S: set[tuple[str,...]] = {('-',)} # prefix of request symbols
         self.E: set[tuple[str,...]] = {(a,) for a in self.alphabet} # suffix of request symbols
@@ -68,13 +69,13 @@ class ObTable:
                         sys.exit(0)
                         
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('CLOSED',)):
-                        self.T[s][e] = ('STOP',)
+                        self.T[s][e] = ('CLOSED',)
                         continue
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('CRASH',)):
-                        self.T[s][e] = ('STOP',)
+                        self.T[s][e] = ('CRASH',)
                         continue
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('TIMEOUT',)):
-                        self.T[s][e] = ('STOP',)
+                        self.T[s][e] = ('TIMEOUT',)
                         continue
                                     
                     out = self.mq.query(s + e)
@@ -126,13 +127,13 @@ class ObTable:
                     # so we just consider they are transfering to same state and jump the query
                     else:
                         if(self.T[s][(a,)] == ('CLOSED',)):
-                            self.T[si][e] = ('STOP',)
+                            self.T[si][e] = ('CLOSED',)
                             continue
                         if(self.T[s][(a,)] == ('CRASH',)):
-                            self.T[si][e] = ('STOP',)
+                            self.T[si][e] = ('CRASH',)
                             continue
                         if(self.T[s][(a,)] == ('TIMEOUT',)):
-                            self.T[si][e] = ('STOP',)
+                            self.T[si][e] = ('TIMEOUT',)
                             continue
                         
                         try_times = 3
@@ -147,7 +148,7 @@ class ObTable:
                                         logger.debug('fill table: try again')
                                         try_times -= 1
                                         if try_times <= 0:
-                                            self.T[si[:len(out)-1]][si[-1:]] = ('STOP',)
+                                            self.T[si[:len(out)-1]][si[-1:]] = ('TIMEOUT',)
                                         else:
                                             continue
                                 
@@ -183,10 +184,10 @@ class ObTable:
         for s in self.S:
             for a in self.alphabet:
                 sa = s + (a,)
-                if self.row(sa) not in rows and self.T[s][(a,)] != 'STOP':
-                    return False, sa
+                if self.row(sa) not in rows:
+                    return False, s, a
        
-        return True, None
+        return True, None, None
 
     def make_close(self):
         """Make table close
@@ -194,9 +195,11 @@ class ObTable:
         logger.debug('Ob: make close')
         while True:
             if self.stop_event.is_set(): return
-            closed, sa = self.is_closed()
-            if closed or sa == None:
+            closed, s, a = self.is_closed()
+            sa = s + (a,) if s and a else None
+            if closed or sa == None or ( s != None and self.T[s[:-1]][s[-1:]] in self.abnormal_syembol):
                 return
+            
             logger.debug(f'add new prefix: {sa}')
             self.S.add(sa)
             with analyzer.lock:
