@@ -126,13 +126,13 @@ class ObTable:
                     # so we just consider they are transfering to same state and jump the query
                     else:
                         if(self.T[s][(a,)] == ('CLOSED',)):
-                            self.T[si][e] = ('CLOSED',)
+                            self.T[si][e] = ('STOP',)
                             continue
                         if(self.T[s][(a,)] == ('CRASH',)):
-                            self.T[si][e] = ('CRASH',)
+                            self.T[si][e] = ('STOP',)
                             continue
                         if(self.T[s][(a,)] == ('TIMEOUT',)):
-                            self.T[si][e] = ('TIMEOUT',)
+                            self.T[si][e] = ('STOP',)
                             continue
                         
                         try_times = 3
@@ -147,7 +147,7 @@ class ObTable:
                                         logger.debug('fill table: try again')
                                         try_times -= 1
                                         if try_times <= 0:
-                                            self.T[si[:len(out)-1]][si[-1:]] = ('TIMEOUT',)
+                                            self.T[si[:len(out)-1]][si[-1:]] = ('STOP',)
                                         else:
                                             continue
                                 
