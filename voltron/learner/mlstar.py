@@ -77,6 +77,9 @@ class ObTable:
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('TIMEOUT',)):
                         self.T[s][e] = ('TIMEOUT',)
                         continue
+                    if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('POLLERR',)):
+                        self.T[s][e] = ('POLLERR',)
+                        continue
                                     
                     out = self.mq.query(s + e)
                     
@@ -134,6 +137,9 @@ class ObTable:
                             continue
                         if(self.T[s][(a,)] == ('TIMEOUT',)):
                             self.T[si][e] = ('TIMEOUT',)
+                            continue
+                        if(self.T[s][(a,)] == ('POLLERR',)):
+                            self.T[si][e] = ('POLLERR',)
                             continue
                         
                         try_times = 3
