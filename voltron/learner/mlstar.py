@@ -197,7 +197,7 @@ class ObTable:
             if self.stop_event.is_set(): return
             closed, s, a = self.is_closed()
             sa = s + (a,) if s and a else None
-            if closed or sa == None or ( s != None and self.T[s[:-1]][s[-1:]] in self.abnormal_syembol):
+            if closed or sa == None or ( s != None and len(s) > 1 and self.T[s[:-1]][s[-1:]] in self.abnormal_syembol):
                 return
             
             logger.debug(f'add new prefix: {sa}')
