@@ -27,7 +27,7 @@ class ObTable:
         stop_event: threading.Event
     ) -> None:
         self.alphabet: list[str] = mq.alphabet # request symbol
-        self.abnormal_syembol = ['CRASH', 'TIMEOUT', 'CLOSED'] # special symbol for abnormal behavior, such as timeout and crash. It is used to fill the table when the SUT has no response due to abnormal behavior.
+        self.abnormal_syembol = ['CRASH', 'TIMEOUT', 'CLOSED', 'POLLERR'] # special symbol for abnormal behavior, such as timeout and crash. It is used to fill the table when the SUT has no response due to abnormal behavior.
         
         self.S: set[tuple[str,...]] = {('-',)} # prefix of request symbols
         self.E: set[tuple[str,...]] = {(a,) for a in self.alphabet} # suffix of request symbols
