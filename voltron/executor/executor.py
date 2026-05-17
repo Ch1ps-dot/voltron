@@ -259,7 +259,7 @@ class Executor:
             
             if proc.poll() is not None:
                 if not self._handle_crash_if_detected(cons, proc, msg_type, last_msg):
-                    cons.add_state(msg_type, 'STOP')
+                    cons.add_state(msg_type, 'CLOSED')
                     cons.add_data(bytes(), bytes())
                     logger.debug('server close')
                 break
@@ -282,7 +282,7 @@ class Executor:
                     # crash
                     # normal
                     if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
-                        cons.add_state(msg_type, 'STOP')
+                        cons.add_state(msg_type, 'POLLERR')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
@@ -293,7 +293,7 @@ class Executor:
                     # crash
                     # noraml
                     if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
-                        cons.add_state(msg_type, 'STOP')
+                        cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.timeout_num += 1
@@ -304,7 +304,7 @@ class Executor:
                     # crash
                     # normal
                     if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
-                        cons.add_state(msg_type, 'STOP')
+                        cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
