@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit
+import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, subprocess
 
 from voltron.executor.conversation import Conversation
 
@@ -28,8 +28,9 @@ def exit_handler():
         if thread.ident:
             fra = sys._current_frames().get(thread.ident)
             logger.debug('\n'.join(traceback.format_stack(fra)))
-            
-atexit.register(exit_handler)
+
+if os.getenv('VOLTRON_DUMP_THREADS_ON_EXIT') == '1':
+    atexit.register(exit_handler)
 
 class Fuzzer:
     def __init__(
@@ -43,9 +44,13 @@ class Fuzzer:
         self.cmdline = cmdline
         self.mode = mode
         self.output = output
+        self._cleanup_lock = threading.RLock()
+        self._cleanup_done = False
+        self._previous_sigint_handler = None
         
         self.load_configs()
         self.module_init()
+        atexit.register(self.cleanup)
         
     def load_configs(
         self
@@ -166,7 +171,7 @@ class Fuzzer:
             analyzer.start_time = start_time
 
         try:
-            signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+            self._install_signal_handlers()
             
             # start fuzzing and set up ui
             t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
@@ -178,17 +183,15 @@ class Fuzzer:
             t_fuzz.join()
             t_ui.join()
             
+        except KeyboardInterrupt:
+            logger.debug('Fuzzer: interrupted')
         except Exception as e:
             logger.debug(f'fuzzer error: {e}')
             logger.debug(traceback.format_exc())
             self.stop_event.set()
         finally:
-            self.mapper.close()
+            self.cleanup()
         logger.debug('Fuzzer: finish fuzzing')
-        
-        # collect results
-        with analyzer.lock:
-            analyzer.collect_results()
             
     def replay(
         self,
@@ -204,7 +207,7 @@ class Fuzzer:
             analyzer.start_time = start_time
 
         try:
-            signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+            self._install_signal_handlers()
             
             # start fuzzing and set up ui
             t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
@@ -216,12 +219,14 @@ class Fuzzer:
             t_fuzz.join()
             t_ui.join()
             
+        except KeyboardInterrupt:
+            logger.debug('Replay: interrupted')
         except Exception as e:
             logger.debug(f'replay error: {e}')
             logger.debug(traceback.format_exc())
             self.stop_event.set()
         finally:
-            self.mapper.close()
+            self.cleanup()
         logger.debug('Fuzzer: finish replay')
                        
     def state_fuzz(
@@ -430,20 +435,89 @@ class Fuzzer:
         frame
     ):
         # Handle normal exit of fuzzer Ctrl+C
-        if analyzer.sut_proc != None:
-            os.killpg(analyzer.sut_proc.pid, signal.SIGKILL)
-            
-        # logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
-        # for thread in threading.enumerate():
-        #     if thread.ident:
-        #         fra = sys._current_frames().get(thread.ident)
-        #         logger.debug('\n'.join(traceback.format_stack(fra)))
-        
+        logger.debug(f'Fuzzer: caught signal {signal_num}, stopping')
         self.stop_event.set()
-        if self.mode != 'replay':
-            with analyzer.lock:
-                analyzer.collect_results()
-        sys.exit(1)
+        self._terminate_active_sut(signal.SIGTERM, timeout=1)
+        raise KeyboardInterrupt
+
+    def _install_signal_handlers(
+        self
+    ) -> None:
+        self._previous_sigint_handler = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+
+    def _restore_signal_handlers(
+        self
+    ) -> None:
+        if self._previous_sigint_handler is not None:
+            try:
+                signal.signal(signal.SIGINT, self._previous_sigint_handler)
+            except Exception as e:
+                logger.debug(f'Fuzzer: restore signal handler failure {e}')
+            self._previous_sigint_handler = None
+
+    def cleanup(
+        self
+    ) -> None:
+        """Run process-exit cleanup once for normal, interrupted, and atexit paths."""
+        with self._cleanup_lock:
+            if self._cleanup_done:
+                return
+            self._cleanup_done = True
+
+            try:
+                self.stop_event.set()
+            except Exception:
+                pass
+
+            self._terminate_active_sut(signal.SIGTERM, timeout=3)
+
+            try:
+                self.mapper.close()
+            except Exception as e:
+                logger.debug(f'Fuzzer: mapper close failure {e}')
+
+            if self.mode != 'replay':
+                self._collect_results()
+
+            self._restore_signal_handlers()
+
+    def _terminate_active_sut(
+        self,
+        sig: signal.Signals,
+        timeout: float
+    ) -> None:
+        proc = analyzer.sut_proc
+        if proc is None:
+            return
+
+        try:
+            if proc.poll() is None:
+                os.killpg(proc.pid, sig)
+                proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait(timeout=1)
+            except Exception as e:
+                logger.debug(f'Fuzzer: SUT kill failure {e}')
+        except ProcessLookupError:
+            pass
+        except Exception as e:
+            logger.debug(f'Fuzzer: SUT terminate failure {e}')
+        finally:
+            if analyzer.sut_proc is proc:
+                analyzer.sut_proc = None
+
+    def _collect_results(
+        self
+    ) -> None:
+        if not hasattr(analyzer, 'start_time') or not hasattr(configs, 'results_path'):
+            return
+        try:
+            analyzer.collect_results()
+        except Exception as e:
+            logger.debug(f'Fuzzer: collect results failure {e}')
         
     def get_creation_timestamp(
         self, 
