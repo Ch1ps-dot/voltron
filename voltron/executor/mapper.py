@@ -4,12 +4,33 @@ from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
+import multiprocessing as mp
+import queue
 import traceback, sys
 from voltron.utils.logger import logger
 from dataclasses import asdict
 import threading
 
 from pathlib import Path
+
+
+EXEC_TIMEOUT_S = 3.0
+EXEC_RETRY_LIMIT = 3
+
+
+def _exec_dynamic_code(
+    code: str,
+    func_name: str,
+    result_queue
+) -> None:
+    namespace = {}
+
+    try:
+        exec(code, namespace)
+        result = namespace[func_name]()
+        result_queue.put(('ok', result))
+    except Exception:
+        result_queue.put(('error', traceback.format_exc()))
 
 class Mapper:
     """Mapper between actual messages and abstract symbols.
@@ -47,6 +68,9 @@ class Mapper:
         self.mutators: dict[str, list[Generator]] = producer.mutators
         # self.cur_suite: Suite = Suite(producer.generators)
         self.parsers: list[Parser] = producer.parsers
+
+        self.exec_timeout_s = EXEC_TIMEOUT_S
+        self.exec_retry_limit = EXEC_RETRY_LIMIT
         
         self.cur_parser: Parser  = self.equip_parser()
         
@@ -116,23 +140,24 @@ class Mapper:
                     
                 try:
                     msg = None
-                    if cache_mode and g.was_used != 0:
+                    if cache_mode:
                         # cache mode to avoid randomness in model learning
-                        msg = self.message_pool[g.msg_type][g.name]
-                    else:
-                        # run generator and cache the generated message in pool
-                        # sometimes the generator code may raise exception and return none,
-                        # we run generator until the results can be used.
-                        msg = self.exe_generator(g)
-                        while msg == None:
+                        msg = self.message_pool[g.msg_type].get(g.name)
+
+                    if msg is None:
+                        # run generator with bounded retries so one bad template
+                        # cannot stall the entire execution loop.
+                        for _ in range(self.exec_retry_limit):
                             msg = self.exe_generator(g)
-                        self.message_pool[g.msg_type][g.name] = msg
-                            
-                    if msg:
+                            if msg is not None:
+                                self.message_pool[g.msg_type][g.name] = msg
+                                break
+
+                    if msg is not None:
                         msg_type = g.msg_type
                         ms.append((msg_type, msg))
                     else:
-                        raise Exception
+                        logger.debug(f'Mapper: generator failed {g.msg_type}/{g.name}')
                 except Exception as e:
                     logger.debug(asdict(g))
                     logger.debug(self.message_pool)
@@ -163,14 +188,19 @@ class Mapper:
                 self.message_pool.setdefault(m.msg_type, {})
                     
                 try:
-                    # sometimes the generator code may raise exception and return none,
-                    # we run generator until the results can be used.
-                    msg = self.exe_mutator(m)
-                    msg_type = m.msg_type
-                    while msg == None:
+                    # Bound retries for the same reason as generators.
+                    msg = None
+                    for _ in range(self.exec_retry_limit):
                         msg = self.exe_mutator(m)
+                        if msg is not None:
+                            break
                         logger.debug(f'mutator error {req} {m.name}')
-                    ms.append((msg_type, msg))
+
+                    if msg is not None:
+                        msg_type = m.msg_type
+                        ms.append((msg_type, msg))
+                    else:
+                        logger.debug(f'Mapper: mutator failed {m.msg_type}/{m.name}')
                 except Exception as e:
                     logger.debug(asdict(m))
                     logger.debug(self.message_pool)
@@ -203,24 +233,13 @@ class Mapper:
         self,
         g: Generator
     ) -> bytes | None:
-        name_space = {}
-        
         try:
             with open(self.g_path(g), 'r', encoding='utf-8') as f:
                 code = f.read()
-                exec(code, name_space)
-                obj = name_space[f'generate']
-                g.was_used += 1
-                return obj()
-                # result = []
-                # def thread_task():
-                #     res = obj()
-                #     result.append(res)
-                    
-                # t = threading.Thread(target=thread_task)
-                # t.start()
-                # t.join(timeout=3)
-                # return result[0]
+                msg = self._run_dynamic_code(code, 'generate')
+                if msg is not None:
+                    g.was_used += 1
+                return msg
         except Exception as e:
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
@@ -230,19 +249,47 @@ class Mapper:
         self,
         m: Generator
     ) -> bytes | None:
-        name_space = {}
-        
         try:
             with open(self.m_path(m), 'r', encoding='utf-8') as f:
                 code = f.read()
-                exec(code, name_space)
-                mutate = name_space[f'mutate']
-                # havoc = name_space[f'havoc_{m.msg_type}']
-                return mutate()
+                return self._run_dynamic_code(code, 'mutate')
         except Exception as e:
             logger.debug(f'Executor: generated failure {e}')
             logger.debug(traceback.format_exc())
             return None
+
+    def _run_dynamic_code(
+        self,
+        code: str,
+        func_name: str
+    ) -> bytes | None:
+        ctx = mp.get_context('spawn')
+        result_queue = ctx.Queue()
+        proc = ctx.Process(
+            target=_exec_dynamic_code,
+            args=(code, func_name, result_queue),
+            daemon=True,
+        )
+        proc.start()
+
+        try:
+            status, payload = result_queue.get(timeout=self.exec_timeout_s)
+        except queue.Empty:
+            logger.debug(f'Executor: {func_name} timeout after {self.exec_timeout_s}s')
+            proc.terminate()
+            proc.join()
+            return None
+
+        proc.join(timeout=0.1)
+        if proc.is_alive():
+            proc.terminate()
+            proc.join()
+
+        if status == 'ok':
+            return payload
+
+        logger.debug(f'Executor: {func_name} failure {payload}')
+        return None
                 
             
     def register_mapper(
