@@ -1,3 +1,4 @@
+import csv
 import threading, time, pprint
 from pathlib import Path
 from voltron.utils.logger import logger
@@ -58,6 +59,8 @@ class Analyzer:
         self.stop_event: threading.Event
         
         self.sut_proc: subprocess.Popen | None = None
+        self._metric_series_path: Path | None = None
+        self._metric_series_last_minute: int | None = None
 
     def collect_results(
             self
@@ -80,6 +83,8 @@ class Analyzer:
                 f.write(f'{"chat_token":<15}: {self.chat_token}\n')
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
+
+        self.collect_metric_series()
             
         states_file = configs.results_path / f'states_info'
         try:
@@ -96,6 +101,52 @@ class Analyzer:
                 )
         except Exception as e:
             logger.debug('Analyzer: collect results failure')
+
+    def collect_metric_series(
+            self
+    ):
+        series_file = configs.results_path / 'states.csv'
+        try:
+            if self._metric_series_path != series_file:
+                self._metric_series_path = series_file
+                self._metric_series_last_minute = None
+
+            elapsed_minute = int((time.time() - self.start_time) // 60)
+            start_minute = 0
+            if self._metric_series_last_minute is not None:
+                start_minute = self._metric_series_last_minute + 1
+
+            if start_minute > elapsed_minute:
+                return
+
+            write_header = not series_file.is_file() or series_file.stat().st_size == 0
+            with series_file.open(mode='a', encoding='utf-8', newline='') as f:
+                writer = csv.DictWriter(
+                    f,
+                    fieldnames=['subject', 'fuzzer', 'data_type', 'time', 'data']
+                )
+                if write_header:
+                    writer.writeheader()
+
+                for minute in range(start_minute, elapsed_minute + 1):
+                    writer.writerow({
+                        'subject': self.target_name,
+                        'fuzzer': 'voltron',
+                        'data_type': 'nodes',
+                        'time': minute,
+                        'data': self.res_types_num()
+                    })
+                    writer.writerow({
+                        'subject': self.target_name,
+                        'fuzzer': 'voltron',
+                        'data_type': 'edges',
+                        'time': minute,
+                        'data': self.resp_trans_num()
+                    })
+
+            self._metric_series_last_minute = elapsed_minute
+        except Exception:
+            logger.debug('Analyzer: collect metric series failure')
 
     def req_types_update(
             self,
