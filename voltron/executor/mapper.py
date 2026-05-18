@@ -5,8 +5,7 @@ from voltron.synthesizer.parser import Parser
 from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 import multiprocessing as mp
-import queue
-import traceback, sys
+import traceback
 from voltron.utils.logger import logger
 from dataclasses import asdict
 import threading
@@ -18,19 +17,35 @@ EXEC_TIMEOUT_S = 3.0
 EXEC_RETRY_LIMIT = 3
 
 
-def _exec_dynamic_code(
-    code: str,
-    func_name: str,
-    result_queue
+def _dynamic_code_worker(
+    conn
 ) -> None:
-    namespace = {}
+    func_cache = {}
 
-    try:
-        exec(code, namespace)
-        result = namespace[func_name]()
-        result_queue.put(('ok', result))
-    except Exception:
-        result_queue.put(('error', traceback.format_exc()))
+    while True:
+        try:
+            item = conn.recv()
+        except EOFError:
+            break
+
+        if item is None:
+            break
+
+        code, func_name = item
+        cache_key = (func_name, code)
+        try:
+            func = func_cache.get(cache_key)
+            if func is None:
+                namespace = {}
+                exec(code, namespace)
+                func = namespace[func_name]
+                func_cache[cache_key] = func
+
+            conn.send(('ok', func()))
+        except Exception:
+            conn.send(('error', traceback.format_exc()))
+
+    conn.close()
 
 class Mapper:
     """Mapper between actual messages and abstract symbols.
@@ -71,6 +86,10 @@ class Mapper:
 
         self.exec_timeout_s = EXEC_TIMEOUT_S
         self.exec_retry_limit = EXEC_RETRY_LIMIT
+        self._dynamic_ctx = mp.get_context('spawn')
+        self._dynamic_conn = None
+        self._dynamic_proc = None
+        self._dynamic_lock = threading.Lock()
         
         self.cur_parser: Parser  = self.equip_parser()
         
@@ -263,33 +282,124 @@ class Mapper:
         code: str,
         func_name: str
     ) -> bytes | None:
-        ctx = mp.get_context('spawn')
-        result_queue = ctx.Queue()
-        proc = ctx.Process(
-            target=_exec_dynamic_code,
-            args=(code, func_name, result_queue),
-            daemon=True,
-        )
-        proc.start()
+        with self._dynamic_lock:
+            if not self._ensure_dynamic_worker():
+                logger.debug(f'Executor: {func_name} worker setup failed')
+                return None
 
-        try:
-            status, payload = result_queue.get(timeout=self.exec_timeout_s)
-        except queue.Empty:
-            logger.debug(f'Executor: {func_name} timeout after {self.exec_timeout_s}s')
-            proc.terminate()
-            proc.join()
-            return None
+            conn = self._dynamic_conn
+            if conn is None:
+                logger.debug(f'Executor: {func_name} worker connection missing')
+                return None
 
-        proc.join(timeout=0.1)
-        if proc.is_alive():
-            proc.terminate()
-            proc.join()
+            try:
+                conn.send((code, func_name))
+            except (BrokenPipeError, EOFError, OSError):
+                if not self._restart_dynamic_worker():
+                    logger.debug(f'Executor: {func_name} worker restart failed')
+                    return None
+
+                conn = self._dynamic_conn
+                if conn is None:
+                    logger.debug(f'Executor: {func_name} worker connection missing after restart')
+                    return None
+                conn.send((code, func_name))
+
+            if not conn.poll(self.exec_timeout_s):
+                logger.debug(f'Executor: {func_name} timeout after {self.exec_timeout_s}s')
+                self._restart_dynamic_worker()
+                return None
+
+            try:
+                status, payload = conn.recv()
+            except (BrokenPipeError, EOFError, OSError):
+                logger.debug(f'Executor: {func_name} worker stopped unexpectedly')
+                self._restart_dynamic_worker()
+                return None
 
         if status == 'ok':
             return payload
 
         logger.debug(f'Executor: {func_name} failure {payload}')
         return None
+
+    def _ensure_dynamic_worker(
+        self
+    ) -> bool:
+        if self._dynamic_proc is not None and self._dynamic_proc.is_alive():
+            return self._dynamic_conn is not None
+
+        return self._start_dynamic_worker()
+
+    def _start_dynamic_worker(
+        self
+    ) -> bool:
+        parent_conn = None
+        child_conn = None
+        try:
+            parent_conn, child_conn = self._dynamic_ctx.Pipe()
+            proc = self._dynamic_ctx.Process(
+                target=_dynamic_code_worker,
+                args=(child_conn,),
+                daemon=True,
+            )
+            proc.start()
+            child_conn.close()
+            self._dynamic_conn = parent_conn
+            self._dynamic_proc = proc
+            return True
+        except Exception as err:
+            logger.debug(f'Executor: dynamic worker start failure {err}')
+            for conn in (parent_conn, child_conn):
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            self._dynamic_conn = None
+            self._dynamic_proc = None
+            return False
+
+    def _restart_dynamic_worker(
+        self
+    ) -> bool:
+        self._stop_dynamic_worker()
+        return self._start_dynamic_worker()
+
+    def _stop_dynamic_worker(
+        self
+    ) -> None:
+        conn = getattr(self, '_dynamic_conn', None)
+        proc = getattr(self, '_dynamic_proc', None)
+        self._dynamic_conn = None
+        self._dynamic_proc = None
+
+        if conn is not None:
+            try:
+                conn.send(None)
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+        if proc is not None:
+            proc.join(timeout=0.2)
+            if proc.is_alive():
+                proc.terminate()
+                proc.join(timeout=1)
+
+    def close(
+        self
+    ) -> None:
+        with self._dynamic_lock:
+            self._stop_dynamic_worker()
+
+    def __del__(
+        self
+    ) -> None:
+        self._stop_dynamic_worker()
                 
             
     def register_mapper(

@@ -182,6 +182,8 @@ class Fuzzer:
             logger.debug(f'fuzzer error: {e}')
             logger.debug(traceback.format_exc())
             self.stop_event.set()
+        finally:
+            self.mapper.close()
         logger.debug('Fuzzer: finish fuzzing')
         
         # collect results
@@ -218,6 +220,8 @@ class Fuzzer:
             logger.debug(f'replay error: {e}')
             logger.debug(traceback.format_exc())
             self.stop_event.set()
+        finally:
+            self.mapper.close()
         logger.debug('Fuzzer: finish replay')
                        
     def state_fuzz(
