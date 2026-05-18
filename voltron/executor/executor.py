@@ -115,7 +115,7 @@ class Executor:
                     [self.setup_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    preexec_fn=os.setpgrp
+                    start_new_session=True
                 )
                 return proc
             except Exception as e:
@@ -136,7 +136,7 @@ class Executor:
                         [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
-                        preexec_fn=os.setpgrp
+                        start_new_session=True
                     )
                     analyzer.sut_proc = proc
                     logger.debug(f'exe pid {proc.pid}')
@@ -146,7 +146,7 @@ class Executor:
                         [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
-                        preexec_fn=os.setpgrp
+                        start_new_session=True
                     )
                     analyzer.sut_proc = proc
                     logger.debug(f'exe pid {proc.pid}')
@@ -155,7 +155,8 @@ class Executor:
                     proc = subprocess.Popen(
                         [self.run_script],
                         stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE
+                        stderr=subprocess.PIPE,
+                        start_new_session=True
                     )
                     analyzer.sut_proc = proc
                     logger.debug(f'exe pid {proc.pid}')
@@ -351,32 +352,9 @@ class Executor:
         self._handle_crash_if_detected(cons, proc, last_msg_type, last_msg)
         
         # close process
-        try:
-            if proc.poll() is None:
-                if configs.fuzz_mode == 'fuzz':
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    returncode = proc.wait(timeout=3)
-                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
-                elif configs.fuzz_mode == 'replay':
-                    os.killpg(proc.pid, signal.SIGUSR1)
-                    returncode = proc.wait(timeout=3)
-                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
-        except Exception as err:
-            logger.debug(f'proc close err: {err}')
-            
-        while True:
-            try:
-                os.killpg(proc.pid, 0)
-                # no die, just kill
-                stderr = proc.communicate(timeout=1)
-                time.sleep(0.1)
-                os.killpg(proc.pid, signal.SIGKILL)
-                logger.debug(f'try to kill: {proc.pid} {stderr}')
-            except Exception as e:
-                # sub-subprocess die out
-                analyzer.sut_proc = None
-                logger.debug(f'target process already closed: {e}')
-                break
+        close_signal = signal.SIGUSR1 if configs.fuzz_mode == 'replay' else signal.SIGTERM
+        self._terminate_process_group(proc, close_signal, timeout=3)
+        analyzer.sut_proc = None
         
         # ensure sub-subprocess die
         # if proc.poll is None:
@@ -395,21 +373,41 @@ class Executor:
         
         # kill clean script
         if clean != None:
-            try:
-                os.killpg(clean.pid, 0)
-                
-                # no die, just kill
-                os.killpg(clean.pid, signal.SIGKILL)
-                logger.debug(f"clean process: clean process alive")
-            except Exception as e:
-                # sub-subprocess die out
-                # logger.debug(f'clean process: {e}')
-                pass
+            self._terminate_process_group(clean, signal.SIGKILL, timeout=1)
                 
 
         # self.post_exe()
         logger.debug("<<<Executor: interact done")
         return True, cons
+
+    def _terminate_process_group(
+        self,
+        proc: subprocess.Popen,
+        sig: signal.Signals,
+        timeout: float
+    ) -> None:
+        """Terminate a SUT process tree that was started with start_new_session."""
+        try:
+            if proc.poll() is None:
+                os.killpg(proc.pid, sig)
+                returncode = proc.wait(timeout=timeout)
+                logger.debug(f'close process group [returncode: {returncode} pid: {proc.pid}]')
+                return
+        except subprocess.TimeoutExpired:
+            logger.debug(f'process group did not stop after {sig.name}: {proc.pid}')
+        except ProcessLookupError:
+            logger.debug(f'process group already closed: {proc.pid}')
+            return
+        except Exception as err:
+            logger.debug(f'process group close err: {err}')
+
+        try:
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
+                returncode = proc.wait(timeout=1)
+                logger.debug(f'killed process group [returncode: {returncode} pid: {proc.pid}]')
+        except Exception as err:
+            logger.debug(f'process group kill err: {err}')
     
     def kill_listeners(
         self,
