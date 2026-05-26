@@ -78,7 +78,8 @@ class AsyncChater:
             self,
             rfc_num: str,
             pro_name: str,
-            rfc_doc: str
+            rfc_doc: str,
+            error_msg: str = ""
     ) -> str | None:
         tmp = self.pmp._tem_doc_analyze
         pmp = tmp.substitute(rfc_num = rfc_num, pro_name = pro_name, rfc_doc = rfc_doc)

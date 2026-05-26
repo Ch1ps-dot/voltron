@@ -305,6 +305,7 @@ class AsyncRFCParser:
         st: SectionTree
     ):
         async with sem:
+            error_msg = ""
             while True:
                 try:
                     doc = st.fetch_node_content(node)
@@ -313,9 +314,12 @@ class AsyncRFCParser:
                         ans = await self.chater.llm_doc_parse(
                             rfc_num = self.rfc_name,
                             pro_name = self.pro_name,
-                            rfc_doc = doc
+                            rfc_doc = doc,
+                            error_msg = error_msg
                         )
                         if ans is None: raise Exception
+                        if ans not in ['request', 'response', 'all', 'none']:
+                            continue
                         logger.debug(f'[Tree Annotate]: {node.name}:{ans}')
                         node.content_type = ans
                         break
