@@ -80,10 +80,10 @@ class Fuzzer:
         for rfc in configs.rfc_name:
             configs.doc_paths.append(configs.base_path / 'config' / 'rfcs' / f'{rfc}.txt')
         configs.pmp_path = configs.base_path / 'skills'
-        configs.base_url = configs_yaml['llm']['base_url']
-        configs.api_key = configs_yaml['llm']['api_key']
-        configs.model = configs_yaml['llm']['model']
-        configs.async_sem = configs_yaml['llm']['async_sem']
+        configs.base_url_doc = configs_yaml['llm_doc']['base_url']
+        configs.api_key_doc = configs_yaml['llm_doc']['api_key']
+        configs.model_doc = configs_yaml['llm_doc']['model']
+        configs.async_sem_doc = configs_yaml['llm_doc']['async_sem']
         configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()
@@ -110,7 +110,8 @@ class Fuzzer:
     ) -> None:
 
         # llm init
-        self.chater = AsyncChater()
+        self.chater = AsyncChater(configs.base_url_doc, configs.api_key_doc, configs.model_doc)
+        self.chater_fuzz = AsyncChater(configs.base_url_fuzz, configs.api_key_fuzz, configs.model_fuzz)
         print('Chater: setup')
         
         # metrics analyzer
@@ -125,7 +126,7 @@ class Fuzzer:
 
         # handler init
         self.producer = AsyncProducer(
-            chater=self.chater,
+            chater=self.chater_fuzz,
             rfcp=self.rfcparser
         )
         self.producer.run()

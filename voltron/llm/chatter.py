@@ -14,13 +14,17 @@ class AsyncChater:
     """Chat with llm through api and manage the context.
     """
     def __init__(
-            self
+        self,
+        base_url: str,
+        api_key: str,
+        model: str
     ) -> None:
         self.configs = configs
         client = AsyncOpenAI(
-            base_url=configs.base_url,
-            api_key=configs.api_key
+            base_url=base_url,
+            api_key=api_key
         )
+        self.model = model
 
         self.clt = client
         self.pmp = Prompter(configs.pmp_path)
@@ -46,7 +50,7 @@ class AsyncChater:
             try:
                 start = time.perf_counter()
                 completion = await self.clt.chat.completions.create(
-                    model=configs.model,
+                    model=self.model,
                     messages=[
                         {"role": "system", "content": "You are a protocol analyzer."},
                         {"role": "user", "content": prompt}

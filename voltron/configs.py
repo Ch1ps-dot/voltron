@@ -23,10 +23,15 @@ class Config:
         self.host: str
         self.rfc_name: str
         
-        self.base_url: str
-        self.api_key: str
-        self.model: str
-        self.async_sem: int
+        self.base_url_doc: str
+        self.api_key_doc: str
+        self.model_doc: str
+        self.async_sem_doc: int
+        
+        self.base_url_fuzz: str
+        self.api_key_fuzz: str
+        self.model_fuzz: str
+        self.async_sem_fuzz: int
         
         self.server: str
         

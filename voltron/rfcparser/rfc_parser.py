@@ -287,7 +287,7 @@ class AsyncRFCParser:
     ):
         logger.debug(f'spe parse: {st}')
         # st.debug_tree()
-        sem = asyncio.Semaphore(configs.async_sem)
+        sem = asyncio.Semaphore(configs.async_sem_doc)
         tasks = [
             self._spe_parse_one(node, sem, st)
             for node in st.leafs
@@ -434,7 +434,7 @@ class AsyncRFCParser:
             logger.debug(f'RFCParser: {field_type} ir load')
         else:
             root = etree.Element('ir')
-            sem = asyncio.Semaphore(configs.async_sem)
+            sem = asyncio.Semaphore(configs.async_sem_doc)
 
             m_types  = ''
             if field_type == 'req':
@@ -474,7 +474,7 @@ class AsyncRFCParser:
                 self.poss_res = json.load(f)
             logger.debug('RFCParser: poss response load')
         else:
-            sem = asyncio.Semaphore(configs.async_sem)
+            sem = asyncio.Semaphore(configs.async_sem_doc)
             tasks = [
                 self._poss_response_one(req_type, sem)
                 for req_type in self.req_types
@@ -517,7 +517,7 @@ class AsyncRFCParser:
                 self.req_dep_map = json.load(f)
             logger.debug('RFCParser: request description load')
         else:
-            sem = asyncio.Semaphore(configs.async_sem)
+            sem = asyncio.Semaphore(configs.async_sem_doc)
             tasks = [
                 self._state_dependency_one(last_req, cur_req, sem)
                 for last_req in self.req_types
