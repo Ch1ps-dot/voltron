@@ -1,3 +1,4 @@
+configs.yaml
 fuzz_logs
 __pycache__/
 # Python 编译缓存文件

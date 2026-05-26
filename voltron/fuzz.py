@@ -84,6 +84,11 @@ class Fuzzer:
         configs.api_key_doc = configs_yaml['llm_doc']['api_key']
         configs.model_doc = configs_yaml['llm_doc']['model']
         configs.async_sem_doc = configs_yaml['llm_doc']['async_sem']
+        
+        configs.base_url_fuzz = configs_yaml['llm_fuzz']['base_url']
+        configs.api_key_fuzz = configs_yaml['llm_fuzz']['api_key']
+        configs.model_fuzz = configs_yaml['llm_fuzz']['model']
+        configs.async_sem_fuzz = configs_yaml['llm_fuzz']['async_sem']
         configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()
