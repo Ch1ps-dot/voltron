@@ -67,26 +67,7 @@ You will be given:
   * each generated message should mutate only a subset of key fields to preserve parser reachability
   * ensure both "single-point extreme" and "multi-field conflict" mutation patterns appear across runs
 
-### 3. Complexity-Driven Vulnerability Mutation Rules (Mandatory)
-
-Design each generated message as a **compound anomaly**, not a single simple corruption.
-
-For every message, combine at least **2 to 4 anomaly families** from the list below (when applicable to the protocol):
-
-* **Framing contradictions**: conflicting length/chunk/body boundaries, premature terminators, extra trailing data, duplicated terminators
-* **Parser ambiguity constructs**: duplicate critical headers/fields with conflicting values, mixed separators, mixed line endings (`\r\n`, `\n`, `\r`), whitespace edge forms
-* **Numeric exploitation patterns**: signed/unsigned confusion, wrap-like boundaries (`-1`, `2^n-1`, `2^n`, `2^n+1`), dense bit flags with reserved bits enabled
-* **State confusion markers**: stale/reused identifiers, out-of-order sequence semantics, incompatible version-feature combinations
-* **Encoding stress**: embedded NUL (`\x00`), high bytes (`\xff`), invalid UTF-8 byte sequences, control-byte injection in semantic fields
-* **Nested/stack pressure patterns**: repeated delimiters, deep token nesting, repeated parameter blocks, duplicate option sections
-
-Rules:
-
-* Keep the message **syntactically close enough** to pass shallow checks, but semantically contradictory in deeper validation.
-* Avoid fully random blobs; use **protocol-aware templates** and mutate only selected pivots.
-* Prefer mutations that create **cross-field and cross-layer inconsistency** rather than isolated invalid literals.
-
-### 4. Message Generation Strategy
+### 3. Message Generation Strategy
 
 * Prefer generating messages that are:
 
@@ -101,15 +82,8 @@ Rules:
   * length-like fields: exact match, underflow (shorter than declared), overflow (longer than declared), and inconsistent framing
   * string/token fields: empty string, very short, very long, invalid charset, mixed separators, and malformed quoting/escaping
   * identifier/version fields: missing, duplicated, stale/reused, malformed format, and unsupported version tags
-* **Total serialized message length MUST be ≤ 1400 bytes** to ensure successful socket transmission.
 
-Generation policy:
-
-* Use a small set of deterministic mutation templates and randomly pick one template per run.
-* Inside the chosen template, randomize concrete values from boundary-heavy candidate pools.
-* Ensure at least one run path keeps a mostly valid skeleton while injecting targeted contradictions.
-
-### 5. Generate a Python Function
+### 4. Generate a Python Function
 
 * Produce a single Python function that:
 
@@ -154,14 +128,3 @@ def mutate():
   
   return message
 ```
-
----
-
-### **Output Constraints**
-
-* Output **only** the completed Python function code
-* Do NOT include explanations, markdown, or text outside the function
-* Do NOT include comments outside the function body
-* The generated function should prioritize vulnerability-relevant complexity over trivial random corruption
-
----

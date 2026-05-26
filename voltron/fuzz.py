@@ -15,7 +15,7 @@ from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
 from voltron.executor.mapper import Mapper
-from voltron.scheduler.havoc import Havoc
+from voltron.scheduler.berserker import Havoc
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs

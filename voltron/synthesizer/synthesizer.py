@@ -158,7 +158,7 @@ class AsyncProducer:
     async def _generator_gen_async(
         self
     ):
-        sem = asyncio.Semaphore(configs.async_sem)
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
             self._generator_gen_one(msg, sem)
             for msg in self.req_ir.findall("message") 
@@ -255,7 +255,7 @@ class AsyncProducer:
         doc_info: str,
         machine: MealyMachine
     ):
-        sem = asyncio.Semaphore(configs.async_sem)
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
             self._generator_evo_one(msg_type=msg_type, doc_info=doc_info, machine=machine, sem=sem)
             for msg_type in self.req_types
@@ -376,7 +376,7 @@ class AsyncProducer:
         doc_info: str,
         req_res
     ) -> list[tuple[str, str]]:
-        sem = asyncio.Semaphore(configs.async_sem)
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
             self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, req_res=req_res, sem=sem)
             for msg_type in self.req_types

@@ -60,7 +60,6 @@ $trace
 
 ### 3. Repair and Enhance Message Generation Logic
 - Fix all code defects identified in root cause analysis (e.g., correct field ordering, adjust values to legal ranges, add missing mandatory fields, align length/payload)
-- Add dynamic variation logic for key fields that control state transitions (within protocol-valid bounds)
 - Ensure generated messages comply with SUT's state machine rules and preconditions for new transitions
 - If prompt-provided information is strongly related to protocol state (such as state preconditions, transition constraints, required context, or state-dependent semantic hints), the generated result must strictly satisfy those requirements
 - Maintain compatibility with the current server state (where applicable) while exploring new transition paths
@@ -68,7 +67,6 @@ $trace
 ### 4. Generate a State Transition-Oriented Message Generator
 - Produce a Python function that constructs **protocol-valid, state-transition-aware instance** of the $msg_type message:
   - All fields are instantiated with valid values that can trigger diverse state transitions
-  - Includes controlled variations of key semantic fields to unlock unobserved states
   - Ensures compatibility with SUT's expected behavior while maximizing transition diversity
   - The output of generator only contains only one target type of message.
 
