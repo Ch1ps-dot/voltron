@@ -1,6 +1,6 @@
 from string import Template
 from pathlib import Path
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 
 class Prompter:
     """Construct prompt for client
