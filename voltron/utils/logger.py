@@ -63,6 +63,6 @@ def get_logger(
 
     return logger
 
-logger_fuzz = get_logger(mode = 'w', name= 'llm')
-logger_llm = get_logger(mode = 'w', name= 'fuzz')
+logger_fuzz = get_logger(mode = 'w', name= 'fuzz')
+logger_llm = get_logger(mode = 'w', name= 'llm')
 
