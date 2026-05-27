@@ -1,6 +1,6 @@
 import yaml
 from pathlib import Path
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 
 class Config:
     def __init__(self) -> None:
