@@ -325,11 +325,7 @@ class AsyncProducer:
             doc_info: the document information to be used for mutator evolution
             req_res: the actual response for each request message, which provides the information for mutator evolution
         """
-        old_m = None
-        if msg_type in self.mutators.keys():
-            old_m = self.mutators[msg_type][-1]
-        else:
-            old_m = self.generators[msg_type][-1]
+        old_m = self.generators[msg_type][-1]
         old_m_path = old_m.path
         old_code = ''
         with open(old_m_path, 'r', encoding='utf-8') as f:
