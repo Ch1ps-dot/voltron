@@ -69,7 +69,8 @@ You will be given:
 
   * numeric fields: very long numeric strings, negative numbers, zero, or out-of-range values
   * length-like fields: underflow (shorter than declared), overflow (longer than declared), and inconsistent framing
-  * string/token fields: empty string, very short, very long, invalid charset, mixed separators, and malformed quoting/escaping
+  * string/token fields: empty string, very short, extremely long values, invalid charset, mixed separators, and malformed quoting/escaping
+  * blob/payload fields: generate payloads that can be super long (thousands to tens of thousands of bytes/characters, or more if useful), and do not truncate them to a "reasonable" length
   * identifier/version fields: missing, duplicated, stale/reused, malformed format, and unsupported version tags
 
 ### 3. Generate a Python Function
@@ -95,6 +96,7 @@ You will be given:
 * Do NOT include networking code
 * The function must be directly executable
 * If helper logic is needed, keep it inside the same function body
+* For fields that accept free-form text, opaque bytes, or payload content, prefer very large outputs and allow them to exceed typical application limits.
 
 ---
 
