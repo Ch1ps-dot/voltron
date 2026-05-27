@@ -28,7 +28,8 @@ You will be given:
   $msg_type
   
 ### **SUT (Server Under Test) Information**:
-  `$info`
+
+  $info
 
   The SUT information may include:
 
@@ -66,7 +67,7 @@ You will be given:
   * **likely to expose parser edge bugs (desync, over-read assumptions, stale state reuse)**
 * For each critical field type, explicitly include candidate value families when applicable:
 
-  * numeric fields: unexpected value or large unexpected magnitudes
+  * numeric fields: very long numeric strings, negative numbers, zero, or out-of-range values
   * length-like fields: underflow (shorter than declared), overflow (longer than declared), and inconsistent framing
   * string/token fields: empty string, very short, very long, invalid charset, mixed separators, and malformed quoting/escaping
   * identifier/version fields: missing, duplicated, stale/reused, malformed format, and unsupported version tags
