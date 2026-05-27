@@ -4,7 +4,7 @@ import time, select, socket, pickle
 from typing import Callable, Tuple
 
 from voltron.configs import configs
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.analyzer.analyzer import analyzer

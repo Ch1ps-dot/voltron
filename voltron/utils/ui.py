@@ -1,6 +1,6 @@
 import threading
 import time
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from dataclasses import dataclass, field
 from voltron.analyzer.analyzer import analyzer
 from rich.layout import Layout

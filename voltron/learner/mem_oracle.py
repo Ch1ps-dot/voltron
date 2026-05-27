@@ -1,7 +1,7 @@
 from voltron.executor.executor import Executor
 from voltron.executor.conversation import Conversation
 from voltron.executor.mapper import Mapper
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 import pprint
 

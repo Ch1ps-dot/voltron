@@ -6,7 +6,7 @@ from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 import multiprocessing as mp
 import traceback
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from dataclasses import asdict
 import threading
 

@@ -3,7 +3,7 @@ from voltron.synthesizer.synthesizer import Generator
 from voltron.executor.executor import Executor, Conversation
 from voltron.analyzer.analyzer import analyzer
 from voltron.learner.automata import MealyMachine
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 import random, time, threading, os, math
 
 class Havoc:

@@ -6,7 +6,7 @@ from string import Template
 import asyncio
 
 from voltron.llm.prompt import Prompter
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_llm as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 
@@ -62,7 +62,7 @@ class AsyncChater:
                 
                 response = completion.choices[0].message.content
 
-                logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
+                logger.debug(f"[Chat]:{usage} cost_time:{end - start} \n ask: {prompt} resp: {response}")
                 with analyzer.lock:
                     analyzer.chat_time_s += end - start
                     if completion.usage != None:

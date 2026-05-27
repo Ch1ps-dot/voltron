@@ -9,7 +9,7 @@ import traceback
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 from voltron.llm.chatter import AsyncChater
@@ -244,6 +244,9 @@ class AsyncProducer:
                     exec(input_code, name_space)
                     obj = name_space[f'generate']
                     obj()
+                    msg: bytes | None = obj()
+                    if msg == None or msg == b'':
+                        raise Exception('mutate return empty')
                     with analyzer.lock:
                         analyzer.finished += 1
                     return msg_type, input_code
@@ -359,7 +362,9 @@ class AsyncProducer:
                     name_space = {}
                     exec(mutate_code, name_space)
                     obj = name_space[f'mutate']
-                    obj()
+                    msg: bytes | None = obj()
+                    if msg == None or msg == b'':
+                        raise Exception('mutate return empty')
                     
                     # exec(havoc_code, name_space)
                     # obj = name_space[f'havoc_{msg_type}']

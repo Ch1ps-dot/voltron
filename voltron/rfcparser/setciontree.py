@@ -1,6 +1,6 @@
 import re
 from typing import Self
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 
 class SectionNode:
     """Structure of Section Node

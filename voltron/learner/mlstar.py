@@ -3,7 +3,7 @@ from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.learner.automata import MealyMachine
 from voltron.learner.equ_oracle import EquOracle
 from voltron.learner.mem_oracle import MembershipOracle
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 import pprint, pickle, threading, sys, traceback, time, copy

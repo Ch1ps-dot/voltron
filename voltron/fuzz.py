@@ -3,7 +3,7 @@ import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, 
 
 from voltron.executor.conversation import Conversation
 
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 
 from voltron.llm.chatter import AsyncChater
 

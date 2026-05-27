@@ -1,7 +1,7 @@
 import csv
 import threading, time, pprint
 from pathlib import Path
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 import threading, subprocess
 

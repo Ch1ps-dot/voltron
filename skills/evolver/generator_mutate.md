@@ -122,9 +122,9 @@ def mutate():
   """
     
   message = b''
-  
+
   # Construct a semantically inconsistent, compound-anomaly protocol message
   # using boundary-heavy values to trigger deep error-handling paths
-  
+
   return message
 ```

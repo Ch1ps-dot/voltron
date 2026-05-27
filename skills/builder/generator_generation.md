@@ -88,6 +88,7 @@ For each `<field>` in `$msg_ir`:
 
 ### **Function Prototype (Must Match Exactly)**
 
+```python
 def generate():
   """Generate one semantically valid, state-exploratory (field name: $field_name value: $msg_type) message for the $pro_name protocol.
   - Input: none
@@ -101,6 +102,7 @@ def generate():
   # (include edge-case values within legal constraints)
   
   return message
+```
 
 ---
 

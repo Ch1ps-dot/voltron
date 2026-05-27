@@ -86,20 +86,22 @@ $trace
 
 ## **Function Prototype (Must Match Exactly)**
 
+```python
 def generate():
- """Generate one $msg_type message for the $pro_name protocol.
- - Input: none
- - Output: bytes
- - Purpose: Trigger diverse, previously unobserved server-side state transitions
- - Compliance: Strictly follows protocol specs and SUT requirements
- """
- 
- message = b''
- 
- # Repaired message construction logic with state transition optimization
- # Includes valid variations of key fields to unlock new state transitions
- 
- return message
+   """Generate one $msg_type message for the $pro_name protocol.
+   - Input: none
+   - Output: bytes
+   - Purpose: Trigger diverse, previously unobserved server-side state transitions
+   - Compliance: Strictly follows protocol specs and SUT requirements
+   """
+
+   message = b''
+
+   # Repaired message construction logic with state transition optimization
+   # Includes valid variations of key fields to unlock new state transitions
+
+   return message
+```
 
 ---
 
