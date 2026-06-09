@@ -99,6 +99,11 @@ class AsyncProducer:
                 logger.debug(f'Producer: generator load error {e}')
                 exit(1)
         else:
+            if not configs.spec_knowledge:
+                raise RuntimeError(
+                    'Specification knowledge is disabled, but no cached '
+                    f'generators exist at {self.generator_info_path}'
+                )
             self.generator_gen()
         
         # load existed parser info or generate init parser
@@ -111,6 +116,11 @@ class AsyncProducer:
             except Exception as e:
                 logger.debug(f'Producer: parser load error {e}')
         else:
+            if not configs.spec_knowledge:
+                raise RuntimeError(
+                    'Specification knowledge is disabled, but no cached '
+                    f'parser exists at {self.parser_info_path}'
+                )
             self.parser_gen()
         
         # load existed parser info or generate init mutator
@@ -122,6 +132,15 @@ class AsyncProducer:
                 logger.debug("Mutator: load mutator info")
             except Exception as e:
                 logger.debug(f'Mutator: load error {e}')
+
+        if not configs.spec_knowledge:
+            self.generators = {
+                msg_type: generators[:1]
+                for msg_type, generators in self.generators.items()
+                if generators
+            }
+            self.parsers = self.parsers[:1]
+            self.mutators = {}
 
     async def _generator_gen_one(
         self,

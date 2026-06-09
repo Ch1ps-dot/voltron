@@ -48,10 +48,8 @@ class AsyncRFCParser:
         self.all_doc: set[str] = set()
         self.ir_base_path = configs.base_path / 'component' / 'ir'
         self.ir_path = configs.base_path / 'component' / 'ir' / configs.pro_name
-        if not self.ir_base_path.is_dir():
-            self.ir_base_path.mkdir()
-        if not self.ir_path.is_dir():
-            self.ir_path.mkdir()
+        self.ir_base_path.mkdir(parents=True, exist_ok=True)
+        self.ir_path.mkdir(parents=True, exist_ok=True)
 
         self.poss_res: dict[str, list[str]] = {}
         self.req_dep_map: dict[str, dict[str, dict]] = {} # dependency between requests
@@ -59,13 +57,15 @@ class AsyncRFCParser:
         self.req_ir = None
         self.res_ir = None
 
-        if (not self.ir_path.is_dir()):
-            self.ir_path.mkdir()
-
-       
     def run(
-        self
+        self,
+        use_spec_knowledge: bool = True,
     ):
+        if not use_spec_knowledge:
+            self.load_seed_metadata()
+            logger.debug('RFCParser: specification knowledge disabled')
+            return
+
         # Ensure RFC documents are available before parsing.
         dl_script = configs.base_path / 'skills' / 'utils' / 'rfc_download.sh'
         if dl_script.is_file():
@@ -112,6 +112,46 @@ class AsyncRFCParser:
 
         # ir generation
         self.ir_generation()
+
+    def load_seed_metadata(
+        self
+    ) -> None:
+        """Load only the symbol metadata needed to replay cached seed equipment."""
+        equipment_path = (
+            configs.base_path / 'component' / 'equipment' / configs.target_name
+        )
+        generator_info_path = (
+            equipment_path / 'generators' / 'generator_info.json'
+        )
+        parser_info_path = equipment_path / 'parsers' / 'parser_info.json'
+
+        if not generator_info_path.is_file() or not parser_info_path.is_file():
+            raise RuntimeError(
+                'Specification knowledge is disabled, but cached seed '
+                f'equipment is missing under {equipment_path}'
+            )
+
+        with open(generator_info_path, 'r', encoding='utf-8') as f:
+            generator_info = json.load(f)
+        with open(parser_info_path, 'r', encoding='utf-8') as f:
+            parser_info = json.load(f)
+
+        self.req_types = {
+            str(msg_type)
+            for msg_type, generators in generator_info.items()
+            if generators
+        }
+        if not self.req_types or not parser_info:
+            raise RuntimeError(
+                'Specification knowledge is disabled, but cached seed '
+                f'equipment is empty under {equipment_path}'
+            )
+        self.req_fields = ['MessageType']
+        self.res_json = []
+        self.res_types = set()
+        self.res_fields = []
+        self.req_dep_map = {}
+        self.poss_res = {}
         
     def spe_parse(
         self,

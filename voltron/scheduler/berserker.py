@@ -27,7 +27,8 @@ class Havoc:
         self,
         mapper: Mapper,
         exe: Executor,
-        machine: MealyMachine
+        machine: MealyMachine | None,
+        use_guidance: bool = True,
     ) -> None:
         self.unique_resp: set[str] = set()
         self.max_unique_resp_num = 0
@@ -35,11 +36,14 @@ class Havoc:
         self.useful_msg: list[tuple[str, bytes]] = []
         self.useful_seq: list[list[tuple[str, bytes]]] = []
         self.max_seq_len = 0
-        
+
         self.mapper = mapper
         self.exe = exe
         self.alphabet = list(mapper.request_types)
-        self.req_dep: dict[str, dict[str, dict]] = mapper.req_dep
+        self.use_guidance = use_guidance
+        self.req_dep: dict[str, dict[str, dict]] = (
+            mapper.req_dep if use_guidance else {}
+        )
         self.dep_alphabet = list(self.req_dep.keys())
         
         self.req_res: dict[str, set[str]] = {}
@@ -57,9 +61,16 @@ class Havoc:
         self.mutator_mode = ['new', 'generic', 'dependent']
         self.prefix_mode = ['new', 'generic', 'dependent']
         self.suffix_mode = ['new', 'generic']
+        if not use_guidance:
+            self.mutator_mode = ['new']
+            self.prefix_mode = ['new']
+            self.suffix_mode = ['new']
         
         # Initialize the automaton and related sets based on the provided Mealy machine, if available
-        if machine:
+        self.machine = machine
+        self.S: list[tuple[str, ...]] = []
+        self.E: list[tuple[str, ...]] = []
+        if machine and use_guidance:
             self.machine = machine
             self.table = machine.table
             self.E = list(self.table[1])
@@ -70,8 +81,19 @@ class Havoc:
                     self.S.append(p)
                 elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
                     self.S.append(p)
-        else:
-            self.machine = None
+    def select_random_requests(
+        self,
+        min_length: int = 1,
+        max_length: int = 8,
+    ) -> list[tuple[str, bytes]]:
+        if not self.alphabet:
+            return []
+        length = self.rand.randint(min_length, max_length)
+        request_types = [
+            self.rand.choice(self.alphabet)
+            for _ in range(length)
+        ]
+        return self.mapper.select_generators(request_types)
 
     def select_prefix(
         self
@@ -86,9 +108,12 @@ class Havoc:
         gs = []
         
         if mode == 'new':
-            p = self.rand.choice(self.S)
-            w = list(p)
-            gs = self.mapper.select_generators(w)
+            if self.S:
+                p = self.rand.choice(self.S)
+                w = list(p)
+                gs = self.mapper.select_generators(w)
+            else:
+                gs = self.select_random_requests()
            
         elif mode == 'generic':
             scope = self.rand.randint(1, 8)
@@ -117,10 +142,10 @@ class Havoc:
     def select_suffix(
         self
     ) -> list[tuple[str, bytes]]:
-        p = self.rand.choice(self.E)
-        w = list(p)
-        gs = self.mapper.select_generators(w)
-        return gs
+        if self.E:
+            p = self.rand.choice(self.E)
+            return self.mapper.select_generators(list(p))
+        return self.select_random_requests()
     
     def select_mutators(
         self
@@ -241,7 +266,7 @@ class Havoc:
         analyzer.finished = energy
         
         # fuzzing the SUT until the energy is depleted, where energy is increased when new behaviors are observed and decreased when no new behaviors are found
-        while energy >= 0:
+        while (energy >= 0 if self.use_guidance else energy > 0):
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
             
@@ -280,7 +305,11 @@ class Havoc:
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq])
                 analyzer.recv = 'None'
             
-            if cur_trans_nums <= last_trans_nums:
+            if not self.use_guidance:
+                energy -= 1
+                with analyzer.lock:
+                    analyzer.finished -= 1
+            elif cur_trans_nums <= last_trans_nums:
                 energy -= 1
                 with analyzer.lock:
                     analyzer.finished -= 1
@@ -315,4 +344,3 @@ class Havoc:
             return True
         else:
             return False
-        

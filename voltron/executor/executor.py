@@ -9,7 +9,7 @@ from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
-import math, statistics, threading, traceback, sys, os, signal
+import math, statistics, threading, traceback, sys, os, signal, re
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
@@ -21,6 +21,28 @@ ASAN_CRASH_MARKERS = (
     'UndefinedBehaviorSanitizer',
     'Sanitizer CHECK failed',
     'DEADLYSIGNAL',
+)
+RUNTIME_EXCEPTION_PATTERNS = (
+    # Python
+    re.compile(r'Traceback \(most recent call last\):', re.IGNORECASE),
+    re.compile(r'Fatal Python error:', re.IGNORECASE),
+    re.compile(r'unhandled exception in (?:asyncio|thread)', re.IGNORECASE),
+    # Java and other JVM languages
+    re.compile(r'Exception in thread "[^"]+"', re.IGNORECASE),
+    re.compile(
+        r'A fatal error has been detected by the Java Runtime Environment',
+        re.IGNORECASE,
+    ),
+    re.compile(r'Internal Error \(.*\), pid=\d+, tid=\d+', re.IGNORECASE),
+    # .NET and Mono (C#, F#, VB.NET)
+    re.compile(r'(?:^|\n)\s*Unhandled exception\.', re.IGNORECASE),
+    re.compile(r'(?:^|\n)\s*Unhandled Exception:', re.IGNORECASE),
+    re.compile(r'FATAL UNHANDLED EXCEPTION:', re.IGNORECASE),
+    # Other managed runtimes with equivalent uncaught-failure behavior
+    re.compile(r'(?:^|\n)\s*panic:', re.IGNORECASE),
+    re.compile(r"thread '[^']+' panicked at", re.IGNORECASE),
+    re.compile(r'(?:uncaught exception|uncaught \w*error)', re.IGNORECASE),
+    re.compile(r'PHP Fatal error:', re.IGNORECASE),
 )
 
 class Executor:
@@ -728,7 +750,7 @@ class Executor:
         if return_code != 0:
             stdout, stderr = self._read_process_output(proc)
 
-        if self._is_crash(return_code, stderr):
+        if self._is_crash(return_code, stdout, stderr):
             self.handle_crash(cons, proc, msg_type, msg, stdout, stderr)
             return True
 
@@ -737,6 +759,7 @@ class Executor:
     def _is_crash(
         self,
         return_code: int | None,
+        stdout: str = '',
         stderr: str = ''
     ) -> bool:
         if return_code is None:
@@ -745,7 +768,14 @@ class Executor:
         if return_code in CRASH_SIGNALS or return_code in CRASH_EXIT_CODES:
             return True
 
-        return return_code != 0 and any(marker in stderr for marker in ASAN_CRASH_MARKERS)
+        if return_code == 0:
+            return False
+
+        output = f'{stdout}\n{stderr}'
+        if any(marker in output for marker in ASAN_CRASH_MARKERS):
+            return True
+
+        return any(pattern.search(output) for pattern in RUNTIME_EXCEPTION_PATTERNS)
     
     def _read_process_output(
         self,

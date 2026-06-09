@@ -38,12 +38,18 @@ class Fuzzer:
             target_name: str,
             cmdline: list[str] = [],
             mode='fuzz',
-            output='default'
+            output='default',
+            spec_knowledge: bool = True,
+            state_learning: bool = True,
+            guided_scheduling: bool = True,
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
         self.mode = mode
         self.output = output
+        self.spec_knowledge = spec_knowledge
+        self.state_learning = state_learning
+        self.guided_scheduling = guided_scheduling
         self._cleanup_lock = threading.RLock()
         self._cleanup_done = False
         self._previous_sigint_handler = None
@@ -106,6 +112,9 @@ class Fuzzer:
         
         configs.results_path = results_dir
         configs.fuzz_mode = self.mode
+        configs.spec_knowledge = self.spec_knowledge
+        configs.state_learning = self.state_learning
+        configs.guided_scheduling = self.guided_scheduling
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name
@@ -126,7 +135,7 @@ class Fuzzer:
         self.rfcparser = AsyncRFCParser(
             chater=self.chater
         )
-        self.rfcparser.run()
+        self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
         print('RFCParser: setup')
 
         # handler init
@@ -240,29 +249,31 @@ class Fuzzer:
         stop_event: threading.Event
     ):
         try:
-            # set membership query and equivelence query method.
-            mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
-            eq = EquOracle(mapper=self.mapper, executor=self.exe)
-            
             with analyzer.lock:   
                 analyzer.iter = 0
-                analyzer.stage = 'model learning'
+                analyzer.stage = (
+                    'model learning'
+                    if self.state_learning
+                    else 'model learning disabled'
+                )
                 
             if not configs.models_path.is_dir():
                 configs.models_path.mkdir()
             
-            # load previous automata model if it existed
             hypothesis: MealyMachine | None = None
-            h_path = configs.models_path / 'evolved_hypothesis.pkl'
-            if h_path.is_file():
-                with open(h_path, 'rb') as f:
-                    hypothesis = pickle.load(f)
-            
             begin_time = time.time()
-            if hypothesis is None:
-                hypothesis = self.model_learning(mq, eq, stop_event)
-            else:
-                self.mapper.message_pool = hypothesis.map
+            if self.state_learning:
+                mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
+                eq = EquOracle(mapper=self.mapper, executor=self.exe)
+                h_path = configs.models_path / 'evolved_hypothesis.pkl'
+                if h_path.is_file():
+                    with open(h_path, 'rb') as f:
+                        hypothesis = pickle.load(f)
+
+                if hypothesis is None:
+                    hypothesis = self.model_learning(mq, eq, stop_event)
+                else:
+                    self.mapper.message_pool = hypothesis.map
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
@@ -310,7 +321,8 @@ class Fuzzer:
                     analyzer.stage = 'fuzzer evolve'
                 if len(h_lsit) == 0:
                     h_lsit.append(h)
-                    self.producer.generator_evo(h)
+                    if self.spec_knowledge:
+                        self.producer.generator_evo(h)
                     continue
                 last_trans_num = len(h_lsit[-1].res_trans_types.keys())
                 cur_trans_num = len(h.res_trans_types.keys())
@@ -327,7 +339,8 @@ class Fuzzer:
                 
                 elif last_trans_num < cur_trans_num:
                     h_lsit.append(h)
-                    self.producer.generator_evo(h)
+                    if self.spec_knowledge:
+                        self.producer.generator_evo(h)
                     continue
 
             except Exception as e:
@@ -343,7 +356,7 @@ class Fuzzer:
     
     def havoc_fuzz(
         self,
-        hypothesis: MealyMachine,
+        hypothesis: MealyMachine | None,
         stop_event
     ):
         """--- havoc fuzzing ---"""
@@ -353,14 +366,20 @@ class Fuzzer:
             analyzer.res_types_cnt = {}
             analyzer.resp_trans_cnt = {}
         
-        havoc = Havoc(self.mapper, self.exe, hypothesis)
+        havoc = Havoc(
+            self.mapper,
+            self.exe,
+            hypothesis,
+            use_guidance=self.guided_scheduling,
+        )
                     
         while not stop_event.is_set():
             try:
                 # init new learning process with previous model and run fuzzer
 
                 req_res = havoc.run(500)
-                self.producer.generator_mutate(req_res)
+                if self.spec_knowledge:
+                    self.producer.generator_mutate(req_res)
                 pre_resp = analyzer.cur_res_types_cnt.keys()
                 
                 # save the results

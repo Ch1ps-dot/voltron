@@ -15,6 +15,9 @@ class Config:
         self.cov_setup_path: Path
         self.cov_collect_path: Path
         self.fuzz_mode: str
+        self.spec_knowledge: bool = True
+        self.state_learning: bool = True
+        self.guided_scheduling: bool = True
         
         self.target_name: str
         self.trans_layer: str

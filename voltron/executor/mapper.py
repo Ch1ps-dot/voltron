@@ -4,6 +4,7 @@ from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
+from voltron.configs import configs
 import multiprocessing as mp
 import traceback
 from voltron.utils.logger import logger_fuzz as logger
@@ -125,6 +126,8 @@ class Mapper:
         self,
         message: bytes
     ) -> Parser:
+        if not configs.spec_knowledge:
+            return self.cur_parser
         self.producer.parser_evo(message)
         self.cur_parser = self.equip_parser()
         return self.cur_parser
