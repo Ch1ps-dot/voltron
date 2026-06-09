@@ -2,6 +2,7 @@ from collections.abc import Callable
 from voltron.synthesizer.synthesizer import AsyncProducer
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
+from voltron.synthesizer.checker import Checker
 from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 from voltron.configs import configs
@@ -10,6 +11,7 @@ import traceback
 from voltron.utils.logger import logger_fuzz as logger
 from dataclasses import asdict
 import threading
+from urllib.parse import quote
 
 from pathlib import Path
 
@@ -74,6 +76,7 @@ class Mapper:
         self.analyzer = analyzer
         self.gs_path = producer.generator_path
         self.ps_path = producer.parser_path
+        self.cs_path = producer.checker_path
         self.ms_path = producer.mutator_path
         
         self.request_types: set[str] = producer.req_types
@@ -84,6 +87,7 @@ class Mapper:
         self.mutators: dict[str, list[Generator]] = producer.mutators
         # self.cur_suite: Suite = Suite(producer.generators)
         self.parsers: list[Parser] = producer.parsers
+        self.checkers: dict[str, list[Checker]] = producer.checkers
 
         self.exec_timeout_s = EXEC_TIMEOUT_S
         self.exec_retry_limit = EXEC_RETRY_LIMIT
@@ -110,6 +114,21 @@ class Mapper:
         p: Parser
     ) -> Path:
         return self.ps_path / f'{p.name}.py'
+
+    def c_path(
+        self,
+        checker: Checker
+    ) -> Path:
+        typed_path = (
+            self.cs_path
+            / quote(checker.msg_type, safe='._-')
+            / f'{checker.name}.py'
+        )
+        if typed_path.is_file():
+            return typed_path
+        if checker.path:
+            return Path(checker.path)
+        return typed_path
     
     def m_path(
         self,
@@ -121,6 +140,15 @@ class Mapper:
         self
     ) -> Parser:
         return self.parsers[-1]
+
+    def equip_checkers(
+        self
+    ) -> dict[str, Checker]:
+        return {
+            msg_type: checkers[-1]
+            for msg_type, checkers in self.checkers.items()
+            if checkers
+        }
     
     def update_parser(
         self,

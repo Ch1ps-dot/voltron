@@ -1,52 +1,54 @@
 You are an expert Python developer and network protocol analyst.
 
+Your task is to generate Python code that extracts the protocol response state
+from exactly one state field.
 
-Your task is to **generate Python code that locates and extracts one or more fields (single or multiple) that determine response type/function and concatenates them as the result**, based only on **protocol field format information provided in a structured JSON-like description**.
+## Input
 
-### **Input**
+- Protocol name: $pro_name
+- Primary response-state field information: $res_info
 
-You will be given:
+`$res_info` is a JSON list containing exactly one field descriptor: the first
+state-field descriptor from the protocol's response information file. The
+descriptor may contain:
 
-- **Protocol name**: $pro_name
-- **protocol format information**: $res_info
+- `field_name`: semantic field name
+- `position`: where the field appears in the response
+- `explanation`: field meaning and encoding details
+- `value`: valid or known values
 
-The protocol format information is given as a list of field descriptors. Each field descriptor may contain:
+## Required Program
 
-- `field_name`: the semantic name of the field (e.g., "Reply Code", "Status Code")
-- `position`: a textual description of where the field appears in the response message (e.g., "first three bytes", "first line before space", "header: Key")
-- `explanation`: the semantic meaning of the field
-- `value`: a list of valid values
+Generate Python code defining:
 
----
+```python
+def packet_parser(response: bytes) -> bytes:
+```
 
-### Your Task
+The function must:
 
-Using the provided protocol format information as **the only source of truth**, write **Python code** that:
+1. Accept a raw response message as `bytes`.
+2. Locate and extract only the field described by the sole descriptor in
+   `$res_info`.
+3. Use the descriptor's `position`, `explanation`, and `value` information to
+   determine the field's wire location, length, encoding, and boundaries.
+4. Return the extracted field value as its raw wire bytes.
+5. Return `b""` if the field cannot be located or parsed.
+6. Never concatenate the field with another field and never use another response
+   field to construct the returned state value.
+7. Never raise an exception for arbitrary byte input.
 
-1. Accepts a response message (bytes) as input.
-2. Locates and extracts all fields listed in `$res_info` that are intended to determine response type or function. This must support:
-	- single code-like fields (e.g., `Status-Code`), and
-	- combined cases where multiple fields together determine the response type (e.g., `Type` + `Subtype`).
-3. For each target field, attempt to parse according to its `position` description using reasonable, protocol-agnostic heuristics (examples: first N bytes, first token on first line, header lines of the form `Key: value`, or applying a simple regex derived from `position`).
-4. When multiple fields are identified, extract their values in the order they appear in `$res_info` and concatenate the raw bytes of each extracted value (no separators) to form the final result.
-5. If any required field (single or one of a combined group) cannot be located or parsed, return `b""`.
+## Constraints
 
----
+- Use Python 3 built-in libraries only.
+- Do not hard-code assumptions unsupported by the supplied descriptor.
+- The response state is determined solely by the first state field supplied in
+  `$res_info`.
+- Input type is `bytes`; output type is `bytes`.
+- The generated code must be self-contained and directly executable.
 
-### Constraints
+## Output Requirements
 
-- Use Python built-in libraries only
-- The function name must be `packet_parser`
-- Do not hard-code protocol-specific assumptions; all logic must rely only on the field descriptors in `$res_info`
-- Support combining multiple fields when the descriptor set implies they jointly determine response type; the combined field-name should be the comma-separated `field_name` values in the same order as in `$res_info`.
-- Input type: `bytes`
-- Output type: `bytes` (concatenation of extracted field values, in order)
-
----
-
-### Output Constraints
-
-- Output only the Python code
-- Do not include explanations, comments, or markdown
-- The code must be directly executable
-
+- Output only Python code.
+- Do not output Markdown fences, explanations, or prose.
+- Do not omit `packet_parser`.

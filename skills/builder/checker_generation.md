@@ -7,15 +7,19 @@ protocol specification.
 ## Input
 
 - Protocol name: $pro_name
+- Target response type: $response_type
+- Primary response-state field information: $res_info
 - Response-message IR:
 
 ```xml
 $msg_ir
 ```
 
-The IR is the only source of truth. It may define one or more response message
-types. A message contains ordered `field` elements and may also contain comments
-that clarify field syntax, optionality, dependencies, or semantic constraints.
+The IR is the source of wire-format and conformance constraints. The supplied
+primary state-field descriptor and target value are the source of checker type
+identity. The IR may define one or more response message types. A message
+contains ordered `field` elements and may also contain comments that clarify
+field syntax, optionality, dependencies, or semantic constraints.
 Typical field attributes include:
 
 - `name`: field name
@@ -23,6 +27,12 @@ Typical field attributes include:
 - `length`: a fixed bit/byte length, a length derived from another field,
   `remaining bytes`, or `undefined`
 - `value`: an exact value, range, enumeration, grammar, or textual description
+
+`$res_info` contains exactly the first response-state field descriptor from the
+protocol response information file. `$response_type` is one value from that
+descriptor's `value` list. Generate a checker specifically for that response
+type. The IR remains the source of message layout and conformance constraints;
+the state-field descriptor determines which response type this checker accepts.
 
 ## Required Program
 
@@ -32,18 +42,18 @@ Generate Python code defining exactly this public function:
 def packet_checker(response: bytes) -> bool:
 ```
 
-The function must return `True` only when the complete response conforms to at
-least one message definition in the IR. It must return `False` for malformed,
-truncated, or non-conforming responses and must never raise an exception for
-arbitrary byte input.
+The function must return `True` only when the complete response both represents
+the target response type `$response_type` according to the primary state field
+and conforms to the supplied IR. It must return `False` for other response
+types, malformed, truncated, or non-conforming responses and must never raise
+an exception for arbitrary byte input.
 
 ## Validation Requirements
 
 1. Reject non-`bytes` input and handle an empty response according to the IR.
-2. Identify the applicable response message definition from discriminating
-   fields such as message codes, status codes, tags, or other constants. Do not
-   assume a message type solely from its XML `name` when the wire fields provide
-   the discriminator.
+2. Locate the primary state field described by `$res_info` and require its
+   decoded value to equal `$response_type`. Do not assume the response type
+   solely from the XML `message` name.
 3. Parse fields in wire order. Maintain exact byte and, when required, bit
    offsets so that packed sub-byte fields are validated correctly.
 4. Validate every field described by the selected message definition:
@@ -87,6 +97,8 @@ arbitrary byte input.
 - The generated program must be self-contained and deterministic.
 - Compile the supplied IR into validation logic in the generated code; the
   function must not require the IR as a runtime argument.
+- Compile `$response_type` into the checker. Do not accept another value of the
+  primary response-state field.
 - Base all protocol-specific behavior on the supplied IR. Do not invent fields,
   defaults, optionality, or constraints not supported by it.
 - Prefer small private helper functions when they make bounds checks, bit

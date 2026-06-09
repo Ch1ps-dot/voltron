@@ -7,6 +7,7 @@ from voltron.configs import configs
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
+from voltron.synthesizer.checker import Checker
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, traceback, sys, os, signal, re
@@ -89,6 +90,8 @@ class Executor:
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
+        self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
+        self.load_checkers(self.mapper.equip_checkers())
         self.stop_event = stop_event
             
     def cov_setup(
@@ -260,8 +263,11 @@ class Executor:
         resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
         last_recv = '-'
         if(resp_code and resp_data):
+            is_valid_response = self.check_response(resp_code, resp_data)
             cons.add_state('-', resp_code)
             cons.add_data(bytes(), resp_data)
+            if not is_valid_response:
+                self.save_invalid_response(cons, resp_code)
             last_recv = resp_code
             with self.analyzer.lock:
                 self.analyzer.res_types_update(resp_code)
@@ -338,6 +344,13 @@ class Executor:
                     if(resp_code == None):
                         logger.debug('Executor: parse error')
                         continue
+
+                    is_valid_response = True
+                    if resp_data is not None:
+                        is_valid_response = self.check_response(
+                            resp_code,
+                            resp_data
+                        )
                     
                     with self.analyzer.lock:
                         self.analyzer.res_num += 1
@@ -350,6 +363,8 @@ class Executor:
                     if(req_data and resp_data):
                         cons.add_data(req_data, resp_data)
                     cons.add_state(msg_type, resp_code)
+                    if not is_valid_response:
+                        self.save_invalid_response(cons, resp_code)
             
             # If socket closed, stop sending
             else:
@@ -811,6 +826,101 @@ class Executor:
                 self.parser_func = obj
         except Exception as e:
             logger.debug(f'Mapper: generated failure {e}')
+
+    def load_checkers(
+        self,
+        checkers: dict[str, Checker]
+    ) -> None:
+        """Load the latest generated checker for each response type."""
+        self.checker_funcs = {}
+        for msg_type, checker in checkers.items():
+            namespace = {}
+            try:
+                with open(self.mapper.c_path(checker), 'r', encoding='utf-8') as f:
+                    exec(f.read(), namespace)
+                checker_func: Callable = namespace.get('packet_checker')
+                if not callable(checker_func):
+                    raise TypeError('packet_checker is missing or not callable')
+                self.checker_funcs[msg_type] = checker_func
+            except Exception as e:
+                logger.debug(
+                    f'Executor: checker load failure [{msg_type}] {e}'
+                )
+
+    def check_response(
+        self,
+        response_type: str,
+        response: bytes
+    ) -> bool:
+        """Validate a response with the checker selected by parser output."""
+        checker = self.checker_funcs.get(response_type)
+        if checker is None:
+            checker = self.checker_funcs.get('__all__')
+        if checker is None:
+            logger.debug(
+                f'Executor: no checker for response type {response_type}'
+            )
+            return True
+
+        try:
+            is_valid = checker(response)
+            if not isinstance(is_valid, bool):
+                raise TypeError('packet_checker must return bool')
+        except Exception as e:
+            logger.debug(
+                f'Executor: checker failure [{response_type}] {e}'
+            )
+            is_valid = False
+
+        if is_valid:
+            return True
+
+        logger.debug(
+            f'Executor: non-conforming response [{response_type}] {response!r}'
+        )
+        return False
+
+    def save_invalid_response(
+        self,
+        cons: Conversation,
+        response_type: str
+    ) -> None:
+        """Save the request/response prefix that produced an invalid response."""
+        target_folder = configs.results_path / 'invalid_responses'
+        target_folder.mkdir(parents=True, exist_ok=True)
+
+        file_count = sum(
+            1
+            for path in target_folder.iterdir()
+            if path.is_file() and path.suffix == '.pkl'
+        )
+        file_id = f'{file_count:06d}'
+
+        with open(target_folder / f'cons_{file_id}.pkl', 'wb') as f:
+            pickle.dump(cons, f)
+
+        with open(
+            target_folder / f'cons_{file_id}.raw',
+            'wb'
+        ) as f:
+            for request, response in cons.content:
+                f.write(b'REQUEST ' + str(len(request)).encode() + b'\n')
+                f.write(request + b'\n')
+                f.write(b'RESPONSE ' + str(len(response)).encode() + b'\n')
+                f.write(response + b'\n')
+
+        with open(
+            target_folder / f'cons_{file_id}.info',
+            'w',
+            encoding='utf-8'
+        ) as f:
+            f.write(f'response_type: {response_type}\n')
+            f.write(f'request_types: {cons.req_seq}\n')
+            f.write(f'response_types: {cons.res_seq}\n')
+
+        logger.debug(
+            f'Executor: saved invalid response sequence cons_{file_id}'
+        )
         
     def save_cons(
         self,

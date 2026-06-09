@@ -22,6 +22,10 @@ class Prompter:
             self._path_gen_parser = dir / "builder" / "parser_generation.md"
             with self._path_gen_parser.open('r+') as f:
                 self._tem_gen_parser = Template(f.read())
+
+            self._path_gen_checker = dir / "builder" / "checker_generation.md"
+            with self._path_gen_checker.open('r+') as f:
+                self._tem_gen_checker = Template(f.read())
                 
             self._path_res_query = dir / "builder" / "response_query.md"
             with self._path_res_query.open('r+') as f:
@@ -62,9 +66,8 @@ class Prompter:
             self._path_mutator_evolve = dir / "evolver" / 'generator_mutate.md'
             with self._path_mutator_evolve.open('r+') as f:
                 self._tem_mutator_evolve = Template(f.read())
-                
-                
+
+
         except Exception as e:
             logger.error(f'Prompter Init Error: {e}')
             exit(0)
-    

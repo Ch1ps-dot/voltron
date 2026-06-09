@@ -264,6 +264,28 @@ class AsyncChater:
         )
 
         return self.code_extract(ans)
+
+    async def llm_checker_gen(
+            self,
+            pro_name: str,
+            msg_ir: str,
+            res_info: str,
+            response_type: str
+    ) -> str:
+        """Generate a response conformance checker from response-message IR."""
+        tmp = self.pmp._tem_gen_checker
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            msg_ir=msg_ir,
+            res_info=res_info,
+            response_type=response_type
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="checker_gen"
+        )
+
+        return self.code_extract(ans)
     
     async def llm_request_query(
             self,

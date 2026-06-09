@@ -170,8 +170,11 @@ During and after execution, the repository accumulates several kinds of outputs:
 
 - `component/ir/<protocol>/`: parsed RFC trees, field descriptions, message IR, and state dependencies
 - `component/models/<target>/`: learned or evolved automata models
-- `component/equipment/<target>/`: synthesized generators, parsers, and mutators
+- `component/equipment/<target>/`: synthesized generators, parsers,
+  per-response-type checkers, and mutators
 - `results-<target>-voltron-<timestamp>/`: final run statistics and discovered state information
+- `results-<target>-voltron-<timestamp>/invalid_responses/`: request/response
+  sequence prefixes whose parsed response failed its type-specific checker
 
 Depending on runtime configuration, log files may also be generated for debugging and crash triage.
 
