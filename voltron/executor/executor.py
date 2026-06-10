@@ -4,12 +4,13 @@ import time, select, socket, pickle
 from typing import Callable, Tuple
 
 from voltron.configs import configs
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
+from voltron.synthesizer.checker import Checker
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
-import math, statistics, threading, traceback, sys, os, signal
+import math, statistics, threading, traceback, sys, os, signal, re
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
@@ -21,6 +22,28 @@ ASAN_CRASH_MARKERS = (
     'UndefinedBehaviorSanitizer',
     'Sanitizer CHECK failed',
     'DEADLYSIGNAL',
+)
+RUNTIME_EXCEPTION_PATTERNS = (
+    # Python
+    re.compile(r'Traceback \(most recent call last\):', re.IGNORECASE),
+    re.compile(r'Fatal Python error:', re.IGNORECASE),
+    re.compile(r'unhandled exception in (?:asyncio|thread)', re.IGNORECASE),
+    # Java and other JVM languages
+    re.compile(r'Exception in thread "[^"]+"', re.IGNORECASE),
+    re.compile(
+        r'A fatal error has been detected by the Java Runtime Environment',
+        re.IGNORECASE,
+    ),
+    re.compile(r'Internal Error \(.*\), pid=\d+, tid=\d+', re.IGNORECASE),
+    # .NET and Mono (C#, F#, VB.NET)
+    re.compile(r'(?:^|\n)\s*Unhandled exception\.', re.IGNORECASE),
+    re.compile(r'(?:^|\n)\s*Unhandled Exception:', re.IGNORECASE),
+    re.compile(r'FATAL UNHANDLED EXCEPTION:', re.IGNORECASE),
+    # Other managed runtimes with equivalent uncaught-failure behavior
+    re.compile(r'(?:^|\n)\s*panic:', re.IGNORECASE),
+    re.compile(r"thread '[^']+' panicked at", re.IGNORECASE),
+    re.compile(r'(?:uncaught exception|uncaught \w*error)', re.IGNORECASE),
+    re.compile(r'PHP Fatal error:', re.IGNORECASE),
 )
 
 class Executor:
@@ -67,6 +90,8 @@ class Executor:
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
+        self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
+        self.load_checkers(self.mapper.equip_checkers())
         self.stop_event = stop_event
             
     def cov_setup(
@@ -115,7 +140,7 @@ class Executor:
                     [self.setup_script],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    preexec_fn=os.setpgrp
+                    start_new_session=True
                 )
                 return proc
             except Exception as e:
@@ -136,7 +161,7 @@ class Executor:
                         [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
-                        preexec_fn=os.setpgrp
+                        start_new_session=True
                     )
                     analyzer.sut_proc = proc
                     logger.debug(f'exe pid {proc.pid}')
@@ -146,7 +171,7 @@ class Executor:
                         [self.run_script],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
-                        preexec_fn=os.setpgrp
+                        start_new_session=True
                     )
                     analyzer.sut_proc = proc
                     logger.debug(f'exe pid {proc.pid}')
@@ -155,7 +180,8 @@ class Executor:
                     proc = subprocess.Popen(
                         [self.run_script],
                         stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE
+                        stderr=subprocess.PIPE,
+                        start_new_session=True
                     )
                     analyzer.sut_proc = proc
                     logger.debug(f'exe pid {proc.pid}')
@@ -237,8 +263,11 @@ class Executor:
         resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
         last_recv = '-'
         if(resp_code and resp_data):
+            is_valid_response = self.check_response(resp_code, resp_data)
             cons.add_state('-', resp_code)
             cons.add_data(bytes(), resp_data)
+            if not is_valid_response:
+                self.save_invalid_response(cons, resp_code)
             last_recv = resp_code
             with self.analyzer.lock:
                 self.analyzer.res_types_update(resp_code)
@@ -259,7 +288,7 @@ class Executor:
             
             if proc.poll() is not None:
                 if not self._handle_crash_if_detected(cons, proc, msg_type, last_msg):
-                    cons.add_state(msg_type, 'TIMEOUR')
+                    cons.add_state(msg_type, 'CLOSED')
                     cons.add_data(bytes(), bytes())
                     logger.debug('server close')
                 break
@@ -282,7 +311,7 @@ class Executor:
                     # crash
                     # normal
                     if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
-                        cons.add_state(msg_type, 'CLOSED')
+                        cons.add_state(msg_type, 'POLLERR')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
@@ -315,6 +344,13 @@ class Executor:
                     if(resp_code == None):
                         logger.debug('Executor: parse error')
                         continue
+
+                    is_valid_response = True
+                    if resp_data is not None:
+                        is_valid_response = self.check_response(
+                            resp_code,
+                            resp_data
+                        )
                     
                     with self.analyzer.lock:
                         self.analyzer.res_num += 1
@@ -327,6 +363,8 @@ class Executor:
                     if(req_data and resp_data):
                         cons.add_data(req_data, resp_data)
                     cons.add_state(msg_type, resp_code)
+                    if not is_valid_response:
+                        self.save_invalid_response(cons, resp_code)
             
             # If socket closed, stop sending
             else:
@@ -351,32 +389,9 @@ class Executor:
         self._handle_crash_if_detected(cons, proc, last_msg_type, last_msg)
         
         # close process
-        try:
-            if proc.poll() is None:
-                if configs.fuzz_mode == 'fuzz':
-                    os.killpg(proc.pid, signal.SIGTERM)
-                    returncode = proc.wait(timeout=3)
-                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
-                elif configs.fuzz_mode == 'replay':
-                    os.killpg(proc.pid, signal.SIGUSR1)
-                    returncode = proc.wait(timeout=3)
-                    logger.debug(f'close sut [returncode: {returncode} pid: {proc.pid}]')
-        except Exception as err:
-            logger.debug(f'proc close err: {err}')
-            
-        while True:
-            try:
-                os.killpg(proc.pid, 0)
-                # no die, just kill
-                stderr = proc.communicate(timeout=1)
-                time.sleep(0.1)
-                os.killpg(proc.pid, signal.SIGKILL)
-                logger.debug(f'try to kill: {proc.pid} {stderr}')
-            except Exception as e:
-                # sub-subprocess die out
-                analyzer.sut_proc = None
-                logger.debug(f'target process already closed: {e}')
-                break
+        close_signal = signal.SIGUSR1 if configs.fuzz_mode == 'replay' else signal.SIGTERM
+        self._terminate_process_group(proc, close_signal, timeout=3)
+        analyzer.sut_proc = None
         
         # ensure sub-subprocess die
         # if proc.poll is None:
@@ -395,21 +410,41 @@ class Executor:
         
         # kill clean script
         if clean != None:
-            try:
-                os.killpg(clean.pid, 0)
-                
-                # no die, just kill
-                os.killpg(clean.pid, signal.SIGKILL)
-                logger.debug(f"clean process: clean process alive")
-            except Exception as e:
-                # sub-subprocess die out
-                # logger.debug(f'clean process: {e}')
-                pass
+            self._terminate_process_group(clean, signal.SIGKILL, timeout=1)
                 
 
         # self.post_exe()
         logger.debug("<<<Executor: interact done")
         return True, cons
+
+    def _terminate_process_group(
+        self,
+        proc: subprocess.Popen,
+        sig: signal.Signals,
+        timeout: float
+    ) -> None:
+        """Terminate a SUT process tree that was started with start_new_session."""
+        try:
+            if proc.poll() is None:
+                os.killpg(proc.pid, sig)
+                returncode = proc.wait(timeout=timeout)
+                logger.debug(f'close process group [returncode: {returncode} pid: {proc.pid}]')
+                return
+        except subprocess.TimeoutExpired:
+            logger.debug(f'process group did not stop after {sig.name}: {proc.pid}')
+        except ProcessLookupError:
+            logger.debug(f'process group already closed: {proc.pid}')
+            return
+        except Exception as err:
+            logger.debug(f'process group close err: {err}')
+
+        try:
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
+                returncode = proc.wait(timeout=1)
+                logger.debug(f'killed process group [returncode: {returncode} pid: {proc.pid}]')
+        except Exception as err:
+            logger.debug(f'process group kill err: {err}')
     
     def kill_listeners(
         self,
@@ -730,7 +765,7 @@ class Executor:
         if return_code != 0:
             stdout, stderr = self._read_process_output(proc)
 
-        if self._is_crash(return_code, stderr):
+        if self._is_crash(return_code, stdout, stderr):
             self.handle_crash(cons, proc, msg_type, msg, stdout, stderr)
             return True
 
@@ -739,6 +774,7 @@ class Executor:
     def _is_crash(
         self,
         return_code: int | None,
+        stdout: str = '',
         stderr: str = ''
     ) -> bool:
         if return_code is None:
@@ -747,7 +783,14 @@ class Executor:
         if return_code in CRASH_SIGNALS or return_code in CRASH_EXIT_CODES:
             return True
 
-        return return_code != 0 and any(marker in stderr for marker in ASAN_CRASH_MARKERS)
+        if return_code == 0:
+            return False
+
+        output = f'{stdout}\n{stderr}'
+        if any(marker in output for marker in ASAN_CRASH_MARKERS):
+            return True
+
+        return any(pattern.search(output) for pattern in RUNTIME_EXCEPTION_PATTERNS)
     
     def _read_process_output(
         self,
@@ -783,6 +826,101 @@ class Executor:
                 self.parser_func = obj
         except Exception as e:
             logger.debug(f'Mapper: generated failure {e}')
+
+    def load_checkers(
+        self,
+        checkers: dict[str, Checker]
+    ) -> None:
+        """Load the latest generated checker for each response type."""
+        self.checker_funcs = {}
+        for msg_type, checker in checkers.items():
+            namespace = {}
+            try:
+                with open(self.mapper.c_path(checker), 'r', encoding='utf-8') as f:
+                    exec(f.read(), namespace)
+                checker_func: Callable = namespace.get('packet_checker')
+                if not callable(checker_func):
+                    raise TypeError('packet_checker is missing or not callable')
+                self.checker_funcs[msg_type] = checker_func
+            except Exception as e:
+                logger.debug(
+                    f'Executor: checker load failure [{msg_type}] {e}'
+                )
+
+    def check_response(
+        self,
+        response_type: str,
+        response: bytes
+    ) -> bool:
+        """Validate a response with the checker selected by parser output."""
+        checker = self.checker_funcs.get(response_type)
+        if checker is None:
+            checker = self.checker_funcs.get('__all__')
+        if checker is None:
+            logger.debug(
+                f'Executor: no checker for response type {response_type}'
+            )
+            return True
+
+        try:
+            is_valid = checker(response)
+            if not isinstance(is_valid, bool):
+                raise TypeError('packet_checker must return bool')
+        except Exception as e:
+            logger.debug(
+                f'Executor: checker failure [{response_type}] {e}'
+            )
+            is_valid = False
+
+        if is_valid:
+            return True
+
+        logger.debug(
+            f'Executor: non-conforming response [{response_type}] {response!r}'
+        )
+        return False
+
+    def save_invalid_response(
+        self,
+        cons: Conversation,
+        response_type: str
+    ) -> None:
+        """Save the request/response prefix that produced an invalid response."""
+        target_folder = configs.results_path / 'invalid_responses'
+        target_folder.mkdir(parents=True, exist_ok=True)
+
+        file_count = sum(
+            1
+            for path in target_folder.iterdir()
+            if path.is_file() and path.suffix == '.pkl'
+        )
+        file_id = f'{file_count:06d}'
+
+        with open(target_folder / f'cons_{file_id}.pkl', 'wb') as f:
+            pickle.dump(cons, f)
+
+        with open(
+            target_folder / f'cons_{file_id}.raw',
+            'wb'
+        ) as f:
+            for request, response in cons.content:
+                f.write(b'REQUEST ' + str(len(request)).encode() + b'\n')
+                f.write(request + b'\n')
+                f.write(b'RESPONSE ' + str(len(response)).encode() + b'\n')
+                f.write(response + b'\n')
+
+        with open(
+            target_folder / f'cons_{file_id}.info',
+            'w',
+            encoding='utf-8'
+        ) as f:
+            f.write(f'response_type: {response_type}\n')
+            f.write(f'request_types: {cons.req_seq}\n')
+            f.write(f'response_types: {cons.res_seq}\n')
+
+        logger.debug(
+            f'Executor: saved invalid response sequence cons_{file_id}'
+        )
         
     def save_cons(
         self,

@@ -5,11 +5,13 @@ import json, asyncio
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
 import traceback
+from urllib.parse import quote
 
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
+from voltron.synthesizer.checker import Checker
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 from voltron.llm.chatter import AsyncChater
@@ -19,7 +21,7 @@ from dataclasses import dataclass, asdict, field
 
 
 class AsyncProducer:
-    """Prepare message Producer (input generator and packet parser).
+    """Prepare message producer, parser, mutator, and response checker.
     
     Atrributes:
         *_path: lots of file path
@@ -31,6 +33,7 @@ class AsyncProducer:
         poss_response: possible response for each request message
         generators: the generated input generators
         parsers: the generated packet parsers
+        checkers: the generated response conformance checkers
         mutators: the generated mutators
     """
 
@@ -49,26 +52,21 @@ class AsyncProducer:
         self.generator_path = self.synthesizer_path / 'generators'
         self.mutator_path = self.synthesizer_path / 'mutators'
         self.parser_path = self.synthesizer_path / 'parsers'
+        self.checker_path = self.synthesizer_path / 'checkers'
         self.info_path = configs.info_path
         
         self.generator_info_path = self.generator_path / 'generator_info.json'
         self.parser_info_path = self.parser_path / 'parser_info.json'
+        self.checker_info_path = self.checker_path / 'checker_info.json'
         self.mutator_info_path = self.mutator_path / 'mutator_info.json'
         
-        if (not self.equipment_path.is_dir()):
-            self.equipment_path.mkdir()
-            
-        if (not self.synthesizer_path.is_dir()):
-            self.synthesizer_path.mkdir()
-
-        if not self.generator_path.is_dir():
-            self.generator_path.mkdir()
-
-        if not self.parser_path.is_dir():
-            self.parser_path.mkdir()
-            
-        if not self.mutator_path.is_dir():
-            self.mutator_path.mkdir()
+        for path in (
+            self.generator_path,
+            self.parser_path,
+            self.checker_path,
+            self.mutator_path,
+        ):
+            path.mkdir(parents=True, exist_ok=True)
 
         self.chater = chater
         self.rfcp = rfcp
@@ -81,12 +79,13 @@ class AsyncProducer:
         
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
+        self.checkers: dict[str, list[Checker]] = {}
         self.mutators: dict[str, list[Generator]] = {}
             
     def run(
         self
     ):
-        """run the producer to generate initial generator and parser
+        """Load or generate initial generators, parser, checker, and mutators.
         """
         # load existed generator info or generate init generators
         if(self.generator_info_path.is_file()):
@@ -99,6 +98,11 @@ class AsyncProducer:
                 logger.debug(f'Producer: generator load error {e}')
                 exit(1)
         else:
+            if not configs.spec_knowledge:
+                raise RuntimeError(
+                    'Specification knowledge is disabled, but no cached '
+                    f'generators exist at {self.generator_info_path}'
+                )
             self.generator_gen()
         
         # load existed parser info or generate init parser
@@ -108,10 +112,55 @@ class AsyncProducer:
                     parser_info = json.load(f)
                     self.parsers_info_load(parser_info)
                 logger.debug("Producer: load parser info")
+                if (
+                    configs.spec_knowledge
+                    and not self._parser_cache_matches_primary_field()
+                ):
+                    logger.debug(
+                        'Producer: parser cache does not match the primary '
+                        'response field; regenerating'
+                    )
+                    self.parsers = []
+                    self.parser_gen()
             except Exception as e:
                 logger.debug(f'Producer: parser load error {e}')
         else:
+            if not configs.spec_knowledge:
+                raise RuntimeError(
+                    'Specification knowledge is disabled, but no cached '
+                    f'parser exists at {self.parser_info_path}'
+                )
             self.parser_gen()
+
+        # Load an existing checker or synthesize the initial checker from IR.
+        if self.checker_info_path.is_file():
+            try:
+                with open(self.checker_info_path, 'r', encoding='utf-8') as f:
+                    checker_info = json.load(f)
+                if isinstance(checker_info, dict):
+                    self.checkers_info_load(checker_info)
+                    logger.debug("Producer: load checker info")
+                    if (
+                        configs.spec_knowledge
+                        and not self._checker_cache_matches_response_types()
+                    ):
+                        logger.debug(
+                            'Producer: checker cache does not match response '
+                            'types from the primary state field; regenerating'
+                        )
+                        self.checker_gen()
+                elif configs.spec_knowledge:
+                    logger.debug(
+                        "Producer: legacy checker cache detected; regenerating"
+                    )
+                    self.checker_gen()
+                else:
+                    self.legacy_checkers_info_load(checker_info)
+                    logger.debug("Producer: load legacy checker info")
+            except Exception as e:
+                logger.debug(f'Producer: checker load error {e}')
+        elif configs.spec_knowledge:
+            self.checker_gen()
         
         # load existed parser info or generate init mutator
         if (self.mutator_info_path.is_file()):
@@ -122,6 +171,20 @@ class AsyncProducer:
                 logger.debug("Mutator: load mutator info")
             except Exception as e:
                 logger.debug(f'Mutator: load error {e}')
+
+        if not configs.spec_knowledge:
+            self.generators = {
+                msg_type: generators[:1]
+                for msg_type, generators in self.generators.items()
+                if generators
+            }
+            self.parsers = self.parsers[:1]
+            self.checkers = {
+                msg_type: checkers[:1]
+                for msg_type, checkers in self.checkers.items()
+                if checkers
+            }
+            self.mutators = {}
 
     async def _generator_gen_one(
         self,
@@ -158,7 +221,7 @@ class AsyncProducer:
     async def _generator_gen_async(
         self
     ):
-        sem = asyncio.Semaphore(configs.async_sem)
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
             self._generator_gen_one(msg, sem)
             for msg in self.req_ir.findall("message") 
@@ -244,6 +307,9 @@ class AsyncProducer:
                     exec(input_code, name_space)
                     obj = name_space[f'generate']
                     obj()
+                    msg: bytes | None = obj()
+                    if msg == None or msg == b'':
+                        raise Exception('mutate return empty')
                     with analyzer.lock:
                         analyzer.finished += 1
                     return msg_type, input_code
@@ -255,7 +321,7 @@ class AsyncProducer:
         doc_info: str,
         machine: MealyMachine
     ):
-        sem = asyncio.Semaphore(configs.async_sem)
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
             self._generator_evo_one(msg_type=msg_type, doc_info=doc_info, machine=machine, sem=sem)
             for msg_type in self.req_types
@@ -322,11 +388,7 @@ class AsyncProducer:
             doc_info: the document information to be used for mutator evolution
             req_res: the actual response for each request message, which provides the information for mutator evolution
         """
-        old_m = None
-        if msg_type in self.mutators.keys():
-            old_m = self.mutators[msg_type][-1]
-        else:
-            old_m = self.generators[msg_type][-1]
+        old_m = self.generators[msg_type][-1]
         old_m_path = old_m.path
         old_code = ''
         with open(old_m_path, 'r', encoding='utf-8') as f:
@@ -359,7 +421,9 @@ class AsyncProducer:
                     name_space = {}
                     exec(mutate_code, name_space)
                     obj = name_space[f'mutate']
-                    obj()
+                    msg: bytes | None = obj()
+                    if msg == None or msg == b'':
+                        raise Exception('mutate return empty')
                     
                     # exec(havoc_code, name_space)
                     # obj = name_space[f'havoc_{msg_type}']
@@ -376,7 +440,7 @@ class AsyncProducer:
         doc_info: str,
         req_res
     ) -> list[tuple[str, str]]:
-        sem = asyncio.Semaphore(configs.async_sem)
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
             self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, req_res=req_res, sem=sem)
             for msg_type in self.req_types
@@ -441,7 +505,7 @@ class AsyncProducer:
     async def _parser_gen_async(
             self
     ):
-        res_info = json.dumps(self.rfcp.res_json)
+        res_info = self._primary_response_field_info()
         while(True):
             try:
                 # generate input generator and save it
@@ -465,17 +529,173 @@ class AsyncProducer:
         init_p_path = self.parser_path / 'id0.py'
         with open(init_p_path, 'w', encoding='utf-8') as f:
             f.write(result)
-            info: dict = {'evolved_from': 'init', 'name': 'id0'}
+            info: dict = {
+                'evolved_from': 'init',
+                'name': 'id0',
+                'state_field': self._primary_response_field_name()
+            }
             self.parsers.append(Parser(**info))
         with open(self.parser_info_path, 'w', encoding='utf-8') as f:
             json.dump(self.parser_info(), f)
         logger.debug("[Producer]: finish parser generation")
+
+    async def _checker_gen_one(
+            self,
+            response_type: str,
+            msg,
+            res_info: str,
+            sem: asyncio.Semaphore
+    ) -> tuple[str, str]:
+        msg_ir = etree.tostring(
+            msg,
+            encoding='utf-8',
+            pretty_print=True
+        ).decode('utf-8')
+
+        async with sem:
+            while True:
+                try:
+                    checker_code = await self.chater.llm_checker_gen(
+                        pro_name=self.rfcp.pro_name,
+                        msg_ir=msg_ir,
+                        res_info=res_info,
+                        response_type=response_type
+                    )
+                    compile(checker_code, '<string>', 'exec')
+                    namespace = {}
+                    exec(checker_code, namespace)
+                    checker_func = namespace.get('packet_checker')
+                    if not callable(checker_func):
+                        raise TypeError(
+                            'packet_checker is missing or not callable'
+                        )
+                    result = checker_func(b'')
+                    if not isinstance(result, bool):
+                        raise TypeError('packet_checker must return bool')
+                    return response_type, checker_code
+                except Exception as e:
+                    logger.debug(
+                        f'[Checker Generation][{response_type}]: '
+                        f'invalid checker {e}'
+                    )
+
+    async def _checker_gen_async(
+            self
+    ) -> list[tuple[str, str]]:
+        if not hasattr(self, 'res_ir'):
+            raise RuntimeError('Response IR is unavailable for checker generation')
+
+        messages = self.res_ir.findall('message')
+        if not messages:
+            raise RuntimeError('Response IR does not contain any messages')
+
+        response_types = self._response_types_from_primary_field()
+        res_info = self._primary_response_field_info()
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
+        tasks = [
+            self._checker_gen_one(
+                response_type,
+                self._checker_ir_for_response_type(
+                    response_type,
+                    messages
+                ),
+                res_info,
+                sem
+            )
+            for response_type in response_types
+        ]
+        return await tqdm_asyncio.gather(*tasks, desc='checker')
+
+    def checker_gen(
+            self
+    ) -> None:
+        """Generate one initial response checker for each response type."""
+        results = asyncio.run(self._checker_gen_async())
+        self.checkers = {}
+
+        for msg_type, checker_code in results:
+            msg_dir = self.checker_path / quote(msg_type, safe='._-')
+            msg_dir.mkdir(parents=True, exist_ok=True)
+            checker_path = msg_dir / 'id0.py'
+            with open(checker_path, 'w', encoding='utf-8') as f:
+                f.write(checker_code)
+
+            checker = Checker(
+                msg_type=msg_type,
+                evolved_from='init',
+                name='id0',
+                path=str(checker_path.resolve()),
+                state_field=self._primary_response_field_name()
+            )
+            self.checkers.setdefault(msg_type, []).append(checker)
+
+        with open(self.checker_info_path, 'w', encoding='utf-8') as f:
+            json.dump(self.checker_info(), f)
+
+        logger.debug("[Producer]: finish checkers generation")
+
+    def _response_types_from_primary_field(
+        self
+    ) -> list[str]:
+        field = json.loads(self._primary_response_field_info())[0]
+        values = field.get('value')
+        if not isinstance(values, list) or not values:
+            raise RuntimeError(
+                'The first response-state field must define a non-empty '
+                'value list for checker generation'
+            )
+        return list(dict.fromkeys(str(value) for value in values))
+
+    def _checker_ir_for_response_type(
+        self,
+        response_type: str,
+        messages: list
+    ):
+        """Select dedicated IR when available, otherwise retain generic IR."""
+        for message in messages:
+            if str(message.get('name', '')) == response_type:
+                return message
+
+        state_field = self._primary_response_field_name()
+        normalized_state_field = self._normalize_field_name(state_field)
+        for message in messages:
+            for field in message.findall('field'):
+                if (
+                    self._normalize_field_name(field.get('name', ''))
+                    != normalized_state_field
+                ):
+                    continue
+                if str(field.get('value', '')).strip() == response_type:
+                    return message
+
+        if len(messages) == 1:
+            return messages[0]
+        return self.res_ir
+
+    @staticmethod
+    def _normalize_field_name(
+        field_name: str
+    ) -> str:
+        return ''.join(char.lower() for char in field_name if char.isalnum())
+
+    def _checker_cache_matches_response_types(
+        self
+    ) -> bool:
+        expected_types = set(self._response_types_from_primary_field())
+        if set(self.checkers) != expected_types:
+            return False
+        state_field = self._primary_response_field_name()
+        return all(
+            checkers
+            and checkers[-1].state_field == state_field
+            for checkers in self.checkers.values()
+        )
         
     async def _parser_evo_one(
         self,
         message
     ):
-        res_info = json.dumps(self.rfcp.res_json)
+        res_info = self._primary_response_field_info()
         old_code = ''
         old_p_name = f'{self.parsers[-1].name}.py'
         old_p_path = self.parser_path / old_p_name
@@ -500,6 +720,32 @@ class AsyncProducer:
             except Exception as e:
                 logger.debug(f'Producer: generate error {e}')
 
+    def _primary_response_field_info(
+        self
+    ) -> str:
+        """Serialize only the first response-state field descriptor."""
+        if not self.rfcp.res_json:
+            raise RuntimeError(
+                'Response field information is empty; parser generation '
+                'requires the first state-field descriptor'
+            )
+        return json.dumps([self.rfcp.res_json[0]])
+
+    def _primary_response_field_name(
+        self
+    ) -> str:
+        field = json.loads(self._primary_response_field_info())[0]
+        return str(field.get('field_name') or field.get('name') or '')
+
+    def _parser_cache_matches_primary_field(
+        self
+    ) -> bool:
+        if not self.parsers:
+            return False
+        return self.parsers[-1].state_field == (
+            self._primary_response_field_name()
+        )
+
     def parser_evo(
         self,
         message
@@ -522,7 +768,11 @@ class AsyncProducer:
             
             old_name = self.parsers[-1].name
             new_name = f'id{cur_id}'
-            info: dict = {'evolved_from': old_name, 'name': new_name}
+            info: dict = {
+                'evolved_from': old_name,
+                'name': new_name,
+                'state_field': self._primary_response_field_name()
+            }
             self.parsers.append(Parser(**info))
                 
         # save the information of new parser to file   
@@ -566,6 +816,15 @@ class AsyncProducer:
         for p in self.parsers:
             info.append(asdict(p))
         return info
+
+    def checker_info(
+        self
+    ) -> dict:
+        """Map each response type to its generated checker metadata."""
+        return {
+            msg_type: [asdict(checker) for checker in checkers]
+            for msg_type, checkers in self.checkers.items()
+        }
     
     def generators_info_load(
         self,
@@ -598,3 +857,32 @@ class AsyncProducer:
     ):
         for p in info:
             self.parsers.append(Parser(**p))
+
+    def checkers_info_load(
+        self,
+        info: dict
+    ):
+        for msg_type, checkers in info.items():
+            for checker in checkers:
+                checker.setdefault('msg_type', msg_type)
+                checker.setdefault('state_field', '')
+                self.checkers.setdefault(msg_type, [])
+                self.checkers[msg_type].append(Checker(**checker))
+
+    def legacy_checkers_info_load(
+        self,
+        info: list
+    ):
+        """Load the former single-checker cache as a global fallback."""
+        for checker in info:
+            name = checker.get('name', 'id0')
+            path = self.checker_path / f'{name}.py'
+            legacy = Checker(
+                msg_type='__all__',
+                evolved_from=checker.get('evolved_from', 'init'),
+                name=name,
+                path=str(path.resolve()),
+                state_field='',
+                checked_res=checker.get('checked_res', [])
+            )
+            self.checkers.setdefault('__all__', []).append(legacy)

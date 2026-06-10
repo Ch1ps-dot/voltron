@@ -10,12 +10,33 @@ import click, random
 @click.option("-t", "--time", type=str, required=True, help="fuzzing time (minute)")
 @click.option("-c", "--cmdline", type=str, default='auto', help="cmd line to invoke target")
 @click.option("-o", "--output", type=str, default='default', help="output path for fuzzing results")
+@click.option(
+    "--spec-knowledge/--no-spec-knowledge",
+    default=True,
+    show_default=True,
+    help="Enable RFC/IR knowledge. Disabled mode requires cached seed generators and parser.",
+)
+@click.option(
+    "--state-learning/--no-state-learning",
+    default=True,
+    show_default=True,
+    help="Enable active Mealy-machine learning before fuzzing.",
+)
+@click.option(
+    "--guided-scheduling/--no-guided-scheduling",
+    default=True,
+    show_default=True,
+    help="Enable state/dependency-guided scheduling and feedback-based energy.",
+)
 def main(
     sut: str, 
     algorithm: str, 
     time: str, 
     cmdline: str,
-    output: str
+    output: str,
+    spec_knowledge: bool,
+    state_learning: bool,
+    guided_scheduling: bool,
 ):
     if cmdline == 'auto':
         with open(configs.base_path / 'config' / 'subjects' / sut / 'run.sh', 'r') as f:
@@ -23,7 +44,10 @@ def main(
     fuzzer = Fuzzer(
         target_name=sut,
         cmdline=cmdline.split(' '),
-        output=output
+        output=output,
+        spec_knowledge=spec_knowledge,
+        state_learning=state_learning,
+        guided_scheduling=guided_scheduling,
     )
     fuzzer.fuzz(
         algo=algorithm,

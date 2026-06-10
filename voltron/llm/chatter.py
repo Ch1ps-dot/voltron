@@ -6,7 +6,7 @@ from string import Template
 import asyncio
 
 from voltron.llm.prompt import Prompter
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_llm as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 
@@ -14,13 +14,17 @@ class AsyncChater:
     """Chat with llm through api and manage the context.
     """
     def __init__(
-            self
+        self,
+        base_url: str,
+        api_key: str,
+        model: str
     ) -> None:
         self.configs = configs
         client = AsyncOpenAI(
-            base_url=configs.base_url,
-            api_key=configs.api_key
+            base_url=base_url,
+            api_key=api_key
         )
+        self.model = model
 
         self.clt = client
         self.pmp = Prompter(configs.pmp_path)
@@ -46,7 +50,7 @@ class AsyncChater:
             try:
                 start = time.perf_counter()
                 completion = await self.clt.chat.completions.create(
-                    model=configs.model,
+                    model=self.model,
                     messages=[
                         {"role": "system", "content": "You are a protocol analyzer."},
                         {"role": "user", "content": prompt}
@@ -58,7 +62,7 @@ class AsyncChater:
                 
                 response = completion.choices[0].message.content
 
-                logger.debug(f"[Chat]:{usage} cost_time:{end - start} resp: {response}")
+                logger.debug(f"[Chat]:{usage} cost_time:{end - start} \n ask: {prompt} resp: {response}")
                 with analyzer.lock:
                     analyzer.chat_time_s += end - start
                     if completion.usage != None:
@@ -78,7 +82,8 @@ class AsyncChater:
             self,
             rfc_num: str,
             pro_name: str,
-            rfc_doc: str
+            rfc_doc: str,
+            error_msg: str = ""
     ) -> str | None:
         tmp = self.pmp._tem_doc_analyze
         pmp = tmp.substitute(rfc_num = rfc_num, pro_name = pro_name, rfc_doc = rfc_doc)
@@ -256,6 +261,28 @@ class AsyncChater:
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "parser_gen"
+        )
+
+        return self.code_extract(ans)
+
+    async def llm_checker_gen(
+            self,
+            pro_name: str,
+            msg_ir: str,
+            res_info: str,
+            response_type: str
+    ) -> str:
+        """Generate a response conformance checker from response-message IR."""
+        tmp = self.pmp._tem_gen_checker
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            msg_ir=msg_ir,
+            res_info=res_info,
+            response_type=response_type
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="checker_gen"
         )
 
         return self.code_extract(ans)

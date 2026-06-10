@@ -127,12 +127,29 @@ Common options:
 - `-t, --time`: fuzzing time in minutes
 - `-c, --cmdline`: optional command line override, defaults to the target `run.sh`
 - `-o, --output`: optional custom results directory
+- `--spec-knowledge/--no-spec-knowledge`: enable or ablate RFC/IR knowledge
+- `--state-learning/--no-state-learning`: enable or skip Mealy-machine learning
+- `--guided-scheduling/--no-guided-scheduling`: enable or ablate state/dependency-guided scheduling
 
 Example:
 
 ```bash
 uv run cli.py -s lightftp -a state -t 30
 ```
+
+For ablation runs, each switch can be disabled independently:
+
+```bash
+uv run cli.py -s lightftp -a state -t 30 --no-state-learning
+uv run cli.py -s lightftp -a state -t 30 --no-guided-scheduling
+uv run cli.py -s lightftp -a state -t 30 --no-spec-knowledge
+```
+
+The no-specification mode is a fixed-seed baseline. Run the full configuration
+once first so `component/equipment/<target>/` contains seed generators and a
+response parser. The ablated run loads only the first cached generator for each
+request type and the first cached parser; it disables RFC parsing, request
+dependencies, mutators, generator evolution, and parser evolution.
 
 ## First Run Behavior
 
@@ -153,8 +170,11 @@ During and after execution, the repository accumulates several kinds of outputs:
 
 - `component/ir/<protocol>/`: parsed RFC trees, field descriptions, message IR, and state dependencies
 - `component/models/<target>/`: learned or evolved automata models
-- `component/equipment/<target>/`: synthesized generators, parsers, and mutators
+- `component/equipment/<target>/`: synthesized generators, parsers,
+  per-response-type checkers, and mutators
 - `results-<target>-voltron-<timestamp>/`: final run statistics and discovered state information
+- `results-<target>-voltron-<timestamp>/invalid_responses/`: request/response
+  sequence prefixes whose parsed response failed its type-specific checker
 
 Depending on runtime configuration, log files may also be generated for debugging and crash triage.
 
@@ -165,4 +185,3 @@ Depending on runtime configuration, log files may also be generated for debuggin
 ## Supported Targets
 
 The current configuration includes examples for several protocols and implementations, including FTP, HTTP, SMTP, SIP, RTSP, TFTP, CoAP, DNS, and DTLS targets.
-

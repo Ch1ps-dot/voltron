@@ -1,9 +1,9 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit
+import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, subprocess
 
 from voltron.executor.conversation import Conversation
 
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 
 from voltron.llm.chatter import AsyncChater
 
@@ -15,7 +15,7 @@ from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
 from voltron.executor.mapper import Mapper
-from voltron.scheduler.havoc import Havoc
+from voltron.scheduler.berserker import Havoc
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
@@ -28,8 +28,9 @@ def exit_handler():
         if thread.ident:
             fra = sys._current_frames().get(thread.ident)
             logger.debug('\n'.join(traceback.format_stack(fra)))
-            
-atexit.register(exit_handler)
+
+if os.getenv('VOLTRON_DUMP_THREADS_ON_EXIT') == '1':
+    atexit.register(exit_handler)
 
 class Fuzzer:
     def __init__(
@@ -37,15 +38,25 @@ class Fuzzer:
             target_name: str,
             cmdline: list[str] = [],
             mode='fuzz',
-            output='default'
+            output='default',
+            spec_knowledge: bool = True,
+            state_learning: bool = True,
+            guided_scheduling: bool = True,
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
         self.mode = mode
         self.output = output
+        self.spec_knowledge = spec_knowledge
+        self.state_learning = state_learning
+        self.guided_scheduling = guided_scheduling
+        self._cleanup_lock = threading.RLock()
+        self._cleanup_done = False
+        self._previous_sigint_handler = None
         
         self.load_configs()
         self.module_init()
+        atexit.register(self.cleanup)
         
     def load_configs(
         self
@@ -75,10 +86,15 @@ class Fuzzer:
         for rfc in configs.rfc_name:
             configs.doc_paths.append(configs.base_path / 'config' / 'rfcs' / f'{rfc}.txt')
         configs.pmp_path = configs.base_path / 'skills'
-        configs.base_url = configs_yaml['llm']['base_url']
-        configs.api_key = configs_yaml['llm']['api_key']
-        configs.model = configs_yaml['llm']['model']
-        configs.async_sem = configs_yaml['llm']['async_sem']
+        configs.base_url_doc = configs_yaml['llm_doc']['base_url']
+        configs.api_key_doc = configs_yaml['llm_doc']['api_key']
+        configs.model_doc = configs_yaml['llm_doc']['model']
+        configs.async_sem_doc = configs_yaml['llm_doc']['async_sem']
+        
+        configs.base_url_fuzz = configs_yaml['llm_fuzz']['base_url']
+        configs.api_key_fuzz = configs_yaml['llm_fuzz']['api_key']
+        configs.model_fuzz = configs_yaml['llm_fuzz']['model']
+        configs.async_sem_fuzz = configs_yaml['llm_fuzz']['async_sem']
         configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()
@@ -96,6 +112,9 @@ class Fuzzer:
         
         configs.results_path = results_dir
         configs.fuzz_mode = self.mode
+        configs.spec_knowledge = self.spec_knowledge
+        configs.state_learning = self.state_learning
+        configs.guided_scheduling = self.guided_scheduling
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name
@@ -105,7 +124,8 @@ class Fuzzer:
     ) -> None:
 
         # llm init
-        self.chater = AsyncChater()
+        self.chater = AsyncChater(configs.base_url_doc, configs.api_key_doc, configs.model_doc)
+        self.chater_fuzz = AsyncChater(configs.base_url_fuzz, configs.api_key_fuzz, configs.model_fuzz)
         print('Chater: setup')
         
         # metrics analyzer
@@ -115,12 +135,12 @@ class Fuzzer:
         self.rfcparser = AsyncRFCParser(
             chater=self.chater
         )
-        self.rfcparser.run()
+        self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
         print('RFCParser: setup')
 
         # handler init
         self.producer = AsyncProducer(
-            chater=self.chater,
+            chater=self.chater_fuzz,
             rfcp=self.rfcparser
         )
         self.producer.run()
@@ -166,7 +186,7 @@ class Fuzzer:
             analyzer.start_time = start_time
 
         try:
-            signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+            self._install_signal_handlers()
             
             # start fuzzing and set up ui
             t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
@@ -178,15 +198,15 @@ class Fuzzer:
             t_fuzz.join()
             t_ui.join()
             
+        except KeyboardInterrupt:
+            logger.debug('Fuzzer: interrupted')
         except Exception as e:
             logger.debug(f'fuzzer error: {e}')
             logger.debug(traceback.format_exc())
             self.stop_event.set()
+        finally:
+            self.cleanup()
         logger.debug('Fuzzer: finish fuzzing')
-        
-        # collect results
-        with analyzer.lock:
-            analyzer.collect_results()
             
     def replay(
         self,
@@ -202,7 +222,7 @@ class Fuzzer:
             analyzer.start_time = start_time
 
         try:
-            signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+            self._install_signal_handlers()
             
             # start fuzzing and set up ui
             t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
@@ -214,10 +234,14 @@ class Fuzzer:
             t_fuzz.join()
             t_ui.join()
             
+        except KeyboardInterrupt:
+            logger.debug('Replay: interrupted')
         except Exception as e:
             logger.debug(f'replay error: {e}')
             logger.debug(traceback.format_exc())
             self.stop_event.set()
+        finally:
+            self.cleanup()
         logger.debug('Fuzzer: finish replay')
                        
     def state_fuzz(
@@ -225,29 +249,31 @@ class Fuzzer:
         stop_event: threading.Event
     ):
         try:
-            # set membership query and equivelence query method.
-            mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
-            eq = EquOracle(mapper=self.mapper, executor=self.exe)
-            
             with analyzer.lock:   
                 analyzer.iter = 0
-                analyzer.stage = 'model learning'
+                analyzer.stage = (
+                    'model learning'
+                    if self.state_learning
+                    else 'model learning disabled'
+                )
                 
             if not configs.models_path.is_dir():
                 configs.models_path.mkdir()
             
-            # load previous automata model if it existed
             hypothesis: MealyMachine | None = None
-            h_path = configs.models_path / 'evolved_hypothesis.pkl'
-            if h_path.is_file():
-                with open(h_path, 'rb') as f:
-                    hypothesis = pickle.load(f)
-            
             begin_time = time.time()
-            if hypothesis is None:
-                hypothesis = self.model_learning(mq, eq, stop_event)
-            else:
-                self.mapper.message_pool = hypothesis.map
+            if self.state_learning:
+                mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
+                eq = EquOracle(mapper=self.mapper, executor=self.exe)
+                h_path = configs.models_path / 'evolved_hypothesis.pkl'
+                if h_path.is_file():
+                    with open(h_path, 'rb') as f:
+                        hypothesis = pickle.load(f)
+
+                if hypothesis is None:
+                    hypothesis = self.model_learning(mq, eq, stop_event)
+                else:
+                    self.mapper.message_pool = hypothesis.map
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
@@ -295,7 +321,8 @@ class Fuzzer:
                     analyzer.stage = 'fuzzer evolve'
                 if len(h_lsit) == 0:
                     h_lsit.append(h)
-                    self.producer.generator_evo(h)
+                    if self.spec_knowledge:
+                        self.producer.generator_evo(h)
                     continue
                 last_trans_num = len(h_lsit[-1].res_trans_types.keys())
                 cur_trans_num = len(h.res_trans_types.keys())
@@ -312,7 +339,8 @@ class Fuzzer:
                 
                 elif last_trans_num < cur_trans_num:
                     h_lsit.append(h)
-                    self.producer.generator_evo(h)
+                    if self.spec_knowledge:
+                        self.producer.generator_evo(h)
                     continue
 
             except Exception as e:
@@ -328,7 +356,7 @@ class Fuzzer:
     
     def havoc_fuzz(
         self,
-        hypothesis: MealyMachine,
+        hypothesis: MealyMachine | None,
         stop_event
     ):
         """--- havoc fuzzing ---"""
@@ -338,14 +366,20 @@ class Fuzzer:
             analyzer.res_types_cnt = {}
             analyzer.resp_trans_cnt = {}
         
-        havoc = Havoc(self.mapper, self.exe, hypothesis)
+        havoc = Havoc(
+            self.mapper,
+            self.exe,
+            hypothesis,
+            use_guidance=self.guided_scheduling,
+        )
                     
         while not stop_event.is_set():
             try:
                 # init new learning process with previous model and run fuzzer
 
                 req_res = havoc.run(500)
-                self.producer.generator_mutate(req_res)
+                if self.spec_knowledge:
+                    self.producer.generator_mutate(req_res)
                 pre_resp = analyzer.cur_res_types_cnt.keys()
                 
                 # save the results
@@ -426,20 +460,89 @@ class Fuzzer:
         frame
     ):
         # Handle normal exit of fuzzer Ctrl+C
-        if analyzer.sut_proc != None:
-            os.killpg(analyzer.sut_proc.pid, signal.SIGKILL)
-            
-        # logger.debug('Fuzzer: caught interrupt signal, exiting gracefully...')
-        # for thread in threading.enumerate():
-        #     if thread.ident:
-        #         fra = sys._current_frames().get(thread.ident)
-        #         logger.debug('\n'.join(traceback.format_stack(fra)))
-        
+        logger.debug(f'Fuzzer: caught signal {signal_num}, stopping')
         self.stop_event.set()
-        if self.mode != 'replay':
-            with analyzer.lock:
-                analyzer.collect_results()
-        sys.exit(1)
+        self._terminate_active_sut(signal.SIGTERM, timeout=1)
+        raise KeyboardInterrupt
+
+    def _install_signal_handlers(
+        self
+    ) -> None:
+        self._previous_sigint_handler = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+
+    def _restore_signal_handlers(
+        self
+    ) -> None:
+        if self._previous_sigint_handler is not None:
+            try:
+                signal.signal(signal.SIGINT, self._previous_sigint_handler)
+            except Exception as e:
+                logger.debug(f'Fuzzer: restore signal handler failure {e}')
+            self._previous_sigint_handler = None
+
+    def cleanup(
+        self
+    ) -> None:
+        """Run process-exit cleanup once for normal, interrupted, and atexit paths."""
+        with self._cleanup_lock:
+            if self._cleanup_done:
+                return
+            self._cleanup_done = True
+
+            try:
+                self.stop_event.set()
+            except Exception:
+                pass
+
+            self._terminate_active_sut(signal.SIGTERM, timeout=3)
+
+            try:
+                self.mapper.close()
+            except Exception as e:
+                logger.debug(f'Fuzzer: mapper close failure {e}')
+
+            if self.mode != 'replay':
+                self._collect_results()
+
+            self._restore_signal_handlers()
+
+    def _terminate_active_sut(
+        self,
+        sig: signal.Signals,
+        timeout: float
+    ) -> None:
+        proc = analyzer.sut_proc
+        if proc is None:
+            return
+
+        try:
+            if proc.poll() is None:
+                os.killpg(proc.pid, sig)
+                proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait(timeout=1)
+            except Exception as e:
+                logger.debug(f'Fuzzer: SUT kill failure {e}')
+        except ProcessLookupError:
+            pass
+        except Exception as e:
+            logger.debug(f'Fuzzer: SUT terminate failure {e}')
+        finally:
+            if analyzer.sut_proc is proc:
+                analyzer.sut_proc = None
+
+    def _collect_results(
+        self
+    ) -> None:
+        if not hasattr(analyzer, 'start_time') or not hasattr(configs, 'results_path'):
+            return
+        try:
+            analyzer.collect_results()
+        except Exception as e:
+            logger.debug(f'Fuzzer: collect results failure {e}')
         
     def get_creation_timestamp(
         self, 

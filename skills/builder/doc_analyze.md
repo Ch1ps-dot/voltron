@@ -22,14 +22,15 @@ Exclusions:
 
 Decision rules:
 
-1. If the excerpt directly describes only request message fields/structure, output: request
-2. If the excerpt directly describes only response message fields/structure, output: response
-3. If the excerpt directly describes both request and response message fields/structure, output: all
-4. If none of the above apply, output: none
+1. If the excerpt directly describes only request message fields/structure, output request
+2. If the excerpt directly describes only response message fields/structure, output response
+3. If the excerpt directly describes both request and response message fields/structure, output all
+4. If none of the above apply, output none
 
-Output constraints:
+Output constraints (MANDATORY):
 
-- Output exactly one of: "request", "response", "all", "none"
-- Lowercase, no quotes, no punctuation, no explanations, no extra text
+- The model MUST output exactly one and only one token from this set: request, response, all, none
+- The output must be lowercase, with no quotes, no punctuation, no surrounding or trailing text or explanation
+- Do NOT output anything other than the single chosen token above; any deviation is invalid
 - Base your decision solely on $rfc_doc; do not infer beyond the excerpt
-- If ambiguous or unclear, choose: none
+- If ambiguous or unclear, choose none

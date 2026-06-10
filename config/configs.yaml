@@ -6,6 +6,20 @@ libcoap:
   trans_layer: udp
   server: parent
 
+microcoap:
+  protocol: coap
+  host: 127.0.0.1
+  port: 5683
+  rfc_name: ["rfc7252", "rfc7641", "rfc7390", "rfc7641", "rfc7959", "rfc7967", "rfc8132", "rfc8323", "rfc8516", "rfc8613", "rfc8768", "rfc8974", "rfc9175", "rfc9177"]
+  trans_layer: udp
+  server: parent
+
+neuron:
+  protocol: http
+  host: 127.0.0.1
+  port: 8080
+  rfc_name: ["rfc9110","rfc7540","rfc2616","rfc1945", "neuron_api"]
+
 atftp:
   protocol: tftp
   host: 127.0.0.1
@@ -158,8 +172,14 @@ dnsmasq:
   trans_layer: udp
   server: parent
 
-llm:
-  base_url: https://xiaoai.plus/v1
-  api_key: sk-vUIK7aS2md6wOsKyEsEEDzzDYNu5BwwaQ9UofpG9N7XB6egQ
-  model: gpt-5-mini-2025-08-07
+llm_doc:
+  base_url: none
+  api_key: none
+  model: none
+  async_sem: 8
+
+llm_fuzz:
+  base_url: none
+  api_key: none
+  model: none
   async_sem: 8

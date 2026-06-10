@@ -3,7 +3,7 @@ from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.learner.automata import MealyMachine
 from voltron.learner.equ_oracle import EquOracle
 from voltron.learner.mem_oracle import MembershipOracle
-from voltron.utils.logger import logger
+from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 import pprint, pickle, threading, sys, traceback, time, copy
@@ -27,6 +27,7 @@ class ObTable:
         stop_event: threading.Event
     ) -> None:
         self.alphabet: list[str] = mq.alphabet # request symbol
+        self.abnormal_syembol = ['CRASH', 'TIMEOUT', 'CLOSED', 'POLLERR'] # special symbol for abnormal behavior, such as timeout and crash. It is used to fill the table when the SUT has no response due to abnormal behavior.
         
         self.S: set[tuple[str,...]] = {('-',)} # prefix of request symbols
         self.E: set[tuple[str,...]] = {(a,) for a in self.alphabet} # suffix of request symbols
@@ -75,6 +76,9 @@ class ObTable:
                         continue
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('TIMEOUT',)):
                         self.T[s][e] = ('TIMEOUT',)
+                        continue
+                    if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('POLLERR',)):
+                        self.T[s][e] = ('POLLERR',)
                         continue
                                     
                     out = self.mq.query(s + e)
@@ -134,6 +138,9 @@ class ObTable:
                         if(self.T[s][(a,)] == ('TIMEOUT',)):
                             self.T[si][e] = ('TIMEOUT',)
                             continue
+                        if(self.T[s][(a,)] == ('POLLERR',)):
+                            self.T[si][e] = ('POLLERR',)
+                            continue
                         
                         try_times = 3
                         out = []
@@ -184,9 +191,9 @@ class ObTable:
             for a in self.alphabet:
                 sa = s + (a,)
                 if self.row(sa) not in rows:
-                    return False, sa
+                    return False, s, a
        
-        return True, None
+        return True, None, None
 
     def make_close(self):
         """Make table close
@@ -194,9 +201,11 @@ class ObTable:
         logger.debug('Ob: make close')
         while True:
             if self.stop_event.is_set(): return
-            closed, sa = self.is_closed()
-            if closed or sa == None:
+            closed, s, a = self.is_closed()
+            sa = s + (a,) if s and a else None
+            if closed or sa == None or ( s != None and len(s) > 1 and self.T[s[:-1]][s[-1:]] in self.abnormal_syembol):
                 return
+            
             logger.debug(f'add new prefix: {sa}')
             self.S.add(sa)
             with analyzer.lock:

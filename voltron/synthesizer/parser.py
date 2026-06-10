@@ -7,6 +7,7 @@ class Parser:
     """
     evolved_from: str
     name: str
+    state_field: str = ''
     parsed_res: list[str] = field(default_factory=list)
     
     # def __post_init__(self):
