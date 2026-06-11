@@ -3,8 +3,9 @@ from voltron.synthesizer.synthesizer import Generator
 from voltron.executor.executor import Executor, Conversation
 from voltron.analyzer.analyzer import analyzer
 from voltron.learner.automata import MealyMachine
+from voltron.configs import configs
 from voltron.utils.logger import logger_fuzz as logger
-import random, time, threading, os, math
+import base64, json, random, time, threading, os, math
 
 class Havoc:
     """Havoc scheduler implementation for fuzzing the system under test (SUT) with random sequences of requests, aiming to explore the state space and find interesting behaviors.
@@ -36,6 +37,8 @@ class Havoc:
         self.useful_msg: list[tuple[str, bytes]] = []
         self.useful_seq: list[list[tuple[str, bytes]]] = []
         self.max_seq_len = 0
+        self.seen_req_res_pairs: set[tuple[str, str]] = set()
+        self._req_res_pair_next_id = 0
 
         self.mapper = mapper
         self.exe = exe
@@ -81,6 +84,7 @@ class Havoc:
                     self.S.append(p)
                 elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
                     self.S.append(p)
+
     def select_random_requests(
         self,
         min_length: int = 1,
@@ -199,6 +203,55 @@ class Havoc:
                     
         logger.debug(f'select mutators[{mode}]: {'/'.join([m[0] for m in ms])}')
         return ms
+
+    def save_request_response_pair(
+        self,
+        request_type: str,
+        response_type: str,
+        request: bytes,
+        response: bytes,
+    ) -> None:
+        """Save one newly observed request-response type relation."""
+        try:
+            target_folder = configs.results_path / 'request_response_pairs'
+            target_folder.mkdir(parents=True, exist_ok=True)
+
+            while True:
+                file_path = (
+                    target_folder
+                    / f'pair_{self._req_res_pair_next_id:06d}.json'
+                )
+                self._req_res_pair_next_id += 1
+                if not file_path.exists():
+                    break
+
+            data = {
+                'request_type': request_type,
+                'response_type': response_type,
+                'request_length': len(request),
+                'response_length': len(response),
+                'request': {
+                    'encoding': 'base64',
+                    'data': base64.b64encode(request).decode('ascii'),
+                },
+                'response': {
+                    'encoding': 'base64',
+                    'data': base64.b64encode(response).decode('ascii'),
+                },
+            }
+            with file_path.open('w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+                f.write('\n')
+
+            logger.debug(
+                'Havoc: saved new request-response relation '
+                f'{request_type}/{response_type} to {file_path.name}'
+            )
+        except Exception as e:
+            logger.debug(
+                'Havoc: failed to save request-response relation '
+                f'{request_type}/{response_type}: {e}'
+            )
     
     def analyze_cons(
         self,
@@ -215,26 +268,56 @@ class Havoc:
         """
         seq = []
         for i in range(len(cons.res_seq)):
+            if i >= len(cons.req_seq):
+                logger.debug(
+                    f'Havoc: incomplete conversation state at index {i}'
+                )
+                continue
+
             req = cons.req_seq[i]
             res = cons.res_seq[i]
-            if res == '-' or res == '-':
+            if req == '-' or res == '-':
                 continue
             
-            if res == 'TIMEOUT' or res == 'CRASH':
+            if res in {'TIMEOUT', 'CRASH', 'CLOSED', 'POLLERR'}:
                 break
+
+            content = cons.content[i] if i < len(cons.content) else None
+            if content is not None:
+                request, response = content
+                relation = (req, res)
+                if (
+                    request
+                    and response
+                    and relation not in self.seen_req_res_pairs
+                ):
+                    self.seen_req_res_pairs.add(relation)
+                    self.save_request_response_pair(
+                        req,
+                        res,
+                        request,
+                        response,
+                    )
             
             if res not in self.unique_resp:
                 self.unique_resp.add(res)
-                self.useful_msg.append((req, cons.content[i][0]))
-                seq = []
-                for j in range(i+1):
-                    if cons.req_seq[j] != '-':
-                        seq.append((cons.req_seq[j], cons.content[j][0]))
-                self.useful_seq.append(seq)
+                if content is not None:
+                    self.useful_msg.append((req, content[0]))
+                    seq = []
+                    prefix_length = min(
+                        i + 1,
+                        len(cons.req_seq),
+                        len(cons.content),
+                    )
+                    for j in range(prefix_length):
+                        if cons.req_seq[j] != '-':
+                            seq.append(
+                                (cons.req_seq[j], cons.content[j][0])
+                            )
+                    self.useful_seq.append(seq)
             
-            if req != '-':
-                map = self.req_res.setdefault(req, set())
-                map.add(res)
+            response_types = self.req_res.setdefault(req, set())
+            response_types.add(res)
             
         seq_len = len(cons.res_seq)
         unique_res_num = len(set(cons.res_seq))
