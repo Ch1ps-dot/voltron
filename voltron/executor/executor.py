@@ -152,43 +152,86 @@ class Executor:
     def run_exe(
         self
     ) -> subprocess.Popen | None:
-        if (self.run_script.is_file()):
-            try:
-                if configs.fuzz_mode == 'replay':
-                    # cmd = ['bash', '-c']
-                    # cmd.append(' '.join(self.cmdline))
-                    proc = subprocess.Popen(
-                        [self.run_script],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        start_new_session=True
-                    )
-                    analyzer.sut_proc = proc
-                    logger.debug(f'exe pid {proc.pid}')
-                    return proc
-                elif configs.server == 'parent':
-                    proc = subprocess.Popen(
-                        [self.run_script],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        start_new_session=True
-                    )
-                    analyzer.sut_proc = proc
-                    logger.debug(f'exe pid {proc.pid}')
-                    return proc
-                elif configs.server == 'child':
-                    proc = subprocess.Popen(
-                        [self.run_script],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        start_new_session=True
-                    )
-                    analyzer.sut_proc = proc
-                    logger.debug(f'exe pid {proc.pid}')
-                    return proc
-            except Exception as e:
-                logger.debug(f'[SUT Setup Failure]: {e}')
-                return None
+        if not self.run_script.is_file():
+            logger.debug(
+                'Executor: SUT launch failed before Popen: '
+                f'run script does not exist or is not a file; '
+                f'script={self.run_script}'
+            )
+            return None
+
+        fuzz_mode = getattr(configs, 'fuzz_mode', '')
+        server_mode = getattr(configs, 'server', None)
+        if fuzz_mode != 'replay' and server_mode not in {'parent', 'child'}:
+            logger.debug(
+                'Executor: SUT launch failed before Popen: '
+                f'unsupported server mode={server_mode!r}; '
+                f'script={self.run_script}'
+            )
+            return None
+
+        try:
+            proc = subprocess.Popen(
+                [self.run_script],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                start_new_session=True
+            )
+            analyzer.sut_proc = proc
+            logger.debug(
+                f'Executor: launched SUT pid={proc.pid} '
+                f'script={self.run_script}'
+            )
+            return proc
+        except Exception as e:
+            logger.debug(
+                'Executor: SUT launch failed during Popen: '
+                f'script={self.run_script}; '
+                f'executable={os.access(self.run_script, os.X_OK)}; '
+                f'exception={type(e).__name__}: {e}'
+            )
+            return None
+
+    def _log_sut_start_failure(
+        self,
+        proc: subprocess.Popen | None,
+        stage: str,
+        attempt: int | None = None,
+        detail: str = ''
+    ) -> None:
+        """Record the available reason for a SUT startup failure."""
+        fields = [
+            'Executor: SUT startup failure',
+            f'stage={stage}',
+            f'script={self.run_script}',
+            f'transport={self.trans_layer}',
+            f'endpoint=localhost:{self.port}',
+        ]
+        if attempt is not None:
+            fields.append(f'attempt={attempt}')
+        if detail:
+            fields.append(f'detail={detail}')
+
+        if proc is None:
+            fields.append('process=not-created')
+        else:
+            return_code = proc.poll()
+            fields.append(f'pid={proc.pid}')
+            fields.append(
+                'process=running'
+                if return_code is None
+                else f'returncode={return_code}'
+            )
+            if return_code is not None:
+                stdout, stderr = self._read_process_output(proc)
+                if stdout:
+                    fields.append(f'stdout={stdout.strip()!r}')
+                if stderr:
+                    fields.append(f'stderr={stderr.strip()!r}')
+                if not stdout and not stderr:
+                    fields.append('output=<empty>')
+
+        logger.debug('; '.join(fields))
 
     def interact(
         self,
@@ -217,40 +260,77 @@ class Executor:
         #     return False, None
         
         # avoid unexceptional crash of target
-        for _ in range(100):
+        for attempt in range(1, 101):
             if proc is not None and proc.poll() is not None:
-                logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
+                self._log_sut_start_failure(
+                    proc,
+                    stage='process-exited-before-ready-check',
+                    attempt=attempt,
+                )
                 proc = self.run_exe()
                 time.sleep(self.setup_time_s)
             else:
                 break
 
         if proc is None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='process-launch-retries',
+                detail='run_exe returned no process',
+            )
+            raise Exception('Execute: process close')
         if proc.poll() is not None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='process-launch-retries',
+                detail='process still exited after launch retries',
+            )
+            raise Exception('Execute: process close')
         
         # wait for server setup
-        for _ in range(100):
+        sock = None
+        for attempt in range(1, 101):
             time.sleep(self.setup_time_s)
             sock = self.setup_socket()
             if sock == None:
                 if proc != None and proc.poll() is not None:
-                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
+                    self._log_sut_start_failure(
+                        proc,
+                        stage='socket-readiness-check',
+                        attempt=attempt,
+                        detail='process exited before socket became ready',
+                    )
                     proc = self.run_exe()
                     self.kill_listeners(self.port)
-                logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
                 break
             
         if proc is None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='socket-readiness-check',
+                detail='restart returned no process',
+            )
+            raise Exception('Executor: process close')
         if proc.poll() is not None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='socket-readiness-check',
+                detail='process exited after socket readiness attempts',
+            )
+            raise Exception('Execute: process close')
             
         if sock == None:
-            logger.debug('socket: setup failure')
+            self._log_sut_start_failure(
+                proc,
+                stage='socket-readiness-timeout',
+                attempt=100,
+                detail=(
+                    f'service did not become reachable within '
+                    f'{100 * self.setup_time_s:.2f}s'
+                ),
+            )
             self.stop_event.set()
             sys.exit(0)
         
