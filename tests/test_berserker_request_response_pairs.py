@@ -113,3 +113,30 @@ def test_uses_next_available_file_id(tmp_path):
     havoc.analyze_cons(cons, trans_inc=0, type_inc=0)
 
     assert (target_folder / 'pair_000001.json').is_file()
+
+
+def test_new_request_response_relation_makes_conversation_interesting(tmp_path):
+    configs.results_path = tmp_path
+    havoc = make_havoc()
+    havoc.unique_resp.add('331')
+    havoc.max_seq_len = 1
+    havoc.max_unique_resp_num = 1
+
+    cons = Conversation()
+    add_exchange(cons, 'USER', '331', b'USER test\r\n', b'331 password\r\n')
+
+    havoc.analyze_cons(cons, trans_inc=0, type_inc=0)
+
+    assert havoc.exe.saved_conversations == [cons]
+
+    duplicate = Conversation()
+    add_exchange(
+        duplicate,
+        'USER',
+        '331',
+        b'USER another\r\n',
+        b'331 password\r\n',
+    )
+    havoc.analyze_cons(duplicate, trans_inc=0, type_inc=0)
+
+    assert havoc.exe.saved_conversations == [cons]

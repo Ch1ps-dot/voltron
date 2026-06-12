@@ -267,6 +267,7 @@ class Havoc:
             type_inc: The increment in the number of unique response types observed compared to the last interaction
         """
         seq = []
+        req_res_inc = 0
         for i in range(len(cons.res_seq)):
             if i >= len(cons.req_seq):
                 logger.debug(
@@ -292,6 +293,7 @@ class Havoc:
                     and relation not in self.seen_req_res_pairs
                 ):
                     self.seen_req_res_pairs.add(relation)
+                    req_res_inc += 1
                     self.save_request_response_pair(
                         req,
                         res,
@@ -327,7 +329,13 @@ class Havoc:
         self.max_seq_len = max(seq_len, self.max_seq_len)
         self.max_unique_resp_num = max(unique_res_num, self.max_unique_resp_num)
         
-        if self.is_interesting(trans_inc, type_inc, len_inc, unique_res_inc):         
+        if self.is_interesting(
+            trans_inc,
+            type_inc,
+            len_inc,
+            unique_res_inc,
+            req_res_inc,
+        ):
             self.exe.save_cons(cons)
         # seq = []
         # if len(cons.res_seq) > self.max_seq_len:
@@ -414,20 +422,34 @@ class Havoc:
         trans_inc: int,
         type_inc: int,
         len_inc: int,
-        unique_res_inc: int
+        unique_res_inc: int,
+        req_res_inc: int
     ) -> bool:
-        """Check if the current conversation is interesting based on the increments in response transitions, response types, sequence length, and unique response types.
+        """Check whether the conversation exposes any new protocol behavior.
         
         Args:
             trans_inc: The increment in the number of response transitions observed.
             type_inc: The increment in the number of unique response types observed.
             len_inc: The increment in the length of the request-response sequence observed.
             unique_res_inc: The increment in the number of unique response types observed.
+            req_res_inc: The number of newly observed request-response type
+                relations in the current conversation.
         """
-        if trans_inc > 0 or type_inc > 0 or len_inc > 0 or unique_res_inc > 0:
+        if (
+            trans_inc > 0
+            or type_inc > 0
+            or len_inc > 0
+            or unique_res_inc > 0
+            or req_res_inc > 0
+        ):
             with analyzer.lock:
                 analyzer.useful_cons += 1
-            logger.debug(f'{trans_inc} {type_inc} {len_inc}')
+            logger.debug(
+                'Havoc: interesting conversation '
+                f'trans={trans_inc} types={type_inc} length={len_inc} '
+                f'unique_responses={unique_res_inc} '
+                f'request_response_relations={req_res_inc}'
+            )
             return True
         else:
             return False
