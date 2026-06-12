@@ -3,7 +3,7 @@ import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, 
 
 from voltron.executor.conversation import Conversation
 
-from voltron.utils.logger import logger_fuzz as logger
+from voltron.utils.logger import configure_file_logging, logger_fuzz as logger
 
 from voltron.llm.chatter import AsyncChater
 
@@ -67,8 +67,8 @@ class Fuzzer:
                 configs_yaml = yaml.safe_load(f)
                 if self.target_name not in configs_yaml.keys():
                     raise Exception(f'Fuzzer: unknown target {self.target_name}')
-        except Exception as e:
-            logger.error(f'Fuzzer: config load failure {e}')
+        except Exception:
+            logger.exception('Fuzzer: config load failure')
             
         # key parameter of protocol
         configs.pro_name = configs_yaml[self.target_name]['protocol']
@@ -111,6 +111,8 @@ class Fuzzer:
             configs.models_path.mkdir(parents=True, exist_ok=True)
         
         configs.results_path = results_dir
+        if self.mode != 'replay' or self.output != 'default':
+            configure_file_logging(configs.results_path)
         configs.fuzz_mode = self.mode
         configs.spec_knowledge = self.spec_knowledge
         configs.state_learning = self.state_learning
@@ -200,9 +202,8 @@ class Fuzzer:
             
         except KeyboardInterrupt:
             logger.debug('Fuzzer: interrupted')
-        except Exception as e:
-            logger.debug(f'fuzzer error: {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Fuzzer: fuzzing failed')
             self.stop_event.set()
         finally:
             self.cleanup()
@@ -215,6 +216,8 @@ class Fuzzer:
     ):
         """Fuzz the target one
         """
+        configs.results_path = res_dir
+        configure_file_logging(configs.results_path)
         
         with analyzer.lock:
             analyzer.strategy = 'replay'
@@ -236,9 +239,8 @@ class Fuzzer:
             
         except KeyboardInterrupt:
             logger.debug('Replay: interrupted')
-        except Exception as e:
-            logger.debug(f'replay error: {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Fuzzer: replay failed')
             self.stop_event.set()
         finally:
             self.cleanup()
@@ -281,9 +283,8 @@ class Fuzzer:
                 
             self.stop_event.set()
                 
-        except Exception as e:
-            logger.debug(f'Fuzzer: exit {e}') 
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Fuzzer: state fuzzing failed')
             stop_event.set()
             
     def model_learning(
@@ -343,9 +344,8 @@ class Fuzzer:
                         self.producer.generator_evo(h)
                     continue
 
-            except Exception as e:
-                logger.debug(f'Fuzzer: exit {e}')
-                logger.debug(traceback.format_exc())
+            except Exception:
+                logger.exception('Fuzzer: model learning failed')
                 stop_event.set()
                 sys.exit(1)
             if (configs.time_limit_s < time.time() - analyzer.start_time):
@@ -388,9 +388,8 @@ class Fuzzer:
                     analyzer.reset_automata_cnt()
                 analyzer.collect_results()
                 
-            except Exception as e:
-                logger.debug(f'Fuzzer: exit {e}')
-                logger.debug(traceback.format_exc())
+            except Exception:
+                logger.exception('Fuzzer: havoc fuzzing failed')
                 stop_event.set()
                 
             if (configs.time_limit_s < time.time() - analyzer.start_time):
@@ -441,18 +440,16 @@ class Fuzzer:
                     
                 try:
                     flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
-                except Exception as e:
-                    logger.debug(f'replayer: exit {e}')
-                    logger.debug(traceback.format_exc())
+                except Exception:
+                    logger.exception('Fuzzer: testcase replay failed')
 
                 with analyzer.lock:
                     analyzer.finished += 1
                     
                 self.exe.cov_collect(cov_folder, cov_file, file_list[i])
             self.stop_event.set()
-        except Exception as e:
-            logger.debug(f'replayer: exit {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Fuzzer: replay processing failed')
 
     def handle_normal_fuzzer_exit(
         self,
@@ -477,8 +474,8 @@ class Fuzzer:
         if self._previous_sigint_handler is not None:
             try:
                 signal.signal(signal.SIGINT, self._previous_sigint_handler)
-            except Exception as e:
-                logger.debug(f'Fuzzer: restore signal handler failure {e}')
+            except Exception:
+                logger.exception('Fuzzer: restore signal handler failure')
             self._previous_sigint_handler = None
 
     def cleanup(
@@ -499,8 +496,8 @@ class Fuzzer:
 
             try:
                 self.mapper.close()
-            except Exception as e:
-                logger.debug(f'Fuzzer: mapper close failure {e}')
+            except Exception:
+                logger.exception('Fuzzer: mapper close failure')
 
             if self.mode != 'replay':
                 self._collect_results()
@@ -524,12 +521,12 @@ class Fuzzer:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait(timeout=1)
-            except Exception as e:
-                logger.debug(f'Fuzzer: SUT kill failure {e}')
+            except Exception:
+                logger.exception('Fuzzer: SUT kill failure')
         except ProcessLookupError:
             pass
-        except Exception as e:
-            logger.debug(f'Fuzzer: SUT terminate failure {e}')
+        except Exception:
+            logger.exception('Fuzzer: SUT terminate failure')
         finally:
             if analyzer.sut_proc is proc:
                 analyzer.sut_proc = None
@@ -541,8 +538,8 @@ class Fuzzer:
             return
         try:
             analyzer.collect_results()
-        except Exception as e:
-            logger.debug(f'Fuzzer: collect results failure {e}')
+        except Exception:
+            logger.exception('Fuzzer: collect results failure')
         
     def get_creation_timestamp(
         self, 

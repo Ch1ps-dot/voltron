@@ -208,10 +208,10 @@ class Mapper:
                         ms.append((msg_type, msg))
                     else:
                         logger.debug(f'Mapper: generator failed {g.msg_type}/{g.name}')
-                except Exception as e:
+                except Exception:
                     logger.debug(asdict(g))
                     logger.debug(self.message_pool)
-                    logger.debug(traceback.format_exc())
+                    logger.exception('Mapper: generator selection failed')
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
@@ -251,10 +251,10 @@ class Mapper:
                         ms.append((msg_type, msg))
                     else:
                         logger.debug(f'Mapper: mutator failed {m.msg_type}/{m.name}')
-                except Exception as e:
+                except Exception:
                     logger.debug(asdict(m))
                     logger.debug(self.message_pool)
-                    logger.debug(traceback.format_exc())
+                    logger.exception('Mapper: mutator selection failed')
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
@@ -290,9 +290,8 @@ class Mapper:
                 if msg is not None:
                     g.was_used += 1
                 return msg
-        except Exception as e:
-            logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Mapper: generator execution failed')
             return None
         
     def exe_mutator(
@@ -303,9 +302,8 @@ class Mapper:
             with open(self.m_path(m), 'r', encoding='utf-8') as f:
                 code = f.read()
                 return self._run_dynamic_code(code, 'mutate')
-        except Exception as e:
-            logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Mapper: mutator execution failed')
             return None
 
     def _run_dynamic_code(

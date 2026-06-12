@@ -81,8 +81,8 @@ class Analyzer:
                 f.write(f'{"model_learn_time_s":<15}: {self.seconds_to_hms(self.model_learning_time_s)}\n')
                 f.write(f'{"chat_time_s":<15}: {self.seconds_to_hms(self.chat_time_s)}\n')
                 f.write(f'{"chat_token":<15}: {self.chat_token}\n')
-        except Exception as e:
-            logger.debug('Analyzer: collect results failure')
+        except Exception:
+            logger.exception('Analyzer: collect status results failure')
 
         self.collect_metric_series()
             
@@ -99,8 +99,8 @@ class Analyzer:
                     self.resp_trans_cnt.keys(),
                     stream=f
                 )
-        except Exception as e:
-            logger.debug('Analyzer: collect results failure')
+        except Exception:
+            logger.exception('Analyzer: collect state results failure')
 
     def collect_metric_series(
             self
@@ -146,7 +146,7 @@ class Analyzer:
 
             self._metric_series_last_minute = elapsed_minute
         except Exception:
-            logger.debug('Analyzer: collect metric series failure')
+            logger.exception('Analyzer: collect metric series failure')
 
     def req_types_update(
             self,

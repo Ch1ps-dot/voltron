@@ -4,7 +4,6 @@ from tqdm import tqdm
 import json, asyncio
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
-import traceback
 from urllib.parse import quote
 
 from voltron.synthesizer.generator import Generator
@@ -431,9 +430,8 @@ class AsyncProducer:
                     with analyzer.lock:
                         analyzer.finished += 1
                     return msg_type, mutate_code
-                except Exception as e:
-                    logger.debug(f'Producer :generate error {e}')
-                    logger.debug(f'Producer :generate error {traceback.format_exc()}')
+                except Exception:
+                    logger.exception('Producer: mutator generation failed')
 
     async def _generator_mutate_async(
         self,

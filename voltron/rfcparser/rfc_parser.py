@@ -363,8 +363,8 @@ class AsyncRFCParser:
                         logger.debug(f'[Tree Annotate]: {node.name}:{ans}')
                         node.content_type = ans
                         break
-                except Exception as e:
-                    logger.error(f'RFCParser: specification parse error {e}')
+                except Exception:
+                    logger.exception('RFCParser: specification parse error')
 
     async def _req_field(
             self,

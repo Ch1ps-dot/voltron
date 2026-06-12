@@ -10,7 +10,7 @@ from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
-import math, statistics, threading, traceback, sys, os, signal, re
+import math, statistics, threading, sys, os, signal, re
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
@@ -951,9 +951,8 @@ class Executor:
                         return resp_code, buf
                 else:
                     logger.debug('recv: no data')
-        except Exception as e:
-            logger.debug(f'net_recv error: {e}')
-            logger.debug(traceback.format_exc())   
+        except Exception:
+            logger.exception('Executor: receive failed')
         finally:
             poller.unregister(sock)
     

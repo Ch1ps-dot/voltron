@@ -68,6 +68,6 @@ class Prompter:
                 self._tem_mutator_evolve = Template(f.read())
 
 
-        except Exception as e:
-            logger.error(f'Prompter Init Error: {e}')
+        except Exception:
+            logger.exception('Prompter initialization failed')
             exit(0)

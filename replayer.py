@@ -16,7 +16,8 @@ def main(
 ):
     replayer = Fuzzer(
         target_name=sut,
-        mode = 'replay'
+        mode='replay',
+        output=dir,
     )
     replayer.replay(
         res_dir=Path(dir),
