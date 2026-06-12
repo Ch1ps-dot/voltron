@@ -85,6 +85,7 @@ def make_runtime_table():
         'CRASH num': ana.crash_num,
         'CLOSED num': ana.rclose_num,
         'TIMEOUT num': ana.timeout_num,
+        'POSSIBLE NON-COMPLIANCE': ana.non_compliant_num,
         'SAVED_CONS': ana.useful_cons
         # 'PULLERR num': ana.pollerr_num,
         # 'TIMEOUT num': ana.timeout_num,
@@ -107,7 +108,8 @@ def make_info_table():
         'target name': ana.target_name,
         'protol type': ana.pro_name,
         'strategy': ana.strategy,
-        'stage': ana.stage
+        'stage': ana.stage,
+        'current operation': ana.current_operation or 'idle',
     }
     table = Table(title="Fuzzer Info", show_header=False, box=None, expand= True, show_lines=True)
     table.add_column(justify='left')

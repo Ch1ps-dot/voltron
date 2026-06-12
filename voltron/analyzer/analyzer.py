@@ -24,6 +24,7 @@ class Analyzer:
         self.crash_num = 0
         self.crash_num = 0
         self.rclose_num = 0
+        self.non_compliant_num = 0
 
         # information of fuzzer
         self.target_name: str
@@ -31,6 +32,7 @@ class Analyzer:
         self.start_time: float
         self.strategy = ''
         self.stage = ''
+        self.current_operation = ''
         
         # communication info
         self.sent = ''
@@ -78,6 +80,10 @@ class Analyzer:
                 f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
                 f.write(f'{"resp_transitions":<15}: {self.resp_trans_num()}\n')
                 f.write(f'{"crash_num":<15}: {self.crash_num}\n')
+                f.write(
+                    f'{"non_compliant":<15}: '
+                    f'{self.non_compliant_num}\n'
+                )
                 f.write(f'{"model_learn_time_s":<15}: {self.seconds_to_hms(self.model_learning_time_s)}\n')
                 f.write(f'{"chat_time_s":<15}: {self.seconds_to_hms(self.chat_time_s)}\n')
                 f.write(f'{"chat_token":<15}: {self.chat_token}\n')

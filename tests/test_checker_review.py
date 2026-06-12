@@ -17,6 +17,7 @@ class FakeProducer:
 
     def review_nonconforming_response(self, **kwargs):
         self.review_calls += 1
+        self.operation_during_review = None
         return {
             "verdict": self.verdict,
             "summary": "reviewed",
@@ -37,6 +38,11 @@ def make_executor(verdict: str):
     )
     executor = Executor.__new__(Executor)
     executor.mapper = mapper
+    executor.analyzer = SimpleNamespace(
+        lock=threading.Lock(),
+        non_compliant_num=0,
+        current_operation="",
+    )
     executor.checked_request_response_pairs = set()
     executor.reviewed_invalid_responses = set()
     executor._invalid_response_lock = threading.Lock()
@@ -57,6 +63,14 @@ def make_conversation(
 def test_confirmed_violation_is_saved_once():
     executor, producer = make_executor("non_compliant")
     saved = []
+    operations = []
+    original_review = producer.review_nonconforming_response
+
+    def review_with_operation(**kwargs):
+        operations.append(executor.analyzer.current_operation)
+        return original_review(**kwargs)
+
+    producer.review_nonconforming_response = review_with_operation
     executor.save_invalid_response = (
         lambda cons, response_type, analysis=None:
         saved.append((response_type, analysis))
@@ -69,6 +83,9 @@ def test_confirmed_violation_is_saved_once():
     assert producer.review_calls == 1
     assert len(saved) == 1
     assert saved[0][1]["verdict"] == "non_compliant"
+    assert executor.analyzer.non_compliant_num == 1
+    assert operations == ["Checking possible non-compliance with LLM"]
+    assert executor.analyzer.current_operation == ""
 
 
 def test_compliant_false_positive_evolves_and_hot_reloads_checker():
@@ -81,6 +98,7 @@ def test_compliant_false_positive_evolves_and_hot_reloads_checker():
 
     assert producer.evolve_calls == 1
     assert len(loaded) == 1
+    assert executor.analyzer.current_operation == ""
 
 
 def test_same_response_for_different_request_types_is_reviewed_separately():

@@ -348,7 +348,11 @@ class Executor:
         cons: Conversation = Conversation()
         
         # maybe recv initialize message
-        resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
+        resp_code, resp_data = self.net_recv(
+            sock=sock,
+            poll_timeout_ms=100,
+            show_fuzz_ui=run_checker,
+        )
         last_recv = '-'
         if(resp_code and resp_data):
             is_valid_response = self.check_response_during_fuzzing(
@@ -398,7 +402,12 @@ class Executor:
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
-                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms, msg_type=msg_type)
+                resp_code, resp_data = self.net_recv(
+                    sock=sock,
+                    poll_timeout_ms=poll_wait_ms,
+                    msg_type=msg_type,
+                    show_fuzz_ui=run_checker,
+                )
 
                 if resp_code == 'POLLERR':
                     # crash
@@ -830,7 +839,8 @@ class Executor:
             self, 
             sock: socket.socket,
             poll_timeout_ms = 0,
-            msg_type = '-'
+            msg_type = '-',
+            show_fuzz_ui: bool = False
     ) -> Tuple[str | None, bytes | None]:
         """Recv message over network
 
@@ -900,8 +910,10 @@ class Executor:
                                 resp_byte = self.parser_func(buf)
                                 if resp_byte == b'':
                                     logger.debug(f'parse error:{buf}')
-                                    new_parser = self.mapper.update_parser(buf)
-                                    self.load_parser(new_parser)
+                                    self._update_parser(
+                                        buf,
+                                        show_fuzz_ui,
+                                    )
                                     logger.debug('Update Parser')
                                 else:
                                     break
@@ -951,8 +963,10 @@ class Executor:
                                 resp_code = self.parser_func(buf)
                                 if resp_code == b'':
                                     logger.debug(f'parse error:{buf}')
-                                    new_parser = self.mapper.update_parser(buf)
-                                    self.load_parser(new_parser)
+                                    self._update_parser(
+                                        buf,
+                                        show_fuzz_ui,
+                                    )
                                     logger.debug('Update Parser')
                                 else:
                                     break
@@ -972,6 +986,27 @@ class Executor:
             poller.unregister(sock)
     
         return None, None
+
+    def _set_ui_operation(
+        self,
+        operation: str
+    ) -> None:
+        with self.analyzer.lock:
+            self.analyzer.current_operation = operation
+
+    def _update_parser(
+        self,
+        response: bytes,
+        show_fuzz_ui: bool
+    ) -> None:
+        if show_fuzz_ui:
+            self._set_ui_operation('Updating parser with LLM')
+        try:
+            new_parser = self.mapper.update_parser(response)
+            self.load_parser(new_parser)
+        finally:
+            if show_fuzz_ui:
+                self._set_ui_operation('')
     
     def handle_crash(
         self,
@@ -1185,6 +1220,9 @@ class Executor:
             self.reviewed_invalid_responses.add(dedup_key)
 
         try:
+            self._set_ui_operation(
+                'Checking possible non-compliance with LLM'
+            )
             analysis = self.mapper.producer.review_nonconforming_response(
                 request_type=request_type,
                 response_type=response_type,
@@ -1197,9 +1235,13 @@ class Executor:
                 f'[{request_type}/{response_type}]'
             )
             return
+        finally:
+            self._set_ui_operation('')
 
         verdict = analysis.get('verdict', 'uncertain')
         if verdict == 'non_compliant':
+            with self.analyzer.lock:
+                self.analyzer.non_compliant_num += 1
             self.save_invalid_response(
                 cons,
                 response_type,
@@ -1209,6 +1251,7 @@ class Executor:
 
         if verdict == 'compliant':
             try:
+                self._set_ui_operation('Updating checker with LLM')
                 checker = self.mapper.producer.evolve_checker(
                     response_type=response_type,
                     response=response,
@@ -1230,6 +1273,8 @@ class Executor:
                     'Executor: checker evolution failed '
                     f'[{request_type}/{response_type}]'
                 )
+            finally:
+                self._set_ui_operation('')
             return
 
         logger.debug(
