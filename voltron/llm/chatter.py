@@ -6,7 +6,7 @@ from string import Template
 import asyncio
 
 from voltron.llm.prompt import Prompter
-from voltron.utils.logger import logger_llm as logger
+from voltron.utils.logger import format_event, logger_llm as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 
@@ -62,7 +62,22 @@ class AsyncChater:
                 
                 response = completion.choices[0].message.content
 
-                logger.debug(f"[Chat]:{usage} cost_time:{end - start} \n ask: {prompt} resp: {response}")
+                logger.debug(
+                    '%s\nPROMPT\n%s\nRESPONSE\n%s',
+                    format_event(
+                        'llm.complete',
+                        usage=usage,
+                        model=self.model,
+                        duration_s=round(end - start, 3),
+                        tokens=(
+                            completion.usage.total_tokens
+                            if completion.usage is not None
+                            else None
+                        ),
+                    ),
+                    prompt,
+                    response,
+                )
                 with analyzer.lock:
                     analyzer.chat_time_s += end - start
                     if completion.usage != None:
@@ -70,7 +85,14 @@ class AsyncChater:
                 break
             except OpenAIError as e:
                 await asyncio.sleep(0.5)
-                logger.debug(f'Chat: API problem {e}')
+                logger.debug(
+                    format_event(
+                        'llm.api_error',
+                        usage=usage,
+                        error_type=type(e).__name__,
+                        error=str(e),
+                    )
+                )
         return response
 
     def llm_query_rfc(

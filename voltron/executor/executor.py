@@ -4,7 +4,7 @@ import time, select, socket, pickle, json, base64, hashlib
 from typing import Callable, Tuple
 
 from voltron.configs import configs
-from voltron.utils.logger import logger_fuzz as logger
+from voltron.utils.logger import format_event, logger_fuzz as logger
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
@@ -398,7 +398,12 @@ class Executor:
             
             # success to send
             if(flag and req_data):
-                logger.debug(f'sent -> {req_data}')
+                logger.debug(format_event(
+                    'network.send',
+                    request_type=msg_type,
+                    length=len(req_data),
+                    data=req_data,
+                ))
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
@@ -461,7 +466,17 @@ class Executor:
                         self.analyzer.res_types_update(resp_code)
                         self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
                     last_recv = resp_code
-                    logger.debug(f'recv <- {resp_data}')
+                    logger.debug(format_event(
+                        'network.receive',
+                        request_type=msg_type,
+                        response_type=resp_code,
+                        length=(
+                            len(resp_data)
+                            if resp_data is not None
+                            else 0
+                        ),
+                        data=resp_data,
+                    ))
                     
                     # record conversation data
                     if req_data is not None and resp_data is not None:
@@ -1159,9 +1174,12 @@ class Executor:
         if is_valid:
             return True
 
-        logger.debug(
-            f'Executor: non-conforming response [{response_type}] {response!r}'
-        )
+        logger.debug(format_event(
+            'checker.reject',
+            response_type=response_type,
+            length=len(response),
+            response=response,
+        ))
         return False
 
     def check_response_during_fuzzing(
@@ -1182,10 +1200,12 @@ class Executor:
         )
         with self._invalid_response_lock:
             if dedup_key in self.checked_request_response_pairs:
-                logger.debug(
-                    'Executor: duplicate request-response pair skipped before '
-                    f'checker [{request_type}/{response_type}]'
-                )
+                logger.debug(format_event(
+                    'checker.deduplicated',
+                    request_type=request_type,
+                    response_type=response_type,
+                    response_sha256=dedup_key[2],
+                ))
                 return True
             self.checked_request_response_pairs.add(dedup_key)
 
@@ -1240,13 +1260,14 @@ class Executor:
 
         verdict = analysis.get('verdict', 'uncertain')
         if verdict == 'non_compliant':
-            with self.analyzer.lock:
-                self.analyzer.non_compliant_num += 1
-            self.save_invalid_response(
+            saved = self.save_invalid_response(
                 cons,
                 response_type,
                 analysis=analysis,
             )
+            if saved:
+                with self.analyzer.lock:
+                    self.analyzer.non_compliant_num += 1
             return
 
         if verdict == 'compliant':
@@ -1287,64 +1308,159 @@ class Executor:
         cons: Conversation,
         response_type: str,
         analysis: dict | None = None
-    ) -> None:
-        """Save a request/response prefix confirmed as non-compliant."""
+    ) -> bool:
+        """Persist one unique, confirmed non-compliant response."""
+        if not cons.content or not cons.req_seq:
+            return False
+
         target_folder = configs.results_path / 'invalid_responses'
         target_folder.mkdir(parents=True, exist_ok=True)
-
-        file_count = sum(
-            1
-            for path in target_folder.iterdir()
-            if path.is_file() and path.suffix == '.pkl'
-        )
-        file_id = f'{file_count:06d}'
-
-        with open(target_folder / f'cons_{file_id}.pkl', 'wb') as f:
-            pickle.dump(cons, f)
-
-        with open(
-            target_folder / f'cons_{file_id}.raw',
-            'wb'
-        ) as f:
-            for request, response in cons.content:
-                f.write(b'REQUEST ' + str(len(request)).encode() + b'\n')
-                f.write(request + b'\n')
-                f.write(b'RESPONSE ' + str(len(response)).encode() + b'\n')
-                f.write(response + b'\n')
-
-        with open(
-            target_folder / f'cons_{file_id}.info',
-            'w',
-            encoding='utf-8'
-        ) as f:
-            f.write(f'response_type: {response_type}\n')
-            f.write(f'request_types: {cons.req_seq}\n')
-            f.write(f'response_types: {cons.res_seq}\n')
-
         request, response = cons.content[-1]
-        record = {
-            'request_type': cons.req_seq[-1],
-            'response_type': response_type,
-            'request': {
-                'encoding': 'base64',
-                'data': base64.b64encode(request).decode('ascii'),
-            },
-            'response': {
-                'encoding': 'base64',
-                'data': base64.b64encode(response).decode('ascii'),
-            },
-            'analysis': analysis or {},
-        }
-        with open(
-            target_folder / f'cons_{file_id}.analysis.json',
-            'w',
-            encoding='utf-8'
-        ) as f:
-            json.dump(record, f, indent=2, ensure_ascii=False)
+        request_type = cons.req_seq[-1]
+        response_digest = hashlib.sha256(response).hexdigest()
+        dedup_key = (request_type, response_type, response_digest)
+        marker_digest = hashlib.sha256(
+            json.dumps(dedup_key, separators=(',', ':')).encode('utf-8')
+        ).hexdigest()
+        marker_path = target_folder / f'.dedup_{marker_digest}'
 
-        logger.debug(
-            f'Executor: saved confirmed non-compliant response cons_{file_id}'
-        )
+        with self._invalid_response_lock:
+            if self._invalid_response_exists(target_folder, dedup_key):
+                logger.debug(format_event(
+                    'invalid_response.deduplicated',
+                    request_type=request_type,
+                    response_type=response_type,
+                    response_sha256=response_digest,
+                ))
+                return False
+
+            try:
+                marker_fd = os.open(
+                    marker_path,
+                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                    0o600,
+                )
+                os.close(marker_fd)
+            except FileExistsError:
+                logger.debug(format_event(
+                    'invalid_response.deduplicated',
+                    request_type=request_type,
+                    response_type=response_type,
+                    response_sha256=response_digest,
+                ))
+                return False
+
+            file_count = sum(
+                1
+                for path in target_folder.iterdir()
+                if path.is_file() and path.suffix == '.pkl'
+            )
+            file_id = f'{file_count:06d}'
+
+            try:
+                with open(
+                    target_folder / f'cons_{file_id}.pkl',
+                    'wb'
+                ) as f:
+                    pickle.dump(cons, f)
+
+                with open(
+                    target_folder / f'cons_{file_id}.raw',
+                    'wb'
+                ) as f:
+                    for saved_request, saved_response in cons.content:
+                        f.write(
+                            b'REQUEST '
+                            + str(len(saved_request)).encode()
+                            + b'\n'
+                        )
+                        f.write(saved_request + b'\n')
+                        f.write(
+                            b'RESPONSE '
+                            + str(len(saved_response)).encode()
+                            + b'\n'
+                        )
+                        f.write(saved_response + b'\n')
+
+                with open(
+                    target_folder / f'cons_{file_id}.info',
+                    'w',
+                    encoding='utf-8'
+                ) as f:
+                    f.write(f'response_type: {response_type}\n')
+                    f.write(f'request_types: {cons.req_seq}\n')
+                    f.write(f'response_types: {cons.res_seq}\n')
+
+                record = {
+                    'request_type': request_type,
+                    'response_type': response_type,
+                    'response_sha256': response_digest,
+                    'request': {
+                        'encoding': 'base64',
+                        'data': base64.b64encode(request).decode('ascii'),
+                    },
+                    'response': {
+                        'encoding': 'base64',
+                        'data': base64.b64encode(response).decode('ascii'),
+                    },
+                    'analysis': analysis or {},
+                }
+                with open(
+                    target_folder / f'cons_{file_id}.analysis.json',
+                    'w',
+                    encoding='utf-8'
+                ) as f:
+                    json.dump(record, f, indent=2, ensure_ascii=False)
+            except Exception:
+                marker_path.unlink(missing_ok=True)
+                logger.exception(
+                    'Executor: failed to save non-compliant response'
+                )
+                return False
+
+        logger.debug(format_event(
+            'invalid_response.saved',
+            testcase=f'cons_{file_id}',
+            request_type=request_type,
+            response_type=response_type,
+            response_sha256=response_digest,
+        ))
+        return True
+
+    def _invalid_response_exists(
+        self,
+        target_folder: Path,
+        dedup_key: tuple[str, str, str]
+    ) -> bool:
+        """Check persisted analysis files, including files from older runs."""
+        request_type, response_type, response_digest = dedup_key
+        for path in target_folder.glob('cons_*.analysis.json'):
+            try:
+                with path.open('r', encoding='utf-8') as f:
+                    record = json.load(f)
+                saved_digest = record.get('response_sha256')
+                if not saved_digest:
+                    encoded = record.get('response', {}).get('data')
+                    if not isinstance(encoded, str):
+                        continue
+                    saved_response = base64.b64decode(
+                        encoded,
+                        validate=True,
+                    )
+                    saved_digest = hashlib.sha256(
+                        saved_response
+                    ).hexdigest()
+                if (
+                    record.get('request_type') == request_type
+                    and record.get('response_type') == response_type
+                    and saved_digest == response_digest
+                ):
+                    return True
+            except Exception:
+                logger.exception(
+                    f'Executor: invalid response index read failed {path}'
+                )
+        return False
         
     def save_cons(
         self,

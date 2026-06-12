@@ -3,6 +3,7 @@ import threading
 from pathlib import Path
 from types import SimpleNamespace
 
+from voltron.configs import configs
 from voltron.executor.conversation import Conversation
 from voltron.executor.executor import Executor
 from voltron.synthesizer.checker import Checker
@@ -73,7 +74,7 @@ def test_confirmed_violation_is_saved_once():
     producer.review_nonconforming_response = review_with_operation
     executor.save_invalid_response = (
         lambda cons, response_type, analysis=None:
-        saved.append((response_type, analysis))
+        saved.append((response_type, analysis)) or True
     )
 
     cons = make_conversation()
@@ -86,6 +87,67 @@ def test_confirmed_violation_is_saved_once():
     assert executor.analyzer.non_compliant_num == 1
     assert operations == ["Checking possible non-compliance with LLM"]
     assert executor.analyzer.current_operation == ""
+
+
+def test_persisted_invalid_response_is_deduplicated_across_executors(tmp_path):
+    configs.results_path = tmp_path
+    first_executor, _ = make_executor("non_compliant")
+    second_executor, _ = make_executor("non_compliant")
+    cons = make_conversation(
+        request_type="CONNECT",
+        response_type="405",
+        response=b"HTTP/1.1 405 Method Not Allowed\r\n",
+    )
+
+    assert first_executor.save_invalid_response(
+        cons,
+        "405",
+        analysis={"verdict": "non_compliant"},
+    ) is True
+    assert second_executor.save_invalid_response(
+        cons,
+        "405",
+        analysis={"verdict": "non_compliant"},
+    ) is False
+
+    target = tmp_path / "invalid_responses"
+    assert len(list(target.glob("cons_*.analysis.json"))) == 1
+    assert len(list(target.glob("cons_*.pkl"))) == 1
+
+
+def test_persisted_dedup_supports_legacy_analysis_without_hash(tmp_path):
+    configs.results_path = tmp_path
+    executor, _ = make_executor("non_compliant")
+    cons = make_conversation(
+        request_type="CONNECT",
+        response_type="405",
+        response=b"HTTP/1.1 405 Method Not Allowed\r\n",
+    )
+    target = tmp_path / "invalid_responses"
+    target.mkdir()
+    legacy = {
+        "request_type": "CONNECT",
+        "response_type": "405",
+        "request": {"encoding": "base64", "data": ""},
+        "response": {
+            "encoding": "base64",
+            "data": (
+                "SFRUUC8xLjEgNDA1IE1ldGhvZCBOb3QgQWxsb3dlZA0K"
+            ),
+        },
+        "analysis": {"verdict": "non_compliant"},
+    }
+    (target / "cons_000000.analysis.json").write_text(
+        json.dumps(legacy),
+        encoding="utf-8",
+    )
+
+    assert executor.save_invalid_response(
+        cons,
+        "405",
+        analysis={"verdict": "non_compliant"},
+    ) is False
+    assert len(list(target.glob("cons_*.analysis.json"))) == 1
 
 
 def test_compliant_false_positive_evolves_and_hot_reloads_checker():

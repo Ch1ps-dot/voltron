@@ -1,4 +1,5 @@
 from logging.handlers import RotatingFileHandler
+import logging
 
 from voltron.utils import logger as logger_module
 
@@ -69,3 +70,44 @@ def test_exception_records_traceback(tmp_path):
     assert 'operation failed' in content
     assert 'Traceback (most recent call last)' in content
     assert 'RuntimeError: context failure' in content
+
+
+def test_file_log_uses_aligned_structured_columns(tmp_path):
+    logger_module.configure_file_logging(tmp_path)
+    logger_module.logger_fuzz.debug(
+        logger_module.format_event(
+            'checker.reject',
+            response_type='500',
+            length=12,
+        )
+    )
+
+    line = (tmp_path / 'fuzz.log').read_text(
+        encoding='utf-8'
+    ).splitlines()[-1]
+    assert ' | DEBUG    | fuzz ' in line
+    assert 'pid=' in line
+    assert 'thread=' in line
+    assert '[CHECKER.REJECT]' in line
+    assert "response_type='500'" in line
+
+
+def test_multiline_log_content_is_indented():
+    formatter = logger_module.ReadableFormatter(
+        '%(levelname)s | %(message)s'
+    )
+    record = logging.LogRecord(
+        name='test',
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg='header\nbody\nlast',
+        args=(),
+        exc_info=None,
+    )
+
+    assert formatter.format(record) == (
+        'DEBUG | header\n'
+        '    | body\n'
+        '    | last'
+    )
