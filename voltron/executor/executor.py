@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-import time, select, socket, pickle
+import time, select, socket, pickle, json, base64, hashlib
 from typing import Callable, Tuple
 
 from voltron.configs import configs
@@ -92,6 +92,8 @@ class Executor:
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
         self.load_checkers(self.mapper.equip_checkers())
+        self.reviewed_invalid_responses: set[tuple[str, str, str]] = set()
+        self._invalid_response_lock = threading.Lock()
         self.stop_event = stop_event
             
     def cov_setup(
@@ -236,13 +238,16 @@ class Executor:
     def interact(
         self,
         msg_seq: list[tuple[str, bytes]],
-        poll_wait_ms: int = 5000
+        poll_wait_ms: int = 5000,
+        run_checker: bool = False
     ) -> Tuple[bool, Conversation | None] :  
         """Interact with the SUT by sending a sequence of messages and receiving the corresponding responses, while recording the conversation.
         
         Args:
             msg_seq: A list of tuples, where each tuple contains a string representing the message type and a bytes object representing the message content to be sent to the SUT.
             poll_wait_ms: An integer representing the maximum time in milliseconds to wait for a response from the SUT after sending each message.
+            run_checker: Enable response conformance checking. This is only
+                enabled by the fuzzing scheduler, not model learning or replay.
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
@@ -343,11 +348,15 @@ class Executor:
         resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
         last_recv = '-'
         if(resp_code and resp_data):
-            is_valid_response = self.check_response(resp_code, resp_data)
+            is_valid_response = self.check_response_during_fuzzing(
+                resp_code,
+                resp_data,
+                run_checker,
+            )
             cons.add_state('-', resp_code)
             cons.add_data(bytes(), resp_data)
             if not is_valid_response:
-                self.save_invalid_response(cons, resp_code)
+                self.handle_nonconforming_response(cons, resp_code)
             last_recv = resp_code
             with self.analyzer.lock:
                 self.analyzer.res_types_update(resp_code)
@@ -427,9 +436,10 @@ class Executor:
 
                     is_valid_response = True
                     if resp_data is not None:
-                        is_valid_response = self.check_response(
+                        is_valid_response = self.check_response_during_fuzzing(
                             resp_code,
-                            resp_data
+                            resp_data,
+                            run_checker,
                         )
                     
                     with self.analyzer.lock:
@@ -440,11 +450,11 @@ class Executor:
                     logger.debug(f'recv <- {resp_data}')
                     
                     # record conversation data
-                    if(req_data and resp_data):
+                    if req_data is not None and resp_data is not None:
                         cons.add_data(req_data, resp_data)
                     cons.add_state(msg_type, resp_code)
                     if not is_valid_response:
-                        self.save_invalid_response(cons, resp_code)
+                        self.handle_nonconforming_response(cons, resp_code)
             
             # If socket closed, stop sending
             else:
@@ -1114,12 +1124,105 @@ class Executor:
         )
         return False
 
-    def save_invalid_response(
+    def check_response_during_fuzzing(
+        self,
+        response_type: str,
+        response: bytes,
+        enabled: bool
+    ) -> bool:
+        """Run generated response checkers only for the fuzzing stage."""
+        if not enabled:
+            return True
+        return self.check_response(response_type, response)
+
+    def handle_nonconforming_response(
         self,
         cons: Conversation,
         response_type: str
     ) -> None:
-        """Save the request/response prefix that produced an invalid response."""
+        """Review one unique checker rejection and act on the LLM verdict."""
+        if not cons.content or not cons.req_seq:
+            logger.debug(
+                'Executor: cannot review response without conversation data'
+            )
+            return
+
+        request, response = cons.content[-1]
+        request_type = cons.req_seq[-1]
+        if not response:
+            return
+
+        response_digest = hashlib.sha256(response).hexdigest()
+        dedup_key = (request_type, response_type, response_digest)
+        with self._invalid_response_lock:
+            if dedup_key in self.reviewed_invalid_responses:
+                logger.debug(
+                    'Executor: duplicate non-conforming response skipped '
+                    f'[{request_type}/{response_type}] {response_digest}'
+                )
+                return
+            self.reviewed_invalid_responses.add(dedup_key)
+
+        try:
+            analysis = self.mapper.producer.review_nonconforming_response(
+                request_type=request_type,
+                response_type=response_type,
+                request=request,
+                response=response,
+            )
+        except Exception:
+            logger.exception(
+                'Executor: non-conforming response review failed '
+                f'[{request_type}/{response_type}]'
+            )
+            return
+
+        verdict = analysis.get('verdict', 'uncertain')
+        if verdict == 'non_compliant':
+            self.save_invalid_response(
+                cons,
+                response_type,
+                analysis=analysis,
+            )
+            return
+
+        if verdict == 'compliant':
+            try:
+                checker = self.mapper.producer.evolve_checker(
+                    response_type=response_type,
+                    response=response,
+                    analysis=analysis,
+                )
+                if checker is not None:
+                    self.load_checkers(self.mapper.equip_checkers())
+                    logger.debug(
+                        'Executor: checker hot-reloaded after false positive '
+                        f'[{request_type}/{response_type}]'
+                    )
+                else:
+                    logger.debug(
+                        'Executor: checker evolution produced no update '
+                        f'[{request_type}/{response_type}]'
+                    )
+            except Exception:
+                logger.exception(
+                    'Executor: checker evolution failed '
+                    f'[{request_type}/{response_type}]'
+                )
+            return
+
+        logger.debug(
+            'Executor: compliance review uncertain; no response recorded and '
+            f'no checker modified [{request_type}/{response_type}]'
+        )
+
+    def save_invalid_response(
+        self,
+        cons: Conversation,
+        response_type: str,
+        analysis: dict | None = None
+    ) -> None:
+        """Save a request/response prefix confirmed as non-compliant."""
         target_folder = configs.results_path / 'invalid_responses'
         target_folder.mkdir(parents=True, exist_ok=True)
 
@@ -1152,8 +1255,29 @@ class Executor:
             f.write(f'request_types: {cons.req_seq}\n')
             f.write(f'response_types: {cons.res_seq}\n')
 
+        request, response = cons.content[-1]
+        record = {
+            'request_type': cons.req_seq[-1],
+            'response_type': response_type,
+            'request': {
+                'encoding': 'base64',
+                'data': base64.b64encode(request).decode('ascii'),
+            },
+            'response': {
+                'encoding': 'base64',
+                'data': base64.b64encode(response).decode('ascii'),
+            },
+            'analysis': analysis or {},
+        }
+        with open(
+            target_folder / f'cons_{file_id}.analysis.json',
+            'w',
+            encoding='utf-8'
+        ) as f:
+            json.dump(record, f, indent=2, ensure_ascii=False)
+
         logger.debug(
-            f'Executor: saved invalid response sequence cons_{file_id}'
+            f'Executor: saved confirmed non-compliant response cons_{file_id}'
         )
         
     def save_cons(

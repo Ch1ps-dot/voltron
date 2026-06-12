@@ -67,6 +67,9 @@ class Prompter:
             with self._path_mutator_evolve.open('r+') as f:
                 self._tem_mutator_evolve = Template(f.read())
 
+            self._path_checker_evolve = dir / "evolver" / "checker_evolve.md"
+            with self._path_checker_evolve.open('r+') as f:
+                self._tem_checker_evolve = Template(f.read())
 
         except Exception:
             logger.exception('Prompter initialization failed')

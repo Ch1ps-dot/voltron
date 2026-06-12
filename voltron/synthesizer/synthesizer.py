@@ -1,7 +1,7 @@
 from pathlib import Path
 from lxml import etree # type: ignore
 from tqdm import tqdm
-import json, asyncio
+import json, asyncio, hashlib
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
 from urllib.parse import quote
@@ -13,6 +13,12 @@ from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
+from voltron.analyzer.compliance import (
+    build_compliance_prompt,
+    collect_response_sections,
+    parse_compliance_result,
+    retrieve_response_sections,
+)
 from voltron.llm.chatter import AsyncChater
 from voltron.learner.automata import MealyMachine
 from dataclasses import dataclass, asdict, field
@@ -80,6 +86,7 @@ class AsyncProducer:
         self.parsers: list[Parser] = []
         self.checkers: dict[str, list[Checker]] = {}
         self.mutators: dict[str, list[Generator]] = {}
+        self._response_sections = None
             
     def run(
         self
@@ -631,6 +638,178 @@ class AsyncProducer:
             json.dump(self.checker_info(), f)
 
         logger.debug("[Producer]: finish checkers generation")
+
+    def review_nonconforming_response(
+        self,
+        request_type: str,
+        response_type: str,
+        request: bytes,
+        response: bytes
+    ) -> dict:
+        """Use relevant response sections to distinguish bugs from checker errors."""
+        if self._response_sections is None:
+            self._response_sections = collect_response_sections(
+                self.rfcp.tree_dict
+            )
+        if not self._response_sections:
+            return {
+                'verdict': 'uncertain',
+                'confidence': 0.0,
+                'summary': 'No annotated response sections are available.',
+                'violations': [],
+                'evidence': [],
+            }
+
+        retrieved = retrieve_response_sections(
+            self._response_sections,
+            request_type,
+            response_type,
+            request,
+            response,
+        )
+        prompt = build_compliance_prompt(
+            protocol=self.rfcp.pro_name,
+            request_type=request_type,
+            response_type=response_type,
+            request=request,
+            response=response,
+            retrieved=retrieved,
+        )
+        model_response = asyncio.run(
+            self.chater.chat_llm(
+                prompt=prompt,
+                usage='checker_non_compliance_review',
+            )
+        )
+        analysis = parse_compliance_result(model_response)
+        analysis['retrieved_sections'] = [
+            {
+                'rfc': section.rfc,
+                'section': section.section,
+                'content_type': section.content_type,
+                'bm25_score': score,
+            }
+            for section, score in retrieved
+        ]
+        return analysis
+
+    def evolve_checker(
+        self,
+        response_type: str,
+        response: bytes,
+        analysis: dict
+    ) -> Checker | None:
+        """Generate and persist a checker version that accepts a false positive."""
+        checker_type = response_type
+        if not self.checkers.get(checker_type):
+            checker_type = '__all__'
+        versions = self.checkers.get(checker_type)
+        if not versions:
+            logger.debug(
+                f'Producer: no checker metadata to evolve [{response_type}]'
+            )
+            return None
+
+        current = versions[-1]
+        typed_checker_path = (
+            self.checker_path
+            / quote(checker_type, safe='._-')
+            / f'{current.name}.py'
+        )
+        checker_path = typed_checker_path
+        if not checker_path.is_file() and current.path:
+            checker_path = Path(current.path)
+        if not checker_path.is_file():
+            logger.debug(
+                f'Producer: checker source missing for evolution {checker_path}'
+            )
+            return None
+
+        with checker_path.open('r', encoding='utf-8') as f:
+            original_code = f.read()
+
+        checker_code = asyncio.run(
+            self._checker_evolve_async(
+                response_type=response_type,
+                original_code=original_code,
+                response=response,
+                analysis=analysis,
+            )
+        )
+        if checker_code is None:
+            return None
+
+        numeric_ids = [
+            int(checker.name[2:])
+            for checker in versions
+            if checker.name.startswith('id') and checker.name[2:].isdigit()
+        ]
+        name = f'id{max(numeric_ids, default=-1) + 1}'
+        target_dir = self.checker_path / quote(checker_type, safe='._-')
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / f'{name}.py'
+        with target_path.open('w', encoding='utf-8') as f:
+            f.write(checker_code)
+
+        response_digest = hashlib.sha256(response).hexdigest()
+        evolved = Checker(
+            msg_type=checker_type,
+            evolved_from=current.name,
+            name=name,
+            path=str(target_path.resolve()),
+            state_field=current.state_field,
+            checked_res=list(dict.fromkeys(
+                [*current.checked_res, response_digest]
+            )),
+        )
+        versions.append(evolved)
+        with self.checker_info_path.open('w', encoding='utf-8') as f:
+            json.dump(self.checker_info(), f, indent=2)
+        logger.debug(
+            f'Producer: evolved checker [{checker_type}] '
+            f'{current.name} -> {name}'
+        )
+        return evolved
+
+    async def _checker_evolve_async(
+        self,
+        response_type: str,
+        original_code: str,
+        response: bytes,
+        analysis: dict
+    ) -> str | None:
+        review_summary = json.dumps(analysis, ensure_ascii=False)
+        for _ in range(3):
+            try:
+                checker_code = await self.chater.llm_checker_evolve(
+                    pro_name=self.rfcp.pro_name,
+                    response_type=response_type,
+                    original_code=original_code,
+                    response=response,
+                    review_summary=review_summary,
+                )
+                compile(checker_code, '<checker_evolve>', 'exec')
+                namespace = {}
+                exec(checker_code, namespace)
+                checker_func = namespace.get('packet_checker')
+                if not callable(checker_func):
+                    raise TypeError(
+                        'packet_checker is missing or not callable'
+                    )
+                result = checker_func(response)
+                if result is not True:
+                    raise ValueError(
+                        'evolved checker still rejects reviewed response'
+                    )
+                probe = checker_func(b'')
+                if not isinstance(probe, bool):
+                    raise TypeError('packet_checker must return bool')
+                return checker_code
+            except Exception:
+                logger.exception(
+                    f'Producer: checker evolution failed [{response_type}]'
+                )
+        return None
 
     def _response_types_from_primary_field(
         self

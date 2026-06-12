@@ -374,7 +374,11 @@ class Havoc:
                     if (i < len_m):
                         req_seq.append(ms[i])
 
-            flag, cons = self.exe.interact(req_seq, poll_wait_ms=3000)
+            flag, cons = self.exe.interact(
+                req_seq,
+                poll_wait_ms=3000,
+                run_checker=True,
+            )
             cur_trans_nums = analyzer.resp_trans_num()
             cur_resp_num = analyzer.res_types_num()
             

@@ -286,6 +286,30 @@ class AsyncChater:
         )
 
         return self.code_extract(ans)
+
+    async def llm_checker_evolve(
+            self,
+            pro_name: str,
+            response_type: str,
+            original_code: str,
+            response: bytes,
+            review_summary: str
+    ) -> str:
+        """Relax a checker after RFC review confirms a false positive."""
+        tmp = self.pmp._tem_checker_evolve
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            response_type=response_type,
+            original_code=original_code,
+            response_repr=repr(response),
+            response_hex=response.hex(' '),
+            review_summary=review_summary
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="checker_evolve"
+        )
+        return self.code_extract(ans)
     
     async def llm_request_query(
             self,
