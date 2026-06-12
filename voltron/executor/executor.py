@@ -529,34 +529,189 @@ class Executor:
     def kill_listeners(
         self,
         port: int
-    ):
-        pids = []
-        try:
-            result = subprocess.check_output(
-                f"netstat -tulnp 2>/dev/null | grep :{port}",
-                shell=True,
-                text=True,
-                stderr=subprocess.DEVNULL
+    ) -> None:
+        """Kill processes listening on exactly the requested TCP/UDP port."""
+        pids, listeners_found = self._find_listener_pids(port)
+        if not listeners_found:
+            return
+        if not pids:
+            logger.debug(
+                'Executor: listener found but PID is unavailable; '
+                f'port={port}; check process visibility and privileges'
             )
-            lines = result.strip().split("\n")[1:]
-            for line in lines:
-                if f":{port}" in line:
-                    pid_str = line.split("/")[0].split(" ")[-1]
-                    if pid_str.isdigit():
-                        pids.append(int(pid_str))
-            pids = list(set(pids))
-        except subprocess.CalledProcessError as e:
-            logger.debug(f'kill execution failure {e}')
-        
-        try:
-            for pid in pids:
-                logger.debug(f'kill {pid}')
-                os.kill(pid, signal.SIGKILL)
+            return
 
-        except Exception as e:
-            logger.debug(f'kill execution failure {e}')
-        
-        
+        for pid in sorted(pids):
+            if pid <= 1 or pid == os.getpid():
+                logger.debug(
+                    'Executor: refusing to kill unsafe listener PID; '
+                    f'port={port}; pid={pid}'
+                )
+                continue
+
+            try:
+                logger.debug(
+                    f'Executor: killing listener port={port}; pid={pid}'
+                )
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                logger.debug(
+                    'Executor: listener exited before kill; '
+                    f'port={port}; pid={pid}'
+                )
+                continue
+            except PermissionError as e:
+                logger.debug(
+                    'Executor: permission denied while killing listener; '
+                    f'port={port}; pid={pid}; error={e}'
+                )
+                continue
+            except Exception as e:
+                logger.debug(
+                    'Executor: failed to kill listener; '
+                    f'port={port}; pid={pid}; '
+                    f'exception={type(e).__name__}: {e}'
+                )
+                continue
+
+            if self._wait_for_process_exit(pid, timeout=0.5):
+                logger.debug(
+                    f'Executor: listener stopped port={port}; pid={pid}'
+                )
+            else:
+                logger.debug(
+                    'Executor: listener still exists after SIGKILL; '
+                    f'port={port}; pid={pid}; '
+                    'possible uninterruptible sleep or PID visibility issue'
+                )
+
+        remaining_pids, remaining_found = self._find_listener_pids(port)
+        if remaining_found:
+            logger.debug(
+                'Executor: port remains occupied after listener cleanup; '
+                f'port={port}; '
+                f'pids={sorted(remaining_pids) if remaining_pids else "hidden"}; '
+                'the service may be supervised or automatically restarted'
+            )
+
+    def _find_listener_pids(
+        self,
+        port: int
+    ) -> tuple[set[int], bool]:
+        """Find listener PIDs with ss, falling back to netstat."""
+        commands = (
+            ('ss', ['ss', '-H', '-ltnup']),
+            ('netstat', ['netstat', '-tulnp']),
+        )
+        failures = []
+
+        for tool, command in commands:
+            try:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            except FileNotFoundError:
+                failures.append(f'{tool}=not-found')
+                continue
+            except Exception as e:
+                failures.append(
+                    f'{tool}={type(e).__name__}: {e}'
+                )
+                continue
+
+            if result.returncode != 0:
+                reason = result.stderr.strip() or result.stdout.strip()
+                failures.append(
+                    f'{tool}=exit-{result.returncode}: '
+                    f'{reason or "no diagnostic output"}'
+                )
+                continue
+            if result.stderr.strip() and not result.stdout.strip():
+                failures.append(
+                    f'{tool}=no-output: {result.stderr.strip()}'
+                )
+                continue
+
+            pids, listeners_found = self._parse_listener_output(
+                result.stdout,
+                port,
+                tool,
+            )
+            if listeners_found and not pids:
+                diagnostic = result.stderr.strip()
+                if diagnostic:
+                    logger.debug(
+                        'Executor: listener query could not expose PID; '
+                        f'tool={tool}; port={port}; '
+                        f'diagnostic={diagnostic!r}'
+                    )
+            return pids, listeners_found
+
+        logger.debug(
+            'Executor: unable to inspect port listeners; '
+            f'port={port}; reasons={"; ".join(failures)}'
+        )
+        return set(), False
+
+    def _parse_listener_output(
+        self,
+        output: str,
+        port: int,
+        tool: str
+    ) -> tuple[set[int], bool]:
+        """Parse only lines whose local endpoint exactly matches port."""
+        pids: set[int] = set()
+        listeners_found = False
+
+        for line in output.splitlines():
+            tokens = line.split()
+            local_index = 4 if tool == 'ss' else 3
+            if len(tokens) <= local_index:
+                continue
+            local_endpoint = tokens[local_index].rstrip(',')
+            port_match = re.search(r':(\d+)$', local_endpoint)
+            if port_match is None or int(port_match.group(1)) != port:
+                continue
+
+            listeners_found = True
+            if tool == 'ss':
+                pids.update(
+                    int(pid)
+                    for pid in re.findall(r'\bpid=(\d+)', line)
+                )
+            elif tool == 'netstat':
+                pids.update(
+                    int(pid)
+                    for pid in re.findall(r'\b(\d+)/[^\s]+', line)
+                )
+
+        return pids, listeners_found
+
+    def _wait_for_process_exit(
+        self,
+        pid: int,
+        timeout: float
+    ) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return True
+            except PermissionError:
+                return False
+            time.sleep(0.02)
+
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        except PermissionError:
+            return False
+        return False
         
     def setup_socket(
         self
