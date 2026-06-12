@@ -37,6 +37,7 @@ def make_executor(verdict: str):
     )
     executor = Executor.__new__(Executor)
     executor.mapper = mapper
+    executor.checked_request_response_pairs = set()
     executor.reviewed_invalid_responses = set()
     executor._invalid_response_lock = threading.Lock()
     return executor, producer
@@ -99,6 +100,8 @@ def test_same_response_for_different_request_types_is_reviewed_separately():
 
 def test_checker_is_skipped_outside_fuzzing():
     executor = Executor.__new__(Executor)
+    executor.checked_request_response_pairs = set()
+    executor._invalid_response_lock = threading.Lock()
     calls = []
     executor.check_response = (
         lambda response_type, response:
@@ -106,6 +109,7 @@ def test_checker_is_skipped_outside_fuzzing():
     )
 
     assert executor.check_response_during_fuzzing(
+        "PING",
         "200",
         b"200 OK\r\n",
         enabled=False,
@@ -115,6 +119,8 @@ def test_checker_is_skipped_outside_fuzzing():
 
 def test_checker_runs_during_fuzzing():
     executor = Executor.__new__(Executor)
+    executor.checked_request_response_pairs = set()
+    executor._invalid_response_lock = threading.Lock()
     calls = []
     executor.check_response = (
         lambda response_type, response:
@@ -122,11 +128,66 @@ def test_checker_runs_during_fuzzing():
     )
 
     assert executor.check_response_during_fuzzing(
+        "PING",
         "200",
         b"invalid",
         enabled=True,
     ) is False
     assert calls == [("200", b"invalid")]
+
+
+def test_duplicate_request_response_pair_is_skipped_before_checker():
+    executor = Executor.__new__(Executor)
+    executor.checked_request_response_pairs = set()
+    executor._invalid_response_lock = threading.Lock()
+    calls = []
+    executor.check_response = (
+        lambda response_type, response:
+        calls.append((response_type, response)) or False
+    )
+
+    first = executor.check_response_during_fuzzing(
+        "PING",
+        "200",
+        b"invalid",
+        enabled=True,
+    )
+    duplicate = executor.check_response_during_fuzzing(
+        "PING",
+        "200",
+        b"invalid",
+        enabled=True,
+    )
+
+    assert first is False
+    assert duplicate is True
+    assert calls == [("200", b"invalid")]
+
+
+def test_different_request_bytes_with_same_types_and_response_are_deduplicated():
+    executor = Executor.__new__(Executor)
+    executor.checked_request_response_pairs = set()
+    executor._invalid_response_lock = threading.Lock()
+    calls = []
+    executor.check_response = (
+        lambda response_type, response:
+        calls.append((response_type, response)) or True
+    )
+
+    executor.check_response_during_fuzzing(
+        "USER",
+        "331",
+        b"331 password\r\n",
+        enabled=True,
+    )
+    executor.check_response_during_fuzzing(
+        "USER",
+        "331",
+        b"331 password\r\n",
+        enabled=True,
+    )
+
+    assert len(calls) == 1
 
 
 class FakeChater:

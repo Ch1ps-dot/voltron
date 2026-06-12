@@ -92,6 +92,9 @@ class Executor:
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
         self.load_checkers(self.mapper.equip_checkers())
+        self.checked_request_response_pairs: set[
+            tuple[str, str, str]
+        ] = set()
         self.reviewed_invalid_responses: set[tuple[str, str, str]] = set()
         self._invalid_response_lock = threading.Lock()
         self.stop_event = stop_event
@@ -349,6 +352,7 @@ class Executor:
         last_recv = '-'
         if(resp_code and resp_data):
             is_valid_response = self.check_response_during_fuzzing(
+                '-',
                 resp_code,
                 resp_data,
                 run_checker,
@@ -437,6 +441,7 @@ class Executor:
                     is_valid_response = True
                     if resp_data is not None:
                         is_valid_response = self.check_response_during_fuzzing(
+                            msg_type,
                             resp_code,
                             resp_data,
                             run_checker,
@@ -1126,13 +1131,29 @@ class Executor:
 
     def check_response_during_fuzzing(
         self,
+        request_type: str,
         response_type: str,
         response: bytes,
         enabled: bool
     ) -> bool:
-        """Run generated response checkers only for the fuzzing stage."""
+        """Deduplicate exchanges before running fuzzing-stage checkers."""
         if not enabled:
             return True
+
+        dedup_key = (
+            request_type,
+            response_type,
+            hashlib.sha256(response).hexdigest(),
+        )
+        with self._invalid_response_lock:
+            if dedup_key in self.checked_request_response_pairs:
+                logger.debug(
+                    'Executor: duplicate request-response pair skipped before '
+                    f'checker [{request_type}/{response_type}]'
+                )
+                return True
+            self.checked_request_response_pairs.add(dedup_key)
+
         return self.check_response(response_type, response)
 
     def handle_nonconforming_response(
