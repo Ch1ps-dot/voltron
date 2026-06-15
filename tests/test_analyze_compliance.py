@@ -15,6 +15,7 @@ from analyze_compliance import (
     load_pair,
     load_sections,
     parse_model_result,
+    positive_int,
     retrieve_sections,
     run,
 )
@@ -174,6 +175,12 @@ def test_parses_model_result(response, expected):
     assert parse_model_result(response)["verdict"] == expected
 
 
+def test_concurrency_must_be_positive():
+    assert positive_int("4") == 4
+    with pytest.raises(argparse.ArgumentTypeError):
+        positive_int("0")
+
+
 def test_run_updates_visual_progress_for_each_pair(tmp_path, monkeypatch):
     pair_paths = [
         tmp_path / "pair_000000.json",
@@ -257,6 +264,7 @@ def test_run_updates_visual_progress_for_each_pair(tmp_path, monkeypatch):
         output=tmp_path / "analysis",
         top_k=8,
         max_section_chars=6000,
+        concurrency=1,
     )
 
     assert asyncio.run(run(args)) == 0
@@ -268,5 +276,94 @@ def test_run_updates_visual_progress_for_each_pair(tmp_path, monkeypatch):
         "verdict": "compliant",
         "completed": 2,
         "failed": 0,
+        "concurrency": 1,
         "refresh": True,
     }
+
+
+def test_run_limits_concurrent_pair_analyses(tmp_path, monkeypatch):
+    pair_paths = [
+        tmp_path / f"pair_{index:06d}.json"
+        for index in range(5)
+    ]
+    for path in pair_paths:
+        write_pair(path)
+
+    class FakeProgress:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def update(self, amount):
+            pass
+
+        def set_postfix(self, **kwargs):
+            pass
+
+    fake_tqdm = lambda **kwargs: FakeProgress()
+    fake_tqdm.write = lambda message: None
+    monkeypatch.setattr(compliance_module, "tqdm", fake_tqdm)
+    monkeypatch.setattr(
+        compliance_module,
+        "load_target_config",
+        lambda sut: {
+            "target_name": sut,
+            "protocol": "ftp",
+            "rfc_names": ["rfc959"],
+            "llm": {},
+        },
+    )
+    monkeypatch.setattr(
+        compliance_module,
+        "discover_pair_files",
+        lambda input_path: pair_paths,
+    )
+    monkeypatch.setattr(
+        compliance_module,
+        "load_sections",
+        lambda protocol, rfc_names: [],
+    )
+    monkeypatch.setattr(
+        compliance_module,
+        "AsyncChater",
+        lambda *args, **kwargs: object(),
+    )
+
+    active = 0
+    max_active = 0
+
+    async def fake_analyze_pair(*args, **kwargs):
+        nonlocal active, max_active
+        pair = args[2]
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return {
+            "source_pair": str(pair.source),
+            "analysis": {
+                "verdict": "compliant",
+                "confidence": 1.0,
+                "summary": "ok",
+            },
+        }
+
+    monkeypatch.setattr(
+        compliance_module,
+        "analyze_pair",
+        fake_analyze_pair,
+    )
+    args = argparse.Namespace(
+        sut="lightftp",
+        input=tmp_path,
+        output=tmp_path / "analysis",
+        top_k=8,
+        max_section_chars=6000,
+        concurrency=2,
+    )
+
+    assert asyncio.run(run(args)) == 0
+    assert max_active == 2
+    assert len(list((tmp_path / "analysis").glob("*.analysis.json"))) == 5

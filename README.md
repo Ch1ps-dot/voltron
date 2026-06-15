@@ -232,6 +232,8 @@ Common options:
 - `--top-k`: number of retrieved RFC sections sent to the LLM; default is `8`
 - `--max-section-chars`: maximum characters retained from each section;
   default is `6000`
+- `-j, --concurrency`: maximum number of pair analyses executed concurrently;
+  default is `1`
 
 Example with an explicit output directory:
 
@@ -240,7 +242,8 @@ uv run analyze_compliance.py \
   -s lighttpd \
   -i results-lighttpd-voltron-<timestamp> \
   -o results-lighttpd-voltron-<timestamp>/compliance_analysis \
-  --top-k 10
+  --top-k 10 \
+  --concurrency 4
 ```
 
 Each input `pair_NNNNNN.json` produces a
@@ -254,7 +257,7 @@ Each input `pair_NNNNNN.json` produces a
 The script prints a one-line verdict for each pair and exits with a nonzero
 status if any pair could not be analyzed. An `uncertain` verdict is still a
 successful analysis result. While running, a command-line progress bar shows
-the current pair, completed count, failure count, and latest verdict.
+the completed count, failure count, configured concurrency, and latest verdict.
 
 ## Replay
 

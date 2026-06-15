@@ -59,6 +59,13 @@ class SectionRecord:
     content: str
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be greater than zero")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -99,6 +106,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=6000,
         help="Maximum characters retained from each RFC section (default: 6000)",
+    )
+    parser.add_argument(
+        "-j",
+        "--concurrency",
+        type=positive_int,
+        default=1,
+        help="Maximum concurrent pair analyses (default: 1)",
     )
     return parser.parse_args()
 
@@ -446,7 +460,42 @@ def default_output_dir(input_path: Path) -> Path:
     return input_path / "compliance_analysis"
 
 
+async def analyze_pair_file(
+    semaphore: asyncio.Semaphore,
+    chater: AsyncChater,
+    target: dict[str, Any],
+    pair_path: Path,
+    sections: list[SectionRecord],
+    output_dir: Path,
+    top_k: int,
+    max_section_chars: int,
+) -> tuple[Path, dict[str, Any] | None, Exception | None]:
+    """Analyze and persist one pair within the configured concurrency limit."""
+    try:
+        async with semaphore:
+            pair = load_pair(pair_path)
+            result = await analyze_pair(
+                chater,
+                target,
+                pair,
+                sections,
+                top_k,
+                max_section_chars,
+            )
+            output_path = output_dir / f"{pair_path.stem}.analysis.json"
+            with output_path.open("w", encoding="utf-8") as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+        return pair_path, result, None
+    except Exception as error:
+        return pair_path, None, error
+
+
 async def run(args: argparse.Namespace) -> int:
+    concurrency = getattr(args, "concurrency", 1)
+    if concurrency <= 0:
+        raise ValueError("concurrency must be greater than zero")
+
     target = load_target_config(args.sut)
     pair_files = discover_pair_files(args.input)
     sections = load_sections(target["protocol"], target["rfc_names"])
@@ -462,34 +511,29 @@ async def run(args: argparse.Namespace) -> int:
 
     failures = 0
     completed = 0
+    semaphore = asyncio.Semaphore(concurrency)
+    tasks = [
+        asyncio.create_task(analyze_pair_file(
+            semaphore=semaphore,
+            chater=chater,
+            target=target,
+            pair_path=pair_path,
+            sections=sections,
+            output_dir=output_dir,
+            top_k=args.top_k,
+            max_section_chars=args.max_section_chars,
+        ))
+        for pair_path in pair_files
+    ]
     with tqdm(
         total=len(pair_files),
         desc="Compliance analysis",
         unit="pair",
         dynamic_ncols=True,
     ) as progress:
-        for pair_path in pair_files:
-            progress.set_postfix(
-                current=pair_path.name,
-                completed=completed,
-                failed=failures,
-                refresh=True,
-            )
-            try:
-                pair = load_pair(pair_path)
-                result = await analyze_pair(
-                    chater,
-                    target,
-                    pair,
-                    sections,
-                    args.top_k,
-                    args.max_section_chars,
-                )
-                output_path = output_dir / f"{pair_path.stem}.analysis.json"
-                with output_path.open("w", encoding="utf-8") as f:
-                    json.dump(result, f, indent=2, ensure_ascii=False)
-                    f.write("\n")
-
+        for task in asyncio.as_completed(tasks):
+            pair_path, result, error = await task
+            if error is None and result is not None:
                 analysis = result["analysis"]
                 verdict = analysis["verdict"]
                 tqdm.write(
@@ -497,19 +541,22 @@ async def run(args: argparse.Namespace) -> int:
                     f"({analysis.get('confidence', 0.0)}) - "
                     f"{analysis.get('summary', '')}"
                 )
-            except Exception as e:
+            else:
                 failures += 1
                 verdict = "failed"
-                tqdm.write(f"{pair_path.name}: analysis failed: {e}")
-            finally:
-                completed += 1
-                progress.update(1)
-                progress.set_postfix(
-                    verdict=verdict,
-                    completed=completed,
-                    failed=failures,
-                    refresh=True,
+                tqdm.write(
+                    f"{pair_path.name}: analysis failed: {error}"
                 )
+
+            completed += 1
+            progress.update(1)
+            progress.set_postfix(
+                verdict=verdict,
+                completed=completed,
+                failed=failures,
+                concurrency=concurrency,
+                refresh=True,
+            )
 
     print(f"Analysis results: {output_dir}")
     return 1 if failures else 0
