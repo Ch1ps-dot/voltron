@@ -248,7 +248,8 @@ Each input `pair_NNNNNN.json` produces a
 
 The script prints a one-line verdict for each pair and exits with a nonzero
 status if any pair could not be analyzed. An `uncertain` verdict is still a
-successful analysis result.
+successful analysis result. While running, a command-line progress bar shows
+the current pair, completed count, failure count, and latest verdict.
 
 ## Replay
 

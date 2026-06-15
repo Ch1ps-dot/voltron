@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 from fastbm25 import fastbm25
+from tqdm import tqdm
 
 from voltron.configs import configs
 from voltron.llm.chatter import AsyncChater
@@ -432,31 +433,55 @@ async def run(args: argparse.Namespace) -> int:
     )
 
     failures = 0
-    for pair_path in pair_files:
-        try:
-            pair = load_pair(pair_path)
-            result = await analyze_pair(
-                chater,
-                target,
-                pair,
-                sections,
-                args.top_k,
-                args.max_section_chars,
+    completed = 0
+    with tqdm(
+        total=len(pair_files),
+        desc="Compliance analysis",
+        unit="pair",
+        dynamic_ncols=True,
+    ) as progress:
+        for pair_path in pair_files:
+            progress.set_postfix(
+                current=pair_path.name,
+                completed=completed,
+                failed=failures,
+                refresh=True,
             )
-            output_path = output_dir / f"{pair_path.stem}.analysis.json"
-            with output_path.open("w", encoding="utf-8") as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
-                f.write("\n")
+            try:
+                pair = load_pair(pair_path)
+                result = await analyze_pair(
+                    chater,
+                    target,
+                    pair,
+                    sections,
+                    args.top_k,
+                    args.max_section_chars,
+                )
+                output_path = output_dir / f"{pair_path.stem}.analysis.json"
+                with output_path.open("w", encoding="utf-8") as f:
+                    json.dump(result, f, indent=2, ensure_ascii=False)
+                    f.write("\n")
 
-            analysis = result["analysis"]
-            print(
-                f"{pair_path.name}: {analysis['verdict']} "
-                f"({analysis.get('confidence', 0.0)}) - "
-                f"{analysis.get('summary', '')}"
-            )
-        except Exception as e:
-            failures += 1
-            print(f"{pair_path.name}: analysis failed: {e}")
+                analysis = result["analysis"]
+                verdict = analysis["verdict"]
+                tqdm.write(
+                    f"{pair_path.name}: {verdict} "
+                    f"({analysis.get('confidence', 0.0)}) - "
+                    f"{analysis.get('summary', '')}"
+                )
+            except Exception as e:
+                failures += 1
+                verdict = "failed"
+                tqdm.write(f"{pair_path.name}: analysis failed: {e}")
+            finally:
+                completed += 1
+                progress.update(1)
+                progress.set_postfix(
+                    verdict=verdict,
+                    completed=completed,
+                    failed=failures,
+                    refresh=True,
+                )
 
     print(f"Analysis results: {output_dir}")
     return 1 if failures else 0
