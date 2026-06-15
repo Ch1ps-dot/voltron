@@ -3,10 +3,13 @@ import threading
 from pathlib import Path
 from types import SimpleNamespace
 
+from lxml import etree
+
 from voltron.configs import configs
 from voltron.executor.conversation import Conversation
 from voltron.executor.executor import Executor
 from voltron.synthesizer.checker import Checker
+from voltron.synthesizer.hasher import ResponseHasher
 from voltron.synthesizer.synthesizer import AsyncProducer
 
 
@@ -15,6 +18,7 @@ class FakeProducer:
         self.verdict = verdict
         self.review_calls = 0
         self.evolve_calls = 0
+        self.semantic_compare_calls = 0
 
     def review_nonconforming_response(self, **kwargs):
         self.review_calls += 1
@@ -29,6 +33,10 @@ class FakeProducer:
     def evolve_checker(self, **kwargs):
         self.evolve_calls += 1
         return object()
+
+    def responses_semantically_equivalent(self, **kwargs):
+        self.semantic_compare_calls += 1
+        return True
 
 
 def make_executor(verdict: str):
@@ -46,7 +54,12 @@ def make_executor(verdict: str):
     )
     executor.checked_request_response_pairs = set()
     executor.reviewed_invalid_responses = set()
+    executor.checked_response_samples = {}
+    executor.reviewed_response_samples = {}
+    executor.hasher_evolution_failures = set()
+    executor.hasher_semantic_reviews = {}
     executor._invalid_response_lock = threading.Lock()
+    executor.hasher_funcs = {}
     return executor, producer
 
 
@@ -113,6 +126,44 @@ def test_persisted_invalid_response_is_deduplicated_across_executors(tmp_path):
     target = tmp_path / "invalid_responses"
     assert len(list(target.glob("cons_*.analysis.json"))) == 1
     assert len(list(target.glob("cons_*.pkl"))) == 1
+
+
+def test_persisted_semantic_hash_deduplicates_dynamic_fields(tmp_path):
+    configs.results_path = tmp_path
+    first_executor, _ = make_executor("non_compliant")
+    second_executor, _ = make_executor("non_compliant")
+    semantic_hasher = lambda response: "c" * 64
+    first_executor.hasher_funcs = {"405": semantic_hasher}
+    second_executor.hasher_funcs = {"405": semantic_hasher}
+    first = make_conversation(
+        request_type="CONNECT",
+        response_type="405",
+        response=b"HTTP/1.1 405\r\nDate: first\r\n\r\n",
+    )
+    second = make_conversation(
+        request_type="CONNECT",
+        response_type="405",
+        response=b"HTTP/1.1 405\r\nDate: second\r\n\r\n",
+    )
+
+    assert first_executor.save_invalid_response(
+        first,
+        "405",
+        analysis={"verdict": "non_compliant"},
+    ) is True
+    assert second_executor.save_invalid_response(
+        second,
+        "405",
+        analysis={"verdict": "non_compliant"},
+    ) is False
+
+    records = list(
+        (tmp_path / "invalid_responses").glob("cons_*.analysis.json")
+    )
+    assert len(records) == 1
+    record = json.loads(records[0].read_text(encoding="utf-8"))
+    assert record["response_hash"] == "c" * 64
+    assert record["response_sha256"] != record["response_hash"]
 
 
 def test_persisted_dedup_supports_legacy_analysis_without_hash(tmp_path):
@@ -182,6 +233,7 @@ def test_checker_is_skipped_outside_fuzzing():
     executor = Executor.__new__(Executor)
     executor.checked_request_response_pairs = set()
     executor._invalid_response_lock = threading.Lock()
+    executor.hasher_funcs = {}
     calls = []
     executor.check_response = (
         lambda response_type, response:
@@ -201,6 +253,7 @@ def test_checker_runs_during_fuzzing():
     executor = Executor.__new__(Executor)
     executor.checked_request_response_pairs = set()
     executor._invalid_response_lock = threading.Lock()
+    executor.hasher_funcs = {}
     calls = []
     executor.check_response = (
         lambda response_type, response:
@@ -220,6 +273,7 @@ def test_duplicate_request_response_pair_is_skipped_before_checker():
     executor = Executor.__new__(Executor)
     executor.checked_request_response_pairs = set()
     executor._invalid_response_lock = threading.Lock()
+    executor.hasher_funcs = {}
     calls = []
     executor.check_response = (
         lambda response_type, response:
@@ -248,6 +302,7 @@ def test_different_request_bytes_with_same_types_and_response_are_deduplicated()
     executor = Executor.__new__(Executor)
     executor.checked_request_response_pairs = set()
     executor._invalid_response_lock = threading.Lock()
+    executor.hasher_funcs = {}
     calls = []
     executor.check_response = (
         lambda response_type, response:
@@ -270,6 +325,145 @@ def test_different_request_bytes_with_same_types_and_response_are_deduplicated()
     assert len(calls) == 1
 
 
+def test_semantic_hasher_deduplicates_dynamic_response_fields():
+    executor = Executor.__new__(Executor)
+    executor.checked_request_response_pairs = set()
+    executor._invalid_response_lock = threading.Lock()
+    executor.checked_response_samples = {}
+    executor.reviewed_response_samples = {}
+    executor.hasher_evolution_failures = set()
+    executor.hasher_funcs = {
+        "405": lambda response: (
+            "a" * 64
+            if response.startswith(b"HTTP/1.1 405")
+            else "b" * 64
+        )
+    }
+    calls = []
+    executor.check_response = (
+        lambda response_type, response:
+        calls.append((response_type, response)) or True
+    )
+
+    executor.check_response_during_fuzzing(
+        "CONNECT",
+        "405",
+        b"HTTP/1.1 405\r\nDate: first\r\n\r\n",
+        enabled=True,
+    )
+    executor.check_response_during_fuzzing(
+        "CONNECT",
+        "405",
+        b"HTTP/1.1 405\r\nDate: second\r\n\r\n",
+        enabled=True,
+    )
+
+    assert len(calls) == 1
+
+
+def test_invalid_hasher_output_falls_back_to_raw_sha256():
+    executor = Executor.__new__(Executor)
+    executor.hasher_funcs = {"200": lambda response: "not-a-hash"}
+    response = b"200 OK\r\n"
+
+    assert executor.hash_response("200", response) == __import__(
+        "hashlib"
+    ).sha256(response).hexdigest()
+
+
+def test_hasher_evolution_rehashes_memory_and_persisted_results(
+    tmp_path,
+):
+    configs.results_path = tmp_path
+    executor, producer = make_executor("non_compliant")
+    first = b"HTTP/1.1 405\r\nDate: first\r\n\r\n"
+    second = b"HTTP/1.1 405\r\nDate: second\r\n\r\n"
+    executor.hasher_funcs = {
+        "405": lambda response: __import__("hashlib").sha256(
+            response
+        ).hexdigest()
+    }
+    checker_calls = []
+    executor.check_response = (
+        lambda response_type, response:
+        checker_calls.append(response) or True
+    )
+    producer.hashers = {"405": [object()]}
+    producer.evolve_calls = 0
+
+    def evolve_hasher(response_type, samples):
+        producer.evolve_calls += 1
+        executor.hasher_funcs = {"405": lambda response: "d" * 64}
+        return object()
+
+    producer.evolve_hasher = evolve_hasher
+    executor.mapper.hashers = producer.hashers
+    executor.mapper.equip_hashers = lambda: {"405": object()}
+    executor.load_hashers = lambda hashers: None
+
+    assert executor.check_response_during_fuzzing(
+        "CONNECT",
+        "405",
+        first,
+        enabled=True,
+    ) is True
+
+    target = tmp_path / "invalid_responses"
+    target.mkdir()
+    record_path = target / "cons_000000.analysis.json"
+    record_path.write_text(json.dumps({
+        "request_type": "CONNECT",
+        "response_type": "405",
+        "response_sha256": __import__("hashlib").sha256(first).hexdigest(),
+        "response_hash": __import__("hashlib").sha256(first).hexdigest(),
+        "response": {
+            "encoding": "base64",
+            "data": __import__("base64").b64encode(first).decode("ascii"),
+        },
+    }), encoding="utf-8")
+
+    assert executor.check_response_during_fuzzing(
+        "CONNECT",
+        "405",
+        second,
+        enabled=True,
+    ) is True
+
+    assert producer.evolve_calls == 1
+    assert checker_calls == [first]
+    assert executor.checked_request_response_pairs == {
+        ("CONNECT", "405", "d" * 64)
+    }
+    updated = json.loads(record_path.read_text(encoding="utf-8"))
+    assert updated["response_hash"] == "d" * 64
+
+
+def test_hasher_does_not_evolve_for_semantically_different_responses():
+    executor, producer = make_executor("non_compliant")
+    first = b"HTTP/1.1 405 Method Not Allowed\r\n\r\n"
+    second = b"HTTP/1.1 405 Retry Later\r\nRetry-After: 30\r\n\r\n"
+    executor.hasher_funcs = {
+        "405": lambda response: __import__("hashlib").sha256(
+            response
+        ).hexdigest()
+    }
+    producer.hashers = {"405": [object()]}
+    producer.responses_semantically_equivalent = lambda **kwargs: False
+    producer.evolve_calls = 0
+    producer.evolve_hasher = (
+        lambda **kwargs:
+        setattr(producer, "evolve_calls", producer.evolve_calls + 1)
+    )
+    executor.checked_response_samples[
+        ("CONNECT", "405", __import__("hashlib").sha256(first).hexdigest())
+    ] = first
+
+    digest = executor.hash_response_with_evolution("405", second)
+
+    assert digest == __import__("hashlib").sha256(second).hexdigest()
+    assert producer.evolve_calls == 0
+
+
 class FakeChater:
     async def llm_checker_evolve(self, **kwargs):
         response = kwargs["response"]
@@ -277,6 +471,21 @@ class FakeChater:
             "def packet_checker(candidate: bytes) -> bool:\n"
             f"    return isinstance(candidate, bytes) and candidate == {response!r}\n"
         )
+
+    async def llm_hasher_evolve(self, **kwargs):
+        return (
+            "def packet_hasher(response: bytes) -> str:\n"
+            "    return 'e' * 64\n"
+        )
+
+    async def llm_hasher_semantic_compare(self, **kwargs):
+        return json.dumps({
+            "semantic_equivalent": True,
+            "confidence": 0.98,
+            "reason": "Only the Date field changed.",
+            "dynamic_differences": ["Date"],
+            "behavioral_differences": [],
+        })
 
 
 def test_checker_evolution_persists_new_version(tmp_path: Path):
@@ -323,3 +532,91 @@ def test_checker_evolution_persists_new_version(tmp_path: Path):
         producer.checker_info_path.read_text(encoding="utf-8")
     )
     assert [item["name"] for item in metadata["200"]] == ["id0", "id1"]
+
+
+def test_hasher_evolution_persists_new_version(tmp_path: Path):
+    hasher_dir = tmp_path / "hashers" / "405"
+    hasher_dir.mkdir(parents=True)
+    old_path = hasher_dir / "id0.py"
+    old_path.write_text(
+        "import hashlib\n"
+        "def packet_hasher(response: bytes) -> str:\n"
+        "    return hashlib.sha256(response).hexdigest()\n",
+        encoding="utf-8",
+    )
+
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.chater = FakeChater()
+    producer.rfcp = SimpleNamespace(pro_name="http")
+    producer.hasher_path = tmp_path / "hashers"
+    producer.hasher_info_path = producer.hasher_path / "hasher_info.json"
+    producer.res_ir = etree.fromstring(
+        b"<ir><message name='405'><field name='Date'/></message></ir>"
+    )
+    producer.hashers = {
+        "405": [
+            ResponseHasher(
+                msg_type="405",
+                name="id0",
+                path=str(old_path),
+                state_field="StatusCode",
+            )
+        ]
+    }
+
+    evolved = producer.evolve_hasher(
+        response_type="405",
+        samples=[
+            b"HTTP/1.1 405\r\nDate: first\r\n\r\n",
+            b"HTTP/1.1 405\r\nDate: second\r\n\r\n",
+        ],
+    )
+
+    assert evolved is not None
+    assert evolved.name == "id1"
+    assert evolved.evolved_from == "id0"
+    assert len(evolved.sample_hashes) == 2
+    metadata = json.loads(
+        producer.hasher_info_path.read_text(encoding="utf-8")
+    )
+    assert [item["name"] for item in metadata["405"]] == ["id0", "id1"]
+
+
+def test_hasher_semantic_comparison_uses_ir(tmp_path: Path):
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.chater = FakeChater()
+    producer.rfcp = SimpleNamespace(pro_name="http")
+    producer.res_ir = etree.fromstring(
+        b"<ir><message name='405'><field name='Date'/></message></ir>"
+    )
+
+    assert producer.responses_semantically_equivalent(
+        response_type="405",
+        old_response=b"HTTP/1.1 405\r\nDate: first\r\n\r\n",
+        new_response=b"HTTP/1.1 405\r\nDate: second\r\n\r\n",
+    ) is True
+
+
+def test_low_confidence_semantic_match_does_not_allow_evolution():
+    class LowConfidenceChater(FakeChater):
+        async def llm_hasher_semantic_compare(self, **kwargs):
+            return json.dumps({
+                "semantic_equivalent": True,
+                "confidence": 0.5,
+                "reason": "The available evidence is ambiguous.",
+                "dynamic_differences": [],
+                "behavioral_differences": [],
+            })
+
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.chater = LowConfidenceChater()
+    producer.rfcp = SimpleNamespace(pro_name="http")
+    producer.res_ir = etree.fromstring(
+        b"<ir><message name='405'><field name='Date'/></message></ir>"
+    )
+
+    assert producer.responses_semantically_equivalent(
+        response_type="405",
+        old_response=b"HTTP/1.1 405\r\nDate: first\r\n\r\n",
+        new_response=b"HTTP/1.1 405\r\nDate: second\r\n\r\n",
+    ) is False

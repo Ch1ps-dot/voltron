@@ -309,6 +309,73 @@ class AsyncChater:
 
         return self.code_extract(ans)
 
+    async def llm_hasher_gen(
+            self,
+            pro_name: str,
+            msg_ir: str,
+            res_info: str,
+            response_type: str
+    ) -> str:
+        """Generate a semantic response hasher from response-message IR."""
+        tmp = self.pmp._tem_gen_hasher
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            msg_ir=msg_ir,
+            res_info=res_info,
+            response_type=response_type,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="hasher_gen",
+        )
+        return self.code_extract(ans)
+
+    async def llm_hasher_evolve(
+            self,
+            pro_name: str,
+            response_type: str,
+            msg_ir: str,
+            original_code: str,
+            samples: str
+    ) -> str:
+        """Evolve a hasher using same-type responses with different hashes."""
+        tmp = self.pmp._tem_hasher_evolve
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            response_type=response_type,
+            msg_ir=msg_ir,
+            original_code=original_code,
+            samples=samples,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="hasher_evolve",
+        )
+        return self.code_extract(ans)
+
+    async def llm_hasher_semantic_compare(
+            self,
+            pro_name: str,
+            response_type: str,
+            msg_ir: str,
+            old_response: bytes,
+            new_response: bytes
+    ) -> str:
+        """Judge whether two responses have the same protocol semantics."""
+        tmp = self.pmp._tem_hasher_semantic_compare
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            response_type=response_type,
+            msg_ir=msg_ir,
+            old_response=repr(old_response),
+            new_response=repr(new_response),
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="hasher_semantic_compare",
+        )
+        return self.json_extract(ans)
+
     async def llm_checker_evolve(
             self,
             pro_name: str,

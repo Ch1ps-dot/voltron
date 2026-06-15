@@ -8,6 +8,7 @@ from voltron.utils.logger import format_event, logger_fuzz as logger
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
+from voltron.synthesizer.hasher import ResponseHasher
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, sys, os, signal, re
@@ -92,10 +93,22 @@ class Executor:
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
         self.load_checkers(self.mapper.equip_checkers())
+        self.hasher_funcs: dict[str, Callable[[bytes], str]] = {}
+        self.load_hashers(self.mapper.equip_hashers())
         self.checked_request_response_pairs: set[
             tuple[str, str, str]
         ] = set()
         self.reviewed_invalid_responses: set[tuple[str, str, str]] = set()
+        self.checked_response_samples: dict[
+            tuple[str, str, str], bytes
+        ] = {}
+        self.reviewed_response_samples: dict[
+            tuple[str, str, str], bytes
+        ] = {}
+        self.hasher_evolution_failures: set[tuple[str, ...]] = set()
+        self.hasher_semantic_reviews: dict[
+            tuple[str, str, str], bool
+        ] = {}
         self._invalid_response_lock = threading.Lock()
         self.stop_event = stop_event
             
@@ -1146,6 +1159,166 @@ class Executor:
                     f'Executor: checker load failure [{msg_type}] {e}'
                 )
 
+    def load_hashers(
+        self,
+        hashers: dict[str, ResponseHasher]
+    ) -> None:
+        """Load the latest generated semantic hasher for each response type."""
+        self.hasher_funcs = {}
+        for msg_type, hasher in hashers.items():
+            namespace = {}
+            try:
+                with open(self.mapper.h_path(hasher), 'r', encoding='utf-8') as f:
+                    exec(f.read(), namespace)
+                hasher_func: Callable = namespace.get('packet_hasher')
+                if not callable(hasher_func):
+                    raise TypeError('packet_hasher is missing or not callable')
+                self.hasher_funcs[msg_type] = hasher_func
+            except Exception:
+                logger.exception(
+                    f'Executor: hasher load failure [{msg_type}]'
+                )
+
+    def hash_response(
+        self,
+        response_type: str,
+        response: bytes
+    ) -> str:
+        """Return an IR-normalized digest, falling back to raw SHA-256."""
+        fallback = hashlib.sha256(response).hexdigest()
+        hasher = self.hasher_funcs.get(response_type)
+        if hasher is None:
+            hasher = self.hasher_funcs.get('__all__')
+        if hasher is None:
+            return fallback
+        try:
+            digest = hasher(response)
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or digest != digest.lower()
+                or any(char not in '0123456789abcdef' for char in digest)
+            ):
+                raise TypeError(
+                    'packet_hasher must return lowercase SHA-256'
+                )
+            return digest
+        except Exception:
+            logger.exception(
+                f'Executor: hasher failure [{response_type}]'
+            )
+            return fallback
+
+    def hash_response_with_evolution(
+        self,
+        response_type: str,
+        response: bytes
+    ) -> str:
+        """Evolve a hasher only for semantically equivalent hash divergence."""
+        if not hasattr(self, 'checked_response_samples'):
+            self.checked_response_samples = {}
+        if not hasattr(self, 'reviewed_response_samples'):
+            self.reviewed_response_samples = {}
+        if not hasattr(self, 'hasher_evolution_failures'):
+            self.hasher_evolution_failures = set()
+        if not hasattr(self, 'hasher_semantic_reviews'):
+            self.hasher_semantic_reviews = {}
+        digest = self.hash_response(response_type, response)
+        if response_type not in self.hasher_funcs:
+            return digest
+
+        previous_samples = self._historical_response_samples(response_type)
+        samples_by_digest: dict[str, list[bytes]] = {}
+        for sample in previous_samples:
+            sample_digest = self.hash_response(response_type, sample)
+            samples_by_digest.setdefault(sample_digest, []).append(sample)
+        previous_digests = set(samples_by_digest)
+        if not previous_samples or digest in previous_digests:
+            return digest
+
+        response_raw_hash = hashlib.sha256(response).hexdigest()
+        equivalent_samples: list[bytes] = []
+        try:
+            for old_digest, old_samples in samples_by_digest.items():
+                if old_digest == digest:
+                    continue
+                representative = old_samples[0]
+                old_raw_hash = hashlib.sha256(representative).hexdigest()
+                review_key = (
+                    response_type,
+                    old_raw_hash,
+                    response_raw_hash,
+                )
+                reverse_key = (
+                    response_type,
+                    response_raw_hash,
+                    old_raw_hash,
+                )
+                equivalent = self.hasher_semantic_reviews.get(review_key)
+                if equivalent is None:
+                    equivalent = self.hasher_semantic_reviews.get(reverse_key)
+                if equivalent is None:
+                    self._set_ui_operation(
+                        'Comparing response semantics with LLM'
+                    )
+                    equivalent = (
+                        self.mapper.producer
+                        .responses_semantically_equivalent(
+                            response_type=response_type,
+                            old_response=representative,
+                            new_response=response,
+                        )
+                    )
+                    self.hasher_semantic_reviews[review_key] = equivalent
+                if equivalent:
+                    equivalent_samples.extend(old_samples)
+        except Exception:
+            logger.exception(
+                f'Executor: response semantic comparison failed '
+                f'[{response_type}]'
+            )
+            return digest
+        finally:
+            self._set_ui_operation('')
+
+        if not equivalent_samples:
+            logger.debug(
+                f'Executor: preserve distinct semantic hashes '
+                f'[{response_type}]'
+            )
+            return digest
+
+        samples = list(dict.fromkeys([*equivalent_samples, response]))
+        failure_key = tuple(sorted(
+            hashlib.sha256(sample).hexdigest()
+            for sample in samples
+        ))
+        if failure_key in self.hasher_evolution_failures:
+            return digest
+
+        try:
+            self._set_ui_operation('Updating response hasher with LLM')
+            evolved = self.mapper.producer.evolve_hasher(
+                response_type=response_type,
+                samples=samples,
+            )
+            if evolved is None:
+                self.hasher_evolution_failures.add(failure_key)
+                return digest
+            self.mapper.hashers = self.mapper.producer.hashers
+            self.load_hashers(self.mapper.equip_hashers())
+            self._rebuild_hash_indexes(response_type)
+            self._rehash_persisted_invalid_responses(response_type)
+            return self.hash_response(response_type, response)
+        except Exception:
+            self.hasher_evolution_failures.add(failure_key)
+            logger.exception(
+                f'Executor: hasher evolution failed [{response_type}]'
+            )
+            return digest
+        finally:
+            self._set_ui_operation('')
+
     def check_response(
         self,
         response_type: str,
@@ -1193,10 +1366,15 @@ class Executor:
         if not enabled:
             return True
 
+        response_hash = self.hash_response_with_evolution(
+            response_type,
+            response,
+        )
+        raw_digest = hashlib.sha256(response).hexdigest()
         dedup_key = (
             request_type,
             response_type,
-            hashlib.sha256(response).hexdigest(),
+            response_hash,
         )
         with self._invalid_response_lock:
             if dedup_key in self.checked_request_response_pairs:
@@ -1204,10 +1382,13 @@ class Executor:
                     'checker.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_sha256=dedup_key[2],
+                    response_hash=dedup_key[2],
                 ))
                 return True
             self.checked_request_response_pairs.add(dedup_key)
+            self.checked_response_samples[
+                (request_type, response_type, raw_digest)
+            ] = response
 
         return self.check_response(response_type, response)
 
@@ -1228,16 +1409,23 @@ class Executor:
         if not response:
             return
 
-        response_digest = hashlib.sha256(response).hexdigest()
-        dedup_key = (request_type, response_type, response_digest)
+        response_hash = self.hash_response(response_type, response)
+        dedup_key = (request_type, response_type, response_hash)
         with self._invalid_response_lock:
             if dedup_key in self.reviewed_invalid_responses:
                 logger.debug(
                     'Executor: duplicate non-conforming response skipped '
-                    f'[{request_type}/{response_type}] {response_digest}'
+                    f'[{request_type}/{response_type}] {response_hash}'
                 )
                 return
             self.reviewed_invalid_responses.add(dedup_key)
+            self.reviewed_response_samples[
+                (
+                    request_type,
+                    response_type,
+                    hashlib.sha256(response).hexdigest(),
+                )
+            ] = response
 
         try:
             self._set_ui_operation(
@@ -1318,7 +1506,8 @@ class Executor:
         request, response = cons.content[-1]
         request_type = cons.req_seq[-1]
         response_digest = hashlib.sha256(response).hexdigest()
-        dedup_key = (request_type, response_type, response_digest)
+        response_hash = self.hash_response(response_type, response)
+        dedup_key = (request_type, response_type, response_hash)
         marker_digest = hashlib.sha256(
             json.dumps(dedup_key, separators=(',', ':')).encode('utf-8')
         ).hexdigest()
@@ -1330,7 +1519,7 @@ class Executor:
                     'invalid_response.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_sha256=response_digest,
+                    response_hash=response_hash,
                 ))
                 return False
 
@@ -1346,7 +1535,7 @@ class Executor:
                     'invalid_response.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_sha256=response_digest,
+                    response_hash=response_hash,
                 ))
                 return False
 
@@ -1395,6 +1584,7 @@ class Executor:
                     'request_type': request_type,
                     'response_type': response_type,
                     'response_sha256': response_digest,
+                    'response_hash': response_hash,
                     'request': {
                         'encoding': 'base64',
                         'data': base64.b64encode(request).decode('ascii'),
@@ -1424,6 +1614,7 @@ class Executor:
             request_type=request_type,
             response_type=response_type,
             response_sha256=response_digest,
+            response_hash=response_hash,
         ))
         return True
 
@@ -1433,13 +1624,13 @@ class Executor:
         dedup_key: tuple[str, str, str]
     ) -> bool:
         """Check persisted analysis files, including files from older runs."""
-        request_type, response_type, response_digest = dedup_key
+        request_type, response_type, response_hash = dedup_key
         for path in target_folder.glob('cons_*.analysis.json'):
             try:
                 with path.open('r', encoding='utf-8') as f:
                     record = json.load(f)
-                saved_digest = record.get('response_sha256')
-                if not saved_digest:
+                saved_hash = record.get('response_hash')
+                if not saved_hash:
                     encoded = record.get('response', {}).get('data')
                     if not isinstance(encoded, str):
                         continue
@@ -1447,13 +1638,14 @@ class Executor:
                         encoded,
                         validate=True,
                     )
-                    saved_digest = hashlib.sha256(
-                        saved_response
-                    ).hexdigest()
+                    saved_hash = self.hash_response(
+                        response_type,
+                        saved_response,
+                    )
                 if (
                     record.get('request_type') == request_type
                     and record.get('response_type') == response_type
-                    and saved_digest == response_digest
+                    and saved_hash == response_hash
                 ):
                     return True
             except Exception:
@@ -1461,6 +1653,141 @@ class Executor:
                     f'Executor: invalid response index read failed {path}'
                 )
         return False
+
+    def _historical_response_samples(
+        self,
+        response_type: str
+    ) -> list[bytes]:
+        samples = [
+            response
+            for (_, saved_type, _), response
+            in self.checked_response_samples.items()
+            if saved_type == response_type
+        ]
+        target_folder = configs.results_path / 'invalid_responses'
+        if target_folder.is_dir():
+            for path in target_folder.glob('cons_*.analysis.json'):
+                try:
+                    with path.open('r', encoding='utf-8') as f:
+                        record = json.load(f)
+                    if record.get('response_type') != response_type:
+                        continue
+                    encoded = record.get('response', {}).get('data')
+                    if isinstance(encoded, str):
+                        samples.append(base64.b64decode(
+                            encoded,
+                            validate=True,
+                        ))
+                except Exception:
+                    logger.exception(
+                        f'Executor: historical response read failed {path}'
+                    )
+        return list(dict.fromkeys(samples))
+
+    def _rebuild_hash_indexes(
+        self,
+        response_type: str
+    ) -> None:
+        self.checked_request_response_pairs = {
+            key
+            for key in self.checked_request_response_pairs
+            if key[1] != response_type
+        }
+        self.reviewed_invalid_responses = {
+            key
+            for key in self.reviewed_invalid_responses
+            if key[1] != response_type
+        }
+        for (request_type, saved_type, _), response in (
+            self.checked_response_samples.items()
+        ):
+            if saved_type == response_type:
+                self.checked_request_response_pairs.add((
+                    request_type,
+                    saved_type,
+                    self.hash_response(saved_type, response),
+                ))
+        for (request_type, saved_type, _), response in (
+            self.reviewed_response_samples.items()
+        ):
+            if saved_type == response_type:
+                self.reviewed_invalid_responses.add((
+                    request_type,
+                    saved_type,
+                    self.hash_response(saved_type, response),
+                ))
+
+    def _rehash_persisted_invalid_responses(
+        self,
+        response_type: str
+    ) -> None:
+        target_folder = configs.results_path / 'invalid_responses'
+        if not target_folder.is_dir():
+            return
+
+        records = []
+        for path in target_folder.glob('cons_*.analysis.json'):
+            try:
+                with path.open('r', encoding='utf-8') as f:
+                    record = json.load(f)
+                if record.get('response_type') == response_type:
+                    encoded = record.get('response', {}).get('data')
+                    if isinstance(encoded, str):
+                        response = base64.b64decode(
+                            encoded,
+                            validate=True,
+                        )
+                        record['response_hash'] = self.hash_response(
+                            response_type,
+                            response,
+                        )
+                        temp_path = path.with_suffix(path.suffix + '.tmp')
+                        with temp_path.open('w', encoding='utf-8') as f:
+                            json.dump(
+                                record,
+                                f,
+                                indent=2,
+                                ensure_ascii=False,
+                            )
+                        temp_path.replace(path)
+                records.append(record)
+            except Exception:
+                logger.exception(
+                    f'Executor: persisted response rehash failed {path}'
+                )
+
+        for marker in target_folder.glob('.dedup_*'):
+            marker.unlink(missing_ok=True)
+        for record in records:
+            request_type = record.get('request_type')
+            saved_type = record.get('response_type')
+            saved_hash = record.get('response_hash')
+            if (
+                isinstance(saved_type, str)
+                and not isinstance(saved_hash, str)
+            ):
+                encoded = record.get('response', {}).get('data')
+                if isinstance(encoded, str):
+                    try:
+                        saved_hash = self.hash_response(
+                            saved_type,
+                            base64.b64decode(encoded, validate=True),
+                        )
+                    except Exception:
+                        logger.exception(
+                            'Executor: marker hash reconstruction failed'
+                        )
+            if not all(isinstance(value, str) for value in (
+                request_type,
+                saved_type,
+                saved_hash,
+            )):
+                continue
+            key = (request_type, saved_type, saved_hash)
+            marker_digest = hashlib.sha256(
+                json.dumps(key, separators=(',', ':')).encode('utf-8')
+            ).hexdigest()
+            (target_folder / f'.dedup_{marker_digest}').touch(exist_ok=True)
         
     def save_cons(
         self,
