@@ -4,7 +4,11 @@ import time, select, socket, pickle, json, base64, hashlib
 from typing import Callable, Tuple
 
 from voltron.configs import configs
-from voltron.utils.logger import format_event, logger_fuzz as logger
+from voltron.utils.logger import (
+    format_boundary,
+    format_event,
+    logger_fuzz as logger,
+)
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
@@ -92,9 +96,10 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
-        self.load_checkers(self.mapper.equip_checkers())
         self.hasher_funcs: dict[str, Callable[[bytes], str]] = {}
-        self.load_hashers(self.mapper.equip_hashers())
+        if configs.fuzz_mode != 'replay':
+            self.load_checkers(self.mapper.equip_checkers())
+            self.load_hashers(self.mapper.equip_hashers())
         self.checked_request_response_pairs: set[
             tuple[str, str, str]
         ] = set()
@@ -256,6 +261,81 @@ class Executor:
         msg_seq: list[tuple[str, bytes]],
         poll_wait_ms: int = 5000,
         run_checker: bool = False
+    ) -> Tuple[bool, Conversation | None]:
+        """Log one complete interaction and execute it against the SUT."""
+        interaction_id = f'{time.monotonic_ns():x}'
+        request_types = '/'.join(
+            msg_type
+            for msg_type, _ in msg_seq
+        ) or '-'
+        started_at = time.perf_counter()
+        result: Tuple[bool, Conversation | None] | None = None
+        outcome = 'exception'
+        error_type = None
+
+        logger.debug(format_boundary(
+            'interact.begin',
+            interaction_id=interaction_id,
+            request_count=len(msg_seq),
+            request_types=request_types,
+            poll_wait_ms=poll_wait_ms,
+            checker_enabled=run_checker,
+            mode=getattr(configs, 'fuzz_mode', ''),
+            endpoint=(
+                f'{getattr(self, "host", "?")}:'
+                f'{getattr(self, "port", "?")}'
+            ),
+        ))
+        try:
+            result = self._interact_once(
+                msg_seq,
+                poll_wait_ms=poll_wait_ms,
+                run_checker=run_checker,
+            )
+            flag, _ = result
+            if flag:
+                outcome = 'completed'
+            elif self.stop_event.is_set():
+                outcome = 'stopped'
+            else:
+                outcome = 'failed'
+            return result
+        except BaseException as error:
+            error_type = type(error).__name__
+            outcome = (
+                'interrupted'
+                if isinstance(error, (KeyboardInterrupt, SystemExit))
+                else 'exception'
+            )
+            raise
+        finally:
+            conversation = result[1] if result is not None else None
+            logger.debug(format_boundary(
+                'interact.end',
+                interaction_id=interaction_id,
+                outcome=outcome,
+                duration_ms=round(
+                    (time.perf_counter() - started_at) * 1000,
+                    3,
+                ),
+                recorded_exchanges=(
+                    len(conversation.content)
+                    if conversation is not None
+                    else 0
+                ),
+                response_types=(
+                    '/'.join(conversation.res_seq)
+                    if conversation is not None
+                    else '-'
+                ),
+                error_type=error_type,
+            ))
+
+    def _interact_once(
+        self,
+        msg_seq: list[tuple[str, bytes]],
+        poll_wait_ms: int = 5000,
+        run_checker: bool = False
     ) -> Tuple[bool, Conversation | None] :  
         """Interact with the SUT by sending a sequence of messages and receiving the corresponding responses, while recording the conversation.
         
@@ -267,8 +347,20 @@ class Executor:
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
+        if self.stop_event.is_set():
+            return False, None
         self.kill_listeners(self.port)
+        if self.stop_event.is_set():
+            return False, None
         clean = self.setup_exe()
+        if self.stop_event.is_set():
+            if clean is not None:
+                self._terminate_process_group(
+                    clean,
+                    signal.SIGKILL,
+                    timeout=1,
+                )
+            return False, None
         proc = self.run_exe()
         
         
@@ -282,14 +374,22 @@ class Executor:
         
         # avoid unexceptional crash of target
         for attempt in range(1, 101):
+            if self.stop_event.is_set():
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGTERM,
+                    timeout=1,
+                )
+                return False, None
             if proc is not None and proc.poll() is not None:
                 self._log_sut_start_failure(
                     proc,
                     stage='process-exited-before-ready-check',
                     attempt=attempt,
                 )
+                if self.stop_event.wait(self.setup_time_s):
+                    return False, None
                 proc = self.run_exe()
-                time.sleep(self.setup_time_s)
             else:
                 break
 
@@ -311,7 +411,13 @@ class Executor:
         # wait for server setup
         sock = None
         for attempt in range(1, 101):
-            time.sleep(self.setup_time_s)
+            if self.stop_event.wait(self.setup_time_s):
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGTERM,
+                    timeout=1,
+                )
+                return False, None
             sock = self.setup_socket()
             if sock == None:
                 if proc != None and proc.poll() is not None:
@@ -321,7 +427,16 @@ class Executor:
                         attempt=attempt,
                         detail='process exited before socket became ready',
                     )
+                    if self.stop_event.is_set():
+                        return False, None
                     proc = self.run_exe()
+                    if self.stop_event.is_set():
+                        self._terminate_process_group(
+                            proc,
+                            signal.SIGTERM,
+                            timeout=1,
+                        )
+                        return False, None
                     self.kill_listeners(self.port)
                 continue
             else:
@@ -366,6 +481,14 @@ class Executor:
             poll_timeout_ms=100,
             show_fuzz_ui=run_checker,
         )
+        if self.stop_event.is_set():
+            sock.close()
+            self._terminate_process_group(
+                proc,
+                signal.SIGTERM,
+                timeout=1,
+            )
+            return False, None
         last_recv = '-'
         if(resp_code and resp_data):
             is_valid_response = self.check_response_during_fuzzing(
@@ -389,19 +512,26 @@ class Executor:
         # send the message sequence and parse the response, record the conversation in cons
         last_msg_type = '-'
         last_msg = bytes()
+        last_request_recorded = True
         for msg_type, msg in msg_seq:
-            last_msg_type = msg_type
-            last_msg = msg if msg is not None else bytes()
-            
             if self.stop_event.is_set():
                 break
             
             if proc.poll() is not None:
-                if not self._handle_crash_if_detected(cons, proc, msg_type, last_msg):
+                if not self._handle_crash_if_detected(
+                    cons,
+                    proc,
+                    last_msg_type,
+                    last_msg,
+                    request_recorded=last_request_recorded,
+                ):
                     cons.add_state(msg_type, 'CLOSED')
-                    cons.add_data(bytes(), bytes())
+                    cons.add_data(msg or bytes(), bytes())
                     logger.debug('server close')
                 break
+
+            last_msg_type = msg_type
+            last_msg = msg if msg is not None else bytes()
             
             # send message and parse response
             if msg == None:
@@ -411,6 +541,7 @@ class Executor:
             
             # success to send
             if(flag and req_data):
+                last_request_recorded = False
                 logger.debug(format_event(
                     'network.send',
                     request_type=msg_type,
@@ -430,34 +561,55 @@ class Executor:
                 if resp_code == 'POLLERR':
                     # crash
                     # normal
-                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
+                    if not self._handle_crash_if_detected(
+                        cons,
+                        proc,
+                        msg_type,
+                        msg,
+                        request_recorded=False,
+                    ):
                         cons.add_state(msg_type, 'POLLERR')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
                         logger.debug(f'recv <- POLLERR')
+                        last_request_recorded = True
                     break
                 
                 elif resp_code == 'TIMEOUT':
                     # crash
                     # noraml
-                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
+                    if not self._handle_crash_if_detected(
+                        cons,
+                        proc,
+                        msg_type,
+                        msg,
+                        request_recorded=False,
+                    ):
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.timeout_num += 1
                         logger.debug(f'recv <- TIMEOUT')
+                        last_request_recorded = True
                     break
                 
                 elif resp_code == 'RCLOSED':
                     # crash
                     # normal
-                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
+                    if not self._handle_crash_if_detected(
+                        cons,
+                        proc,
+                        msg_type,
+                        msg,
+                        request_recorded=False,
+                    ):
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
                         logger.debug(f'recv <- rclose')
+                        last_request_recorded = True
                     break
                 
                 else:
@@ -492,9 +644,10 @@ class Executor:
                     ))
                     
                     # record conversation data
-                    if req_data is not None and resp_data is not None:
-                        cons.add_data(req_data, resp_data)
+                    if req_data is not None:
+                        cons.add_data(req_data, resp_data or bytes())
                     cons.add_state(msg_type, resp_code)
+                    last_request_recorded = True
                     if not is_valid_response:
                         self.handle_nonconforming_response(cons, resp_code)
             
@@ -503,7 +656,13 @@ class Executor:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                self._handle_crash_if_detected(cons, proc, msg_type, msg)
+                self._handle_crash_if_detected(
+                    cons,
+                    proc,
+                    msg_type,
+                    msg,
+                    request_recorded=False,
+                )
                         
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
@@ -518,7 +677,13 @@ class Executor:
         except Exception as e:
             logger.debug(f'socket close error: {e}')
         
-        self._handle_crash_if_detected(cons, proc, last_msg_type, last_msg)
+        self._handle_crash_if_detected(
+            cons,
+            proc,
+            last_msg_type,
+            last_msg,
+            request_recorded=last_request_recorded,
+        )
         
         # close process
         close_signal = signal.SIGUSR1 if configs.fuzz_mode == 'replay' else signal.SIGTERM
@@ -551,11 +716,13 @@ class Executor:
 
     def _terminate_process_group(
         self,
-        proc: subprocess.Popen,
+        proc: subprocess.Popen | None,
         sig: signal.Signals,
         timeout: float
     ) -> None:
         """Terminate a SUT process tree that was started with start_new_session."""
+        if proc is None:
+            return
         try:
             if proc.poll() is None:
                 os.killpg(proc.pid, sig)
@@ -806,6 +973,8 @@ class Executor:
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
             return False, None
+        if self.stop_event.is_set():
+            return False, None
         
         poller = select.poll()
         poller.register(sock, select.POLLOUT | select.POLLERR | select.POLLHUP)
@@ -877,6 +1046,8 @@ class Executor:
         # check clinet socket before response
         if sock is None or sock.fileno() < 0:
             logger.debug("Executor: socket closed")
+            return None, None
+        if self.stop_event.is_set():
             return None, None
         
         """ 
@@ -1043,7 +1214,8 @@ class Executor:
         msg_type: str,
         msg: bytes,
         stdout: str = '',
-        stderr: str = ''
+        stderr: str = '',
+        request_recorded: bool = True,
     ):
         if msg_type in self.crash_testcases.keys() and msg in self.crash_testcases[msg_type]:
             pass
@@ -1051,7 +1223,12 @@ class Executor:
             self.crash_testcases.setdefault(msg_type, [])
 
             self.crash_testcases[msg_type].append(msg)
-            cons.add_state('-', 'CRASH')
+            if not request_recorded and msg_type != '-' and msg:
+                cons.add_state(msg_type, 'CRASH')
+                cons.add_data(msg, bytes())
+            else:
+                cons.add_state('-', 'CRASH')
+                cons.add_data(bytes(), bytes())
             logger.debug(f'Program crash exitcode {proc.returncode}')
             with self.analyzer.lock:
                 self.analyzer.crash_num += 1
@@ -1066,7 +1243,8 @@ class Executor:
         cons: Conversation,
         proc: subprocess.Popen,
         msg_type: str,
-        msg: bytes
+        msg: bytes,
+        request_recorded: bool = True,
     ) -> bool:
         return_code = proc.poll()
         if return_code is None:
@@ -1078,7 +1256,15 @@ class Executor:
             stdout, stderr = self._read_process_output(proc)
 
         if self._is_crash(return_code, stdout, stderr):
-            self.handle_crash(cons, proc, msg_type, msg, stdout, stderr)
+            self.handle_crash(
+                cons,
+                proc,
+                msg_type,
+                msg,
+                stdout,
+                stderr,
+                request_recorded=request_recorded,
+            )
             return True
 
         return False

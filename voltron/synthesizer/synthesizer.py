@@ -143,7 +143,41 @@ class AsyncProducer:
                 )
             self.parser_gen()
 
-        # Load an existing checker or synthesize the initial checker from IR.
+        if configs.fuzz_mode != 'replay':
+            self._load_checkers()
+            self._load_hashers()
+
+        # load existed parser info or generate init mutator
+        if (self.mutator_info_path.is_file()):
+            try:
+                with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
+                    mutator_info = json.load(f)
+                    self.mutators_info_load(mutator_info)
+                logger.debug("Mutator: load mutator info")
+            except Exception as e:
+                logger.debug(f'Mutator: load error {e}')
+
+        if not configs.spec_knowledge:
+            self.generators = {
+                msg_type: generators[:1]
+                for msg_type, generators in self.generators.items()
+                if generators
+            }
+            self.parsers = self.parsers[:1]
+            self.checkers = {
+                msg_type: checkers[:1]
+                for msg_type, checkers in self.checkers.items()
+                if checkers
+            }
+            self.hashers = {
+                msg_type: hashers[:1]
+                for msg_type, hashers in self.hashers.items()
+                if hashers
+            }
+            self.mutators = {}
+
+    def _load_checkers(self) -> None:
+        """Load or synthesize response checkers outside replay mode."""
         if self.checker_info_path.is_file():
             try:
                 with open(self.checker_info_path, 'r', encoding='utf-8') as f:
@@ -173,6 +207,8 @@ class AsyncProducer:
         elif configs.spec_knowledge:
             self.checker_gen()
 
+    def _load_hashers(self) -> None:
+        """Load or synthesize response hashers outside replay mode."""
         if self.hasher_info_path.is_file():
             try:
                 with self.hasher_info_path.open('r', encoding='utf-8') as f:
@@ -194,35 +230,6 @@ class AsyncProducer:
                     self.hasher_gen()
         elif configs.spec_knowledge:
             self.hasher_gen()
-        
-        # load existed parser info or generate init mutator
-        if (self.mutator_info_path.is_file()):
-            try:
-                with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
-                    mutator_info = json.load(f)
-                    self.mutators_info_load(mutator_info)
-                logger.debug("Mutator: load mutator info")
-            except Exception as e:
-                logger.debug(f'Mutator: load error {e}')
-
-        if not configs.spec_knowledge:
-            self.generators = {
-                msg_type: generators[:1]
-                for msg_type, generators in self.generators.items()
-                if generators
-            }
-            self.parsers = self.parsers[:1]
-            self.checkers = {
-                msg_type: checkers[:1]
-                for msg_type, checkers in self.checkers.items()
-                if checkers
-            }
-            self.hashers = {
-                msg_type: hashers[:1]
-                for msg_type, hashers in self.hashers.items()
-                if hashers
-            }
-            self.mutators = {}
 
     async def _generator_gen_one(
         self,

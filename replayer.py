@@ -1,27 +1,41 @@
 #!/bin/python3
 
 from voltron.fuzz import Fuzzer
-from voltron.configs import configs
-import click, random
+import click
 from pathlib import Path
 
 @click.command(help='fuzzer')
 @click.option("-s", "--sut", type=str, required=True, help="server under test")
-@click.option("-d", "--dir", type=str, required=True, help="testcase input direcotory")
-@click.option("-c", "--gcov_folder", type=str, required=True, help="gcov analysis directory")
+@click.option(
+    "-d",
+    "--dir",
+    "result_dir",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="testcase input directory",
+)
+@click.option(
+    "-c",
+    "--gcov_folder",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="gcov analysis directory",
+)
 def main(
-    sut: str, 
-    dir: str, 
-    gcov_folder: str
+    sut: str,
+    result_dir: Path,
+    gcov_folder: Path,
 ):
+    result_dir = result_dir.expanduser().resolve()
+    gcov_folder = gcov_folder.expanduser().resolve()
     replayer = Fuzzer(
         target_name=sut,
         mode='replay',
-        output=dir,
+        output=str(result_dir),
     )
     replayer.replay(
-        res_dir=Path(dir),
-        cov_folder=Path(gcov_folder)
+        res_dir=result_dir,
+        cov_folder=gcov_folder,
     )
 
 if __name__ == '__main__':

@@ -53,11 +53,20 @@ class Fuzzer:
         self._cleanup_lock = threading.RLock()
         self._cleanup_done = False
         self._previous_sigint_handler = None
-        
-        self.load_configs()
-        self.module_init()
+        self._signal_handler_installed = False
+        self._worker_threads: list[threading.Thread] = []
+        self.stop_event = threading.Event()
+        analyzer.stop_event = self.stop_event
         atexit.register(self.cleanup)
-        
+        self._install_signal_handlers()
+
+        try:
+            self.load_configs()
+            self.module_init()
+        except BaseException:
+            self.cleanup()
+            raise
+
     def load_configs(
         self
     ) -> None:
@@ -151,8 +160,6 @@ class Fuzzer:
         # scheduler init
         self.mapper = Mapper(self.producer)
         
-        self.stop_event = threading.Event()
-        analyzer.stop_event = self.stop_event
         # setup executor
         self.exe = Executor(
             mapper=self.mapper,
@@ -191,8 +198,19 @@ class Fuzzer:
             self._install_signal_handlers()
             
             # start fuzzing and set up ui
-            t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
-            t_fuzz = threading.Thread(target=fuzz_loop, args=(self.stop_event,))
+            t_ui = threading.Thread(
+                target=ui_loop,
+                args=(self.stop_event,),
+                name='voltron-ui',
+                daemon=True,
+            )
+            t_fuzz = threading.Thread(
+                target=fuzz_loop,
+                args=(self.stop_event,),
+                name='voltron-fuzz',
+                daemon=True,
+            )
+            self._worker_threads = [t_fuzz, t_ui]
 
             t_fuzz.start()
             t_ui.start()
@@ -216,6 +234,8 @@ class Fuzzer:
     ):
         """Fuzz the target one
         """
+        res_dir = res_dir.expanduser().resolve()
+        cov_folder = cov_folder.expanduser().resolve()
         configs.results_path = res_dir
         configure_file_logging(configs.results_path)
         
@@ -228,8 +248,19 @@ class Fuzzer:
             self._install_signal_handlers()
             
             # start fuzzing and set up ui
-            t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
-            t_fuzz = threading.Thread(target=self.replay_process, args=(res_dir, cov_folder,))
+            t_ui = threading.Thread(
+                target=ui_loop,
+                args=(self.stop_event,),
+                name='voltron-ui',
+                daemon=True,
+            )
+            t_fuzz = threading.Thread(
+                target=self.replay_process,
+                args=(res_dir, cov_folder,),
+                name='voltron-replay',
+                daemon=True,
+            )
+            self._worker_threads = [t_fuzz, t_ui]
 
             t_fuzz.start()
             t_ui.start()
@@ -412,7 +443,11 @@ class Fuzzer:
             
         file_count = 0
         try:
-            file_paths = [f for f in in_dir.iterdir() if f.is_file()]
+            file_paths = [
+                path
+                for path in in_dir.iterdir()
+                if path.is_file() and path.suffix == '.pkl'
+            ]
             sorted_files = sorted(
                 file_paths,
                 key=self.get_creation_timestamp,
@@ -421,12 +456,20 @@ class Fuzzer:
             cons_seq: list[Conversation] = []
             file_list: list[Path] = []
             for item in sorted_files:
-                if item.is_file():
+                try:
                     with open(item, 'rb') as f:
                         cons = pickle.load(f)
-                        cons_seq.append(cons)
-                        file_list.append(item)
+                    if not isinstance(cons, Conversation):
+                        raise TypeError(
+                            f'expected Conversation, got {type(cons).__name__}'
+                        )
+                    cons_seq.append(cons)
+                    file_list.append(item)
                     file_count += 1
+                except Exception:
+                    logger.exception(
+                        f'Fuzzer: skip invalid replay testcase {item}'
+                    )
             
             analyzer.set_progress('havoc', 'replay', file_count)
             self.exe.cov_setup(cov_folder, cov_file)
@@ -442,14 +485,17 @@ class Fuzzer:
                     flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
                 except Exception:
                     logger.exception('Fuzzer: testcase replay failed')
+                    continue
 
                 with analyzer.lock:
                     analyzer.finished += 1
-                    
-                self.exe.cov_collect(cov_folder, cov_file, file_list[i])
-            self.stop_event.set()
+
+                if flag:
+                    self.exe.cov_collect(cov_folder, cov_file, file_list[i])
         except Exception:
             logger.exception('Fuzzer: replay processing failed')
+        finally:
+            self.stop_event.set()
 
     def handle_normal_fuzzer_exit(
         self,
@@ -459,14 +505,18 @@ class Fuzzer:
         # Handle normal exit of fuzzer Ctrl+C
         logger.debug(f'Fuzzer: caught signal {signal_num}, stopping')
         self.stop_event.set()
-        self._terminate_active_sut(signal.SIGTERM, timeout=1)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        self._terminate_active_sut(signal.SIGTERM, timeout=0.5)
         raise KeyboardInterrupt
 
     def _install_signal_handlers(
         self
     ) -> None:
+        if self._signal_handler_installed:
+            return
         self._previous_sigint_handler = signal.getsignal(signal.SIGINT)
         signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+        self._signal_handler_installed = True
 
     def _restore_signal_handlers(
         self
@@ -477,6 +527,7 @@ class Fuzzer:
             except Exception:
                 logger.exception('Fuzzer: restore signal handler failure')
             self._previous_sigint_handler = None
+        self._signal_handler_installed = False
 
     def cleanup(
         self
@@ -493,9 +544,12 @@ class Fuzzer:
                 pass
 
             self._terminate_active_sut(signal.SIGTERM, timeout=3)
+            self._join_worker_threads(timeout=1)
 
             try:
-                self.mapper.close()
+                mapper = getattr(self, 'mapper', None)
+                if mapper is not None:
+                    mapper.close()
             except Exception:
                 logger.exception('Fuzzer: mapper close failure')
 
@@ -503,6 +557,28 @@ class Fuzzer:
                 self._collect_results()
 
             self._restore_signal_handlers()
+
+    def _join_worker_threads(self, timeout: float) -> None:
+        """Wait briefly for cooperative workers before collecting results."""
+        deadline = time.monotonic() + timeout
+        current = threading.current_thread()
+        for thread in self._worker_threads:
+            if thread is current or not thread.is_alive():
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            thread.join(timeout=remaining)
+
+        alive = [
+            thread.name
+            for thread in self._worker_threads
+            if thread is not current and thread.is_alive()
+        ]
+        if alive:
+            logger.debug(
+                f'Fuzzer: worker shutdown timeout; alive={alive}'
+            )
 
     def _terminate_active_sut(
         self,

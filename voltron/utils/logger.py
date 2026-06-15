@@ -43,6 +43,12 @@ def format_event(event: str, **fields) -> str:
     return ' '.join(parts)
 
 
+def format_boundary(event: str, **fields) -> str:
+    """Build a visually distinct boundary around a lifecycle event."""
+    marker = '=' * 18
+    return f'{marker} {format_event(event, **fields)} {marker}'
+
+
 def get_logger(name: str = '') -> logging.Logger:
     """Create a logger without opening a file during module import."""
     logger = logging.getLogger(name)

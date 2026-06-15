@@ -111,3 +111,16 @@ def test_multiline_log_content_is_indented():
         '    | body\n'
         '    | last'
     )
+
+
+def test_boundary_log_is_visually_distinct():
+    boundary = logger_module.format_boundary(
+        'interact.begin',
+        interaction_id='abc',
+        request_count=2,
+    )
+
+    assert boundary.startswith('=' * 18)
+    assert boundary.endswith('=' * 18)
+    assert '[INTERACT.BEGIN]' in boundary
+    assert "interaction_id='abc'" in boundary
