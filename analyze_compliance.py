@@ -6,6 +6,7 @@ import base64
 import json
 import pickle
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -205,35 +206,62 @@ def load_pair(path: Path) -> PairRecord:
 
 def load_sections(protocol: str, rfc_names: list[str]) -> list[SectionRecord]:
     sections: list[SectionRecord] = []
+    failures: list[str] = []
     ir_path = configs.base_path / "component" / "ir" / protocol
     for rfc_name in dict.fromkeys(rfc_names):
         tree_path = ir_path / f"{rfc_name}.pkl"
-        if not tree_path.is_file():
-            raise FileNotFoundError(
-                f"cached SectionTree not found: {tree_path}. "
-                "Run the normal specification-aware workflow first."
-            )
-        with tree_path.open("rb") as f:
-            tree = pickle.load(f)
-        if not isinstance(tree, SectionTree):
-            raise TypeError(f"unexpected SectionTree cache type: {tree_path}")
-
-        for node in tree.leafs:
-            if node.content_type not in {"request", "response", "all"}:
-                continue
-            content = tree.fetch_node_content(node).strip()
-            if content:
-                sections.append(
-                    SectionRecord(
-                        rfc=rfc_name,
-                        section=node.name.strip(),
-                        content_type=node.content_type,
-                        content=content,
-                    )
+        try:
+            if not tree_path.is_file():
+                raise FileNotFoundError("cache file does not exist")
+            with tree_path.open("rb") as f:
+                tree = pickle.load(f)
+            if not isinstance(tree, SectionTree):
+                raise TypeError(
+                    f"expected SectionTree, got {type(tree).__name__}"
                 )
 
+            loaded_count = 0
+            for node in tree.leafs:
+                if node.content_type not in {"request", "response", "all"}:
+                    continue
+                content = tree.fetch_node_content(node).strip()
+                if content:
+                    sections.append(
+                        SectionRecord(
+                            rfc=rfc_name,
+                            section=node.name.strip(),
+                            content_type=node.content_type,
+                            content=content,
+                        )
+                    )
+                    loaded_count += 1
+            if loaded_count == 0:
+                raise ValueError(
+                    "cache contains no annotated protocol sections"
+                )
+        except Exception as error:
+            reason = f"{tree_path}: {type(error).__name__}: {error}"
+            failures.append(reason)
+            print(
+                "Warning: skipping unusable SectionTree cache: "
+                f"{reason}",
+                file=sys.stderr,
+            )
+
     if not sections:
-        raise ValueError(f"no annotated RFC sections found for protocol {protocol}")
+        details = "\n".join(f"- {failure}" for failure in failures)
+        raise RuntimeError(
+            f"no usable cached RFC SectionTrees found for protocol "
+            f"{protocol}.\n{details}\n"
+            "Run the normal specification-aware workflow again to "
+            "regenerate component/ir caches."
+        )
+    if failures:
+        print(
+            f"Loaded {len(sections)} protocol sections while skipping "
+            f"{len(failures)} unusable RFC cache(s).",
+            file=sys.stderr,
+        )
     return sections
 
 

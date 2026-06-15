@@ -2,6 +2,7 @@ import base64
 import argparse
 import asyncio
 import json
+import pickle
 
 import pytest
 
@@ -12,10 +13,12 @@ from analyze_compliance import (
     build_prompt,
     discover_pair_files,
     load_pair,
+    load_sections,
     parse_model_result,
     retrieve_sections,
     run,
 )
+from voltron.rfcparser.setciontree import SectionNode, SectionTree
 
 
 def write_pair(path, request=b"USER test\r\n", response=b"331 password\r\n"):
@@ -61,6 +64,59 @@ def test_rejects_mismatched_pair_length(tmp_path):
 
     with pytest.raises(ValueError, match="request_length mismatch"):
         load_pair(pair_path)
+
+
+def write_section_tree(
+    path,
+    content="331 User name okay, need password.",
+):
+    tree = SectionTree.__new__(SectionTree)
+    tree.doc_content = content
+    node = SectionNode(1, 0, len(content), "4.2 Replies")
+    node.content_type = "response"
+    tree.leafs = [node]
+    with path.open("wb") as stream:
+        pickle.dump(tree, stream)
+
+
+def test_load_sections_skips_truncated_cache_when_another_is_valid(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    ir_path = tmp_path / "component" / "ir" / "ftp"
+    ir_path.mkdir(parents=True)
+    (ir_path / "broken.pkl").write_bytes(b"\x80\x05truncated")
+    write_section_tree(ir_path / "rfc959.pkl")
+    monkeypatch.setattr(compliance_module.configs, "base_path", tmp_path)
+
+    sections = load_sections("ftp", ["broken", "rfc959"])
+
+    assert len(sections) == 1
+    assert sections[0].rfc == "rfc959"
+    stderr = capsys.readouterr().err
+    assert "skipping unusable SectionTree cache" in stderr
+    assert "UnpicklingError" in stderr
+    assert "Loaded 1 protocol sections" in stderr
+
+
+def test_load_sections_reports_all_unusable_caches(
+    tmp_path,
+    monkeypatch,
+):
+    ir_path = tmp_path / "component" / "ir" / "ftp"
+    ir_path.mkdir(parents=True)
+    (ir_path / "broken.pkl").write_bytes(b"\x80\x05truncated")
+    monkeypatch.setattr(compliance_module.configs, "base_path", tmp_path)
+
+    with pytest.raises(RuntimeError) as error:
+        load_sections("ftp", ["broken", "missing"])
+
+    message = str(error.value)
+    assert "no usable cached RFC SectionTrees" in message
+    assert "broken.pkl" in message
+    assert "missing.pkl" in message
+    assert "regenerate component/ir caches" in message
 
 
 def test_retrieval_and_prompt_include_exchange_and_rfc_context(tmp_path):

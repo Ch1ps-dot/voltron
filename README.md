@@ -198,6 +198,11 @@ Before running the analysis:
 3. Ensure the input contains the `pair_*.json` files generated under
    `request_response_pairs/`.
 
+If one cached RFC SectionTree is missing or damaged, the script prints a
+warning and continues with the remaining valid caches. If no usable cache
+remains, rerun the normal specification-aware workflow to regenerate
+`component/ir/<protocol>/*.pkl`.
+
 Analyze all saved pairs in a fuzz result directory:
 
 ```bash
