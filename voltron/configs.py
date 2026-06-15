@@ -35,6 +35,11 @@ class Config:
         self.api_key_fuzz: str
         self.model_fuzz: str
         self.async_sem_fuzz: int
+
+        self.base_url_compliance: str
+        self.api_key_compliance: str
+        self.model_compliance: str
+        self.async_sem_compliance: int
         
         self.server: str
         

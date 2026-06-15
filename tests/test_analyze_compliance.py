@@ -10,10 +10,12 @@ import analyze_compliance as compliance_module
 from analyze_compliance import (
     PairRecord,
     SectionRecord,
+    analyze_pair_file,
     build_prompt,
     discover_pair_files,
     load_pair,
     load_sections,
+    load_target_config,
     parse_model_result,
     positive_int,
     retrieve_sections,
@@ -179,6 +181,116 @@ def test_concurrency_must_be_positive():
     assert positive_int("4") == 4
     with pytest.raises(argparse.ArgumentTypeError):
         positive_int("0")
+
+
+def test_load_target_config_uses_compliance_llm(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "configs.yaml").write_text(
+        """
+lightftp:
+  protocol: ftp
+  rfc_name: [rfc959]
+llm_doc:
+  base_url: https://doc.example
+  api_key: doc-key
+  model: doc-model
+  async_sem: 2
+llm_compliance:
+  base_url: https://compliance.example
+  api_key: compliance-key
+  model: compliance-model
+  async_sem: 6
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(compliance_module.configs, "base_path", tmp_path)
+
+    target = load_target_config("lightftp")
+
+    assert target["llm"]["model"] == "compliance-model"
+    assert compliance_module.configs.base_url_compliance == (
+        "https://compliance.example"
+    )
+    assert compliance_module.configs.api_key_compliance == "compliance-key"
+    assert compliance_module.configs.model_compliance == "compliance-model"
+    assert compliance_module.configs.async_sem_compliance == 6
+
+
+@pytest.mark.parametrize(
+    "verdict",
+    ["compliant", "non_compliant", "uncertain"],
+)
+def test_analyze_pair_file_groups_results_by_verdict(
+    verdict,
+    tmp_path,
+    monkeypatch,
+):
+    pair_path = tmp_path / "pair_000000.json"
+    write_pair(pair_path)
+
+    async def fake_analyze_pair(*args, **kwargs):
+        return {
+            "source_pair": str(pair_path),
+            "analysis": {
+                "verdict": verdict,
+                "confidence": 1.0,
+                "summary": "test",
+            },
+        }
+
+    monkeypatch.setattr(
+        compliance_module,
+        "analyze_pair",
+        fake_analyze_pair,
+    )
+    output_dir = tmp_path / "analysis"
+    _, result, error = asyncio.run(
+        analyze_pair_file(
+            semaphore=asyncio.Semaphore(1),
+            chater=object(),
+            target={},
+            pair_path=pair_path,
+            sections=[],
+            output_dir=output_dir,
+            top_k=8,
+            max_section_chars=6000,
+        )
+    )
+
+    assert error is None
+    assert result["analysis"]["verdict"] == verdict
+    assert (
+        output_dir
+        / verdict
+        / "pair_000000.analysis.json"
+    ).is_file()
+
+
+def test_analyze_pair_file_saves_failures_separately(tmp_path):
+    pair_path = tmp_path / "pair_000000.json"
+    pair_path.write_text("{broken", encoding="utf-8")
+    output_dir = tmp_path / "analysis"
+
+    _, result, error = asyncio.run(
+        analyze_pair_file(
+            semaphore=asyncio.Semaphore(1),
+            chater=object(),
+            target={},
+            pair_path=pair_path,
+            sections=[],
+            output_dir=output_dir,
+            top_k=8,
+            max_section_chars=6000,
+        )
+    )
+
+    assert result is None
+    assert isinstance(error, json.JSONDecodeError)
+    failure_path = output_dir / "failed" / "pair_000000.analysis.json"
+    failure = json.loads(failure_path.read_text(encoding="utf-8"))
+    assert failure["error_type"] == "JSONDecodeError"
+    assert failure["source_pair"] == str(pair_path)
 
 
 def test_run_updates_visual_progress_for_each_pair(tmp_path, monkeypatch):
@@ -366,4 +478,10 @@ def test_run_limits_concurrent_pair_analyses(tmp_path, monkeypatch):
 
     assert asyncio.run(run(args)) == 0
     assert max_active == 2
-    assert len(list((tmp_path / "analysis").glob("*.analysis.json"))) == 5
+    assert len(
+        list(
+            (tmp_path / "analysis" / "compliant").glob(
+                "*.analysis.json"
+            )
+        )
+    ) == 5

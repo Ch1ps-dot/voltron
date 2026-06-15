@@ -187,11 +187,21 @@ Depending on runtime configuration, log files may also be generated for debuggin
 `analyze_compliance.py` analyzes saved request-response pairs for possible
 protocol non-compliance bugs. For each pair, it retrieves relevant protocol
 requirements from the cached RFC SectionTrees, combines them with the captured
-request and response, and asks the configured document LLM for a verdict.
+request and response, and asks the configured compliance LLM for a verdict.
 
 Before running the analysis:
 
-1. Configure `llm_doc` in `config/configs.yaml`.
+1. Configure the dedicated `llm_compliance` entry in
+   `config/configs.yaml`:
+
+```yaml
+llm_compliance:
+  base_url: your-api-base-url
+  api_key: your-api-key
+  model: your-model
+  async_sem: 8
+```
+
 2. Run the normal specification-aware fuzzing workflow at least once. The
    required SectionTree caches must exist under
    `component/ir/<protocol>/<rfc-name>.pkl`.
@@ -233,7 +243,7 @@ Common options:
 - `--max-section-chars`: maximum characters retained from each section;
   default is `6000`
 - `-j, --concurrency`: maximum number of pair analyses executed concurrently;
-  default is `1`
+  defaults to `llm_compliance.async_sem`
 
 Example with an explicit output directory:
 
@@ -246,13 +256,25 @@ uv run analyze_compliance.py \
   --concurrency 4
 ```
 
-Each input `pair_NNNNNN.json` produces a
-`pair_NNNNNN.analysis.json` containing:
+Each input `pair_NNNNNN.json` produces a categorized result:
+
+```text
+compliance_analysis/
+├── compliant/
+├── non_compliant/
+├── uncertain/
+└── failed/
+```
+
+Successful `pair_NNNNNN.analysis.json` files contain:
 
 - `verdict`: `compliant`, `non_compliant`, or `uncertain`
 - confidence and summary
 - identified violations and supporting RFC requirements
 - metadata for the retrieved RFC sections
+
+Files that cannot be analyzed are stored under `failed/` with the source path,
+exception type, and error message.
 
 The script prints a one-line verdict for each pair and exits with a nonzero
 status if any pair could not be analyzed. An `uncertain` verdict is still a

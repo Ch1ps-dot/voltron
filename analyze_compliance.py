@@ -111,8 +111,11 @@ def parse_args() -> argparse.Namespace:
         "-j",
         "--concurrency",
         type=positive_int,
-        default=1,
-        help="Maximum concurrent pair analyses (default: 1)",
+        default=None,
+        help=(
+            "Maximum concurrent pair analyses "
+            "(default: llm_compliance.async_sem)"
+        ),
     )
     return parser.parse_args()
 
@@ -126,9 +129,11 @@ def load_target_config(target_name: str) -> dict[str, Any]:
     if not isinstance(target, dict):
         raise ValueError(f"unknown SUT in {config_path}: {target_name}")
 
-    llm_config = config_data.get("llm_doc")
+    llm_config = config_data.get("llm_compliance")
     if not isinstance(llm_config, dict):
-        raise ValueError(f"missing llm_doc configuration in {config_path}")
+        raise ValueError(
+            f"missing llm_compliance configuration in {config_path}"
+        )
 
     rfc_names = target.get("rfc_name")
     if not isinstance(rfc_names, list) or not rfc_names:
@@ -142,9 +147,10 @@ def load_target_config(target_name: str) -> dict[str, Any]:
     configs.pro_name = protocol
     configs.rfc_name = rfc_names
     configs.pmp_path = configs.base_path / "skills"
-    configs.base_url_doc = str(llm_config.get("base_url", ""))
-    configs.api_key_doc = str(llm_config.get("api_key", ""))
-    configs.model_doc = str(llm_config.get("model", ""))
+    configs.base_url_compliance = str(llm_config.get("base_url", ""))
+    configs.api_key_compliance = str(llm_config.get("api_key", ""))
+    configs.model_compliance = str(llm_config.get("model", ""))
+    configs.async_sem_compliance = llm_config.get("async_sem", 1)
 
     return {
         "target_name": target_name,
@@ -482,21 +488,47 @@ async def analyze_pair_file(
                 top_k,
                 max_section_chars,
             )
-            output_path = output_dir / f"{pair_path.stem}.analysis.json"
+            verdict = result["analysis"]["verdict"]
+            result_dir = output_dir / verdict
+            result_dir.mkdir(parents=True, exist_ok=True)
+            output_path = result_dir / f"{pair_path.stem}.analysis.json"
             with output_path.open("w", encoding="utf-8") as f:
                 json.dump(result, f, indent=2, ensure_ascii=False)
                 f.write("\n")
         return pair_path, result, None
     except Exception as error:
+        failure_dir = output_dir / "failed"
+        failure_dir.mkdir(parents=True, exist_ok=True)
+        failure_path = failure_dir / f"{pair_path.stem}.analysis.json"
+        failure_record = {
+            "source_pair": str(pair_path),
+            "error_type": type(error).__name__,
+            "error": str(error),
+        }
+        try:
+            with failure_path.open("w", encoding="utf-8") as f:
+                json.dump(failure_record, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+        except OSError:
+            pass
         return pair_path, None, error
 
 
 async def run(args: argparse.Namespace) -> int:
-    concurrency = getattr(args, "concurrency", 1)
-    if concurrency <= 0:
-        raise ValueError("concurrency must be greater than zero")
-
     target = load_target_config(args.sut)
+    concurrency = getattr(args, "concurrency", None)
+    if concurrency is None:
+        concurrency = target["llm"].get("async_sem", 1)
+    if (
+        not isinstance(concurrency, int)
+        or isinstance(concurrency, bool)
+        or concurrency <= 0
+    ):
+        raise ValueError(
+            "concurrency must be a positive integer; check --concurrency "
+            "or llm_compliance.async_sem"
+        )
+
     pair_files = discover_pair_files(args.input)
     sections = load_sections(target["protocol"], target["rfc_names"])
     output_dir = (args.output or default_output_dir(args.input)).resolve()
