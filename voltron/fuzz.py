@@ -122,6 +122,7 @@ class Fuzzer:
         configs.results_path = results_dir
         if self.mode != 'replay' or self.output != 'default':
             configure_file_logging(configs.results_path)
+        analyzer.reset_phase_metrics()
         configs.fuzz_mode = self.mode
         configs.spec_knowledge = self.spec_knowledge
         configs.state_learning = self.state_learning
@@ -143,19 +144,27 @@ class Fuzzer:
         print('Analyzer: setup')
 
         # rfcparser init
-        self.rfcparser = AsyncRFCParser(
-            chater=self.chater
-        )
-        self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
-        print('RFCParser: setup')
+        analyzer.begin_phase('doc_analysis')
+        doc_phase_status = 'completed'
+        try:
+            self.rfcparser = AsyncRFCParser(
+                chater=self.chater
+            )
+            self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
+            print('RFCParser: setup')
 
-        # handler init
-        self.producer = AsyncProducer(
-            chater=self.chater_fuzz,
-            rfcp=self.rfcparser
-        )
-        self.producer.run()
-        print('Producer: equipment setup')
+            # handler init
+            self.producer = AsyncProducer(
+                chater=self.chater_fuzz,
+                rfcp=self.rfcparser
+            )
+            self.producer.run()
+            print('Producer: equipment setup')
+        except BaseException:
+            doc_phase_status = 'failed'
+            raise
+        finally:
+            analyzer.end_phase('doc_analysis', doc_phase_status)
         
         # scheduler init
         self.mapper = Mapper(self.producer)
@@ -296,17 +305,29 @@ class Fuzzer:
             hypothesis: MealyMachine | None = None
             begin_time = time.time()
             if self.state_learning:
-                mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
-                eq = EquOracle(mapper=self.mapper, executor=self.exe)
-                h_path = configs.models_path / 'evolved_hypothesis.pkl'
-                if h_path.is_file():
-                    with open(h_path, 'rb') as f:
-                        hypothesis = pickle.load(f)
+                analyzer.begin_phase('model_learning')
+                model_phase_status = 'completed'
+                try:
+                    mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
+                    eq = EquOracle(mapper=self.mapper, executor=self.exe)
+                    h_path = configs.models_path / 'evolved_hypothesis.pkl'
+                    if h_path.is_file():
+                        with open(h_path, 'rb') as f:
+                            hypothesis = pickle.load(f)
 
-                if hypothesis is None:
-                    hypothesis = self.model_learning(mq, eq, stop_event)
-                else:
-                    self.mapper.message_pool = hypothesis.map
+                    if hypothesis is None:
+                        hypothesis = self.model_learning(mq, eq, stop_event)
+                    else:
+                        self.mapper.message_pool = hypothesis.map
+                except BaseException:
+                    model_phase_status = 'failed'
+                    raise
+                finally:
+                    if stop_event.is_set() and model_phase_status == 'completed':
+                        model_phase_status = 'stopped'
+                    analyzer.end_phase('model_learning', model_phase_status)
+            else:
+                analyzer.record_skipped_phase('model_learning')
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
@@ -335,12 +356,14 @@ class Fuzzer:
                     analyzer.iter += 1
                     analyzer.reset_automata_cnt()
                 next_id = str(analyzer.iter)
-                
+
                 # run model learning
-                with analyzer.lock:   
+                iteration_start = time.time()
+                with analyzer.lock:
                     analyzer.stage = 'model learning'
                 ml = MealyLstar(mq, eq, self.stop_event)
                 h = ml.run(cur_id)
+                iteration_duration = time.time() - iteration_start
                 
                 # save and evaluate the automata
                 self.mapper.register_mapper(h)
@@ -349,10 +372,18 @@ class Fuzzer:
 
                 # select a better generator to evolve
                 # the more states transitions the better the generator
-                with analyzer.lock:   
+                iteration_status = 'initial'
+                with analyzer.lock:
                     analyzer.stage = 'fuzzer evolve'
                 if len(h_lsit) == 0:
                     h_lsit.append(h)
+                    analyzer.record_model_learning_iteration(
+                        iteration=int(cur_id),
+                        hypothesis=h,
+                        duration_s=iteration_duration,
+                        status=iteration_status,
+                        try_limit=try_limit,
+                    )
                     if self.spec_knowledge:
                         self.producer.generator_evo(h)
                     continue
@@ -363,14 +394,38 @@ class Fuzzer:
                     # self.producer.generator_evo(h_lsit[-1], next_id)
                     try_limit -= 1
                     if try_limit <= 0:
+                        iteration_status = 'accepted_final'
                         with open(h_path, 'wb') as f:
                             pickle.dump(h, f)
                         h.graph('evolved')
                         logger.debug('ml: save evolved model')
+                        analyzer.record_model_learning_iteration(
+                            iteration=int(cur_id),
+                            hypothesis=h,
+                            duration_s=iteration_duration,
+                            status=iteration_status,
+                            try_limit=try_limit,
+                        )
                         break
+                    iteration_status = 'not_improved'
+                    analyzer.record_model_learning_iteration(
+                        iteration=int(cur_id),
+                        hypothesis=h,
+                        duration_s=iteration_duration,
+                        status=iteration_status,
+                        try_limit=try_limit,
+                    )
                 
                 elif last_trans_num < cur_trans_num:
+                    iteration_status = 'improved'
                     h_lsit.append(h)
+                    analyzer.record_model_learning_iteration(
+                        iteration=int(cur_id),
+                        hypothesis=h,
+                        duration_s=iteration_duration,
+                        status=iteration_status,
+                        try_limit=try_limit,
+                    )
                     if self.spec_knowledge:
                         self.producer.generator_evo(h)
                     continue
@@ -403,30 +458,38 @@ class Fuzzer:
             hypothesis,
             use_guidance=self.guided_scheduling,
         )
-                    
-        while not stop_event.is_set():
-            try:
-                # init new learning process with previous model and run fuzzer
 
-                req_res = havoc.run(500)
-                if self.spec_knowledge:
-                    self.producer.generator_mutate(req_res)
-                pre_resp = analyzer.cur_res_types_cnt.keys()
-                
-                # save the results
-                with analyzer.lock:   
-                    analyzer.iter += 1
-                    analyzer.reset_automata_cnt()
-                analyzer.collect_results()
-                
-            except Exception:
-                logger.exception('Fuzzer: havoc fuzzing failed')
-                stop_event.set()
-                
-            if (configs.time_limit_s < time.time() - analyzer.start_time):
-                logger.debug('Fuzzer: timeout')
-                stop_event.set()
-                analyzer.collect_results()
+        analyzer.begin_phase('fuzzing')
+        fuzz_phase_status = 'completed'
+        try:
+            while not stop_event.is_set():
+                try:
+                    # init new learning process with previous model and run fuzzer
+
+                    req_res = havoc.run(500)
+                    if self.spec_knowledge:
+                        self.producer.generator_mutate(req_res)
+                    pre_resp = analyzer.cur_res_types_cnt.keys()
+
+                    # save the results
+                    with analyzer.lock:
+                        analyzer.iter += 1
+                        analyzer.reset_automata_cnt()
+                    analyzer.collect_results()
+
+                except Exception:
+                    fuzz_phase_status = 'failed'
+                    logger.exception('Fuzzer: havoc fuzzing failed')
+                    stop_event.set()
+
+                if (configs.time_limit_s < time.time() - analyzer.start_time):
+                    logger.debug('Fuzzer: timeout')
+                    stop_event.set()
+                    analyzer.collect_results()
+        finally:
+            if stop_event.is_set() and fuzz_phase_status == 'completed':
+                fuzz_phase_status = 'stopped'
+            analyzer.end_phase('fuzzing', fuzz_phase_status)
                 
     def replay_process(
         self,
@@ -613,6 +676,7 @@ class Fuzzer:
         if not hasattr(analyzer, 'start_time') or not hasattr(configs, 'results_path'):
             return
         try:
+            analyzer.finalize_open_phase()
             analyzer.collect_results()
         except Exception:
             logger.exception('Fuzzer: collect results failure')

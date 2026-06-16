@@ -82,6 +82,28 @@ class AsyncChater:
                     analyzer.chat_time_s += end - start
                     if completion.usage != None:
                         analyzer.chat_token += completion.usage.total_tokens
+                    analyzer.record_llm_usage(
+                        duration_s=end - start,
+                        prompt_tokens=(
+                            getattr(completion.usage, 'prompt_tokens', 0)
+                            if completion.usage is not None
+                            else 0
+                        ),
+                        completion_tokens=(
+                            getattr(
+                                completion.usage,
+                                'completion_tokens',
+                                0
+                            )
+                            if completion.usage is not None
+                            else 0
+                        ),
+                        total_tokens=(
+                            getattr(completion.usage, 'total_tokens', 0)
+                            if completion.usage is not None
+                            else 0
+                        ),
+                    )
                 break
             except OpenAIError as e:
                 await asyncio.sleep(0.5)

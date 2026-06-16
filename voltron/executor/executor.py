@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-import time, select, socket, pickle, json, base64, hashlib
+import time, select, socket, pickle, json, base64, hashlib, asyncio
 from typing import Callable, Tuple
 
 from voltron.configs import configs
@@ -1237,6 +1237,14 @@ class Executor:
                 if stdout == '' and stderr == '':
                     stdout, stderr = self._read_process_output(proc)
                 self.save_cons(cons, stdout, stderr, True)
+                self.generate_crash_report(
+                    cons=cons,
+                    proc=proc,
+                    msg_type=msg_type,
+                    msg=msg,
+                    stdout=stdout,
+                    stderr=stderr,
+                )
     
     def _handle_crash_if_detected(
         self,
@@ -1309,6 +1317,163 @@ class Executor:
         if isinstance(data, bytes):
             return data.decode('utf-8', errors='backslashreplace')
         return str(data)
+
+    def generate_crash_report(
+        self,
+        cons: Conversation,
+        proc,
+        msg_type: str,
+        msg: bytes,
+        stdout: str = '',
+        stderr: str = '',
+    ) -> None:
+        """Ask the fuzz LLM to summarize a crash-inducing exchange."""
+        try:
+            chater = self._crash_report_chater()
+            if chater is None:
+                logger.debug('Executor: skip crash report; no LLM client')
+                return
+
+            target_folder = configs.results_path / 'crash_reports'
+            target_folder.mkdir(parents=True, exist_ok=True)
+            report_id = self._next_artifact_id(target_folder, 'report_', '.json')
+            record = self._build_crash_record(
+                report_id=report_id,
+                cons=cons,
+                proc=proc,
+                msg_type=msg_type,
+                msg=msg,
+                stdout=stdout,
+                stderr=stderr,
+            )
+            prompt = self._build_crash_report_prompt(record)
+            report = asyncio.run(
+                chater.chat_llm(
+                    prompt=prompt,
+                    usage='crash_report',
+                )
+            )
+            record['llm_report'] = report or ''
+
+            json_path = target_folder / f'report_{report_id}.json'
+            md_path = target_folder / f'report_{report_id}.md'
+            with json_path.open('w', encoding='utf-8') as f:
+                json.dump(record, f, indent=2, ensure_ascii=False)
+                f.write('\n')
+            with md_path.open('w', encoding='utf-8') as f:
+                f.write(report or 'The model returned no crash report.')
+                f.write('\n')
+            logger.debug(f'Executor: saved crash report {json_path}')
+        except Exception:
+            logger.exception('Executor: crash report generation failed')
+
+    def _crash_report_chater(
+        self
+    ):
+        mapper = getattr(self, 'mapper', None)
+        producer = getattr(mapper, 'producer', None)
+        return getattr(producer, 'chater', None)
+
+    def _build_crash_record(
+        self,
+        report_id: str,
+        cons: Conversation,
+        proc,
+        msg_type: str,
+        msg: bytes,
+        stdout: str,
+        stderr: str,
+    ) -> dict:
+        return {
+            'report_id': report_id,
+            'target': getattr(configs, 'target_name', ''),
+            'protocol': getattr(configs, 'pro_name', ''),
+            'crash': {
+                'returncode': getattr(proc, 'returncode', None),
+                'trigger_request_type': msg_type,
+                'trigger_request': self._encode_bytes(msg),
+                'stdout': stdout,
+                'stderr': stderr,
+            },
+            'response_feedback': {
+                'request_sequence': list(cons.req_seq),
+                'response_sequence': list(cons.res_seq),
+            },
+            'exchanges': [
+                {
+                    'index': index,
+                    'request_type': (
+                        cons.req_seq[index]
+                        if index < len(cons.req_seq)
+                        else ''
+                    ),
+                    'response_type': (
+                        cons.res_seq[index]
+                        if index < len(cons.res_seq)
+                        else ''
+                    ),
+                    'request': self._encode_bytes(request),
+                    'response': self._encode_bytes(response),
+                }
+                for index, (request, response) in enumerate(cons.content)
+            ],
+        }
+
+    def _build_crash_report_prompt(
+        self,
+        record: dict
+    ) -> str:
+        compact = json.dumps(record, indent=2, ensure_ascii=False)
+        return (
+            'You are a security engineer analyzing a protocol fuzzing crash.\n'
+            'Use the captured request/response sequence, response feedback, '
+            'process exit information, stdout, and stderr to draft a concise '
+            'vulnerability report.\n\n'
+            'The report should include:\n'
+            '1. Summary\n'
+            '2. Affected target/protocol\n'
+            '3. Crash signal or sanitizer evidence\n'
+            '4. Triggering request and preceding protocol context\n'
+            '5. Reproduction steps using the captured message sequence\n'
+            '6. Security impact hypothesis\n'
+            '7. Triage notes and confidence\n\n'
+            'If evidence is insufficient, say so explicitly and avoid '
+            'inventing root causes.\n\n'
+            f'Crash evidence JSON:\n{compact}'
+        )
+
+    def _encode_bytes(
+        self,
+        data: bytes | None
+    ) -> dict:
+        raw = data or bytes()
+        sample = raw[:4096]
+        return {
+            'encoding': 'base64',
+            'length': len(raw),
+            'truncated': len(sample) < len(raw),
+            'data': base64.b64encode(sample).decode('ascii'),
+            'text': sample.decode('utf-8', errors='backslashreplace'),
+            'hex': sample.hex(' '),
+        }
+
+    def _next_artifact_id(
+        self,
+        folder: Path,
+        prefix: str,
+        suffix: str,
+    ) -> str:
+        max_id = -1
+        for item in folder.iterdir():
+            if not item.is_file():
+                continue
+            name = item.name
+            if not name.startswith(prefix) or not name.endswith(suffix):
+                continue
+            raw_id = name[len(prefix):-len(suffix)]
+            if raw_id.isdigit():
+                max_id = max(max_id, int(raw_id))
+        return f'{max_id + 1:06d}'
         
     
     def load_parser(

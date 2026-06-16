@@ -1,3 +1,4 @@
+import json
 import pickle
 import threading
 from pathlib import Path
@@ -107,7 +108,11 @@ def test_crash_saves_unsaved_triggering_request(monkeypatch):
         crash_num=0,
     )
     saved = []
+    reports = []
     executor.save_cons = lambda cons, *args: saved.append(cons)
+    executor.generate_crash_report = (
+        lambda **kwargs: reports.append(kwargs["cons"])
+    )
     monkeypatch.setattr(configs, "fuzz_mode", "fuzz", raising=False)
 
     cons = Conversation()
@@ -130,6 +135,63 @@ def test_crash_saves_unsaved_triggering_request(monkeypatch):
     assert cons.content[-1] == (trigger, b"")
     assert len(cons.req_seq) == len(cons.res_seq) == len(cons.content)
     assert saved == [cons]
+    assert reports == [cons]
+
+
+def test_crash_report_collects_feedback_and_messages(tmp_path, monkeypatch):
+    class FakeChater:
+        async def chat_llm(self, prompt, usage):
+            self.prompt = prompt
+            self.usage = usage
+            return "# Crash Report\n\nLikely null dereference."
+
+    chater = FakeChater()
+    executor = Executor.__new__(Executor)
+    executor.mapper = SimpleNamespace(
+        producer=SimpleNamespace(chater=chater)
+    )
+    monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
+    monkeypatch.setattr(configs, "target_name", "demo", raising=False)
+    monkeypatch.setattr(configs, "pro_name", "ftp", raising=False)
+
+    cons = Conversation()
+    cons.add_state("-", "220")
+    cons.add_data(b"", b"220 ready\r\n")
+    cons.add_state("CRASH", "CRASH")
+    cons.add_data(b"CRASH\r\n", b"")
+    proc = SimpleNamespace(returncode=-11)
+
+    executor.generate_crash_report(
+        cons=cons,
+        proc=proc,
+        msg_type="CRASH",
+        msg=b"CRASH\r\n",
+        stdout="",
+        stderr="AddressSanitizer: SEGV",
+    )
+
+    report_dir = tmp_path / "crash_reports"
+    json_path = report_dir / "report_000000.json"
+    md_path = report_dir / "report_000000.md"
+    assert json_path.is_file()
+    assert md_path.read_text(encoding="utf-8").startswith("# Crash Report")
+    record = json.loads(json_path.read_text(encoding="utf-8"))
+    assert record["target"] == "demo"
+    assert record["protocol"] == "ftp"
+    assert record["crash"]["returncode"] == -11
+    assert record["response_feedback"]["request_sequence"] == [
+        "-",
+        "CRASH",
+    ]
+    assert record["response_feedback"]["response_sequence"] == [
+        "220",
+        "CRASH",
+    ]
+    assert record["exchanges"][1]["request"]["encoding"] == "base64"
+    assert record["exchanges"][1]["request"]["length"] == len(b"CRASH\r\n")
+    assert record["llm_report"].startswith("# Crash Report")
+    assert chater.usage == "crash_report"
+    assert "AddressSanitizer: SEGV" in chater.prompt
 
 
 def test_executor_does_not_load_checkers_or_hashers_in_replay(
