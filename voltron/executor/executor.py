@@ -1,16 +1,21 @@
 import subprocess
 from pathlib import Path
-import time, select, socket, pickle
+import time, select, socket, pickle, json, base64, hashlib, asyncio
 from typing import Callable, Tuple
 
 from voltron.configs import configs
-from voltron.utils.logger import logger_fuzz as logger
+from voltron.utils.logger import (
+    format_boundary,
+    format_event,
+    logger_fuzz as logger,
+)
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
+from voltron.synthesizer.hasher import ResponseHasher
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
-import math, statistics, threading, traceback, sys, os, signal, re
+import math, statistics, threading, sys, os, signal, re
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
@@ -91,7 +96,25 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
-        self.load_checkers(self.mapper.equip_checkers())
+        self.hasher_funcs: dict[str, Callable[[bytes], str]] = {}
+        if configs.fuzz_mode != 'replay':
+            self.load_checkers(self.mapper.equip_checkers())
+            self.load_hashers(self.mapper.equip_hashers())
+        self.checked_request_response_pairs: set[
+            tuple[str, str, str]
+        ] = set()
+        self.reviewed_invalid_responses: set[tuple[str, str, str]] = set()
+        self.checked_response_samples: dict[
+            tuple[str, str, str], bytes
+        ] = {}
+        self.reviewed_response_samples: dict[
+            tuple[str, str, str], bytes
+        ] = {}
+        self.hasher_evolution_failures: set[tuple[str, ...]] = set()
+        self.hasher_semantic_reviews: dict[
+            tuple[str, str, str], bool
+        ] = {}
+        self._invalid_response_lock = threading.Lock()
         self.stop_event = stop_event
             
     def cov_setup(
@@ -152,59 +175,192 @@ class Executor:
     def run_exe(
         self
     ) -> subprocess.Popen | None:
-        if (self.run_script.is_file()):
-            try:
-                if configs.fuzz_mode == 'replay':
-                    # cmd = ['bash', '-c']
-                    # cmd.append(' '.join(self.cmdline))
-                    proc = subprocess.Popen(
-                        [self.run_script],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        start_new_session=True
-                    )
-                    analyzer.sut_proc = proc
-                    logger.debug(f'exe pid {proc.pid}')
-                    return proc
-                elif configs.server == 'parent':
-                    proc = subprocess.Popen(
-                        [self.run_script],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        start_new_session=True
-                    )
-                    analyzer.sut_proc = proc
-                    logger.debug(f'exe pid {proc.pid}')
-                    return proc
-                elif configs.server == 'child':
-                    proc = subprocess.Popen(
-                        [self.run_script],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        start_new_session=True
-                    )
-                    analyzer.sut_proc = proc
-                    logger.debug(f'exe pid {proc.pid}')
-                    return proc
-            except Exception as e:
-                logger.debug(f'[SUT Setup Failure]: {e}')
-                return None
+        if not self.run_script.is_file():
+            logger.debug(
+                'Executor: SUT launch failed before Popen: '
+                f'run script does not exist or is not a file; '
+                f'script={self.run_script}'
+            )
+            return None
+
+        fuzz_mode = getattr(configs, 'fuzz_mode', '')
+        server_mode = getattr(configs, 'server', None)
+        if fuzz_mode != 'replay' and server_mode not in {'parent', 'child'}:
+            logger.debug(
+                'Executor: SUT launch failed before Popen: '
+                f'unsupported server mode={server_mode!r}; '
+                f'script={self.run_script}'
+            )
+            return None
+
+        try:
+            proc = subprocess.Popen(
+                [self.run_script],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                start_new_session=True
+            )
+            analyzer.sut_proc = proc
+            logger.debug(
+                f'Executor: launched SUT pid={proc.pid} '
+                f'script={self.run_script}'
+            )
+            return proc
+        except Exception as e:
+            logger.debug(
+                'Executor: SUT launch failed during Popen: '
+                f'script={self.run_script}; '
+                f'executable={os.access(self.run_script, os.X_OK)}; '
+                f'exception={type(e).__name__}: {e}'
+            )
+            return None
+
+    def _log_sut_start_failure(
+        self,
+        proc: subprocess.Popen | None,
+        stage: str,
+        attempt: int | None = None,
+        detail: str = ''
+    ) -> None:
+        """Record the available reason for a SUT startup failure."""
+        fields = [
+            'Executor: SUT startup failure',
+            f'stage={stage}',
+            f'script={self.run_script}',
+            f'transport={self.trans_layer}',
+            f'endpoint=localhost:{self.port}',
+        ]
+        if attempt is not None:
+            fields.append(f'attempt={attempt}')
+        if detail:
+            fields.append(f'detail={detail}')
+
+        if proc is None:
+            fields.append('process=not-created')
+        else:
+            return_code = proc.poll()
+            fields.append(f'pid={proc.pid}')
+            fields.append(
+                'process=running'
+                if return_code is None
+                else f'returncode={return_code}'
+            )
+            if return_code is not None:
+                stdout, stderr = self._read_process_output(proc)
+                if stdout:
+                    fields.append(f'stdout={stdout.strip()!r}')
+                if stderr:
+                    fields.append(f'stderr={stderr.strip()!r}')
+                if not stdout and not stderr:
+                    fields.append('output=<empty>')
+
+        logger.debug('; '.join(fields))
 
     def interact(
         self,
         msg_seq: list[tuple[str, bytes]],
-        poll_wait_ms: int = 5000
+        poll_wait_ms: int = 5000,
+        run_checker: bool = False
+    ) -> Tuple[bool, Conversation | None]:
+        """Log one complete interaction and execute it against the SUT."""
+        interaction_id = f'{time.monotonic_ns():x}'
+        request_types = '/'.join(
+            msg_type
+            for msg_type, _ in msg_seq
+        ) or '-'
+        started_at = time.perf_counter()
+        result: Tuple[bool, Conversation | None] | None = None
+        outcome = 'exception'
+        error_type = None
+
+        logger.debug(format_boundary(
+            'interact.begin',
+            interaction_id=interaction_id,
+            request_count=len(msg_seq),
+            request_types=request_types,
+            poll_wait_ms=poll_wait_ms,
+            checker_enabled=run_checker,
+            mode=getattr(configs, 'fuzz_mode', ''),
+            endpoint=(
+                f'{getattr(self, "host", "?")}:'
+                f'{getattr(self, "port", "?")}'
+            ),
+        ))
+        try:
+            result = self._interact_once(
+                msg_seq,
+                poll_wait_ms=poll_wait_ms,
+                run_checker=run_checker,
+            )
+            flag, _ = result
+            if flag:
+                outcome = 'completed'
+            elif self.stop_event.is_set():
+                outcome = 'stopped'
+            else:
+                outcome = 'failed'
+            return result
+        except BaseException as error:
+            error_type = type(error).__name__
+            outcome = (
+                'interrupted'
+                if isinstance(error, (KeyboardInterrupt, SystemExit))
+                else 'exception'
+            )
+            raise
+        finally:
+            conversation = result[1] if result is not None else None
+            logger.debug(format_boundary(
+                'interact.end',
+                interaction_id=interaction_id,
+                outcome=outcome,
+                duration_ms=round(
+                    (time.perf_counter() - started_at) * 1000,
+                    3,
+                ),
+                recorded_exchanges=(
+                    len(conversation.content)
+                    if conversation is not None
+                    else 0
+                ),
+                response_types=(
+                    '/'.join(conversation.res_seq)
+                    if conversation is not None
+                    else '-'
+                ),
+                error_type=error_type,
+            ))
+
+    def _interact_once(
+        self,
+        msg_seq: list[tuple[str, bytes]],
+        poll_wait_ms: int = 5000,
+        run_checker: bool = False
     ) -> Tuple[bool, Conversation | None] :  
         """Interact with the SUT by sending a sequence of messages and receiving the corresponding responses, while recording the conversation.
         
         Args:
             msg_seq: A list of tuples, where each tuple contains a string representing the message type and a bytes object representing the message content to be sent to the SUT.
             poll_wait_ms: An integer representing the maximum time in milliseconds to wait for a response from the SUT after sending each message.
+            run_checker: Enable response conformance checking. This is only
+                enabled by the fuzzing scheduler, not model learning or replay.
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
+        if self.stop_event.is_set():
+            return False, None
         self.kill_listeners(self.port)
+        if self.stop_event.is_set():
+            return False, None
         clean = self.setup_exe()
+        if self.stop_event.is_set():
+            if clean is not None:
+                self._terminate_process_group(
+                    clean,
+                    signal.SIGKILL,
+                    timeout=1,
+                )
+            return False, None
         proc = self.run_exe()
         
         
@@ -217,40 +373,100 @@ class Executor:
         #     return False, None
         
         # avoid unexceptional crash of target
-        for _ in range(100):
+        for attempt in range(1, 101):
+            if self.stop_event.is_set():
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGTERM,
+                    timeout=1,
+                )
+                return False, None
             if proc is not None and proc.poll() is not None:
-                logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
+                self._log_sut_start_failure(
+                    proc,
+                    stage='process-exited-before-ready-check',
+                    attempt=attempt,
+                )
+                if self.stop_event.wait(self.setup_time_s):
+                    return False, None
                 proc = self.run_exe()
-                time.sleep(self.setup_time_s)
             else:
                 break
 
         if proc is None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='process-launch-retries',
+                detail='run_exe returned no process',
+            )
+            raise Exception('Execute: process close')
         if proc.poll() is not None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='process-launch-retries',
+                detail='process still exited after launch retries',
+            )
+            raise Exception('Execute: process close')
         
         # wait for server setup
-        for _ in range(100):
-            time.sleep(self.setup_time_s)
+        sock = None
+        for attempt in range(1, 101):
+            if self.stop_event.wait(self.setup_time_s):
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGTERM,
+                    timeout=1,
+                )
+                return False, None
             sock = self.setup_socket()
             if sock == None:
                 if proc != None and proc.poll() is not None:
-                    logger.debug(f'Executor:  SUT Setup Failure {proc.returncode} {proc.communicate()}')
+                    self._log_sut_start_failure(
+                        proc,
+                        stage='socket-readiness-check',
+                        attempt=attempt,
+                        detail='process exited before socket became ready',
+                    )
+                    if self.stop_event.is_set():
+                        return False, None
                     proc = self.run_exe()
+                    if self.stop_event.is_set():
+                        self._terminate_process_group(
+                            proc,
+                            signal.SIGTERM,
+                            timeout=1,
+                        )
+                        return False, None
                     self.kill_listeners(self.port)
-                logger.debug('Executor: Socket Setup Failure' )
                 continue
             else:
                 break
             
         if proc is None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='socket-readiness-check',
+                detail='restart returned no process',
+            )
+            raise Exception('Executor: process close')
         if proc.poll() is not None:
-            raise Exception('Execute: process bad')
+            self._log_sut_start_failure(
+                proc,
+                stage='socket-readiness-check',
+                detail='process exited after socket readiness attempts',
+            )
+            raise Exception('Execute: process close')
             
         if sock == None:
-            logger.debug('socket: setup failure')
+            self._log_sut_start_failure(
+                proc,
+                stage='socket-readiness-timeout',
+                attempt=100,
+                detail=(
+                    f'service did not become reachable within '
+                    f'{100 * self.setup_time_s:.2f}s'
+                ),
+            )
             self.stop_event.set()
             sys.exit(0)
         
@@ -260,14 +476,31 @@ class Executor:
         cons: Conversation = Conversation()
         
         # maybe recv initialize message
-        resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=100)
+        resp_code, resp_data = self.net_recv(
+            sock=sock,
+            poll_timeout_ms=100,
+            show_fuzz_ui=run_checker,
+        )
+        if self.stop_event.is_set():
+            sock.close()
+            self._terminate_process_group(
+                proc,
+                signal.SIGTERM,
+                timeout=1,
+            )
+            return False, None
         last_recv = '-'
         if(resp_code and resp_data):
-            is_valid_response = self.check_response(resp_code, resp_data)
+            is_valid_response = self.check_response_during_fuzzing(
+                '-',
+                resp_code,
+                resp_data,
+                run_checker,
+            )
             cons.add_state('-', resp_code)
             cons.add_data(bytes(), resp_data)
             if not is_valid_response:
-                self.save_invalid_response(cons, resp_code)
+                self.handle_nonconforming_response(cons, resp_code)
             last_recv = resp_code
             with self.analyzer.lock:
                 self.analyzer.res_types_update(resp_code)
@@ -279,19 +512,26 @@ class Executor:
         # send the message sequence and parse the response, record the conversation in cons
         last_msg_type = '-'
         last_msg = bytes()
+        last_request_recorded = True
         for msg_type, msg in msg_seq:
-            last_msg_type = msg_type
-            last_msg = msg if msg is not None else bytes()
-            
             if self.stop_event.is_set():
                 break
             
             if proc.poll() is not None:
-                if not self._handle_crash_if_detected(cons, proc, msg_type, last_msg):
+                if not self._handle_crash_if_detected(
+                    cons,
+                    proc,
+                    last_msg_type,
+                    last_msg,
+                    request_recorded=last_request_recorded,
+                ):
                     cons.add_state(msg_type, 'CLOSED')
-                    cons.add_data(bytes(), bytes())
+                    cons.add_data(msg or bytes(), bytes())
                     logger.debug('server close')
                 break
+
+            last_msg_type = msg_type
+            last_msg = msg if msg is not None else bytes()
             
             # send message and parse response
             if msg == None:
@@ -301,43 +541,75 @@ class Executor:
             
             # success to send
             if(flag and req_data):
-                logger.debug(f'sent -> {req_data}')
+                last_request_recorded = False
+                logger.debug(format_event(
+                    'network.send',
+                    request_type=msg_type,
+                    length=len(req_data),
+                    data=req_data,
+                ))
                 with self.analyzer.lock:
                     self.analyzer.req_num = self.analyzer.req_num + 1
                     self.analyzer.req_types_update(msg_type)
-                resp_code, resp_data = self.net_recv(sock=sock, poll_timeout_ms=poll_wait_ms, msg_type=msg_type)
+                resp_code, resp_data = self.net_recv(
+                    sock=sock,
+                    poll_timeout_ms=poll_wait_ms,
+                    msg_type=msg_type,
+                    show_fuzz_ui=run_checker,
+                )
 
                 if resp_code == 'POLLERR':
                     # crash
                     # normal
-                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
+                    if not self._handle_crash_if_detected(
+                        cons,
+                        proc,
+                        msg_type,
+                        msg,
+                        request_recorded=False,
+                    ):
                         cons.add_state(msg_type, 'POLLERR')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
                         logger.debug(f'recv <- POLLERR')
+                        last_request_recorded = True
                     break
                 
                 elif resp_code == 'TIMEOUT':
                     # crash
                     # noraml
-                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
+                    if not self._handle_crash_if_detected(
+                        cons,
+                        proc,
+                        msg_type,
+                        msg,
+                        request_recorded=False,
+                    ):
                         cons.add_state(msg_type, 'TIMEOUT')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.timeout_num += 1
                         logger.debug(f'recv <- TIMEOUT')
+                        last_request_recorded = True
                     break
                 
                 elif resp_code == 'RCLOSED':
                     # crash
                     # normal
-                    if not self._handle_crash_if_detected(cons, proc, msg_type, msg):
+                    if not self._handle_crash_if_detected(
+                        cons,
+                        proc,
+                        msg_type,
+                        msg,
+                        request_recorded=False,
+                    ):
                         cons.add_state(msg_type, 'CLOSED')
                         cons.add_data(req_data, bytes())
                         with self.analyzer.lock:
                             self.analyzer.rclose_num += 1
                         logger.debug(f'recv <- rclose')
+                        last_request_recorded = True
                     break
                 
                 else:
@@ -347,9 +619,11 @@ class Executor:
 
                     is_valid_response = True
                     if resp_data is not None:
-                        is_valid_response = self.check_response(
+                        is_valid_response = self.check_response_during_fuzzing(
+                            msg_type,
                             resp_code,
-                            resp_data
+                            resp_data,
+                            run_checker,
                         )
                     
                     with self.analyzer.lock:
@@ -357,21 +631,38 @@ class Executor:
                         self.analyzer.res_types_update(resp_code)
                         self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
                     last_recv = resp_code
-                    logger.debug(f'recv <- {resp_data}')
+                    logger.debug(format_event(
+                        'network.receive',
+                        request_type=msg_type,
+                        response_type=resp_code,
+                        length=(
+                            len(resp_data)
+                            if resp_data is not None
+                            else 0
+                        ),
+                        data=resp_data,
+                    ))
                     
                     # record conversation data
-                    if(req_data and resp_data):
-                        cons.add_data(req_data, resp_data)
+                    if req_data is not None:
+                        cons.add_data(req_data, resp_data or bytes())
                     cons.add_state(msg_type, resp_code)
+                    last_request_recorded = True
                     if not is_valid_response:
-                        self.save_invalid_response(cons, resp_code)
+                        self.handle_nonconforming_response(cons, resp_code)
             
             # If socket closed, stop sending
             else:
                 return_code = proc.poll()
                 
                 # program exited unexpectly
-                self._handle_crash_if_detected(cons, proc, msg_type, msg)
+                self._handle_crash_if_detected(
+                    cons,
+                    proc,
+                    msg_type,
+                    msg,
+                    request_recorded=False,
+                )
                         
                 seq = '/'.join([msg_type for msg_type, data in msg_seq])
                 logger.debug(f'Executor: socket closed with {return_code} because of {seq}')
@@ -386,7 +677,13 @@ class Executor:
         except Exception as e:
             logger.debug(f'socket close error: {e}')
         
-        self._handle_crash_if_detected(cons, proc, last_msg_type, last_msg)
+        self._handle_crash_if_detected(
+            cons,
+            proc,
+            last_msg_type,
+            last_msg,
+            request_recorded=last_request_recorded,
+        )
         
         # close process
         close_signal = signal.SIGUSR1 if configs.fuzz_mode == 'replay' else signal.SIGTERM
@@ -419,11 +716,13 @@ class Executor:
 
     def _terminate_process_group(
         self,
-        proc: subprocess.Popen,
+        proc: subprocess.Popen | None,
         sig: signal.Signals,
         timeout: float
     ) -> None:
         """Terminate a SUT process tree that was started with start_new_session."""
+        if proc is None:
+            return
         try:
             if proc.poll() is None:
                 os.killpg(proc.pid, sig)
@@ -449,34 +748,189 @@ class Executor:
     def kill_listeners(
         self,
         port: int
-    ):
-        pids = []
-        try:
-            result = subprocess.check_output(
-                f"netstat -tulnp 2>/dev/null | grep :{port}",
-                shell=True,
-                text=True,
-                stderr=subprocess.DEVNULL
+    ) -> None:
+        """Kill processes listening on exactly the requested TCP/UDP port."""
+        pids, listeners_found = self._find_listener_pids(port)
+        if not listeners_found:
+            return
+        if not pids:
+            logger.debug(
+                'Executor: listener found but PID is unavailable; '
+                f'port={port}; check process visibility and privileges'
             )
-            lines = result.strip().split("\n")[1:]
-            for line in lines:
-                if f":{port}" in line:
-                    pid_str = line.split("/")[0].split(" ")[-1]
-                    if pid_str.isdigit():
-                        pids.append(int(pid_str))
-            pids = list(set(pids))
-        except subprocess.CalledProcessError as e:
-            logger.debug(f'kill execution failure {e}')
-        
-        try:
-            for pid in pids:
-                logger.debug(f'kill {pid}')
-                os.kill(pid, signal.SIGKILL)
+            return
 
-        except Exception as e:
-            logger.debug(f'kill execution failure {e}')
-        
-        
+        for pid in sorted(pids):
+            if pid <= 1 or pid == os.getpid():
+                logger.debug(
+                    'Executor: refusing to kill unsafe listener PID; '
+                    f'port={port}; pid={pid}'
+                )
+                continue
+
+            try:
+                logger.debug(
+                    f'Executor: killing listener port={port}; pid={pid}'
+                )
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                logger.debug(
+                    'Executor: listener exited before kill; '
+                    f'port={port}; pid={pid}'
+                )
+                continue
+            except PermissionError as e:
+                logger.debug(
+                    'Executor: permission denied while killing listener; '
+                    f'port={port}; pid={pid}; error={e}'
+                )
+                continue
+            except Exception as e:
+                logger.debug(
+                    'Executor: failed to kill listener; '
+                    f'port={port}; pid={pid}; '
+                    f'exception={type(e).__name__}: {e}'
+                )
+                continue
+
+            if self._wait_for_process_exit(pid, timeout=0.5):
+                logger.debug(
+                    f'Executor: listener stopped port={port}; pid={pid}'
+                )
+            else:
+                logger.debug(
+                    'Executor: listener still exists after SIGKILL; '
+                    f'port={port}; pid={pid}; '
+                    'possible uninterruptible sleep or PID visibility issue'
+                )
+
+        remaining_pids, remaining_found = self._find_listener_pids(port)
+        if remaining_found:
+            logger.debug(
+                'Executor: port remains occupied after listener cleanup; '
+                f'port={port}; '
+                f'pids={sorted(remaining_pids) if remaining_pids else "hidden"}; '
+                'the service may be supervised or automatically restarted'
+            )
+
+    def _find_listener_pids(
+        self,
+        port: int
+    ) -> tuple[set[int], bool]:
+        """Find listener PIDs with ss, falling back to netstat."""
+        commands = (
+            ('ss', ['ss', '-H', '-ltnup']),
+            ('netstat', ['netstat', '-tulnp']),
+        )
+        failures = []
+
+        for tool, command in commands:
+            try:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            except FileNotFoundError:
+                failures.append(f'{tool}=not-found')
+                continue
+            except Exception as e:
+                failures.append(
+                    f'{tool}={type(e).__name__}: {e}'
+                )
+                continue
+
+            if result.returncode != 0:
+                reason = result.stderr.strip() or result.stdout.strip()
+                failures.append(
+                    f'{tool}=exit-{result.returncode}: '
+                    f'{reason or "no diagnostic output"}'
+                )
+                continue
+            if result.stderr.strip() and not result.stdout.strip():
+                failures.append(
+                    f'{tool}=no-output: {result.stderr.strip()}'
+                )
+                continue
+
+            pids, listeners_found = self._parse_listener_output(
+                result.stdout,
+                port,
+                tool,
+            )
+            if listeners_found and not pids:
+                diagnostic = result.stderr.strip()
+                if diagnostic:
+                    logger.debug(
+                        'Executor: listener query could not expose PID; '
+                        f'tool={tool}; port={port}; '
+                        f'diagnostic={diagnostic!r}'
+                    )
+            return pids, listeners_found
+
+        logger.debug(
+            'Executor: unable to inspect port listeners; '
+            f'port={port}; reasons={"; ".join(failures)}'
+        )
+        return set(), False
+
+    def _parse_listener_output(
+        self,
+        output: str,
+        port: int,
+        tool: str
+    ) -> tuple[set[int], bool]:
+        """Parse only lines whose local endpoint exactly matches port."""
+        pids: set[int] = set()
+        listeners_found = False
+
+        for line in output.splitlines():
+            tokens = line.split()
+            local_index = 4 if tool == 'ss' else 3
+            if len(tokens) <= local_index:
+                continue
+            local_endpoint = tokens[local_index].rstrip(',')
+            port_match = re.search(r':(\d+)$', local_endpoint)
+            if port_match is None or int(port_match.group(1)) != port:
+                continue
+
+            listeners_found = True
+            if tool == 'ss':
+                pids.update(
+                    int(pid)
+                    for pid in re.findall(r'\bpid=(\d+)', line)
+                )
+            elif tool == 'netstat':
+                pids.update(
+                    int(pid)
+                    for pid in re.findall(r'\b(\d+)/[^\s]+', line)
+                )
+
+        return pids, listeners_found
+
+    def _wait_for_process_exit(
+        self,
+        pid: int,
+        timeout: float
+    ) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return True
+            except PermissionError:
+                return False
+            time.sleep(0.02)
+
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        except PermissionError:
+            return False
+        return False
         
     def setup_socket(
         self
@@ -518,6 +972,8 @@ class Executor:
         """
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
+            return False, None
+        if self.stop_event.is_set():
             return False, None
         
         poller = select.poll()
@@ -580,7 +1036,8 @@ class Executor:
             self, 
             sock: socket.socket,
             poll_timeout_ms = 0,
-            msg_type = '-'
+            msg_type = '-',
+            show_fuzz_ui: bool = False
     ) -> Tuple[str | None, bytes | None]:
         """Recv message over network
 
@@ -589,6 +1046,8 @@ class Executor:
         # check clinet socket before response
         if sock is None or sock.fileno() < 0:
             logger.debug("Executor: socket closed")
+            return None, None
+        if self.stop_event.is_set():
             return None, None
         
         """ 
@@ -650,8 +1109,10 @@ class Executor:
                                 resp_byte = self.parser_func(buf)
                                 if resp_byte == b'':
                                     logger.debug(f'parse error:{buf}')
-                                    new_parser = self.mapper.update_parser(buf)
-                                    self.load_parser(new_parser)
+                                    self._update_parser(
+                                        buf,
+                                        show_fuzz_ui,
+                                    )
                                     logger.debug('Update Parser')
                                 else:
                                     break
@@ -701,8 +1162,10 @@ class Executor:
                                 resp_code = self.parser_func(buf)
                                 if resp_code == b'':
                                     logger.debug(f'parse error:{buf}')
-                                    new_parser = self.mapper.update_parser(buf)
-                                    self.load_parser(new_parser)
+                                    self._update_parser(
+                                        buf,
+                                        show_fuzz_ui,
+                                    )
                                     logger.debug('Update Parser')
                                 else:
                                     break
@@ -716,13 +1179,33 @@ class Executor:
                         return resp_code, buf
                 else:
                     logger.debug('recv: no data')
-        except Exception as e:
-            logger.debug(f'net_recv error: {e}')
-            logger.debug(traceback.format_exc())   
+        except Exception:
+            logger.exception('Executor: receive failed')
         finally:
             poller.unregister(sock)
     
         return None, None
+
+    def _set_ui_operation(
+        self,
+        operation: str
+    ) -> None:
+        with self.analyzer.lock:
+            self.analyzer.current_operation = operation
+
+    def _update_parser(
+        self,
+        response: bytes,
+        show_fuzz_ui: bool
+    ) -> None:
+        if show_fuzz_ui:
+            self._set_ui_operation('Updating parser with LLM')
+        try:
+            new_parser = self.mapper.update_parser(response)
+            self.load_parser(new_parser)
+        finally:
+            if show_fuzz_ui:
+                self._set_ui_operation('')
     
     def handle_crash(
         self,
@@ -731,7 +1214,8 @@ class Executor:
         msg_type: str,
         msg: bytes,
         stdout: str = '',
-        stderr: str = ''
+        stderr: str = '',
+        request_recorded: bool = True,
     ):
         if msg_type in self.crash_testcases.keys() and msg in self.crash_testcases[msg_type]:
             pass
@@ -739,7 +1223,12 @@ class Executor:
             self.crash_testcases.setdefault(msg_type, [])
 
             self.crash_testcases[msg_type].append(msg)
-            cons.add_state('-', 'CRASH')
+            if not request_recorded and msg_type != '-' and msg:
+                cons.add_state(msg_type, 'CRASH')
+                cons.add_data(msg, bytes())
+            else:
+                cons.add_state('-', 'CRASH')
+                cons.add_data(bytes(), bytes())
             logger.debug(f'Program crash exitcode {proc.returncode}')
             with self.analyzer.lock:
                 self.analyzer.crash_num += 1
@@ -748,13 +1237,22 @@ class Executor:
                 if stdout == '' and stderr == '':
                     stdout, stderr = self._read_process_output(proc)
                 self.save_cons(cons, stdout, stderr, True)
+                self.generate_crash_report(
+                    cons=cons,
+                    proc=proc,
+                    msg_type=msg_type,
+                    msg=msg,
+                    stdout=stdout,
+                    stderr=stderr,
+                )
     
     def _handle_crash_if_detected(
         self,
         cons: Conversation,
         proc: subprocess.Popen,
         msg_type: str,
-        msg: bytes
+        msg: bytes,
+        request_recorded: bool = True,
     ) -> bool:
         return_code = proc.poll()
         if return_code is None:
@@ -766,7 +1264,15 @@ class Executor:
             stdout, stderr = self._read_process_output(proc)
 
         if self._is_crash(return_code, stdout, stderr):
-            self.handle_crash(cons, proc, msg_type, msg, stdout, stderr)
+            self.handle_crash(
+                cons,
+                proc,
+                msg_type,
+                msg,
+                stdout,
+                stderr,
+                request_recorded=request_recorded,
+            )
             return True
 
         return False
@@ -811,6 +1317,163 @@ class Executor:
         if isinstance(data, bytes):
             return data.decode('utf-8', errors='backslashreplace')
         return str(data)
+
+    def generate_crash_report(
+        self,
+        cons: Conversation,
+        proc,
+        msg_type: str,
+        msg: bytes,
+        stdout: str = '',
+        stderr: str = '',
+    ) -> None:
+        """Ask the fuzz LLM to summarize a crash-inducing exchange."""
+        try:
+            chater = self._crash_report_chater()
+            if chater is None:
+                logger.debug('Executor: skip crash report; no LLM client')
+                return
+
+            target_folder = configs.results_path / 'crash_reports'
+            target_folder.mkdir(parents=True, exist_ok=True)
+            report_id = self._next_artifact_id(target_folder, 'report_', '.json')
+            record = self._build_crash_record(
+                report_id=report_id,
+                cons=cons,
+                proc=proc,
+                msg_type=msg_type,
+                msg=msg,
+                stdout=stdout,
+                stderr=stderr,
+            )
+            prompt = self._build_crash_report_prompt(record)
+            report = asyncio.run(
+                chater.chat_llm(
+                    prompt=prompt,
+                    usage='crash_report',
+                )
+            )
+            record['llm_report'] = report or ''
+
+            json_path = target_folder / f'report_{report_id}.json'
+            md_path = target_folder / f'report_{report_id}.md'
+            with json_path.open('w', encoding='utf-8') as f:
+                json.dump(record, f, indent=2, ensure_ascii=False)
+                f.write('\n')
+            with md_path.open('w', encoding='utf-8') as f:
+                f.write(report or 'The model returned no crash report.')
+                f.write('\n')
+            logger.debug(f'Executor: saved crash report {json_path}')
+        except Exception:
+            logger.exception('Executor: crash report generation failed')
+
+    def _crash_report_chater(
+        self
+    ):
+        mapper = getattr(self, 'mapper', None)
+        producer = getattr(mapper, 'producer', None)
+        return getattr(producer, 'chater', None)
+
+    def _build_crash_record(
+        self,
+        report_id: str,
+        cons: Conversation,
+        proc,
+        msg_type: str,
+        msg: bytes,
+        stdout: str,
+        stderr: str,
+    ) -> dict:
+        return {
+            'report_id': report_id,
+            'target': getattr(configs, 'target_name', ''),
+            'protocol': getattr(configs, 'pro_name', ''),
+            'crash': {
+                'returncode': getattr(proc, 'returncode', None),
+                'trigger_request_type': msg_type,
+                'trigger_request': self._encode_bytes(msg),
+                'stdout': stdout,
+                'stderr': stderr,
+            },
+            'response_feedback': {
+                'request_sequence': list(cons.req_seq),
+                'response_sequence': list(cons.res_seq),
+            },
+            'exchanges': [
+                {
+                    'index': index,
+                    'request_type': (
+                        cons.req_seq[index]
+                        if index < len(cons.req_seq)
+                        else ''
+                    ),
+                    'response_type': (
+                        cons.res_seq[index]
+                        if index < len(cons.res_seq)
+                        else ''
+                    ),
+                    'request': self._encode_bytes(request),
+                    'response': self._encode_bytes(response),
+                }
+                for index, (request, response) in enumerate(cons.content)
+            ],
+        }
+
+    def _build_crash_report_prompt(
+        self,
+        record: dict
+    ) -> str:
+        compact = json.dumps(record, indent=2, ensure_ascii=False)
+        return (
+            'You are a security engineer analyzing a protocol fuzzing crash.\n'
+            'Use the captured request/response sequence, response feedback, '
+            'process exit information, stdout, and stderr to draft a concise '
+            'vulnerability report.\n\n'
+            'The report should include:\n'
+            '1. Summary\n'
+            '2. Affected target/protocol\n'
+            '3. Crash signal or sanitizer evidence\n'
+            '4. Triggering request and preceding protocol context\n'
+            '5. Reproduction steps using the captured message sequence\n'
+            '6. Security impact hypothesis\n'
+            '7. Triage notes and confidence\n\n'
+            'If evidence is insufficient, say so explicitly and avoid '
+            'inventing root causes.\n\n'
+            f'Crash evidence JSON:\n{compact}'
+        )
+
+    def _encode_bytes(
+        self,
+        data: bytes | None
+    ) -> dict:
+        raw = data or bytes()
+        sample = raw[:4096]
+        return {
+            'encoding': 'base64',
+            'length': len(raw),
+            'truncated': len(sample) < len(raw),
+            'data': base64.b64encode(sample).decode('ascii'),
+            'text': sample.decode('utf-8', errors='backslashreplace'),
+            'hex': sample.hex(' '),
+        }
+
+    def _next_artifact_id(
+        self,
+        folder: Path,
+        prefix: str,
+        suffix: str,
+    ) -> str:
+        max_id = -1
+        for item in folder.iterdir():
+            if not item.is_file():
+                continue
+            name = item.name
+            if not name.startswith(prefix) or not name.endswith(suffix):
+                continue
+            raw_id = name[len(prefix):-len(suffix)]
+            if raw_id.isdigit():
+                max_id = max(max_id, int(raw_id))
+        return f'{max_id + 1:06d}'
         
     
     def load_parser(
@@ -847,6 +1510,166 @@ class Executor:
                     f'Executor: checker load failure [{msg_type}] {e}'
                 )
 
+    def load_hashers(
+        self,
+        hashers: dict[str, ResponseHasher]
+    ) -> None:
+        """Load the latest generated semantic hasher for each response type."""
+        self.hasher_funcs = {}
+        for msg_type, hasher in hashers.items():
+            namespace = {}
+            try:
+                with open(self.mapper.h_path(hasher), 'r', encoding='utf-8') as f:
+                    exec(f.read(), namespace)
+                hasher_func: Callable = namespace.get('packet_hasher')
+                if not callable(hasher_func):
+                    raise TypeError('packet_hasher is missing or not callable')
+                self.hasher_funcs[msg_type] = hasher_func
+            except Exception:
+                logger.exception(
+                    f'Executor: hasher load failure [{msg_type}]'
+                )
+
+    def hash_response(
+        self,
+        response_type: str,
+        response: bytes
+    ) -> str:
+        """Return an IR-normalized digest, falling back to raw SHA-256."""
+        fallback = hashlib.sha256(response).hexdigest()
+        hasher = self.hasher_funcs.get(response_type)
+        if hasher is None:
+            hasher = self.hasher_funcs.get('__all__')
+        if hasher is None:
+            return fallback
+        try:
+            digest = hasher(response)
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or digest != digest.lower()
+                or any(char not in '0123456789abcdef' for char in digest)
+            ):
+                raise TypeError(
+                    'packet_hasher must return lowercase SHA-256'
+                )
+            return digest
+        except Exception:
+            logger.exception(
+                f'Executor: hasher failure [{response_type}]'
+            )
+            return fallback
+
+    def hash_response_with_evolution(
+        self,
+        response_type: str,
+        response: bytes
+    ) -> str:
+        """Evolve a hasher only for semantically equivalent hash divergence."""
+        if not hasattr(self, 'checked_response_samples'):
+            self.checked_response_samples = {}
+        if not hasattr(self, 'reviewed_response_samples'):
+            self.reviewed_response_samples = {}
+        if not hasattr(self, 'hasher_evolution_failures'):
+            self.hasher_evolution_failures = set()
+        if not hasattr(self, 'hasher_semantic_reviews'):
+            self.hasher_semantic_reviews = {}
+        digest = self.hash_response(response_type, response)
+        if response_type not in self.hasher_funcs:
+            return digest
+
+        previous_samples = self._historical_response_samples(response_type)
+        samples_by_digest: dict[str, list[bytes]] = {}
+        for sample in previous_samples:
+            sample_digest = self.hash_response(response_type, sample)
+            samples_by_digest.setdefault(sample_digest, []).append(sample)
+        previous_digests = set(samples_by_digest)
+        if not previous_samples or digest in previous_digests:
+            return digest
+
+        response_raw_hash = hashlib.sha256(response).hexdigest()
+        equivalent_samples: list[bytes] = []
+        try:
+            for old_digest, old_samples in samples_by_digest.items():
+                if old_digest == digest:
+                    continue
+                representative = old_samples[0]
+                old_raw_hash = hashlib.sha256(representative).hexdigest()
+                review_key = (
+                    response_type,
+                    old_raw_hash,
+                    response_raw_hash,
+                )
+                reverse_key = (
+                    response_type,
+                    response_raw_hash,
+                    old_raw_hash,
+                )
+                equivalent = self.hasher_semantic_reviews.get(review_key)
+                if equivalent is None:
+                    equivalent = self.hasher_semantic_reviews.get(reverse_key)
+                if equivalent is None:
+                    self._set_ui_operation(
+                        'Comparing response semantics with LLM'
+                    )
+                    equivalent = (
+                        self.mapper.producer
+                        .responses_semantically_equivalent(
+                            response_type=response_type,
+                            old_response=representative,
+                            new_response=response,
+                        )
+                    )
+                    self.hasher_semantic_reviews[review_key] = equivalent
+                if equivalent:
+                    equivalent_samples.extend(old_samples)
+        except Exception:
+            logger.exception(
+                f'Executor: response semantic comparison failed '
+                f'[{response_type}]'
+            )
+            return digest
+        finally:
+            self._set_ui_operation('')
+
+        if not equivalent_samples:
+            logger.debug(
+                f'Executor: preserve distinct semantic hashes '
+                f'[{response_type}]'
+            )
+            return digest
+
+        samples = list(dict.fromkeys([*equivalent_samples, response]))
+        failure_key = tuple(sorted(
+            hashlib.sha256(sample).hexdigest()
+            for sample in samples
+        ))
+        if failure_key in self.hasher_evolution_failures:
+            return digest
+
+        try:
+            self._set_ui_operation('Updating response hasher with LLM')
+            evolved = self.mapper.producer.evolve_hasher(
+                response_type=response_type,
+                samples=samples,
+            )
+            if evolved is None:
+                self.hasher_evolution_failures.add(failure_key)
+                return digest
+            self.mapper.hashers = self.mapper.producer.hashers
+            self.load_hashers(self.mapper.equip_hashers())
+            self._rebuild_hash_indexes(response_type)
+            self._rehash_persisted_invalid_responses(response_type)
+            return self.hash_response(response_type, response)
+        except Exception:
+            self.hasher_evolution_failures.add(failure_key)
+            logger.exception(
+                f'Executor: hasher evolution failed [{response_type}]'
+            )
+            return digest
+        finally:
+            self._set_ui_operation('')
+
     def check_response(
         self,
         response_type: str,
@@ -875,52 +1698,447 @@ class Executor:
         if is_valid:
             return True
 
-        logger.debug(
-            f'Executor: non-conforming response [{response_type}] {response!r}'
-        )
+        logger.debug(format_event(
+            'checker.reject',
+            response_type=response_type,
+            length=len(response),
+            response=response,
+        ))
         return False
 
-    def save_invalid_response(
+    def check_response_during_fuzzing(
+        self,
+        request_type: str,
+        response_type: str,
+        response: bytes,
+        enabled: bool
+    ) -> bool:
+        """Deduplicate exchanges before running fuzzing-stage checkers."""
+        if not enabled:
+            return True
+
+        response_hash = self.hash_response_with_evolution(
+            response_type,
+            response,
+        )
+        raw_digest = hashlib.sha256(response).hexdigest()
+        dedup_key = (
+            request_type,
+            response_type,
+            response_hash,
+        )
+        with self._invalid_response_lock:
+            if dedup_key in self.checked_request_response_pairs:
+                logger.debug(format_event(
+                    'checker.deduplicated',
+                    request_type=request_type,
+                    response_type=response_type,
+                    response_hash=dedup_key[2],
+                ))
+                return True
+            self.checked_request_response_pairs.add(dedup_key)
+            self.checked_response_samples[
+                (request_type, response_type, raw_digest)
+            ] = response
+
+        return self.check_response(response_type, response)
+
+    def handle_nonconforming_response(
         self,
         cons: Conversation,
         response_type: str
     ) -> None:
-        """Save the request/response prefix that produced an invalid response."""
-        target_folder = configs.results_path / 'invalid_responses'
-        target_folder.mkdir(parents=True, exist_ok=True)
+        """Review one unique checker rejection and act on the LLM verdict."""
+        if not cons.content or not cons.req_seq:
+            logger.debug(
+                'Executor: cannot review response without conversation data'
+            )
+            return
 
-        file_count = sum(
-            1
-            for path in target_folder.iterdir()
-            if path.is_file() and path.suffix == '.pkl'
-        )
-        file_id = f'{file_count:06d}'
+        request, response = cons.content[-1]
+        request_type = cons.req_seq[-1]
+        if not response:
+            return
 
-        with open(target_folder / f'cons_{file_id}.pkl', 'wb') as f:
-            pickle.dump(cons, f)
+        response_hash = self.hash_response(response_type, response)
+        dedup_key = (request_type, response_type, response_hash)
+        with self._invalid_response_lock:
+            if dedup_key in self.reviewed_invalid_responses:
+                logger.debug(
+                    'Executor: duplicate non-conforming response skipped '
+                    f'[{request_type}/{response_type}] {response_hash}'
+                )
+                return
+            self.reviewed_invalid_responses.add(dedup_key)
+            self.reviewed_response_samples[
+                (
+                    request_type,
+                    response_type,
+                    hashlib.sha256(response).hexdigest(),
+                )
+            ] = response
 
-        with open(
-            target_folder / f'cons_{file_id}.raw',
-            'wb'
-        ) as f:
-            for request, response in cons.content:
-                f.write(b'REQUEST ' + str(len(request)).encode() + b'\n')
-                f.write(request + b'\n')
-                f.write(b'RESPONSE ' + str(len(response)).encode() + b'\n')
-                f.write(response + b'\n')
+        try:
+            self._set_ui_operation(
+                'Checking possible non-compliance with LLM'
+            )
+            analysis = self.mapper.producer.review_nonconforming_response(
+                request_type=request_type,
+                response_type=response_type,
+                request=request,
+                response=response,
+            )
+        except Exception:
+            logger.exception(
+                'Executor: non-conforming response review failed '
+                f'[{request_type}/{response_type}]'
+            )
+            return
+        finally:
+            self._set_ui_operation('')
 
-        with open(
-            target_folder / f'cons_{file_id}.info',
-            'w',
-            encoding='utf-8'
-        ) as f:
-            f.write(f'response_type: {response_type}\n')
-            f.write(f'request_types: {cons.req_seq}\n')
-            f.write(f'response_types: {cons.res_seq}\n')
+        verdict = analysis.get('verdict', 'uncertain')
+        if verdict == 'non_compliant':
+            saved = self.save_invalid_response(
+                cons,
+                response_type,
+                analysis=analysis,
+            )
+            if saved:
+                with self.analyzer.lock:
+                    self.analyzer.non_compliant_num += 1
+            return
+
+        if verdict == 'compliant':
+            try:
+                self._set_ui_operation('Updating checker with LLM')
+                checker = self.mapper.producer.evolve_checker(
+                    response_type=response_type,
+                    response=response,
+                    analysis=analysis,
+                )
+                if checker is not None:
+                    self.load_checkers(self.mapper.equip_checkers())
+                    logger.debug(
+                        'Executor: checker hot-reloaded after false positive '
+                        f'[{request_type}/{response_type}]'
+                    )
+                else:
+                    logger.debug(
+                        'Executor: checker evolution produced no update '
+                        f'[{request_type}/{response_type}]'
+                    )
+            except Exception:
+                logger.exception(
+                    'Executor: checker evolution failed '
+                    f'[{request_type}/{response_type}]'
+                )
+            finally:
+                self._set_ui_operation('')
+            return
 
         logger.debug(
-            f'Executor: saved invalid response sequence cons_{file_id}'
+            'Executor: compliance review uncertain; no response recorded and '
+            f'no checker modified [{request_type}/{response_type}]'
         )
+
+    def save_invalid_response(
+        self,
+        cons: Conversation,
+        response_type: str,
+        analysis: dict | None = None
+    ) -> bool:
+        """Persist one unique, confirmed non-compliant response."""
+        if not cons.content or not cons.req_seq:
+            return False
+
+        target_folder = configs.results_path / 'invalid_responses'
+        target_folder.mkdir(parents=True, exist_ok=True)
+        request, response = cons.content[-1]
+        request_type = cons.req_seq[-1]
+        response_digest = hashlib.sha256(response).hexdigest()
+        response_hash = self.hash_response(response_type, response)
+        dedup_key = (request_type, response_type, response_hash)
+        marker_digest = hashlib.sha256(
+            json.dumps(dedup_key, separators=(',', ':')).encode('utf-8')
+        ).hexdigest()
+        marker_path = target_folder / f'.dedup_{marker_digest}'
+
+        with self._invalid_response_lock:
+            if self._invalid_response_exists(target_folder, dedup_key):
+                logger.debug(format_event(
+                    'invalid_response.deduplicated',
+                    request_type=request_type,
+                    response_type=response_type,
+                    response_hash=response_hash,
+                ))
+                return False
+
+            try:
+                marker_fd = os.open(
+                    marker_path,
+                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                    0o600,
+                )
+                os.close(marker_fd)
+            except FileExistsError:
+                logger.debug(format_event(
+                    'invalid_response.deduplicated',
+                    request_type=request_type,
+                    response_type=response_type,
+                    response_hash=response_hash,
+                ))
+                return False
+
+            file_count = sum(
+                1
+                for path in target_folder.iterdir()
+                if path.is_file() and path.suffix == '.pkl'
+            )
+            file_id = f'{file_count:06d}'
+
+            try:
+                with open(
+                    target_folder / f'cons_{file_id}.pkl',
+                    'wb'
+                ) as f:
+                    pickle.dump(cons, f)
+
+                with open(
+                    target_folder / f'cons_{file_id}.raw',
+                    'wb'
+                ) as f:
+                    for saved_request, saved_response in cons.content:
+                        f.write(
+                            b'REQUEST '
+                            + str(len(saved_request)).encode()
+                            + b'\n'
+                        )
+                        f.write(saved_request + b'\n')
+                        f.write(
+                            b'RESPONSE '
+                            + str(len(saved_response)).encode()
+                            + b'\n'
+                        )
+                        f.write(saved_response + b'\n')
+
+                with open(
+                    target_folder / f'cons_{file_id}.info',
+                    'w',
+                    encoding='utf-8'
+                ) as f:
+                    f.write(f'response_type: {response_type}\n')
+                    f.write(f'request_types: {cons.req_seq}\n')
+                    f.write(f'response_types: {cons.res_seq}\n')
+
+                record = {
+                    'request_type': request_type,
+                    'response_type': response_type,
+                    'response_sha256': response_digest,
+                    'response_hash': response_hash,
+                    'request': {
+                        'encoding': 'base64',
+                        'data': base64.b64encode(request).decode('ascii'),
+                    },
+                    'response': {
+                        'encoding': 'base64',
+                        'data': base64.b64encode(response).decode('ascii'),
+                    },
+                    'analysis': analysis or {},
+                }
+                with open(
+                    target_folder / f'cons_{file_id}.analysis.json',
+                    'w',
+                    encoding='utf-8'
+                ) as f:
+                    json.dump(record, f, indent=2, ensure_ascii=False)
+            except Exception:
+                marker_path.unlink(missing_ok=True)
+                logger.exception(
+                    'Executor: failed to save non-compliant response'
+                )
+                return False
+
+        logger.debug(format_event(
+            'invalid_response.saved',
+            testcase=f'cons_{file_id}',
+            request_type=request_type,
+            response_type=response_type,
+            response_sha256=response_digest,
+            response_hash=response_hash,
+        ))
+        return True
+
+    def _invalid_response_exists(
+        self,
+        target_folder: Path,
+        dedup_key: tuple[str, str, str]
+    ) -> bool:
+        """Check persisted analysis files, including files from older runs."""
+        request_type, response_type, response_hash = dedup_key
+        for path in target_folder.glob('cons_*.analysis.json'):
+            try:
+                with path.open('r', encoding='utf-8') as f:
+                    record = json.load(f)
+                saved_hash = record.get('response_hash')
+                if not saved_hash:
+                    encoded = record.get('response', {}).get('data')
+                    if not isinstance(encoded, str):
+                        continue
+                    saved_response = base64.b64decode(
+                        encoded,
+                        validate=True,
+                    )
+                    saved_hash = self.hash_response(
+                        response_type,
+                        saved_response,
+                    )
+                if (
+                    record.get('request_type') == request_type
+                    and record.get('response_type') == response_type
+                    and saved_hash == response_hash
+                ):
+                    return True
+            except Exception:
+                logger.exception(
+                    f'Executor: invalid response index read failed {path}'
+                )
+        return False
+
+    def _historical_response_samples(
+        self,
+        response_type: str
+    ) -> list[bytes]:
+        samples = [
+            response
+            for (_, saved_type, _), response
+            in self.checked_response_samples.items()
+            if saved_type == response_type
+        ]
+        target_folder = configs.results_path / 'invalid_responses'
+        if target_folder.is_dir():
+            for path in target_folder.glob('cons_*.analysis.json'):
+                try:
+                    with path.open('r', encoding='utf-8') as f:
+                        record = json.load(f)
+                    if record.get('response_type') != response_type:
+                        continue
+                    encoded = record.get('response', {}).get('data')
+                    if isinstance(encoded, str):
+                        samples.append(base64.b64decode(
+                            encoded,
+                            validate=True,
+                        ))
+                except Exception:
+                    logger.exception(
+                        f'Executor: historical response read failed {path}'
+                    )
+        return list(dict.fromkeys(samples))
+
+    def _rebuild_hash_indexes(
+        self,
+        response_type: str
+    ) -> None:
+        self.checked_request_response_pairs = {
+            key
+            for key in self.checked_request_response_pairs
+            if key[1] != response_type
+        }
+        self.reviewed_invalid_responses = {
+            key
+            for key in self.reviewed_invalid_responses
+            if key[1] != response_type
+        }
+        for (request_type, saved_type, _), response in (
+            self.checked_response_samples.items()
+        ):
+            if saved_type == response_type:
+                self.checked_request_response_pairs.add((
+                    request_type,
+                    saved_type,
+                    self.hash_response(saved_type, response),
+                ))
+        for (request_type, saved_type, _), response in (
+            self.reviewed_response_samples.items()
+        ):
+            if saved_type == response_type:
+                self.reviewed_invalid_responses.add((
+                    request_type,
+                    saved_type,
+                    self.hash_response(saved_type, response),
+                ))
+
+    def _rehash_persisted_invalid_responses(
+        self,
+        response_type: str
+    ) -> None:
+        target_folder = configs.results_path / 'invalid_responses'
+        if not target_folder.is_dir():
+            return
+
+        records = []
+        for path in target_folder.glob('cons_*.analysis.json'):
+            try:
+                with path.open('r', encoding='utf-8') as f:
+                    record = json.load(f)
+                if record.get('response_type') == response_type:
+                    encoded = record.get('response', {}).get('data')
+                    if isinstance(encoded, str):
+                        response = base64.b64decode(
+                            encoded,
+                            validate=True,
+                        )
+                        record['response_hash'] = self.hash_response(
+                            response_type,
+                            response,
+                        )
+                        temp_path = path.with_suffix(path.suffix + '.tmp')
+                        with temp_path.open('w', encoding='utf-8') as f:
+                            json.dump(
+                                record,
+                                f,
+                                indent=2,
+                                ensure_ascii=False,
+                            )
+                        temp_path.replace(path)
+                records.append(record)
+            except Exception:
+                logger.exception(
+                    f'Executor: persisted response rehash failed {path}'
+                )
+
+        for marker in target_folder.glob('.dedup_*'):
+            marker.unlink(missing_ok=True)
+        for record in records:
+            request_type = record.get('request_type')
+            saved_type = record.get('response_type')
+            saved_hash = record.get('response_hash')
+            if (
+                isinstance(saved_type, str)
+                and not isinstance(saved_hash, str)
+            ):
+                encoded = record.get('response', {}).get('data')
+                if isinstance(encoded, str):
+                    try:
+                        saved_hash = self.hash_response(
+                            saved_type,
+                            base64.b64decode(encoded, validate=True),
+                        )
+                    except Exception:
+                        logger.exception(
+                            'Executor: marker hash reconstruction failed'
+                        )
+            if not all(isinstance(value, str) for value in (
+                request_type,
+                saved_type,
+                saved_hash,
+            )):
+                continue
+            key = (request_type, saved_type, saved_hash)
+            marker_digest = hashlib.sha256(
+                json.dumps(key, separators=(',', ':')).encode('utf-8')
+            ).hexdigest()
+            (target_folder / f'.dedup_{marker_digest}').touch(exist_ok=True)
         
     def save_cons(
         self,

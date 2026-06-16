@@ -3,7 +3,7 @@ import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, 
 
 from voltron.executor.conversation import Conversation
 
-from voltron.utils.logger import logger_fuzz as logger
+from voltron.utils.logger import configure_file_logging, logger_fuzz as logger
 
 from voltron.llm.chatter import AsyncChater
 
@@ -53,11 +53,20 @@ class Fuzzer:
         self._cleanup_lock = threading.RLock()
         self._cleanup_done = False
         self._previous_sigint_handler = None
-        
-        self.load_configs()
-        self.module_init()
+        self._signal_handler_installed = False
+        self._worker_threads: list[threading.Thread] = []
+        self.stop_event = threading.Event()
+        analyzer.stop_event = self.stop_event
         atexit.register(self.cleanup)
-        
+        self._install_signal_handlers()
+
+        try:
+            self.load_configs()
+            self.module_init()
+        except BaseException:
+            self.cleanup()
+            raise
+
     def load_configs(
         self
     ) -> None:
@@ -67,8 +76,8 @@ class Fuzzer:
                 configs_yaml = yaml.safe_load(f)
                 if self.target_name not in configs_yaml.keys():
                     raise Exception(f'Fuzzer: unknown target {self.target_name}')
-        except Exception as e:
-            logger.error(f'Fuzzer: config load failure {e}')
+        except Exception:
+            logger.exception('Fuzzer: config load failure')
             
         # key parameter of protocol
         configs.pro_name = configs_yaml[self.target_name]['protocol']
@@ -111,6 +120,9 @@ class Fuzzer:
             configs.models_path.mkdir(parents=True, exist_ok=True)
         
         configs.results_path = results_dir
+        if self.mode != 'replay' or self.output != 'default':
+            configure_file_logging(configs.results_path)
+        analyzer.reset_phase_metrics()
         configs.fuzz_mode = self.mode
         configs.spec_knowledge = self.spec_knowledge
         configs.state_learning = self.state_learning
@@ -132,25 +144,31 @@ class Fuzzer:
         print('Analyzer: setup')
 
         # rfcparser init
-        self.rfcparser = AsyncRFCParser(
-            chater=self.chater
-        )
-        self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
-        print('RFCParser: setup')
+        analyzer.begin_phase('doc_analysis')
+        doc_phase_status = 'completed'
+        try:
+            self.rfcparser = AsyncRFCParser(
+                chater=self.chater
+            )
+            self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
+            print('RFCParser: setup')
 
-        # handler init
-        self.producer = AsyncProducer(
-            chater=self.chater_fuzz,
-            rfcp=self.rfcparser
-        )
-        self.producer.run()
-        print('Producer: equipment setup')
+            # handler init
+            self.producer = AsyncProducer(
+                chater=self.chater_fuzz,
+                rfcp=self.rfcparser
+            )
+            self.producer.run()
+            print('Producer: equipment setup')
+        except BaseException:
+            doc_phase_status = 'failed'
+            raise
+        finally:
+            analyzer.end_phase('doc_analysis', doc_phase_status)
         
         # scheduler init
         self.mapper = Mapper(self.producer)
         
-        self.stop_event = threading.Event()
-        analyzer.stop_event = self.stop_event
         # setup executor
         self.exe = Executor(
             mapper=self.mapper,
@@ -189,8 +207,19 @@ class Fuzzer:
             self._install_signal_handlers()
             
             # start fuzzing and set up ui
-            t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
-            t_fuzz = threading.Thread(target=fuzz_loop, args=(self.stop_event,))
+            t_ui = threading.Thread(
+                target=ui_loop,
+                args=(self.stop_event,),
+                name='voltron-ui',
+                daemon=True,
+            )
+            t_fuzz = threading.Thread(
+                target=fuzz_loop,
+                args=(self.stop_event,),
+                name='voltron-fuzz',
+                daemon=True,
+            )
+            self._worker_threads = [t_fuzz, t_ui]
 
             t_fuzz.start()
             t_ui.start()
@@ -200,9 +229,8 @@ class Fuzzer:
             
         except KeyboardInterrupt:
             logger.debug('Fuzzer: interrupted')
-        except Exception as e:
-            logger.debug(f'fuzzer error: {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Fuzzer: fuzzing failed')
             self.stop_event.set()
         finally:
             self.cleanup()
@@ -215,6 +243,10 @@ class Fuzzer:
     ):
         """Fuzz the target one
         """
+        res_dir = res_dir.expanduser().resolve()
+        cov_folder = cov_folder.expanduser().resolve()
+        configs.results_path = res_dir
+        configure_file_logging(configs.results_path)
         
         with analyzer.lock:
             analyzer.strategy = 'replay'
@@ -225,8 +257,19 @@ class Fuzzer:
             self._install_signal_handlers()
             
             # start fuzzing and set up ui
-            t_ui   = threading.Thread(target=ui_loop, args=(self.stop_event,))
-            t_fuzz = threading.Thread(target=self.replay_process, args=(res_dir, cov_folder,))
+            t_ui = threading.Thread(
+                target=ui_loop,
+                args=(self.stop_event,),
+                name='voltron-ui',
+                daemon=True,
+            )
+            t_fuzz = threading.Thread(
+                target=self.replay_process,
+                args=(res_dir, cov_folder,),
+                name='voltron-replay',
+                daemon=True,
+            )
+            self._worker_threads = [t_fuzz, t_ui]
 
             t_fuzz.start()
             t_ui.start()
@@ -236,9 +279,8 @@ class Fuzzer:
             
         except KeyboardInterrupt:
             logger.debug('Replay: interrupted')
-        except Exception as e:
-            logger.debug(f'replay error: {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Fuzzer: replay failed')
             self.stop_event.set()
         finally:
             self.cleanup()
@@ -263,17 +305,29 @@ class Fuzzer:
             hypothesis: MealyMachine | None = None
             begin_time = time.time()
             if self.state_learning:
-                mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
-                eq = EquOracle(mapper=self.mapper, executor=self.exe)
-                h_path = configs.models_path / 'evolved_hypothesis.pkl'
-                if h_path.is_file():
-                    with open(h_path, 'rb') as f:
-                        hypothesis = pickle.load(f)
+                analyzer.begin_phase('model_learning')
+                model_phase_status = 'completed'
+                try:
+                    mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
+                    eq = EquOracle(mapper=self.mapper, executor=self.exe)
+                    h_path = configs.models_path / 'evolved_hypothesis.pkl'
+                    if h_path.is_file():
+                        with open(h_path, 'rb') as f:
+                            hypothesis = pickle.load(f)
 
-                if hypothesis is None:
-                    hypothesis = self.model_learning(mq, eq, stop_event)
-                else:
-                    self.mapper.message_pool = hypothesis.map
+                    if hypothesis is None:
+                        hypothesis = self.model_learning(mq, eq, stop_event)
+                    else:
+                        self.mapper.message_pool = hypothesis.map
+                except BaseException:
+                    model_phase_status = 'failed'
+                    raise
+                finally:
+                    if stop_event.is_set() and model_phase_status == 'completed':
+                        model_phase_status = 'stopped'
+                    analyzer.end_phase('model_learning', model_phase_status)
+            else:
+                analyzer.record_skipped_phase('model_learning')
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
@@ -281,9 +335,8 @@ class Fuzzer:
                 
             self.stop_event.set()
                 
-        except Exception as e:
-            logger.debug(f'Fuzzer: exit {e}') 
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Fuzzer: state fuzzing failed')
             stop_event.set()
             
     def model_learning(
@@ -303,12 +356,14 @@ class Fuzzer:
                     analyzer.iter += 1
                     analyzer.reset_automata_cnt()
                 next_id = str(analyzer.iter)
-                
+
                 # run model learning
-                with analyzer.lock:   
+                iteration_start = time.time()
+                with analyzer.lock:
                     analyzer.stage = 'model learning'
                 ml = MealyLstar(mq, eq, self.stop_event)
                 h = ml.run(cur_id)
+                iteration_duration = time.time() - iteration_start
                 
                 # save and evaluate the automata
                 self.mapper.register_mapper(h)
@@ -317,10 +372,18 @@ class Fuzzer:
 
                 # select a better generator to evolve
                 # the more states transitions the better the generator
-                with analyzer.lock:   
+                iteration_status = 'initial'
+                with analyzer.lock:
                     analyzer.stage = 'fuzzer evolve'
                 if len(h_lsit) == 0:
                     h_lsit.append(h)
+                    analyzer.record_model_learning_iteration(
+                        iteration=int(cur_id),
+                        hypothesis=h,
+                        duration_s=iteration_duration,
+                        status=iteration_status,
+                        try_limit=try_limit,
+                    )
                     if self.spec_knowledge:
                         self.producer.generator_evo(h)
                     continue
@@ -331,21 +394,44 @@ class Fuzzer:
                     # self.producer.generator_evo(h_lsit[-1], next_id)
                     try_limit -= 1
                     if try_limit <= 0:
+                        iteration_status = 'accepted_final'
                         with open(h_path, 'wb') as f:
                             pickle.dump(h, f)
                         h.graph('evolved')
                         logger.debug('ml: save evolved model')
+                        analyzer.record_model_learning_iteration(
+                            iteration=int(cur_id),
+                            hypothesis=h,
+                            duration_s=iteration_duration,
+                            status=iteration_status,
+                            try_limit=try_limit,
+                        )
                         break
+                    iteration_status = 'not_improved'
+                    analyzer.record_model_learning_iteration(
+                        iteration=int(cur_id),
+                        hypothesis=h,
+                        duration_s=iteration_duration,
+                        status=iteration_status,
+                        try_limit=try_limit,
+                    )
                 
                 elif last_trans_num < cur_trans_num:
+                    iteration_status = 'improved'
                     h_lsit.append(h)
+                    analyzer.record_model_learning_iteration(
+                        iteration=int(cur_id),
+                        hypothesis=h,
+                        duration_s=iteration_duration,
+                        status=iteration_status,
+                        try_limit=try_limit,
+                    )
                     if self.spec_knowledge:
                         self.producer.generator_evo(h)
                     continue
 
-            except Exception as e:
-                logger.debug(f'Fuzzer: exit {e}')
-                logger.debug(traceback.format_exc())
+            except Exception:
+                logger.exception('Fuzzer: model learning failed')
                 stop_event.set()
                 sys.exit(1)
             if (configs.time_limit_s < time.time() - analyzer.start_time):
@@ -372,31 +458,38 @@ class Fuzzer:
             hypothesis,
             use_guidance=self.guided_scheduling,
         )
-                    
-        while not stop_event.is_set():
-            try:
-                # init new learning process with previous model and run fuzzer
 
-                req_res = havoc.run(500)
-                if self.spec_knowledge:
-                    self.producer.generator_mutate(req_res)
-                pre_resp = analyzer.cur_res_types_cnt.keys()
-                
-                # save the results
-                with analyzer.lock:   
-                    analyzer.iter += 1
-                    analyzer.reset_automata_cnt()
-                analyzer.collect_results()
-                
-            except Exception as e:
-                logger.debug(f'Fuzzer: exit {e}')
-                logger.debug(traceback.format_exc())
-                stop_event.set()
-                
-            if (configs.time_limit_s < time.time() - analyzer.start_time):
-                logger.debug('Fuzzer: timeout')
-                stop_event.set()
-                analyzer.collect_results()
+        analyzer.begin_phase('fuzzing')
+        fuzz_phase_status = 'completed'
+        try:
+            while not stop_event.is_set():
+                try:
+                    # init new learning process with previous model and run fuzzer
+
+                    req_res = havoc.run(500)
+                    if self.spec_knowledge:
+                        self.producer.generator_mutate(req_res)
+                    pre_resp = analyzer.cur_res_types_cnt.keys()
+
+                    # save the results
+                    with analyzer.lock:
+                        analyzer.iter += 1
+                        analyzer.reset_automata_cnt()
+                    analyzer.collect_results()
+
+                except Exception:
+                    fuzz_phase_status = 'failed'
+                    logger.exception('Fuzzer: havoc fuzzing failed')
+                    stop_event.set()
+
+                if (configs.time_limit_s < time.time() - analyzer.start_time):
+                    logger.debug('Fuzzer: timeout')
+                    stop_event.set()
+                    analyzer.collect_results()
+        finally:
+            if stop_event.is_set() and fuzz_phase_status == 'completed':
+                fuzz_phase_status = 'stopped'
+            analyzer.end_phase('fuzzing', fuzz_phase_status)
                 
     def replay_process(
         self,
@@ -413,7 +506,11 @@ class Fuzzer:
             
         file_count = 0
         try:
-            file_paths = [f for f in in_dir.iterdir() if f.is_file()]
+            file_paths = [
+                path
+                for path in in_dir.iterdir()
+                if path.is_file() and path.suffix == '.pkl'
+            ]
             sorted_files = sorted(
                 file_paths,
                 key=self.get_creation_timestamp,
@@ -422,12 +519,20 @@ class Fuzzer:
             cons_seq: list[Conversation] = []
             file_list: list[Path] = []
             for item in sorted_files:
-                if item.is_file():
+                try:
                     with open(item, 'rb') as f:
                         cons = pickle.load(f)
-                        cons_seq.append(cons)
-                        file_list.append(item)
+                    if not isinstance(cons, Conversation):
+                        raise TypeError(
+                            f'expected Conversation, got {type(cons).__name__}'
+                        )
+                    cons_seq.append(cons)
+                    file_list.append(item)
                     file_count += 1
+                except Exception:
+                    logger.exception(
+                        f'Fuzzer: skip invalid replay testcase {item}'
+                    )
             
             analyzer.set_progress('havoc', 'replay', file_count)
             self.exe.cov_setup(cov_folder, cov_file)
@@ -441,18 +546,19 @@ class Fuzzer:
                     
                 try:
                     flag, res_cons = self.exe.interact(req_seq, poll_wait_ms=3000)
-                except Exception as e:
-                    logger.debug(f'replayer: exit {e}')
-                    logger.debug(traceback.format_exc())
+                except Exception:
+                    logger.exception('Fuzzer: testcase replay failed')
+                    continue
 
                 with analyzer.lock:
                     analyzer.finished += 1
-                    
-                self.exe.cov_collect(cov_folder, cov_file, file_list[i])
+
+                if flag:
+                    self.exe.cov_collect(cov_folder, cov_file, file_list[i])
+        except Exception:
+            logger.exception('Fuzzer: replay processing failed')
+        finally:
             self.stop_event.set()
-        except Exception as e:
-            logger.debug(f'replayer: exit {e}')
-            logger.debug(traceback.format_exc())
 
     def handle_normal_fuzzer_exit(
         self,
@@ -462,14 +568,18 @@ class Fuzzer:
         # Handle normal exit of fuzzer Ctrl+C
         logger.debug(f'Fuzzer: caught signal {signal_num}, stopping')
         self.stop_event.set()
-        self._terminate_active_sut(signal.SIGTERM, timeout=1)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        self._terminate_active_sut(signal.SIGTERM, timeout=0.5)
         raise KeyboardInterrupt
 
     def _install_signal_handlers(
         self
     ) -> None:
+        if self._signal_handler_installed:
+            return
         self._previous_sigint_handler = signal.getsignal(signal.SIGINT)
         signal.signal(signal.SIGINT, self.handle_normal_fuzzer_exit)
+        self._signal_handler_installed = True
 
     def _restore_signal_handlers(
         self
@@ -477,9 +587,10 @@ class Fuzzer:
         if self._previous_sigint_handler is not None:
             try:
                 signal.signal(signal.SIGINT, self._previous_sigint_handler)
-            except Exception as e:
-                logger.debug(f'Fuzzer: restore signal handler failure {e}')
+            except Exception:
+                logger.exception('Fuzzer: restore signal handler failure')
             self._previous_sigint_handler = None
+        self._signal_handler_installed = False
 
     def cleanup(
         self
@@ -496,16 +607,41 @@ class Fuzzer:
                 pass
 
             self._terminate_active_sut(signal.SIGTERM, timeout=3)
+            self._join_worker_threads(timeout=1)
 
             try:
-                self.mapper.close()
-            except Exception as e:
-                logger.debug(f'Fuzzer: mapper close failure {e}')
+                mapper = getattr(self, 'mapper', None)
+                if mapper is not None:
+                    mapper.close()
+            except Exception:
+                logger.exception('Fuzzer: mapper close failure')
 
             if self.mode != 'replay':
                 self._collect_results()
 
             self._restore_signal_handlers()
+
+    def _join_worker_threads(self, timeout: float) -> None:
+        """Wait briefly for cooperative workers before collecting results."""
+        deadline = time.monotonic() + timeout
+        current = threading.current_thread()
+        for thread in self._worker_threads:
+            if thread is current or not thread.is_alive():
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            thread.join(timeout=remaining)
+
+        alive = [
+            thread.name
+            for thread in self._worker_threads
+            if thread is not current and thread.is_alive()
+        ]
+        if alive:
+            logger.debug(
+                f'Fuzzer: worker shutdown timeout; alive={alive}'
+            )
 
     def _terminate_active_sut(
         self,
@@ -524,12 +660,12 @@ class Fuzzer:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait(timeout=1)
-            except Exception as e:
-                logger.debug(f'Fuzzer: SUT kill failure {e}')
+            except Exception:
+                logger.exception('Fuzzer: SUT kill failure')
         except ProcessLookupError:
             pass
-        except Exception as e:
-            logger.debug(f'Fuzzer: SUT terminate failure {e}')
+        except Exception:
+            logger.exception('Fuzzer: SUT terminate failure')
         finally:
             if analyzer.sut_proc is proc:
                 analyzer.sut_proc = None
@@ -540,9 +676,10 @@ class Fuzzer:
         if not hasattr(analyzer, 'start_time') or not hasattr(configs, 'results_path'):
             return
         try:
+            analyzer.finalize_open_phase()
             analyzer.collect_results()
-        except Exception as e:
-            logger.debug(f'Fuzzer: collect results failure {e}')
+        except Exception:
+            logger.exception('Fuzzer: collect results failure')
         
     def get_creation_timestamp(
         self, 

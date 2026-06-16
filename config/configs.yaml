@@ -183,3 +183,9 @@ llm_fuzz:
   api_key: none
   model: none
   async_sem: 8
+
+llm_compliance:
+  base_url: none
+  api_key: none
+  model: none
+  async_sem: 8

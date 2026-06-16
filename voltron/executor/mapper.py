@@ -3,6 +3,7 @@ from voltron.synthesizer.synthesizer import AsyncProducer
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.synthesizer.checker import Checker
+from voltron.synthesizer.hasher import ResponseHasher
 from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 from voltron.configs import configs
@@ -77,6 +78,7 @@ class Mapper:
         self.gs_path = producer.generator_path
         self.ps_path = producer.parser_path
         self.cs_path = producer.checker_path
+        self.hs_path = producer.hasher_path
         self.ms_path = producer.mutator_path
         
         self.request_types: set[str] = producer.req_types
@@ -88,6 +90,7 @@ class Mapper:
         # self.cur_suite: Suite = Suite(producer.generators)
         self.parsers: list[Parser] = producer.parsers
         self.checkers: dict[str, list[Checker]] = producer.checkers
+        self.hashers: dict[str, list[ResponseHasher]] = producer.hashers
 
         self.exec_timeout_s = EXEC_TIMEOUT_S
         self.exec_retry_limit = EXEC_RETRY_LIMIT
@@ -129,6 +132,21 @@ class Mapper:
         if checker.path:
             return Path(checker.path)
         return typed_path
+
+    def h_path(
+        self,
+        hasher: ResponseHasher
+    ) -> Path:
+        typed_path = (
+            self.hs_path
+            / quote(hasher.msg_type, safe='._-')
+            / f'{hasher.name}.py'
+        )
+        if typed_path.is_file():
+            return typed_path
+        if hasher.path:
+            return Path(hasher.path)
+        return typed_path
     
     def m_path(
         self,
@@ -148,6 +166,13 @@ class Mapper:
             msg_type: checkers[-1]
             for msg_type, checkers in self.checkers.items()
             if checkers
+        }
+
+    def equip_hashers(self) -> dict[str, ResponseHasher]:
+        return {
+            msg_type: hashers[-1]
+            for msg_type, hashers in self.hashers.items()
+            if hashers
         }
     
     def update_parser(
@@ -208,10 +233,10 @@ class Mapper:
                         ms.append((msg_type, msg))
                     else:
                         logger.debug(f'Mapper: generator failed {g.msg_type}/{g.name}')
-                except Exception as e:
+                except Exception:
                     logger.debug(asdict(g))
                     logger.debug(self.message_pool)
-                    logger.debug(traceback.format_exc())
+                    logger.exception('Mapper: generator selection failed')
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
@@ -251,10 +276,10 @@ class Mapper:
                         ms.append((msg_type, msg))
                     else:
                         logger.debug(f'Mapper: mutator failed {m.msg_type}/{m.name}')
-                except Exception as e:
+                except Exception:
                     logger.debug(asdict(m))
                     logger.debug(self.message_pool)
-                    logger.debug(traceback.format_exc())
+                    logger.exception('Mapper: mutator selection failed')
             else:
                 logger.debug(f'Mapper: unexpected type {req}')
         return ms
@@ -290,9 +315,8 @@ class Mapper:
                 if msg is not None:
                     g.was_used += 1
                 return msg
-        except Exception as e:
-            logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Mapper: generator execution failed')
             return None
         
     def exe_mutator(
@@ -303,9 +327,8 @@ class Mapper:
             with open(self.m_path(m), 'r', encoding='utf-8') as f:
                 code = f.read()
                 return self._run_dynamic_code(code, 'mutate')
-        except Exception as e:
-            logger.debug(f'Executor: generated failure {e}')
-            logger.debug(traceback.format_exc())
+        except Exception:
+            logger.exception('Mapper: mutator execution failed')
             return None
 
     def _run_dynamic_code(

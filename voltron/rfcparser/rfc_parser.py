@@ -1,4 +1,4 @@
-import pickle, json, re, asyncio, sys, subprocess
+import pickle, json, re, asyncio, sys, subprocess, os
 from pathlib import Path
 from typing import Tuple
 from lxml import etree # type: ignore
@@ -95,15 +95,9 @@ class AsyncRFCParser:
         for i in range(len(self.doc_paths)):
             name=configs.rfc_name[i]
             logger.debug(f'create st: {name}')
-            fn = self.ir_path / f"{name}.pkl"
-            if(fn.is_file()):
-                self.load_st(name)
-                logger.debug('RFCParser: load parser')
-                self._query_prepare(name)
-            else:
-                self.spe_parse(i)
-                logger.debug('RFCParser: parse document')
-                self._query_prepare(name)
+            source = self.prepare_section_tree(i, name)
+            logger.debug(f'RFCParser: sectiontree {source} [{name}]')
+            self._query_prepare(name)
             logger.debug('RFCParser: finish parse')
 
         self.rag_req_msg: fastbm25 = self.rag_init(list(self.req_doc))
@@ -363,8 +357,8 @@ class AsyncRFCParser:
                         logger.debug(f'[Tree Annotate]: {node.name}:{ans}')
                         node.content_type = ans
                         break
-                except Exception as e:
-                    logger.error(f'RFCParser: specification parse error {e}')
+                except Exception:
+                    logger.exception('RFCParser: specification parse error')
 
     async def _req_field(
             self,
@@ -671,22 +665,66 @@ class AsyncRFCParser:
     def load_st(
         self,
         name: str
-    ):
-        """Load rfc parser 
-        """
-        with open(self.ir_path / f"{name}.pkl", "rb") as f:
+    ) -> SectionTree:
+        """Load and validate one cached RFC SectionTree."""
+        tree_path = self.ir_path / f"{name}.pkl"
+        with tree_path.open("rb") as f:
             st = pickle.load(f)
-            self.tree_dict[name] = st
+        if not isinstance(st, SectionTree):
+            raise TypeError(
+                f"expected SectionTree, got {type(st).__name__}"
+            )
+        if not isinstance(getattr(st, "leafs", None), list):
+            raise ValueError("SectionTree leaf list is missing or invalid")
+        if not isinstance(getattr(st, "doc_content", None), str):
+            raise ValueError("SectionTree document content is missing")
+        self.tree_dict[name] = st
+        return st
+
+    def prepare_section_tree(
+        self,
+        idx: int,
+        name: str,
+    ) -> str:
+        """Load a valid cache or regenerate it from the RFC document."""
+        tree_path = self.ir_path / f"{name}.pkl"
+        if tree_path.is_file():
+            try:
+                self.load_st(name)
+                return "loaded"
+            except Exception:
+                self.tree_dict.pop(name, None)
+                logger.exception(
+                    f"RFCParser: damaged SectionTree cache; regenerating "
+                    f"[{name}] path={tree_path}"
+                )
+
+        self.spe_parse(idx)
+        if name not in self.tree_dict:
+            raise RuntimeError(
+                f"RFCParser: SectionTree regeneration produced no tree "
+                f"[{name}]"
+            )
+        return "regenerated"
         
     def save_st(
         self,
         st: SectionTree
     ):
-        """Use pickle to store section tree instance
-        """
-        with open(self.ir_path / f"{st.name}.pkl", "wb") as f:
-            pickle.dump(st, f)
-            logger.debug("RFCParser: save sectiontree")   
+        """Atomically persist a SectionTree to avoid truncated caches."""
+        target_path = self.ir_path / f"{st.name}.pkl"
+        temp_path = target_path.with_suffix(
+            f"{target_path.suffix}.tmp-{os.getpid()}"
+        )
+        try:
+            with temp_path.open("wb") as f:
+                pickle.dump(st, f)
+                f.flush()
+                os.fsync(f.fileno())
+            temp_path.replace(target_path)
+            logger.debug("RFCParser: save sectiontree")
+        finally:
+            temp_path.unlink(missing_ok=True)
 
     def rag_init(
         self,

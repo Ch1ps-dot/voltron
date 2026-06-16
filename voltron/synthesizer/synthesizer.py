@@ -1,19 +1,25 @@
 from pathlib import Path
 from lxml import etree # type: ignore
 from tqdm import tqdm
-import json, asyncio
+import json, asyncio, hashlib
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
-import traceback
 from urllib.parse import quote
 
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.synthesizer.checker import Checker
+from voltron.synthesizer.hasher import ResponseHasher
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
+from voltron.analyzer.compliance import (
+    build_compliance_prompt,
+    collect_response_sections,
+    parse_compliance_result,
+    retrieve_response_sections,
+)
 from voltron.llm.chatter import AsyncChater
 from voltron.learner.automata import MealyMachine
 from dataclasses import dataclass, asdict, field
@@ -53,17 +59,20 @@ class AsyncProducer:
         self.mutator_path = self.synthesizer_path / 'mutators'
         self.parser_path = self.synthesizer_path / 'parsers'
         self.checker_path = self.synthesizer_path / 'checkers'
+        self.hasher_path = self.synthesizer_path / 'hashers'
         self.info_path = configs.info_path
         
         self.generator_info_path = self.generator_path / 'generator_info.json'
         self.parser_info_path = self.parser_path / 'parser_info.json'
         self.checker_info_path = self.checker_path / 'checker_info.json'
+        self.hasher_info_path = self.hasher_path / 'hasher_info.json'
         self.mutator_info_path = self.mutator_path / 'mutator_info.json'
         
         for path in (
             self.generator_path,
             self.parser_path,
             self.checker_path,
+            self.hasher_path,
             self.mutator_path,
         ):
             path.mkdir(parents=True, exist_ok=True)
@@ -80,7 +89,9 @@ class AsyncProducer:
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
         self.checkers: dict[str, list[Checker]] = {}
+        self.hashers: dict[str, list[ResponseHasher]] = {}
         self.mutators: dict[str, list[Generator]] = {}
+        self._response_sections = None
             
     def run(
         self
@@ -132,7 +143,41 @@ class AsyncProducer:
                 )
             self.parser_gen()
 
-        # Load an existing checker or synthesize the initial checker from IR.
+        if configs.fuzz_mode != 'replay':
+            self._load_checkers()
+            self._load_hashers()
+
+        # load existed parser info or generate init mutator
+        if (self.mutator_info_path.is_file()):
+            try:
+                with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
+                    mutator_info = json.load(f)
+                    self.mutators_info_load(mutator_info)
+                logger.debug("Mutator: load mutator info")
+            except Exception as e:
+                logger.debug(f'Mutator: load error {e}')
+
+        if not configs.spec_knowledge:
+            self.generators = {
+                msg_type: generators[:1]
+                for msg_type, generators in self.generators.items()
+                if generators
+            }
+            self.parsers = self.parsers[:1]
+            self.checkers = {
+                msg_type: checkers[:1]
+                for msg_type, checkers in self.checkers.items()
+                if checkers
+            }
+            self.hashers = {
+                msg_type: hashers[:1]
+                for msg_type, hashers in self.hashers.items()
+                if hashers
+            }
+            self.mutators = {}
+
+    def _load_checkers(self) -> None:
+        """Load or synthesize response checkers outside replay mode."""
         if self.checker_info_path.is_file():
             try:
                 with open(self.checker_info_path, 'r', encoding='utf-8') as f:
@@ -161,30 +206,30 @@ class AsyncProducer:
                 logger.debug(f'Producer: checker load error {e}')
         elif configs.spec_knowledge:
             self.checker_gen()
-        
-        # load existed parser info or generate init mutator
-        if (self.mutator_info_path.is_file()):
-            try:
-                with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
-                    mutator_info = json.load(f)
-                    self.mutators_info_load(mutator_info)
-                logger.debug("Mutator: load mutator info")
-            except Exception as e:
-                logger.debug(f'Mutator: load error {e}')
 
-        if not configs.spec_knowledge:
-            self.generators = {
-                msg_type: generators[:1]
-                for msg_type, generators in self.generators.items()
-                if generators
-            }
-            self.parsers = self.parsers[:1]
-            self.checkers = {
-                msg_type: checkers[:1]
-                for msg_type, checkers in self.checkers.items()
-                if checkers
-            }
-            self.mutators = {}
+    def _load_hashers(self) -> None:
+        """Load or synthesize response hashers outside replay mode."""
+        if self.hasher_info_path.is_file():
+            try:
+                with self.hasher_info_path.open('r', encoding='utf-8') as f:
+                    hasher_info = json.load(f)
+                self.hashers_info_load(hasher_info)
+                logger.debug("Producer: load hasher info")
+                if (
+                    configs.spec_knowledge
+                    and not self._hasher_cache_matches_response_types()
+                ):
+                    logger.debug(
+                        'Producer: hasher cache does not match response types; '
+                        'regenerating'
+                    )
+                    self.hasher_gen()
+            except Exception:
+                logger.exception('Producer: hasher load error')
+                if configs.spec_knowledge:
+                    self.hasher_gen()
+        elif configs.spec_knowledge:
+            self.hasher_gen()
 
     async def _generator_gen_one(
         self,
@@ -431,9 +476,8 @@ class AsyncProducer:
                     with analyzer.lock:
                         analyzer.finished += 1
                     return msg_type, mutate_code
-                except Exception as e:
-                    logger.debug(f'Producer :generate error {e}')
-                    logger.debug(f'Producer :generate error {traceback.format_exc()}')
+                except Exception:
+                    logger.exception('Producer: mutator generation failed')
 
     async def _generator_mutate_async(
         self,
@@ -634,6 +678,451 @@ class AsyncProducer:
 
         logger.debug("[Producer]: finish checkers generation")
 
+    async def _hasher_gen_one(
+        self,
+        response_type: str,
+        msg,
+        res_info: str,
+        sem: asyncio.Semaphore
+    ) -> tuple[str, str]:
+        msg_ir = etree.tostring(
+            msg,
+            encoding='utf-8',
+            pretty_print=True,
+        ).decode('utf-8')
+        async with sem:
+            while True:
+                try:
+                    hasher_code = await self.chater.llm_hasher_gen(
+                        pro_name=self.rfcp.pro_name,
+                        msg_ir=msg_ir,
+                        res_info=res_info,
+                        response_type=response_type,
+                    )
+                    compile(hasher_code, '<hasher_gen>', 'exec')
+                    namespace = {}
+                    exec(hasher_code, namespace)
+                    hasher_func = namespace.get('packet_hasher')
+                    if not callable(hasher_func):
+                        raise TypeError(
+                            'packet_hasher is missing or not callable'
+                        )
+                    for probe in (b'', b'voltron-hasher-probe'):
+                        digest = hasher_func(probe)
+                        if not self._valid_digest(digest):
+                            raise TypeError(
+                                'packet_hasher must return lowercase SHA-256'
+                            )
+                        if hasher_func(probe) != digest:
+                            raise ValueError(
+                                'packet_hasher must be deterministic'
+                            )
+                    return response_type, hasher_code
+                except Exception:
+                    logger.exception(
+                        f'Producer: invalid hasher [{response_type}]'
+                    )
+
+    async def _hasher_gen_async(self) -> list[tuple[str, str]]:
+        if not hasattr(self, 'res_ir'):
+            raise RuntimeError('Response IR is unavailable for hasher generation')
+        messages = self.res_ir.findall('message')
+        if not messages:
+            raise RuntimeError('Response IR does not contain any messages')
+        response_types = self._response_types_from_primary_field()
+        res_info = self._primary_response_field_info()
+        sem = asyncio.Semaphore(configs.async_sem_fuzz)
+        tasks = [
+            self._hasher_gen_one(
+                response_type,
+                self._checker_ir_for_response_type(response_type, messages),
+                res_info,
+                sem,
+            )
+            for response_type in response_types
+        ]
+        return await tqdm_asyncio.gather(*tasks, desc='hasher')
+
+    def hasher_gen(self) -> None:
+        """Generate one semantic response hasher for each response type."""
+        results = asyncio.run(self._hasher_gen_async())
+        self.hashers = {}
+        for msg_type, hasher_code in results:
+            msg_dir = self.hasher_path / quote(msg_type, safe='._-')
+            msg_dir.mkdir(parents=True, exist_ok=True)
+            hasher_path = msg_dir / 'id0.py'
+            with hasher_path.open('w', encoding='utf-8') as f:
+                f.write(hasher_code)
+            hasher = ResponseHasher(
+                msg_type=msg_type,
+                name='id0',
+                path=str(hasher_path.resolve()),
+                state_field=self._primary_response_field_name(),
+                evolved_from='init',
+            )
+            self.hashers.setdefault(msg_type, []).append(hasher)
+        with self.hasher_info_path.open('w', encoding='utf-8') as f:
+            json.dump(self.hasher_info(), f, indent=2)
+        logger.debug("[Producer]: finish hashers generation")
+
+    def evolve_hasher(
+        self,
+        response_type: str,
+        samples: list[bytes]
+    ) -> ResponseHasher | None:
+        """Evolve a response hasher so same-type historical samples converge."""
+        versions = self.hashers.get(response_type)
+        if not versions:
+            logger.debug(
+                f'Producer: no hasher metadata to evolve [{response_type}]'
+            )
+            return None
+        current = versions[-1]
+        typed_path = (
+            self.hasher_path
+            / quote(response_type, safe='._-')
+            / f'{current.name}.py'
+        )
+        current_path = typed_path
+        if not current_path.is_file() and current.path:
+            current_path = Path(current.path)
+        if not current_path.is_file():
+            logger.debug(
+                f'Producer: hasher source missing for evolution {current_path}'
+            )
+            return None
+
+        messages = self.res_ir.findall('message')
+        msg = self._checker_ir_for_response_type(response_type, messages)
+        msg_ir = etree.tostring(
+            msg,
+            encoding='utf-8',
+            pretty_print=True,
+        ).decode('utf-8')
+        with current_path.open('r', encoding='utf-8') as f:
+            original_code = f.read()
+
+        unique_samples = list(dict.fromkeys(samples))
+        hasher_code = asyncio.run(
+            self._hasher_evolve_async(
+                response_type,
+                msg_ir,
+                original_code,
+                unique_samples,
+            )
+        )
+        if hasher_code is None:
+            return None
+
+        numeric_ids = [
+            int(hasher.name[2:])
+            for hasher in versions
+            if hasher.name.startswith('id') and hasher.name[2:].isdigit()
+        ]
+        name = f'id{max(numeric_ids, default=-1) + 1}'
+        target_dir = self.hasher_path / quote(response_type, safe='._-')
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / f'{name}.py'
+        with target_path.open('w', encoding='utf-8') as f:
+            f.write(hasher_code)
+
+        evolved = ResponseHasher(
+            msg_type=response_type,
+            name=name,
+            path=str(target_path.resolve()),
+            state_field=current.state_field,
+            evolved_from=current.name,
+            sample_hashes=[
+                hashlib.sha256(sample).hexdigest()
+                for sample in unique_samples
+            ],
+        )
+        versions.append(evolved)
+        with self.hasher_info_path.open('w', encoding='utf-8') as f:
+            json.dump(self.hasher_info(), f, indent=2)
+        logger.debug(
+            f'Producer: evolved hasher [{response_type}] '
+            f'{current.name} -> {name}'
+        )
+        return evolved
+
+    def responses_semantically_equivalent(
+        self,
+        response_type: str,
+        old_response: bytes,
+        new_response: bytes
+    ) -> bool:
+        """Use the response IR and LLM to gate hasher evolution."""
+        try:
+            messages = self.res_ir.findall('message')
+            msg = self._checker_ir_for_response_type(
+                response_type,
+                messages,
+            )
+            msg_ir = etree.tostring(
+                msg,
+                encoding='utf-8',
+                pretty_print=True,
+            ).decode('utf-8')
+            result = asyncio.run(
+                self.chater.llm_hasher_semantic_compare(
+                    pro_name=self.rfcp.pro_name,
+                    response_type=response_type,
+                    msg_ir=msg_ir,
+                    old_response=old_response,
+                    new_response=new_response,
+                )
+            )
+            analysis = json.loads(result)
+            confidence = analysis.get('confidence', 0.0)
+            equivalent = (
+                analysis.get('semantic_equivalent') is True
+                and isinstance(confidence, (int, float))
+                and confidence >= 0.8
+            )
+            logger.debug(
+                'Producer: hasher semantic comparison '
+                f'[{response_type}] equivalent={equivalent} '
+                f'confidence={confidence} '
+                f'reason={analysis.get("reason", "")}'
+            )
+            return equivalent
+        except Exception:
+            logger.exception(
+                f'Producer: hasher semantic comparison failed '
+                f'[{response_type}]'
+            )
+            return False
+
+    async def _hasher_evolve_async(
+        self,
+        response_type: str,
+        msg_ir: str,
+        original_code: str,
+        samples: list[bytes]
+    ) -> str | None:
+        sample_info = json.dumps([
+            {
+                'raw_sha256': hashlib.sha256(sample).hexdigest(),
+                'length': len(sample),
+                'repr': repr(sample),
+            }
+            for sample in samples
+        ], indent=2)
+        for _ in range(3):
+            try:
+                code = await self.chater.llm_hasher_evolve(
+                    pro_name=self.rfcp.pro_name,
+                    response_type=response_type,
+                    msg_ir=msg_ir,
+                    original_code=original_code,
+                    samples=sample_info,
+                )
+                compile(code, '<hasher_evolve>', 'exec')
+                namespace = {}
+                exec(code, namespace)
+                hasher_func = namespace.get('packet_hasher')
+                if not callable(hasher_func):
+                    raise TypeError(
+                        'packet_hasher is missing or not callable'
+                    )
+                digests = [hasher_func(sample) for sample in samples]
+                if not all(self._valid_digest(digest) for digest in digests):
+                    raise TypeError(
+                        'packet_hasher must return lowercase SHA-256'
+                    )
+                if len(set(digests)) != 1:
+                    raise ValueError(
+                        'evolved hasher does not unify historical samples'
+                    )
+                return code
+            except Exception:
+                logger.exception(
+                    f'Producer: hasher evolution failed [{response_type}]'
+                )
+        return None
+
+    @staticmethod
+    def _valid_digest(digest) -> bool:
+        return (
+            isinstance(digest, str)
+            and len(digest) == 64
+            and digest == digest.lower()
+            and all(char in '0123456789abcdef' for char in digest)
+        )
+
+    def review_nonconforming_response(
+        self,
+        request_type: str,
+        response_type: str,
+        request: bytes,
+        response: bytes
+    ) -> dict:
+        """Use relevant response sections to distinguish bugs from checker errors."""
+        if self._response_sections is None:
+            self._response_sections = collect_response_sections(
+                self.rfcp.tree_dict
+            )
+        if not self._response_sections:
+            return {
+                'verdict': 'uncertain',
+                'confidence': 0.0,
+                'summary': 'No annotated response sections are available.',
+                'violations': [],
+                'evidence': [],
+            }
+
+        retrieved = retrieve_response_sections(
+            self._response_sections,
+            request_type,
+            response_type,
+            request,
+            response,
+        )
+        prompt = build_compliance_prompt(
+            protocol=self.rfcp.pro_name,
+            request_type=request_type,
+            response_type=response_type,
+            request=request,
+            response=response,
+            retrieved=retrieved,
+        )
+        model_response = asyncio.run(
+            self.chater.chat_llm(
+                prompt=prompt,
+                usage='checker_non_compliance_review',
+            )
+        )
+        analysis = parse_compliance_result(model_response)
+        analysis['retrieved_sections'] = [
+            {
+                'rfc': section.rfc,
+                'section': section.section,
+                'content_type': section.content_type,
+                'bm25_score': score,
+            }
+            for section, score in retrieved
+        ]
+        return analysis
+
+    def evolve_checker(
+        self,
+        response_type: str,
+        response: bytes,
+        analysis: dict
+    ) -> Checker | None:
+        """Generate and persist a checker version that accepts a false positive."""
+        checker_type = response_type
+        if not self.checkers.get(checker_type):
+            checker_type = '__all__'
+        versions = self.checkers.get(checker_type)
+        if not versions:
+            logger.debug(
+                f'Producer: no checker metadata to evolve [{response_type}]'
+            )
+            return None
+
+        current = versions[-1]
+        typed_checker_path = (
+            self.checker_path
+            / quote(checker_type, safe='._-')
+            / f'{current.name}.py'
+        )
+        checker_path = typed_checker_path
+        if not checker_path.is_file() and current.path:
+            checker_path = Path(current.path)
+        if not checker_path.is_file():
+            logger.debug(
+                f'Producer: checker source missing for evolution {checker_path}'
+            )
+            return None
+
+        with checker_path.open('r', encoding='utf-8') as f:
+            original_code = f.read()
+
+        checker_code = asyncio.run(
+            self._checker_evolve_async(
+                response_type=response_type,
+                original_code=original_code,
+                response=response,
+                analysis=analysis,
+            )
+        )
+        if checker_code is None:
+            return None
+
+        numeric_ids = [
+            int(checker.name[2:])
+            for checker in versions
+            if checker.name.startswith('id') and checker.name[2:].isdigit()
+        ]
+        name = f'id{max(numeric_ids, default=-1) + 1}'
+        target_dir = self.checker_path / quote(checker_type, safe='._-')
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path = target_dir / f'{name}.py'
+        with target_path.open('w', encoding='utf-8') as f:
+            f.write(checker_code)
+
+        response_digest = hashlib.sha256(response).hexdigest()
+        evolved = Checker(
+            msg_type=checker_type,
+            evolved_from=current.name,
+            name=name,
+            path=str(target_path.resolve()),
+            state_field=current.state_field,
+            checked_res=list(dict.fromkeys(
+                [*current.checked_res, response_digest]
+            )),
+        )
+        versions.append(evolved)
+        with self.checker_info_path.open('w', encoding='utf-8') as f:
+            json.dump(self.checker_info(), f, indent=2)
+        logger.debug(
+            f'Producer: evolved checker [{checker_type}] '
+            f'{current.name} -> {name}'
+        )
+        return evolved
+
+    async def _checker_evolve_async(
+        self,
+        response_type: str,
+        original_code: str,
+        response: bytes,
+        analysis: dict
+    ) -> str | None:
+        review_summary = json.dumps(analysis, ensure_ascii=False)
+        for _ in range(3):
+            try:
+                checker_code = await self.chater.llm_checker_evolve(
+                    pro_name=self.rfcp.pro_name,
+                    response_type=response_type,
+                    original_code=original_code,
+                    response=response,
+                    review_summary=review_summary,
+                )
+                compile(checker_code, '<checker_evolve>', 'exec')
+                namespace = {}
+                exec(checker_code, namespace)
+                checker_func = namespace.get('packet_checker')
+                if not callable(checker_func):
+                    raise TypeError(
+                        'packet_checker is missing or not callable'
+                    )
+                result = checker_func(response)
+                if result is not True:
+                    raise ValueError(
+                        'evolved checker still rejects reviewed response'
+                    )
+                probe = checker_func(b'')
+                if not isinstance(probe, bool):
+                    raise TypeError('packet_checker must return bool')
+                return checker_code
+            except Exception:
+                logger.exception(
+                    f'Producer: checker evolution failed [{response_type}]'
+                )
+        return None
+
     def _response_types_from_primary_field(
         self
     ) -> list[str]:
@@ -689,6 +1178,16 @@ class AsyncProducer:
             checkers
             and checkers[-1].state_field == state_field
             for checkers in self.checkers.values()
+        )
+
+    def _hasher_cache_matches_response_types(self) -> bool:
+        expected_types = set(self._response_types_from_primary_field())
+        if set(self.hashers) != expected_types:
+            return False
+        state_field = self._primary_response_field_name()
+        return all(
+            hashers and hashers[-1].state_field == state_field
+            for hashers in self.hashers.values()
         )
         
     async def _parser_evo_one(
@@ -825,6 +1324,12 @@ class AsyncProducer:
             msg_type: [asdict(checker) for checker in checkers]
             for msg_type, checkers in self.checkers.items()
         }
+
+    def hasher_info(self) -> dict:
+        return {
+            msg_type: [asdict(hasher) for hasher in hashers]
+            for msg_type, hashers in self.hashers.items()
+        }
     
     def generators_info_load(
         self,
@@ -868,6 +1373,18 @@ class AsyncProducer:
                 checker.setdefault('state_field', '')
                 self.checkers.setdefault(msg_type, [])
                 self.checkers[msg_type].append(Checker(**checker))
+
+    def hashers_info_load(self, info: dict) -> None:
+        self.hashers = {}
+        for msg_type, hashers in info.items():
+            for hasher in hashers:
+                hasher.setdefault('msg_type', msg_type)
+                hasher.setdefault('state_field', '')
+                hasher.setdefault('evolved_from', 'init')
+                hasher.setdefault('sample_hashes', [])
+                self.hashers.setdefault(msg_type, []).append(
+                    ResponseHasher(**hasher)
+                )
 
     def legacy_checkers_info_load(
         self,

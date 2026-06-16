@@ -6,7 +6,7 @@ from string import Template
 import asyncio
 
 from voltron.llm.prompt import Prompter
-from voltron.utils.logger import logger_llm as logger
+from voltron.utils.logger import format_event, logger_llm as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 
@@ -62,15 +62,59 @@ class AsyncChater:
                 
                 response = completion.choices[0].message.content
 
-                logger.debug(f"[Chat]:{usage} cost_time:{end - start} \n ask: {prompt} resp: {response}")
+                logger.debug(
+                    '%s\nPROMPT\n%s\nRESPONSE\n%s',
+                    format_event(
+                        'llm.complete',
+                        usage=usage,
+                        model=self.model,
+                        duration_s=round(end - start, 3),
+                        tokens=(
+                            completion.usage.total_tokens
+                            if completion.usage is not None
+                            else None
+                        ),
+                    ),
+                    prompt,
+                    response,
+                )
                 with analyzer.lock:
                     analyzer.chat_time_s += end - start
                     if completion.usage != None:
                         analyzer.chat_token += completion.usage.total_tokens
+                    analyzer.record_llm_usage(
+                        duration_s=end - start,
+                        prompt_tokens=(
+                            getattr(completion.usage, 'prompt_tokens', 0)
+                            if completion.usage is not None
+                            else 0
+                        ),
+                        completion_tokens=(
+                            getattr(
+                                completion.usage,
+                                'completion_tokens',
+                                0
+                            )
+                            if completion.usage is not None
+                            else 0
+                        ),
+                        total_tokens=(
+                            getattr(completion.usage, 'total_tokens', 0)
+                            if completion.usage is not None
+                            else 0
+                        ),
+                    )
                 break
             except OpenAIError as e:
                 await asyncio.sleep(0.5)
-                logger.debug(f'Chat: API problem {e}')
+                logger.debug(
+                    format_event(
+                        'llm.api_error',
+                        usage=usage,
+                        error_type=type(e).__name__,
+                        error=str(e),
+                    )
+                )
         return response
 
     def llm_query_rfc(
@@ -285,6 +329,97 @@ class AsyncChater:
             usage="checker_gen"
         )
 
+        return self.code_extract(ans)
+
+    async def llm_hasher_gen(
+            self,
+            pro_name: str,
+            msg_ir: str,
+            res_info: str,
+            response_type: str
+    ) -> str:
+        """Generate a semantic response hasher from response-message IR."""
+        tmp = self.pmp._tem_gen_hasher
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            msg_ir=msg_ir,
+            res_info=res_info,
+            response_type=response_type,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="hasher_gen",
+        )
+        return self.code_extract(ans)
+
+    async def llm_hasher_evolve(
+            self,
+            pro_name: str,
+            response_type: str,
+            msg_ir: str,
+            original_code: str,
+            samples: str
+    ) -> str:
+        """Evolve a hasher using same-type responses with different hashes."""
+        tmp = self.pmp._tem_hasher_evolve
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            response_type=response_type,
+            msg_ir=msg_ir,
+            original_code=original_code,
+            samples=samples,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="hasher_evolve",
+        )
+        return self.code_extract(ans)
+
+    async def llm_hasher_semantic_compare(
+            self,
+            pro_name: str,
+            response_type: str,
+            msg_ir: str,
+            old_response: bytes,
+            new_response: bytes
+    ) -> str:
+        """Judge whether two responses have the same protocol semantics."""
+        tmp = self.pmp._tem_hasher_semantic_compare
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            response_type=response_type,
+            msg_ir=msg_ir,
+            old_response=repr(old_response),
+            new_response=repr(new_response),
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="hasher_semantic_compare",
+        )
+        return self.json_extract(ans)
+
+    async def llm_checker_evolve(
+            self,
+            pro_name: str,
+            response_type: str,
+            original_code: str,
+            response: bytes,
+            review_summary: str
+    ) -> str:
+        """Relax a checker after RFC review confirms a false positive."""
+        tmp = self.pmp._tem_checker_evolve
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            response_type=response_type,
+            original_code=original_code,
+            response_repr=repr(response),
+            response_hex=response.hex(' '),
+            review_summary=review_summary
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="checker_evolve"
+        )
         return self.code_extract(ans)
     
     async def llm_request_query(

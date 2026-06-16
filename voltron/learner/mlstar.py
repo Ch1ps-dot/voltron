@@ -6,12 +6,12 @@ from voltron.learner.mem_oracle import MembershipOracle
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint, pickle, threading, sys, traceback, time, copy
+import pprint, pickle, threading, sys, time, copy
 
 
 class ObTable:
     """Oberservation Table for LM* algorithm, which is used to learn the Mealy machine model of the SUT.
-    
+
     Attributes:
         alphabet: A list of input symbols (requests) that can be sent to the SUT.
         S: A set of tuples representing the prefixes of input sequences observed so far.
@@ -309,11 +309,10 @@ class MealyLstar:
             self.table.make_close()
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)
-        except Exception as e:
-            logger.debug(f'LM: {e}')
-            logger.debug(f'{traceback.format_exc()}')
+        except Exception:
+            logger.exception('LM: learning failed')
         return h
-    
+
     def havoc_run(
         self,
         id: str
@@ -337,8 +336,6 @@ class MealyLstar:
             self.table.make_close()
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)
-        except Exception as e:
-            logger.debug(f'LM: {e}')
-            logger.debug(f'{traceback.format_exc()}')
+        except Exception:
+            logger.exception('LM: learning with existing table failed')
         return h
-    

@@ -24,7 +24,7 @@ class Config:
         self.pro_name: str
         self.port: int
         self.host: str
-        self.rfc_name: str
+        self.rfc_name: list[str]
         
         self.base_url_doc: str
         self.api_key_doc: str
@@ -35,6 +35,11 @@ class Config:
         self.api_key_fuzz: str
         self.model_fuzz: str
         self.async_sem_fuzz: int
+
+        self.base_url_compliance: str
+        self.api_key_compliance: str
+        self.model_compliance: str
+        self.async_sem_compliance: int
         
         self.server: str
         
