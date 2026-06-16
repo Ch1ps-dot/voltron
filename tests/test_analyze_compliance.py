@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import json
 import pickle
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,7 @@ from analyze_compliance import (
     analyze_pair_file,
     build_prompt,
     discover_pair_files,
+    generate_vulnerability_report,
     load_pair,
     load_sections,
     load_target_config,
@@ -244,6 +246,18 @@ def test_analyze_pair_file_groups_results_by_verdict(
         "analyze_pair",
         fake_analyze_pair,
     )
+    if verdict == "non_compliant":
+        async def fake_report(*args, **kwargs):
+            return {
+                "json": str(tmp_path / "report.json"),
+                "markdown": str(tmp_path / "report.md"),
+            }
+
+        monkeypatch.setattr(
+            compliance_module,
+            "generate_vulnerability_report",
+            fake_report,
+        )
     output_dir = tmp_path / "analysis"
     _, result, error = asyncio.run(
         analyze_pair_file(
@@ -265,6 +279,139 @@ def test_analyze_pair_file_groups_results_by_verdict(
         / verdict
         / "pair_000000.analysis.json"
     ).is_file()
+
+
+def test_vulnerability_report_includes_request_and_response(tmp_path):
+    class FakeChater:
+        def __init__(self):
+            self.prompt = ""
+            self.usage = ""
+
+        async def chat_llm(self, prompt, usage):
+            self.prompt = prompt
+            self.usage = usage
+            return "## Summary\nThe response violates the expected reply."
+
+    pair_path = tmp_path / "pair_000000.json"
+    request = b"USER test\r\n"
+    response = b"500 unexpected\r\n"
+    write_pair(pair_path, request=request, response=response)
+    pair = load_pair(pair_path)
+    result = {
+        "source_pair": str(pair_path),
+        "target": "lightftp",
+        "protocol": "ftp",
+        "request_type": pair.request_type,
+        "response_type": pair.response_type,
+        "analysis": {
+            "verdict": "non_compliant",
+            "confidence": 0.92,
+            "summary": "Unexpected response for USER.",
+            "violations": [],
+            "evidence": [],
+        },
+        "retrieved_sections": [
+            {
+                "rfc": "rfc959",
+                "section": "4.2",
+                "content_type": "response",
+                "bm25_score": 1.0,
+            }
+        ],
+    }
+    chater = FakeChater()
+
+    paths = asyncio.run(
+        generate_vulnerability_report(
+            chater=chater,
+            target={
+                "target_name": "lightftp",
+                "protocol": "ftp",
+                "rfc_names": ["rfc959"],
+            },
+            pair=pair,
+            result=result,
+            output_dir=tmp_path / "analysis",
+        )
+    )
+
+    assert chater.usage == "non_compliance_report"
+    assert "USER test" in chater.prompt
+    assert "500 unexpected" in chater.prompt
+    report_json = json.loads(
+        Path(paths["json"]).read_text(encoding="utf-8")
+    )
+    assert base64.b64decode(report_json["request"]["base64"]) == request
+    assert base64.b64decode(report_json["response"]["base64"]) == response
+    markdown = Path(paths["markdown"]).read_text(encoding="utf-8")
+    assert "USER test" in markdown
+    assert "500 unexpected" in markdown
+    assert base64.b64encode(request).decode("ascii") in markdown
+    assert base64.b64encode(response).decode("ascii") in markdown
+
+
+def test_non_compliant_analysis_records_report_paths(tmp_path, monkeypatch):
+    pair_path = tmp_path / "pair_000000.json"
+    write_pair(pair_path)
+
+    class FakeChater:
+        async def chat_llm(self, prompt, usage):
+            return "## Report\nNon-compliant response."
+
+    async def fake_analyze_pair(*args, **kwargs):
+        pair = args[2]
+        return {
+            "source_pair": str(pair.source),
+            "target": "lightftp",
+            "protocol": "ftp",
+            "request_type": pair.request_type,
+            "response_type": pair.response_type,
+            "analysis": {
+                "verdict": "non_compliant",
+                "confidence": 1.0,
+                "summary": "bad",
+                "violations": [],
+                "evidence": [],
+            },
+            "retrieved_sections": [],
+        }
+
+    monkeypatch.setattr(
+        compliance_module,
+        "analyze_pair",
+        fake_analyze_pair,
+    )
+    output_dir = tmp_path / "analysis"
+    _, result, error = asyncio.run(
+        analyze_pair_file(
+            semaphore=asyncio.Semaphore(1),
+            chater=FakeChater(),
+            target={
+                "target_name": "lightftp",
+                "protocol": "ftp",
+                "rfc_names": ["rfc959"],
+            },
+            pair_path=pair_path,
+            sections=[],
+            output_dir=output_dir,
+            top_k=8,
+            max_section_chars=6000,
+        )
+    )
+
+    assert error is None
+    assert result["vulnerability_report"]["markdown"].endswith(
+        "pair_000000.report.md"
+    )
+    analysis_path = (
+        output_dir
+        / "non_compliant"
+        / "pair_000000.analysis.json"
+    )
+    saved = json.loads(analysis_path.read_text(encoding="utf-8"))
+    assert "vulnerability_report" in saved
+    assert Path(saved["vulnerability_report"]["json"]).is_file()
+    assert Path(saved["vulnerability_report"]["markdown"]).is_file()
 
 
 def test_analyze_pair_file_saves_failures_separately(tmp_path):

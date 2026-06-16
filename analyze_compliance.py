@@ -313,8 +313,8 @@ def retrieve_sections(
     ]
 
 
-def display_bytes(data: bytes, limit: int = 4096) -> dict[str, Any]:
-    sample = data[:limit]
+def display_bytes(data: bytes, limit: int | None = 4096) -> dict[str, Any]:
+    sample = data if limit is None else data[:limit]
     return {
         "length": len(data),
         "truncated": len(sample) < len(data),
@@ -425,6 +425,137 @@ def parse_model_result(response: str | None) -> dict[str, Any]:
     return result
 
 
+def build_vulnerability_report_prompt(
+    target: dict[str, Any],
+    pair: PairRecord,
+    result: dict[str, Any],
+) -> str:
+    exchange = {
+        "request_type": pair.request_type,
+        "response_type": pair.response_type,
+        "request": display_bytes(pair.request, limit=8192),
+        "response": display_bytes(pair.response, limit=8192),
+    }
+    report_context = {
+        "target": target["target_name"],
+        "protocol": target["protocol"],
+        "source_pair": str(pair.source),
+        "analysis": result["analysis"],
+        "retrieved_sections": result["retrieved_sections"],
+        "captured_exchange": exchange,
+    }
+    return (
+        "You are a security engineer writing a vulnerability report for a "
+        "protocol standards non-compliance bug.\n\n"
+        "Use the provided compliance analysis, retrieved RFC evidence, and "
+        "captured request/response messages. Do not invent unsupported root "
+        "causes. If impact is uncertain, say so explicitly.\n\n"
+        "Write a concise Markdown report with these sections:\n"
+        "1. Summary\n"
+        "2. Affected Target and Protocol\n"
+        "3. Non-Compliance Evidence\n"
+        "4. Triggering Request and Observed Response\n"
+        "5. Reproduction Notes\n"
+        "6. Security Impact Hypothesis\n"
+        "7. Confidence and Open Questions\n\n"
+        f"Evidence JSON:\n{json.dumps(report_context, indent=2, ensure_ascii=False)}"
+    )
+
+
+def render_vulnerability_report_markdown(
+    pair: PairRecord,
+    result: dict[str, Any],
+    model_report: str | None,
+) -> str:
+    request = display_bytes(pair.request, limit=None)
+    response = display_bytes(pair.response, limit=None)
+    analysis = result["analysis"]
+    model_text = model_report or "The model returned no vulnerability report."
+    return (
+        f"# Vulnerability Report: {pair.source.stem}\n\n"
+        "## Captured Exchange\n\n"
+        f"- Source pair: `{pair.source}`\n"
+        f"- Request type: `{pair.request_type}`\n"
+        f"- Response type: `{pair.response_type}`\n"
+        f"- Verdict: `{analysis.get('verdict', '')}`\n"
+        f"- Confidence: `{analysis.get('confidence', '')}`\n"
+        f"- Summary: {analysis.get('summary', '')}\n\n"
+        "## Request Message\n\n"
+        f"- Length: {request['length']}\n"
+        f"- Encoding: base64\n\n"
+        "````text\n"
+        f"{request['text']}\n"
+        "````\n\n"
+        "```hex\n"
+        f"{request['hex']}\n"
+        "```\n\n"
+        "```base64\n"
+        f"{request['base64']}\n"
+        "```\n\n"
+        "## Response Message\n\n"
+        f"- Length: {response['length']}\n"
+        f"- Encoding: base64\n\n"
+        "````text\n"
+        f"{response['text']}\n"
+        "````\n\n"
+        "```hex\n"
+        f"{response['hex']}\n"
+        "```\n\n"
+        "```base64\n"
+        f"{response['base64']}\n"
+        "```\n\n"
+        "## Model-Generated Analysis\n\n"
+        f"{model_text.strip()}\n"
+    )
+
+
+async def generate_vulnerability_report(
+    chater: AsyncChater,
+    target: dict[str, Any],
+    pair: PairRecord,
+    result: dict[str, Any],
+    output_dir: Path,
+) -> dict[str, str]:
+    report_dir = output_dir / "vulnerability_reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    prompt = build_vulnerability_report_prompt(target, pair, result)
+    model_report = await chater.chat_llm(
+        prompt=prompt,
+        usage="non_compliance_report",
+    )
+
+    report_record = {
+        "source_pair": str(pair.source),
+        "target": target["target_name"],
+        "protocol": target["protocol"],
+        "request_type": pair.request_type,
+        "response_type": pair.response_type,
+        "analysis": result["analysis"],
+        "retrieved_sections": result["retrieved_sections"],
+        "request": display_bytes(pair.request, limit=None),
+        "response": display_bytes(pair.response, limit=None),
+        "llm_report": model_report or "",
+    }
+    json_path = report_dir / f"{pair.source.stem}.report.json"
+    markdown_path = report_dir / f"{pair.source.stem}.report.md"
+    with json_path.open("w", encoding="utf-8") as f:
+        json.dump(report_record, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    with markdown_path.open("w", encoding="utf-8") as f:
+        f.write(
+            render_vulnerability_report_markdown(
+                pair,
+                result,
+                model_report,
+            )
+        )
+        f.write("\n")
+    return {
+        "json": str(json_path),
+        "markdown": str(markdown_path),
+    }
+
+
 async def analyze_pair(
     chater: AsyncChater,
     target: dict[str, Any],
@@ -491,6 +622,23 @@ async def analyze_pair_file(
             verdict = result["analysis"]["verdict"]
             result_dir = output_dir / verdict
             result_dir.mkdir(parents=True, exist_ok=True)
+            if verdict == "non_compliant":
+                try:
+                    result["vulnerability_report"] = (
+                        await generate_vulnerability_report(
+                            chater,
+                            target,
+                            pair,
+                            result,
+                            output_dir,
+                        )
+                    )
+                except Exception as report_error:
+                    print(
+                        "Warning: vulnerability report generation failed "
+                        f"for {pair_path}: {report_error}",
+                        file=sys.stderr,
+                    )
             output_path = result_dir / f"{pair_path.stem}.analysis.json"
             with output_path.open("w", encoding="utf-8") as f:
                 json.dump(result, f, indent=2, ensure_ascii=False)
