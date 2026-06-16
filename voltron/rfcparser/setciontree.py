@@ -2,6 +2,16 @@ import re
 from typing import Self
 from voltron.utils.logger import logger_fuzz as logger
 
+FIXED_SECTION_TITLES = {
+    'abstract',
+    'status of this memo',
+    'security considerations',
+    'iana considerations',
+    'references',
+    'acknowledgements',
+    'acknowledgments',
+}
+
 class SectionNode:
     """Structure of Section Node
 
@@ -95,6 +105,7 @@ class SectionTree:
             self.doc_apx = ans['apx']
             self.doc_content = ans['rest']
 
+        self.tree = [[SectionNode(0, 0, len(self.doc_content), '0.')]]
         self.construct_tree()
         self.identify_leaf(self.tree[0][0])
 
@@ -341,7 +352,222 @@ class SectionTree:
     ) -> None:
         """Construct the section tree
         """
-        self._section_helper(1, 0, len(self.doc_content) - 1, '0.') 
+        if not self._construct_tree_from_headings():
+            self._section_helper(1, 0, len(self.doc_content), '0.')
+
+    def _construct_tree_from_headings(
+            self
+    ) -> bool:
+        """Construct the tree from scored line-based heading candidates."""
+        candidates = self._scan_heading_candidates()
+        headings = self._filter_heading_candidates(candidates)
+        if len(headings) < 2:
+            return False
+
+        self.tree = [[SectionNode(0, 0, len(self.doc_content), '0.')]]
+        self.height = 0
+        root = self.tree[0][0]
+        stack = [root]
+        nodes: list[SectionNode] = []
+
+        for heading in headings:
+            node = SectionNode(
+                heading['level'],
+                heading['offset'],
+                len(self.doc_content),
+                heading['raw'],
+            )
+            self.add_section(node)
+            while stack and stack[-1].level >= node.level:
+                stack.pop()
+            parent = stack[-1] if stack else root
+            parent.add_subsection(node)
+            node.upper = parent
+            stack.append(node)
+            nodes.append(node)
+
+        for index, node in enumerate(nodes):
+            node.end = (
+                nodes[index + 1].start
+                if index + 1 < len(nodes)
+                else len(self.doc_content)
+            )
+        root.end = len(self.doc_content)
+        return True
+
+    def _scan_heading_candidates(
+            self
+    ) -> list[dict]:
+        candidates = []
+        offset = 0
+        lines = self.doc_content.splitlines(keepends=True)
+        for line_no, line in enumerate(lines):
+            raw_line = line.rstrip('\r\n')
+            stripped = raw_line.strip()
+            if not stripped:
+                offset += len(line)
+                continue
+
+            candidate = self._parse_heading_line(stripped, raw_line, offset, line_no)
+            if candidate is None:
+                offset += len(line)
+                continue
+
+            prev_blank = self._is_blank_line(lines, line_no - 1)
+            next_blank = self._is_blank_line(lines, line_no + 1)
+            score, reasons = self._score_heading_candidate(
+                candidate,
+                raw_line,
+                prev_blank,
+                next_blank,
+            )
+            candidate['score'] = score
+            candidate['reasons'] = reasons
+            if score >= 0.65:
+                candidates.append(candidate)
+            offset += len(line)
+        return candidates
+
+    def _parse_heading_line(
+            self,
+            stripped: str,
+            raw_line: str,
+            offset: int,
+            line_no: int,
+    ) -> dict | None:
+        numeric = re.match(
+            r'^(?P<number>\d+(?:\.\d+)*\.?)\s+(?P<title>\S.*)$',
+            stripped,
+        )
+        if numeric:
+            number = numeric.group('number')
+            title = numeric.group('title').strip()
+            clean_number = number.rstrip('.')
+            level = len(clean_number.split('.'))
+            return {
+                'raw': stripped,
+                'number': clean_number,
+                'title': title,
+                'level': level,
+                'offset': offset + raw_line.index(stripped[0]),
+                'line_no': line_no,
+                'source': 'numeric',
+            }
+
+        fixed_title = stripped.lower()
+        if fixed_title in FIXED_SECTION_TITLES:
+            return {
+                'raw': stripped,
+                'number': None,
+                'title': stripped,
+                'level': 1,
+                'offset': offset + raw_line.index(stripped[0]),
+                'line_no': line_no,
+                'source': 'fixed',
+            }
+
+        appendix = re.match(
+            r'^(Appendix\s+(?P<number>[A-Z])(?:\.\d+)*\.?)'
+            r'(?:\s+(?P<title>\S.*))?$',
+            stripped,
+            re.IGNORECASE,
+        )
+        if appendix:
+            number = appendix.group('number').upper()
+            suffix = stripped.split(None, 2)
+            title = appendix.group('title') or ''
+            return {
+                'raw': stripped,
+                'number': f'Appendix {number}',
+                'title': title or suffix[-1],
+                'level': 1,
+                'offset': offset + raw_line.index(stripped[0]),
+                'line_no': line_no,
+                'source': 'appendix',
+            }
+        return None
+
+    def _score_heading_candidate(
+            self,
+            candidate: dict,
+            raw_line: str,
+            prev_blank: bool,
+            next_blank: bool,
+    ) -> tuple[float, list[str]]:
+        score = 0.0
+        reasons = []
+        stripped = raw_line.strip()
+        indent = len(raw_line) - len(raw_line.lstrip(' '))
+
+        if candidate['source'] in {'numeric', 'appendix'}:
+            score += 0.55
+            reasons.append('structured-prefix')
+        if candidate['source'] == 'fixed':
+            score += 0.75
+            reasons.append('fixed-title')
+        if prev_blank:
+            score += 0.2
+            reasons.append('previous-blank')
+        if next_blank:
+            score += 0.2
+            reasons.append('next-blank')
+        if len(stripped) <= 90:
+            score += 0.1
+            reasons.append('short-line')
+        if indent >= 8:
+            score -= 0.4
+            reasons.append('deep-indent')
+        if stripped.endswith(('.', ';', ',')) and candidate['source'] == 'numeric':
+            score -= 0.25
+            reasons.append('sentence-like-ending')
+        if len(re.findall(r'[,;:]', stripped)) >= 2:
+            score -= 0.2
+            reasons.append('punctuation-heavy')
+        if candidate['source'] == 'numeric' and not prev_blank:
+            score -= 0.35
+            reasons.append('inline-numbered-text')
+        return score, reasons
+
+    def _filter_heading_candidates(
+            self,
+            candidates: list[dict],
+    ) -> list[dict]:
+        filtered = []
+        seen_numbers = set()
+        for candidate in candidates:
+            number = candidate.get('number')
+            if number and number in seen_numbers:
+                continue
+            if candidate['source'] == 'numeric':
+                parent_number = self._parent_section_number(number)
+                if (
+                    parent_number is not None
+                    and parent_number not in seen_numbers
+                ):
+                    candidate['score'] -= 0.2
+                    if candidate['score'] < 0.65:
+                        continue
+            filtered.append(candidate)
+            if number:
+                seen_numbers.add(number)
+        return filtered
+
+    def _parent_section_number(
+            self,
+            number: str | None
+    ) -> str | None:
+        if number is None or '.' not in number:
+            return None
+        return number.rsplit('.', 1)[0]
+
+    def _is_blank_line(
+            self,
+            lines: list[str],
+            index: int,
+    ) -> bool:
+        if index < 0 or index >= len(lines):
+            return True
+        return lines[index].strip() == ''
 
     def add_section(
             self, 
