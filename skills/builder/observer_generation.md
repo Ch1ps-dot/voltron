@@ -1,6 +1,6 @@
 You are an expert Python developer and network protocol analyst.
 
-Generate a self-contained semantic hasher for one response type using the
+Generate a self-contained semantic observer for one response type using the
 provided protocol response IR.
 
 ## Input
@@ -19,7 +19,7 @@ $msg_ir
 Define exactly this public function:
 
 ```python
-def packet_hasher(response: bytes) -> str:
+def packet_observer(response: bytes) -> str:
 ```
 
 The function must parse the response according to the IR, normalize only

@@ -9,7 +9,7 @@ from urllib.parse import quote
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.synthesizer.checker import Checker
-from voltron.synthesizer.hasher import ResponseHasher
+from voltron.synthesizer.observer import ResponseObserver
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
@@ -59,20 +59,24 @@ class AsyncProducer:
         self.mutator_path = self.synthesizer_path / 'mutators'
         self.parser_path = self.synthesizer_path / 'parsers'
         self.checker_path = self.synthesizer_path / 'checkers'
-        self.hasher_path = self.synthesizer_path / 'hashers'
+        self.observer_path = self.synthesizer_path / 'observers'
+        self.legacy_observer_path = self.synthesizer_path / 'hashers'
         self.info_path = configs.info_path
         
         self.generator_info_path = self.generator_path / 'generator_info.json'
         self.parser_info_path = self.parser_path / 'parser_info.json'
         self.checker_info_path = self.checker_path / 'checker_info.json'
-        self.hasher_info_path = self.hasher_path / 'hasher_info.json'
+        self.observer_info_path = self.observer_path / 'observer_info.json'
+        self.legacy_observer_info_path = (
+            self.legacy_observer_path / 'hasher_info.json'
+        )
         self.mutator_info_path = self.mutator_path / 'mutator_info.json'
         
         for path in (
             self.generator_path,
             self.parser_path,
             self.checker_path,
-            self.hasher_path,
+            self.observer_path,
             self.mutator_path,
         ):
             path.mkdir(parents=True, exist_ok=True)
@@ -89,7 +93,7 @@ class AsyncProducer:
         self.generators: dict[str, list[Generator]] = {}
         self.parsers: list[Parser] = []
         self.checkers: dict[str, list[Checker]] = {}
-        self.hashers: dict[str, list[ResponseHasher]] = {}
+        self.observers: dict[str, list[ResponseObserver]] = {}
         self.mutators: dict[str, list[Generator]] = {}
         self._response_sections = None
             
@@ -145,7 +149,7 @@ class AsyncProducer:
 
         if configs.fuzz_mode != 'replay':
             self._load_checkers()
-            self._load_hashers()
+            self._load_observers()
 
         # load existed parser info or generate init mutator
         if (self.mutator_info_path.is_file()):
@@ -169,10 +173,10 @@ class AsyncProducer:
                 for msg_type, checkers in self.checkers.items()
                 if checkers
             }
-            self.hashers = {
-                msg_type: hashers[:1]
-                for msg_type, hashers in self.hashers.items()
-                if hashers
+            self.observers = {
+                msg_type: observers[:1]
+                for msg_type, observers in self.observers.items()
+                if observers
             }
             self.mutators = {}
 
@@ -207,29 +211,33 @@ class AsyncProducer:
         elif configs.spec_knowledge:
             self.checker_gen()
 
-    def _load_hashers(self) -> None:
-        """Load or synthesize response hashers outside replay mode."""
-        if self.hasher_info_path.is_file():
+    def _load_observers(self) -> None:
+        """Load or synthesize response observers outside replay mode."""
+        info_path = self.observer_info_path
+        if not info_path.is_file() and self.legacy_observer_info_path.is_file():
+            info_path = self.legacy_observer_info_path
+
+        if info_path.is_file():
             try:
-                with self.hasher_info_path.open('r', encoding='utf-8') as f:
-                    hasher_info = json.load(f)
-                self.hashers_info_load(hasher_info)
-                logger.debug("Producer: load hasher info")
+                with info_path.open('r', encoding='utf-8') as f:
+                    observer_info = json.load(f)
+                self.observers_info_load(observer_info)
+                logger.debug("Producer: load observer info")
                 if (
                     configs.spec_knowledge
-                    and not self._hasher_cache_matches_response_types()
+                    and not self._observer_cache_matches_response_types()
                 ):
                     logger.debug(
-                        'Producer: hasher cache does not match response types; '
+                        'Producer: observer cache does not match response types; '
                         'regenerating'
                     )
-                    self.hasher_gen()
+                    self.observer_gen()
             except Exception:
-                logger.exception('Producer: hasher load error')
+                logger.exception('Producer: observer load error')
                 if configs.spec_knowledge:
-                    self.hasher_gen()
+                    self.observer_gen()
         elif configs.spec_knowledge:
-            self.hasher_gen()
+            self.observer_gen()
 
     async def _generator_gen_one(
         self,
@@ -678,7 +686,7 @@ class AsyncProducer:
 
         logger.debug("[Producer]: finish checkers generation")
 
-    async def _hasher_gen_one(
+    async def _observer_gen_one(
         self,
         response_type: str,
         msg,
@@ -693,39 +701,39 @@ class AsyncProducer:
         async with sem:
             while True:
                 try:
-                    hasher_code = await self.chater.llm_hasher_gen(
+                    observer_code = await self.chater.llm_observer_gen(
                         pro_name=self.rfcp.pro_name,
                         msg_ir=msg_ir,
                         res_info=res_info,
                         response_type=response_type,
                     )
-                    compile(hasher_code, '<hasher_gen>', 'exec')
+                    compile(observer_code, '<observer_gen>', 'exec')
                     namespace = {}
-                    exec(hasher_code, namespace)
-                    hasher_func = namespace.get('packet_hasher')
-                    if not callable(hasher_func):
+                    exec(observer_code, namespace)
+                    observer_func = self._observer_callable(namespace)
+                    if not callable(observer_func):
                         raise TypeError(
-                            'packet_hasher is missing or not callable'
+                            'packet_observer is missing or not callable'
                         )
-                    for probe in (b'', b'voltron-hasher-probe'):
-                        digest = hasher_func(probe)
+                    for probe in (b'', b'voltron-observer-probe'):
+                        digest = observer_func(probe)
                         if not self._valid_digest(digest):
                             raise TypeError(
-                                'packet_hasher must return lowercase SHA-256'
+                                'packet_observer must return lowercase SHA-256'
                             )
-                        if hasher_func(probe) != digest:
+                        if observer_func(probe) != digest:
                             raise ValueError(
-                                'packet_hasher must be deterministic'
+                                'packet_observer must be deterministic'
                             )
-                    return response_type, hasher_code
+                    return response_type, observer_code
                 except Exception:
                     logger.exception(
-                        f'Producer: invalid hasher [{response_type}]'
+                        f'Producer: invalid observer [{response_type}]'
                     )
 
-    async def _hasher_gen_async(self) -> list[tuple[str, str]]:
+    async def _observer_gen_async(self) -> list[tuple[str, str]]:
         if not hasattr(self, 'res_ir'):
-            raise RuntimeError('Response IR is unavailable for hasher generation')
+            raise RuntimeError('Response IR is unavailable for observer generation')
         messages = self.res_ir.findall('message')
         if not messages:
             raise RuntimeError('Response IR does not contain any messages')
@@ -733,7 +741,7 @@ class AsyncProducer:
         res_info = self._primary_response_field_info()
         sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
-            self._hasher_gen_one(
+            self._observer_gen_one(
                 response_type,
                 self._checker_ir_for_response_type(response_type, messages),
                 res_info,
@@ -741,45 +749,45 @@ class AsyncProducer:
             )
             for response_type in response_types
         ]
-        return await tqdm_asyncio.gather(*tasks, desc='hasher')
+        return await tqdm_asyncio.gather(*tasks, desc='observer')
 
-    def hasher_gen(self) -> None:
-        """Generate one semantic response hasher for each response type."""
-        results = asyncio.run(self._hasher_gen_async())
-        self.hashers = {}
-        for msg_type, hasher_code in results:
-            msg_dir = self.hasher_path / quote(msg_type, safe='._-')
+    def observer_gen(self) -> None:
+        """Generate one semantic response observer for each response type."""
+        results = asyncio.run(self._observer_gen_async())
+        self.observers = {}
+        for msg_type, observer_code in results:
+            msg_dir = self.observer_path / quote(msg_type, safe='._-')
             msg_dir.mkdir(parents=True, exist_ok=True)
-            hasher_path = msg_dir / 'id0.py'
-            with hasher_path.open('w', encoding='utf-8') as f:
-                f.write(hasher_code)
-            hasher = ResponseHasher(
+            observer_path = msg_dir / 'id0.py'
+            with observer_path.open('w', encoding='utf-8') as f:
+                f.write(observer_code)
+            observer = ResponseObserver(
                 msg_type=msg_type,
                 name='id0',
-                path=str(hasher_path.resolve()),
+                path=str(observer_path.resolve()),
                 state_field=self._primary_response_field_name(),
                 evolved_from='init',
             )
-            self.hashers.setdefault(msg_type, []).append(hasher)
-        with self.hasher_info_path.open('w', encoding='utf-8') as f:
-            json.dump(self.hasher_info(), f, indent=2)
-        logger.debug("[Producer]: finish hashers generation")
+            self.observers.setdefault(msg_type, []).append(observer)
+        with self.observer_info_path.open('w', encoding='utf-8') as f:
+            json.dump(self.observer_info(), f, indent=2)
+        logger.debug("[Producer]: finish observers generation")
 
-    def evolve_hasher(
+    def evolve_observer(
         self,
         response_type: str,
         samples: list[bytes]
-    ) -> ResponseHasher | None:
-        """Evolve a response hasher so same-type historical samples converge."""
-        versions = self.hashers.get(response_type)
+    ) -> ResponseObserver | None:
+        """Evolve a response observer so same-type historical samples converge."""
+        versions = self.observers.get(response_type)
         if not versions:
             logger.debug(
-                f'Producer: no hasher metadata to evolve [{response_type}]'
+                f'Producer: no observer metadata to evolve [{response_type}]'
             )
             return None
         current = versions[-1]
         typed_path = (
-            self.hasher_path
+            self.observer_path
             / quote(response_type, safe='._-')
             / f'{current.name}.py'
         )
@@ -788,7 +796,7 @@ class AsyncProducer:
             current_path = Path(current.path)
         if not current_path.is_file():
             logger.debug(
-                f'Producer: hasher source missing for evolution {current_path}'
+                f'Producer: observer source missing for evolution {current_path}'
             )
             return None
 
@@ -803,30 +811,30 @@ class AsyncProducer:
             original_code = f.read()
 
         unique_samples = list(dict.fromkeys(samples))
-        hasher_code = asyncio.run(
-            self._hasher_evolve_async(
+        observer_code = asyncio.run(
+            self._observer_evolve_async(
                 response_type,
                 msg_ir,
                 original_code,
                 unique_samples,
             )
         )
-        if hasher_code is None:
+        if observer_code is None:
             return None
 
         numeric_ids = [
-            int(hasher.name[2:])
-            for hasher in versions
-            if hasher.name.startswith('id') and hasher.name[2:].isdigit()
+            int(observer.name[2:])
+            for observer in versions
+            if observer.name.startswith('id') and observer.name[2:].isdigit()
         ]
         name = f'id{max(numeric_ids, default=-1) + 1}'
-        target_dir = self.hasher_path / quote(response_type, safe='._-')
+        target_dir = self.observer_path / quote(response_type, safe='._-')
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / f'{name}.py'
         with target_path.open('w', encoding='utf-8') as f:
-            f.write(hasher_code)
+            f.write(observer_code)
 
-        evolved = ResponseHasher(
+        evolved = ResponseObserver(
             msg_type=response_type,
             name=name,
             path=str(target_path.resolve()),
@@ -838,10 +846,10 @@ class AsyncProducer:
             ],
         )
         versions.append(evolved)
-        with self.hasher_info_path.open('w', encoding='utf-8') as f:
-            json.dump(self.hasher_info(), f, indent=2)
+        with self.observer_info_path.open('w', encoding='utf-8') as f:
+            json.dump(self.observer_info(), f, indent=2)
         logger.debug(
-            f'Producer: evolved hasher [{response_type}] '
+            f'Producer: evolved observer [{response_type}] '
             f'{current.name} -> {name}'
         )
         return evolved
@@ -852,7 +860,7 @@ class AsyncProducer:
         old_response: bytes,
         new_response: bytes
     ) -> bool:
-        """Use the response IR and LLM to gate hasher evolution."""
+        """Use the response IR and LLM to gate observer evolution."""
         try:
             messages = self.res_ir.findall('message')
             msg = self._checker_ir_for_response_type(
@@ -865,7 +873,7 @@ class AsyncProducer:
                 pretty_print=True,
             ).decode('utf-8')
             result = asyncio.run(
-                self.chater.llm_hasher_semantic_compare(
+                self.chater.llm_observer_semantic_compare(
                     pro_name=self.rfcp.pro_name,
                     response_type=response_type,
                     msg_ir=msg_ir,
@@ -881,7 +889,7 @@ class AsyncProducer:
                 and confidence >= 0.8
             )
             logger.debug(
-                'Producer: hasher semantic comparison '
+                'Producer: observer semantic comparison '
                 f'[{response_type}] equivalent={equivalent} '
                 f'confidence={confidence} '
                 f'reason={analysis.get("reason", "")}'
@@ -889,12 +897,12 @@ class AsyncProducer:
             return equivalent
         except Exception:
             logger.exception(
-                f'Producer: hasher semantic comparison failed '
+                f'Producer: observer semantic comparison failed '
                 f'[{response_type}]'
             )
             return False
 
-    async def _hasher_evolve_async(
+    async def _observer_evolve_async(
         self,
         response_type: str,
         msg_ir: str,
@@ -911,36 +919,40 @@ class AsyncProducer:
         ], indent=2)
         for _ in range(3):
             try:
-                code = await self.chater.llm_hasher_evolve(
+                code = await self.chater.llm_observer_evolve(
                     pro_name=self.rfcp.pro_name,
                     response_type=response_type,
                     msg_ir=msg_ir,
                     original_code=original_code,
                     samples=sample_info,
                 )
-                compile(code, '<hasher_evolve>', 'exec')
+                compile(code, '<observer_evolve>', 'exec')
                 namespace = {}
                 exec(code, namespace)
-                hasher_func = namespace.get('packet_hasher')
-                if not callable(hasher_func):
+                observer_func = self._observer_callable(namespace)
+                if not callable(observer_func):
                     raise TypeError(
-                        'packet_hasher is missing or not callable'
+                        'packet_observer is missing or not callable'
                     )
-                digests = [hasher_func(sample) for sample in samples]
+                digests = [observer_func(sample) for sample in samples]
                 if not all(self._valid_digest(digest) for digest in digests):
                     raise TypeError(
-                        'packet_hasher must return lowercase SHA-256'
+                        'packet_observer must return lowercase SHA-256'
                     )
                 if len(set(digests)) != 1:
                     raise ValueError(
-                        'evolved hasher does not unify historical samples'
+                        'evolved observer does not unify historical samples'
                     )
                 return code
             except Exception:
                 logger.exception(
-                    f'Producer: hasher evolution failed [{response_type}]'
+                    f'Producer: observer evolution failed [{response_type}]'
                 )
         return None
+
+    @staticmethod
+    def _observer_callable(namespace: dict) -> Callable | None:
+        return namespace.get('packet_observer') or namespace.get('packet_hasher')
 
     @staticmethod
     def _valid_digest(digest) -> bool:
@@ -1180,14 +1192,14 @@ class AsyncProducer:
             for checkers in self.checkers.values()
         )
 
-    def _hasher_cache_matches_response_types(self) -> bool:
+    def _observer_cache_matches_response_types(self) -> bool:
         expected_types = set(self._response_types_from_primary_field())
-        if set(self.hashers) != expected_types:
+        if set(self.observers) != expected_types:
             return False
         state_field = self._primary_response_field_name()
         return all(
-            hashers and hashers[-1].state_field == state_field
-            for hashers in self.hashers.values()
+            observers and observers[-1].state_field == state_field
+            for observers in self.observers.values()
         )
         
     async def _parser_evo_one(
@@ -1325,10 +1337,10 @@ class AsyncProducer:
             for msg_type, checkers in self.checkers.items()
         }
 
-    def hasher_info(self) -> dict:
+    def observer_info(self) -> dict:
         return {
-            msg_type: [asdict(hasher) for hasher in hashers]
-            for msg_type, hashers in self.hashers.items()
+            msg_type: [asdict(observer) for observer in observers]
+            for msg_type, observers in self.observers.items()
         }
     
     def generators_info_load(
@@ -1374,16 +1386,16 @@ class AsyncProducer:
                 self.checkers.setdefault(msg_type, [])
                 self.checkers[msg_type].append(Checker(**checker))
 
-    def hashers_info_load(self, info: dict) -> None:
-        self.hashers = {}
-        for msg_type, hashers in info.items():
-            for hasher in hashers:
-                hasher.setdefault('msg_type', msg_type)
-                hasher.setdefault('state_field', '')
-                hasher.setdefault('evolved_from', 'init')
-                hasher.setdefault('sample_hashes', [])
-                self.hashers.setdefault(msg_type, []).append(
-                    ResponseHasher(**hasher)
+    def observers_info_load(self, info: dict) -> None:
+        self.observers = {}
+        for msg_type, observers in info.items():
+            for observer in observers:
+                observer.setdefault('msg_type', msg_type)
+                observer.setdefault('state_field', '')
+                observer.setdefault('evolved_from', 'init')
+                observer.setdefault('sample_hashes', [])
+                self.observers.setdefault(msg_type, []).append(
+                    ResponseObserver(**observer)
                 )
 
     def legacy_checkers_info_load(

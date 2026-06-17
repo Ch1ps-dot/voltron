@@ -1,6 +1,6 @@
 You are an expert Python developer and protocol analyst.
 
-An IR-driven response hasher produced different hashes for multiple responses
+An IR-driven response observer produced different hashes for multiple responses
 of the same response type. Repair it by identifying dynamic fields that vary
 without changing protocol behavior.
 
@@ -12,7 +12,7 @@ Response IR:
 $msg_ir
 ```
 
-Current hasher:
+Current observer:
 ```python
 $original_code
 ```
@@ -23,7 +23,7 @@ $samples
 Return a complete replacement defining:
 
 ```python
-def packet_hasher(response: bytes) -> str:
+def packet_observer(response: bytes) -> str:
 ```
 
 Requirements:

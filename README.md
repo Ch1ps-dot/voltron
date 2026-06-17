@@ -363,7 +363,7 @@ During replay, Voltron:
 4. Sends the saved raw request bytes in their original order.
 5. Runs `cov_collect.sh` after each successfully replayed testcase.
 
-Replay does not run response checkers or semantic hashers and does not modify
+Replay does not run response checkers or semantic observers and does not modify
 the saved testcase. Pressing `Ctrl+C` once stops the active SUT and exits the
 replay process.
 

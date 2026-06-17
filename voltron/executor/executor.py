@@ -12,7 +12,7 @@ from voltron.utils.logger import (
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
-from voltron.synthesizer.hasher import ResponseHasher
+from voltron.synthesizer.observer import ResponseObserver
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 import math, statistics, threading, sys, os, signal, re
@@ -96,10 +96,10 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
-        self.hasher_funcs: dict[str, Callable[[bytes], str]] = {}
+        self.observer_funcs: dict[str, Callable[[bytes], str]] = {}
         if configs.fuzz_mode != 'replay':
             self.load_checkers(self.mapper.equip_checkers())
-            self.load_hashers(self.mapper.equip_hashers())
+            self.load_observers(self.mapper.equip_observers())
         self.checked_request_response_pairs: set[
             tuple[str, str, str]
         ] = set()
@@ -110,8 +110,8 @@ class Executor:
         self.reviewed_response_samples: dict[
             tuple[str, str, str], bytes
         ] = {}
-        self.hasher_evolution_failures: set[tuple[str, ...]] = set()
-        self.hasher_semantic_reviews: dict[
+        self.observer_evolution_failures: set[tuple[str, ...]] = set()
+        self.observer_semantic_reviews: dict[
             tuple[str, str, str], bool
         ] = {}
         self._invalid_response_lock = threading.Lock()
@@ -1510,40 +1510,40 @@ class Executor:
                     f'Executor: checker load failure [{msg_type}] {e}'
                 )
 
-    def load_hashers(
+    def load_observers(
         self,
-        hashers: dict[str, ResponseHasher]
+        observers: dict[str, ResponseObserver]
     ) -> None:
-        """Load the latest generated semantic hasher for each response type."""
-        self.hasher_funcs = {}
-        for msg_type, hasher in hashers.items():
+        """Load the latest generated semantic observer for each response type."""
+        self.observer_funcs = {}
+        for msg_type, observer in observers.items():
             namespace = {}
             try:
-                with open(self.mapper.h_path(hasher), 'r', encoding='utf-8') as f:
+                with open(self.mapper.h_path(observer), 'r', encoding='utf-8') as f:
                     exec(f.read(), namespace)
-                hasher_func: Callable = namespace.get('packet_hasher')
-                if not callable(hasher_func):
-                    raise TypeError('packet_hasher is missing or not callable')
-                self.hasher_funcs[msg_type] = hasher_func
+                observer_func: Callable = namespace.get('packet_observer')
+                if not callable(observer_func):
+                    raise TypeError('packet_observer is missing or not callable')
+                self.observer_funcs[msg_type] = observer_func
             except Exception:
                 logger.exception(
-                    f'Executor: hasher load failure [{msg_type}]'
+                    f'Executor: observer load failure [{msg_type}]'
                 )
 
-    def hash_response(
+    def observe_response(
         self,
         response_type: str,
         response: bytes
     ) -> str:
         """Return an IR-normalized digest, falling back to raw SHA-256."""
         fallback = hashlib.sha256(response).hexdigest()
-        hasher = self.hasher_funcs.get(response_type)
-        if hasher is None:
-            hasher = self.hasher_funcs.get('__all__')
-        if hasher is None:
+        observer = self.observer_funcs.get(response_type)
+        if observer is None:
+            observer = self.observer_funcs.get('__all__')
+        if observer is None:
             return fallback
         try:
-            digest = hasher(response)
+            digest = observer(response)
             if (
                 not isinstance(digest, str)
                 or len(digest) != 64
@@ -1551,37 +1551,37 @@ class Executor:
                 or any(char not in '0123456789abcdef' for char in digest)
             ):
                 raise TypeError(
-                    'packet_hasher must return lowercase SHA-256'
+                    'packet_observer must return lowercase SHA-256'
                 )
             return digest
         except Exception:
             logger.exception(
-                f'Executor: hasher failure [{response_type}]'
+                f'Executor: observer failure [{response_type}]'
             )
             return fallback
 
-    def hash_response_with_evolution(
+    def observe_response_with_evolution(
         self,
         response_type: str,
         response: bytes
     ) -> str:
-        """Evolve a hasher only for semantically equivalent hash divergence."""
+        """Evolve a observer only for semantically equivalent hash divergence."""
         if not hasattr(self, 'checked_response_samples'):
             self.checked_response_samples = {}
         if not hasattr(self, 'reviewed_response_samples'):
             self.reviewed_response_samples = {}
-        if not hasattr(self, 'hasher_evolution_failures'):
-            self.hasher_evolution_failures = set()
-        if not hasattr(self, 'hasher_semantic_reviews'):
-            self.hasher_semantic_reviews = {}
-        digest = self.hash_response(response_type, response)
-        if response_type not in self.hasher_funcs:
+        if not hasattr(self, 'observer_evolution_failures'):
+            self.observer_evolution_failures = set()
+        if not hasattr(self, 'observer_semantic_reviews'):
+            self.observer_semantic_reviews = {}
+        digest = self.observe_response(response_type, response)
+        if response_type not in self.observer_funcs:
             return digest
 
         previous_samples = self._historical_response_samples(response_type)
         samples_by_digest: dict[str, list[bytes]] = {}
         for sample in previous_samples:
-            sample_digest = self.hash_response(response_type, sample)
+            sample_digest = self.observe_response(response_type, sample)
             samples_by_digest.setdefault(sample_digest, []).append(sample)
         previous_digests = set(samples_by_digest)
         if not previous_samples or digest in previous_digests:
@@ -1605,9 +1605,9 @@ class Executor:
                     response_raw_hash,
                     old_raw_hash,
                 )
-                equivalent = self.hasher_semantic_reviews.get(review_key)
+                equivalent = self.observer_semantic_reviews.get(review_key)
                 if equivalent is None:
-                    equivalent = self.hasher_semantic_reviews.get(reverse_key)
+                    equivalent = self.observer_semantic_reviews.get(reverse_key)
                 if equivalent is None:
                     self._set_ui_operation(
                         'Comparing response semantics with LLM'
@@ -1620,7 +1620,7 @@ class Executor:
                             new_response=response,
                         )
                     )
-                    self.hasher_semantic_reviews[review_key] = equivalent
+                    self.observer_semantic_reviews[review_key] = equivalent
                 if equivalent:
                     equivalent_samples.extend(old_samples)
         except Exception:
@@ -1644,27 +1644,27 @@ class Executor:
             hashlib.sha256(sample).hexdigest()
             for sample in samples
         ))
-        if failure_key in self.hasher_evolution_failures:
+        if failure_key in self.observer_evolution_failures:
             return digest
 
         try:
-            self._set_ui_operation('Updating response hasher with LLM')
-            evolved = self.mapper.producer.evolve_hasher(
+            self._set_ui_operation('Updating response observer with LLM')
+            evolved = self.mapper.producer.evolve_observer(
                 response_type=response_type,
                 samples=samples,
             )
             if evolved is None:
-                self.hasher_evolution_failures.add(failure_key)
+                self.observer_evolution_failures.add(failure_key)
                 return digest
-            self.mapper.hashers = self.mapper.producer.hashers
-            self.load_hashers(self.mapper.equip_hashers())
+            self.mapper.observers = self.mapper.producer.observers
+            self.load_observers(self.mapper.equip_observers())
             self._rebuild_hash_indexes(response_type)
             self._rehash_persisted_invalid_responses(response_type)
-            return self.hash_response(response_type, response)
+            return self.observe_response(response_type, response)
         except Exception:
-            self.hasher_evolution_failures.add(failure_key)
+            self.observer_evolution_failures.add(failure_key)
             logger.exception(
-                f'Executor: hasher evolution failed [{response_type}]'
+                f'Executor: observer evolution failed [{response_type}]'
             )
             return digest
         finally:
@@ -1717,7 +1717,7 @@ class Executor:
         if not enabled:
             return True
 
-        response_hash = self.hash_response_with_evolution(
+        response_observation = self.observe_response_with_evolution(
             response_type,
             response,
         )
@@ -1725,7 +1725,7 @@ class Executor:
         dedup_key = (
             request_type,
             response_type,
-            response_hash,
+            response_observation,
         )
         with self._invalid_response_lock:
             if dedup_key in self.checked_request_response_pairs:
@@ -1733,7 +1733,7 @@ class Executor:
                     'checker.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_hash=dedup_key[2],
+                    response_observation=dedup_key[2],
                 ))
                 return True
             self.checked_request_response_pairs.add(dedup_key)
@@ -1760,13 +1760,13 @@ class Executor:
         if not response:
             return
 
-        response_hash = self.hash_response(response_type, response)
-        dedup_key = (request_type, response_type, response_hash)
+        response_observation = self.observe_response(response_type, response)
+        dedup_key = (request_type, response_type, response_observation)
         with self._invalid_response_lock:
             if dedup_key in self.reviewed_invalid_responses:
                 logger.debug(
                     'Executor: duplicate non-conforming response skipped '
-                    f'[{request_type}/{response_type}] {response_hash}'
+                    f'[{request_type}/{response_type}] {response_observation}'
                 )
                 return
             self.reviewed_invalid_responses.add(dedup_key)
@@ -1857,8 +1857,8 @@ class Executor:
         request, response = cons.content[-1]
         request_type = cons.req_seq[-1]
         response_digest = hashlib.sha256(response).hexdigest()
-        response_hash = self.hash_response(response_type, response)
-        dedup_key = (request_type, response_type, response_hash)
+        response_observation = self.observe_response(response_type, response)
+        dedup_key = (request_type, response_type, response_observation)
         marker_digest = hashlib.sha256(
             json.dumps(dedup_key, separators=(',', ':')).encode('utf-8')
         ).hexdigest()
@@ -1870,7 +1870,7 @@ class Executor:
                     'invalid_response.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_hash=response_hash,
+                    response_observation=response_observation,
                 ))
                 return False
 
@@ -1886,7 +1886,7 @@ class Executor:
                     'invalid_response.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_hash=response_hash,
+                    response_observation=response_observation,
                 ))
                 return False
 
@@ -1935,7 +1935,7 @@ class Executor:
                     'request_type': request_type,
                     'response_type': response_type,
                     'response_sha256': response_digest,
-                    'response_hash': response_hash,
+                    'response_observation': response_observation,
                     'request': {
                         'encoding': 'base64',
                         'data': base64.b64encode(request).decode('ascii'),
@@ -1965,7 +1965,7 @@ class Executor:
             request_type=request_type,
             response_type=response_type,
             response_sha256=response_digest,
-            response_hash=response_hash,
+            response_observation=response_observation,
         ))
         return True
 
@@ -1975,12 +1975,12 @@ class Executor:
         dedup_key: tuple[str, str, str]
     ) -> bool:
         """Check persisted analysis files, including files from older runs."""
-        request_type, response_type, response_hash = dedup_key
+        request_type, response_type, response_observation = dedup_key
         for path in target_folder.glob('cons_*.analysis.json'):
             try:
                 with path.open('r', encoding='utf-8') as f:
                     record = json.load(f)
-                saved_hash = record.get('response_hash')
+                saved_hash = record.get('response_observation')
                 if not saved_hash:
                     encoded = record.get('response', {}).get('data')
                     if not isinstance(encoded, str):
@@ -1989,14 +1989,14 @@ class Executor:
                         encoded,
                         validate=True,
                     )
-                    saved_hash = self.hash_response(
+                    saved_hash = self.observe_response(
                         response_type,
                         saved_response,
                     )
                 if (
                     record.get('request_type') == request_type
                     and record.get('response_type') == response_type
-                    and saved_hash == response_hash
+                    and saved_hash == response_observation
                 ):
                     return True
             except Exception:
@@ -2056,7 +2056,7 @@ class Executor:
                 self.checked_request_response_pairs.add((
                     request_type,
                     saved_type,
-                    self.hash_response(saved_type, response),
+                    self.observe_response(saved_type, response),
                 ))
         for (request_type, saved_type, _), response in (
             self.reviewed_response_samples.items()
@@ -2065,7 +2065,7 @@ class Executor:
                 self.reviewed_invalid_responses.add((
                     request_type,
                     saved_type,
-                    self.hash_response(saved_type, response),
+                    self.observe_response(saved_type, response),
                 ))
 
     def _rehash_persisted_invalid_responses(
@@ -2088,7 +2088,7 @@ class Executor:
                             encoded,
                             validate=True,
                         )
-                        record['response_hash'] = self.hash_response(
+                        record['response_observation'] = self.observe_response(
                             response_type,
                             response,
                         )
@@ -2112,7 +2112,7 @@ class Executor:
         for record in records:
             request_type = record.get('request_type')
             saved_type = record.get('response_type')
-            saved_hash = record.get('response_hash')
+            saved_hash = record.get('response_observation')
             if (
                 isinstance(saved_type, str)
                 and not isinstance(saved_hash, str)
@@ -2120,7 +2120,7 @@ class Executor:
                 encoded = record.get('response', {}).get('data')
                 if isinstance(encoded, str):
                     try:
-                        saved_hash = self.hash_response(
+                        saved_hash = self.observe_response(
                             saved_type,
                             base64.b64decode(encoded, validate=True),
                         )

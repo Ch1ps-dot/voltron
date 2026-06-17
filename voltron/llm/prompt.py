@@ -27,9 +27,9 @@ class Prompter:
             with self._path_gen_checker.open('r+') as f:
                 self._tem_gen_checker = Template(f.read())
 
-            self._path_gen_hasher = dir / "builder" / "hasher_generation.md"
-            with self._path_gen_hasher.open('r+') as f:
-                self._tem_gen_hasher = Template(f.read())
+            self._path_gen_observer = dir / "builder" / "observer_generation.md"
+            with self._path_gen_observer.open('r+') as f:
+                self._tem_gen_observer = Template(f.read())
                 
             self._path_res_query = dir / "builder" / "response_query.md"
             with self._path_res_query.open('r+') as f:
@@ -75,15 +75,15 @@ class Prompter:
             with self._path_checker_evolve.open('r+') as f:
                 self._tem_checker_evolve = Template(f.read())
 
-            self._path_hasher_evolve = dir / "evolver" / "hasher_evolve.md"
-            with self._path_hasher_evolve.open('r+') as f:
-                self._tem_hasher_evolve = Template(f.read())
+            self._path_observer_evolve = dir / "evolver" / "observer_evolve.md"
+            with self._path_observer_evolve.open('r+') as f:
+                self._tem_observer_evolve = Template(f.read())
 
-            self._path_hasher_semantic_compare = (
-                dir / "evolver" / "hasher_semantic_compare.md"
+            self._path_observer_semantic_compare = (
+                dir / "evolver" / "observer_semantic_compare.md"
             )
-            with self._path_hasher_semantic_compare.open('r+') as f:
-                self._tem_hasher_semantic_compare = Template(f.read())
+            with self._path_observer_semantic_compare.open('r+') as f:
+                self._tem_observer_semantic_compare = Template(f.read())
 
         except Exception:
             logger.exception('Prompter initialization failed')

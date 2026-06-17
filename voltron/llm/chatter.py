@@ -331,15 +331,15 @@ class AsyncChater:
 
         return self.code_extract(ans)
 
-    async def llm_hasher_gen(
+    async def llm_observer_gen(
             self,
             pro_name: str,
             msg_ir: str,
             res_info: str,
             response_type: str
     ) -> str:
-        """Generate a semantic response hasher from response-message IR."""
-        tmp = self.pmp._tem_gen_hasher
+        """Generate a semantic response observer from response-message IR."""
+        tmp = self.pmp._tem_gen_observer
         pmp = tmp.substitute(
             pro_name=pro_name,
             msg_ir=msg_ir,
@@ -348,11 +348,11 @@ class AsyncChater:
         )
         ans = await self.chat_llm(
             prompt=pmp,
-            usage="hasher_gen",
+            usage="observer_gen",
         )
         return self.code_extract(ans)
 
-    async def llm_hasher_evolve(
+    async def llm_observer_evolve(
             self,
             pro_name: str,
             response_type: str,
@@ -360,8 +360,8 @@ class AsyncChater:
             original_code: str,
             samples: str
     ) -> str:
-        """Evolve a hasher using same-type responses with different hashes."""
-        tmp = self.pmp._tem_hasher_evolve
+        """Evolve a observer using same-type responses with different hashes."""
+        tmp = self.pmp._tem_observer_evolve
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
@@ -371,11 +371,11 @@ class AsyncChater:
         )
         ans = await self.chat_llm(
             prompt=pmp,
-            usage="hasher_evolve",
+            usage="observer_evolve",
         )
         return self.code_extract(ans)
 
-    async def llm_hasher_semantic_compare(
+    async def llm_observer_semantic_compare(
             self,
             pro_name: str,
             response_type: str,
@@ -384,7 +384,7 @@ class AsyncChater:
             new_response: bytes
     ) -> str:
         """Judge whether two responses have the same protocol semantics."""
-        tmp = self.pmp._tem_hasher_semantic_compare
+        tmp = self.pmp._tem_observer_semantic_compare
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
@@ -394,7 +394,7 @@ class AsyncChater:
         )
         ans = await self.chat_llm(
             prompt=pmp,
-            usage="hasher_semantic_compare",
+            usage="observer_semantic_compare",
         )
         return self.json_extract(ans)
 

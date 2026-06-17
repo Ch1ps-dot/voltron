@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class ResponseHasher:
-    """Generated response semantic hasher metadata."""
+class ResponseObserver:
+    """Generated response semantic observer metadata."""
 
     msg_type: str
     name: str
