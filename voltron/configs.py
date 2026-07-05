@@ -42,6 +42,8 @@ class Config:
         self.async_sem_compliance: int
         
         self.server: str
+        self.sut_deployment: str = 'local'
+        self.monitor: dict = {}
         
         self.time_limit_s: int
 

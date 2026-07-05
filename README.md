@@ -76,8 +76,8 @@ Each target needs:
 
 - An entry in `config/configs.yaml`
 - A directory `config/subjects/<target>/`
-- A `run.sh` script to start the SUT
-- A `setup.sh` script to reset or prepare the SUT
+- A `run.sh` script to start the SUT in local mode
+- A `setup.sh` script to reset or prepare the SUT in local mode
 - An `info.md` file with protocol- or target-specific notes for synthesis
 
 Example target configuration:
@@ -92,7 +92,61 @@ lightftp:
   server: parent
 ```
 
-### 2. Configure the LLM
+### 2. Configure a remote target
+
+Use remote mode when the SUT runs on another machine and Voltron should not
+start, stop, or kill a local process. In this mode, `host` and `port` point to
+the remote protocol service, and `monitor` optionally points to a lightweight
+agent running beside the SUT.
+
+```yaml
+remote-lightftp:
+  protocol: ftp
+  host: 192.0.2.10
+  port: 2200
+  rfc_name: ["rfc959", "rfc2428", "rfc3659", "rfc2389", "rfc2228"]
+  trans_layer: tcp
+  server: parent
+  sut_deployment: remote
+  monitor:
+    mode: agent
+    url: http://192.0.2.10:9000
+    service_host: 192.0.2.10
+    service_port: 2200
+    timeout_s: 1.0
+    log_tail: 200
+```
+
+The agent endpoints are deliberately small:
+
+- `POST /start`: optional; start or restart the remote SUT.
+- `GET /health`: return process and service status as JSON.
+- `GET /logs?tail=N`: optional; return recent log lines for crash triage.
+- `POST /stop`: optional; stop the remote SUT.
+
+`GET /health` should return fields such as:
+
+```json
+{
+  "state": "RUNNING",
+  "process_running": true,
+  "port_listening": true,
+  "returncode": null,
+  "stderr": "",
+  "logs": ""
+}
+```
+
+Valid states are `RUNNING`, `EXITED`, `CRASHED`, `UNREACHABLE`, and `UNKNOWN`.
+If the agent is unavailable, Voltron falls back to black-box network behavior:
+it can still connect to the target and record protocol-level timeouts, but it
+cannot reliably distinguish a remote crash from a hang or network failure.
+
+Remote SUT support is still experimental and has not been fully validated across
+real deployments. Users should try it with their own target, agent, and network
+environment before relying on the results.
+
+### 3. Configure the LLM
 
 The `llm` section in `config/configs.yaml` controls the API endpoint, key, model, and concurrency:
 
@@ -106,7 +160,7 @@ llm:
 
 For safety, avoid committing real API keys to the repository.
 
-### 3. Provide RFC documents
+### 4. Provide RFC documents
 
 Place RFC text files in `config/rfcs/` using the filenames referenced in `rfc_name`, for example `rfc959.txt`.
 
@@ -135,6 +189,13 @@ Example:
 
 ```bash
 uv run cli.py -s lightftp -a state -t 30
+```
+
+Remote targets use the same command; select the remote target name from
+`config/configs.yaml`:
+
+```bash
+uv run cli.py -s remote-lightftp -a state -t 30
 ```
 
 For ablation runs, each switch can be disabled independently:

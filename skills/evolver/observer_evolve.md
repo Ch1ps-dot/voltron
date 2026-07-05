@@ -1,6 +1,6 @@
 You are an expert Python developer and protocol analyst.
 
-An IR-driven response observer produced different hashes for multiple responses
+An IR-driven response observer produced different observations for multiple responses
 of the same response type. Repair it by identifying dynamic fields that vary
 without changing protocol behavior.
 
@@ -17,7 +17,7 @@ Current observer:
 $original_code
 ```
 
-Observed same-type responses and current hashes:
+Observed same-type responses and current observations:
 $samples
 
 Return a complete replacement defining:

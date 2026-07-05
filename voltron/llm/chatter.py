@@ -360,7 +360,7 @@ class AsyncChater:
             original_code: str,
             samples: str
     ) -> str:
-        """Evolve a observer using same-type responses with different hashes."""
+        """Evolve a observer using same-type responses with different observations."""
         tmp = self.pmp._tem_observer_evolve
         pmp = tmp.substitute(
             pro_name=pro_name,

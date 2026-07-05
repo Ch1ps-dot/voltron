@@ -371,7 +371,7 @@ def test_invalid_observer_output_falls_back_to_raw_sha256():
     ).sha256(response).hexdigest()
 
 
-def test_observer_evolution_rehashes_memory_and_persisted_results(
+def test_observer_evolution_reobservees_memory_and_persisted_results(
     tmp_path,
 ):
     configs.results_path = tmp_path
@@ -575,7 +575,7 @@ def test_observer_evolution_persists_new_version(tmp_path: Path):
     assert evolved is not None
     assert evolved.name == "id1"
     assert evolved.evolved_from == "id0"
-    assert len(evolved.sample_hashes) == 2
+    assert len(evolved.sample_observations) == 2
     metadata = json.loads(
         producer.observer_info_path.read_text(encoding="utf-8")
     )

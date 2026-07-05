@@ -15,6 +15,14 @@ from voltron.synthesizer.checker import Checker
 from voltron.synthesizer.observer import ResponseObserver
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
+from voltron.executor.sut_monitor import (
+    CRASHED,
+    EXITED,
+    RUNNING,
+    UNREACHABLE,
+    RemoteSUTProcess,
+    build_sut_monitor,
+)
 import math, statistics, threading, sys, os, signal, re
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
@@ -78,6 +86,8 @@ class Executor:
         self.host = configs.host
         self.port = configs.port
         self.trans_layer = configs.trans_layer
+        self.sut_deployment = getattr(configs, 'sut_deployment', 'local')
+        self.sut_monitor = build_sut_monitor(configs)
         self.try_times_parser = 2
 
         # time related values
@@ -228,7 +238,7 @@ class Executor:
             f'stage={stage}',
             f'script={self.run_script}',
             f'transport={self.trans_layer}',
-            f'endpoint=localhost:{self.port}',
+            f'endpoint={getattr(self, "host", "localhost")}:{self.port}',
         ]
         if attempt is not None:
             fields.append(f'attempt={attempt}')
@@ -255,6 +265,34 @@ class Executor:
                     fields.append('output=<empty>')
 
         logger.debug('; '.join(fields))
+
+    def _is_remote_deployment(
+        self
+    ) -> bool:
+        return getattr(self, 'sut_deployment', 'local') == 'remote'
+
+    def _monitor(
+        self
+    ):
+        monitor = getattr(self, 'sut_monitor', None)
+        if monitor is None:
+            self.sut_monitor = build_sut_monitor(configs)
+            monitor = self.sut_monitor
+        return monitor
+
+    def _remote_status_summary(
+        self
+    ) -> str:
+        status = self._monitor().status()
+        fields = [
+            f'remote_state={status.state}',
+            f'returncode={status.returncode}',
+            f'process_running={status.process_running}',
+            f'port_listening={status.port_listening}',
+        ]
+        if status.detail:
+            fields.append(f'detail={status.detail}')
+        return '; '.join(fields)
 
     def interact(
         self,
@@ -347,21 +385,27 @@ class Executor:
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
+        remote_deployment = self._is_remote_deployment()
         if self.stop_event.is_set():
             return False, None
-        self.kill_listeners(self.port)
-        if self.stop_event.is_set():
-            return False, None
-        clean = self.setup_exe()
-        if self.stop_event.is_set():
-            if clean is not None:
-                self._terminate_process_group(
-                    clean,
-                    signal.SIGKILL,
-                    timeout=1,
-                )
-            return False, None
-        proc = self.run_exe()
+        clean = None
+        proc = None
+        if remote_deployment:
+            self._monitor().start()
+        else:
+            self.kill_listeners(self.port)
+            if self.stop_event.is_set():
+                return False, None
+            clean = self.setup_exe()
+            if self.stop_event.is_set():
+                if clean is not None:
+                    self._terminate_process_group(
+                        clean,
+                        signal.SIGKILL,
+                        timeout=1,
+                    )
+                return False, None
+            proc = self.run_exe()
         
         
         # if proc is None:
@@ -373,54 +417,72 @@ class Executor:
         #     return False, None
         
         # avoid unexceptional crash of target
-        for attempt in range(1, 101):
-            if self.stop_event.is_set():
-                self._terminate_process_group(
-                    proc,
-                    signal.SIGTERM,
-                    timeout=1,
-                )
-                return False, None
-            if proc is not None and proc.poll() is not None:
+        if not remote_deployment:
+            for attempt in range(1, 101):
+                if self.stop_event.is_set():
+                    self._terminate_process_group(
+                        proc,
+                        signal.SIGTERM,
+                        timeout=1,
+                    )
+                    return False, None
+                if proc is not None and proc.poll() is not None:
+                    self._log_sut_start_failure(
+                        proc,
+                        stage='process-exited-before-ready-check',
+                        attempt=attempt,
+                    )
+                    if self.stop_event.wait(self.setup_time_s):
+                        return False, None
+                    proc = self.run_exe()
+                else:
+                    break
+
+            if proc is None:
                 self._log_sut_start_failure(
                     proc,
-                    stage='process-exited-before-ready-check',
-                    attempt=attempt,
+                    stage='process-launch-retries',
+                    detail='run_exe returned no process',
                 )
-                if self.stop_event.wait(self.setup_time_s):
-                    return False, None
-                proc = self.run_exe()
-            else:
-                break
-
-        if proc is None:
-            self._log_sut_start_failure(
-                proc,
-                stage='process-launch-retries',
-                detail='run_exe returned no process',
-            )
-            raise Exception('Execute: process close')
-        if proc.poll() is not None:
-            self._log_sut_start_failure(
-                proc,
-                stage='process-launch-retries',
-                detail='process still exited after launch retries',
-            )
-            raise Exception('Execute: process close')
+                raise Exception('Execute: process close')
+            if proc.poll() is not None:
+                self._log_sut_start_failure(
+                    proc,
+                    stage='process-launch-retries',
+                    detail='process still exited after launch retries',
+                )
+                raise Exception('Execute: process close')
         
         # wait for server setup
         sock = None
         for attempt in range(1, 101):
             if self.stop_event.wait(self.setup_time_s):
-                self._terminate_process_group(
-                    proc,
-                    signal.SIGTERM,
-                    timeout=1,
-                )
+                if not remote_deployment:
+                    self._terminate_process_group(
+                        proc,
+                        signal.SIGTERM,
+                        timeout=1,
+                    )
                 return False, None
             sock = self.setup_socket()
             if sock == None:
-                if proc != None and proc.poll() is not None:
+                if remote_deployment:
+                    status = self._monitor().status()
+                    logger.debug(
+                        'Executor: remote SUT not ready; '
+                        f'attempt={attempt}; state={status.state}; '
+                        f'process_running={status.process_running}; '
+                        f'port_listening={status.port_listening}'
+                    )
+                    if status.state in {EXITED, CRASHED}:
+                        self._log_sut_start_failure(
+                            proc,
+                            stage='remote-readiness-check',
+                            attempt=attempt,
+                            detail=self._remote_status_summary(),
+                        )
+                        raise Exception('Execute: remote process close')
+                elif proc != None and proc.poll() is not None:
                     self._log_sut_start_failure(
                         proc,
                         stage='socket-readiness-check',
@@ -442,14 +504,14 @@ class Executor:
             else:
                 break
             
-        if proc is None:
+        if not remote_deployment and proc is None:
             self._log_sut_start_failure(
                 proc,
                 stage='socket-readiness-check',
                 detail='restart returned no process',
             )
             raise Exception('Executor: process close')
-        if proc.poll() is not None:
+        if not remote_deployment and proc.poll() is not None:
             self._log_sut_start_failure(
                 proc,
                 stage='socket-readiness-check',
@@ -465,6 +527,11 @@ class Executor:
                 detail=(
                     f'service did not become reachable within '
                     f'{100 * self.setup_time_s:.2f}s'
+                    + (
+                        f'; {self._remote_status_summary()}'
+                        if remote_deployment
+                        else ''
+                    )
                 ),
             )
             self.stop_event.set()
@@ -483,11 +550,14 @@ class Executor:
         )
         if self.stop_event.is_set():
             sock.close()
-            self._terminate_process_group(
-                proc,
-                signal.SIGTERM,
-                timeout=1,
-            )
+            if remote_deployment:
+                self._monitor().stop()
+            else:
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGTERM,
+                    timeout=1,
+                )
             return False, None
         last_recv = '-'
         if(resp_code and resp_data):
@@ -517,7 +587,7 @@ class Executor:
             if self.stop_event.is_set():
                 break
             
-            if proc.poll() is not None:
+            if not remote_deployment and proc.poll() is not None:
                 if not self._handle_crash_if_detected(
                     cons,
                     proc,
@@ -653,7 +723,7 @@ class Executor:
             
             # If socket closed, stop sending
             else:
-                return_code = proc.poll()
+                return_code = proc.poll() if proc is not None else None
                 
                 # program exited unexpectly
                 self._handle_crash_if_detected(
@@ -686,8 +756,15 @@ class Executor:
         )
         
         # close process
-        close_signal = signal.SIGUSR1 if configs.fuzz_mode == 'replay' else signal.SIGTERM
-        self._terminate_process_group(proc, close_signal, timeout=3)
+        close_signal = (
+            signal.SIGUSR1
+            if getattr(configs, 'fuzz_mode', '') == 'replay'
+            else signal.SIGTERM
+        )
+        if remote_deployment:
+            self._monitor().stop()
+        else:
+            self._terminate_process_group(proc, close_signal, timeout=3)
         analyzer.sut_proc = None
         
         # ensure sub-subprocess die
@@ -706,7 +783,7 @@ class Executor:
         #             break
         
         # kill clean script
-        if clean != None:
+        if clean != None and not remote_deployment:
             self._terminate_process_group(clean, signal.SIGKILL, timeout=1)
                 
 
@@ -944,7 +1021,7 @@ class Executor:
             
             try:
                 if (self.trans_layer == 'tcp'):
-                    sock = socket.create_connection(('localhost', self.port))
+                    sock = socket.create_connection((self.host, self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 else:
@@ -1210,7 +1287,7 @@ class Executor:
     def handle_crash(
         self,
         cons: Conversation,
-        proc: subprocess.Popen,
+        proc: subprocess.Popen | RemoteSUTProcess | None,
         msg_type: str,
         msg: bytes,
         stdout: str = '',
@@ -1229,12 +1306,19 @@ class Executor:
             else:
                 cons.add_state('-', 'CRASH')
                 cons.add_data(bytes(), bytes())
-            logger.debug(f'Program crash exitcode {proc.returncode}')
+            logger.debug(
+                f'Program crash exitcode {getattr(proc, "returncode", None)}'
+            )
             with self.analyzer.lock:
                 self.analyzer.crash_num += 1
 
-            if configs.fuzz_mode != 'replay':
-                if stdout == '' and stderr == '':
+            if getattr(configs, 'fuzz_mode', '') != 'replay':
+                if (
+                    proc is not None
+                    and hasattr(proc, 'communicate')
+                    and stdout == ''
+                    and stderr == ''
+                ):
                     stdout, stderr = self._read_process_output(proc)
                 self.save_cons(cons, stdout, stderr, True)
                 self.generate_crash_report(
@@ -1249,11 +1333,20 @@ class Executor:
     def _handle_crash_if_detected(
         self,
         cons: Conversation,
-        proc: subprocess.Popen,
+        proc: subprocess.Popen | RemoteSUTProcess | None,
         msg_type: str,
         msg: bytes,
         request_recorded: bool = True,
     ) -> bool:
+        if self._is_remote_deployment():
+            return self._handle_remote_crash_if_detected(
+                cons,
+                msg_type,
+                msg,
+                request_recorded=request_recorded,
+            )
+        if proc is None:
+            return False
         return_code = proc.poll()
         if return_code is None:
             return False
@@ -1276,6 +1369,49 @@ class Executor:
             return True
 
         return False
+
+    def _handle_remote_crash_if_detected(
+        self,
+        cons: Conversation,
+        msg_type: str,
+        msg: bytes,
+        request_recorded: bool = True,
+    ) -> bool:
+        status = self._monitor().collect_failure_evidence()
+        if status.state == UNREACHABLE:
+            logger.debug(
+                'Executor: UNKNOWN_REMOTE_STATUS; '
+                f'detail={status.detail or "monitor unreachable"}'
+            )
+            return False
+        stdout = status.stdout
+        stderr = '\n'.join(
+            part
+            for part in (status.stderr, status.logs)
+            if part
+        )
+        crashed = status.state == CRASHED
+        if status.state == EXITED:
+            return_code = status.returncode
+            if return_code is None and (stdout or stderr):
+                return_code = 1
+            crashed = self._is_crash(return_code, stdout, stderr)
+        if not crashed:
+            if status.state == RUNNING:
+                logger.debug('Executor: remote SUT still running')
+            return False
+
+        proc = RemoteSUTProcess(status)
+        self.handle_crash(
+            cons,
+            proc,
+            msg_type,
+            msg,
+            stdout,
+            stderr,
+            request_recorded=request_recorded,
+        )
+        return True
     
     def _is_crash(
         self,
@@ -1388,6 +1524,7 @@ class Executor:
             'report_id': report_id,
             'target': getattr(configs, 'target_name', ''),
             'protocol': getattr(configs, 'pro_name', ''),
+            'sut_deployment': getattr(configs, 'sut_deployment', 'local'),
             'crash': {
                 'returncode': getattr(proc, 'returncode', None),
                 'trigger_request_type': msg_type,
@@ -1519,9 +1656,12 @@ class Executor:
         for msg_type, observer in observers.items():
             namespace = {}
             try:
-                with open(self.mapper.h_path(observer), 'r', encoding='utf-8') as f:
+                with open(self.mapper.o_path(observer), 'r', encoding='utf-8') as f:
                     exec(f.read(), namespace)
-                observer_func: Callable = namespace.get('packet_observer')
+                observer_func: Callable = (
+                    namespace.get('packet_observer')
+                    or namespace.get('packet_hasher')
+                )
                 if not callable(observer_func):
                     raise TypeError('packet_observer is missing or not callable')
                 self.observer_funcs[msg_type] = observer_func
@@ -1565,7 +1705,7 @@ class Executor:
         response_type: str,
         response: bytes
     ) -> str:
-        """Evolve a observer only for semantically equivalent hash divergence."""
+        """Evolve an observer only for semantically equivalent divergence."""
         if not hasattr(self, 'checked_response_samples'):
             self.checked_response_samples = {}
         if not hasattr(self, 'reviewed_response_samples'):
@@ -1634,7 +1774,7 @@ class Executor:
 
         if not equivalent_samples:
             logger.debug(
-                f'Executor: preserve distinct semantic hashes '
+                f'Executor: preserve distinct semantic observations '
                 f'[{response_type}]'
             )
             return digest
@@ -1658,8 +1798,8 @@ class Executor:
                 return digest
             self.mapper.observers = self.mapper.producer.observers
             self.load_observers(self.mapper.equip_observers())
-            self._rebuild_hash_indexes(response_type)
-            self._rehash_persisted_invalid_responses(response_type)
+            self._rebuild_observation_indexes(response_type)
+            self._reobserve_persisted_invalid_responses(response_type)
             return self.observe_response(response_type, response)
         except Exception:
             self.observer_evolution_failures.add(failure_key)
@@ -1980,7 +2120,10 @@ class Executor:
             try:
                 with path.open('r', encoding='utf-8') as f:
                     record = json.load(f)
-                saved_hash = record.get('response_observation')
+                saved_hash = (
+                    record.get('response_observation')
+                    or record.get('response_hash')
+                )
                 if not saved_hash:
                     encoded = record.get('response', {}).get('data')
                     if not isinstance(encoded, str):
@@ -2035,7 +2178,7 @@ class Executor:
                     )
         return list(dict.fromkeys(samples))
 
-    def _rebuild_hash_indexes(
+    def _rebuild_observation_indexes(
         self,
         response_type: str
     ) -> None:
@@ -2068,7 +2211,7 @@ class Executor:
                     self.observe_response(saved_type, response),
                 ))
 
-    def _rehash_persisted_invalid_responses(
+    def _reobserve_persisted_invalid_responses(
         self,
         response_type: str
     ) -> None:
@@ -2104,7 +2247,7 @@ class Executor:
                 records.append(record)
             except Exception:
                 logger.exception(
-                    f'Executor: persisted response rehash failed {path}'
+                    f'Executor: persisted response reobserve failed {path}'
                 )
 
         for marker in target_folder.glob('.dedup_*'):
@@ -2112,7 +2255,10 @@ class Executor:
         for record in records:
             request_type = record.get('request_type')
             saved_type = record.get('response_type')
-            saved_hash = record.get('response_observation')
+            saved_hash = (
+                record.get('response_observation')
+                or record.get('response_hash')
+            )
             if (
                 isinstance(saved_type, str)
                 and not isinstance(saved_hash, str)
@@ -2126,7 +2272,7 @@ class Executor:
                         )
                     except Exception:
                         logger.exception(
-                            'Executor: marker hash reconstruction failed'
+                            'Executor: marker observation reconstruction failed'
                         )
             if not all(isinstance(value, str) for value in (
                 request_type,

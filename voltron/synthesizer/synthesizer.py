@@ -840,7 +840,7 @@ class AsyncProducer:
             path=str(target_path.resolve()),
             state_field=current.state_field,
             evolved_from=current.name,
-            sample_hashes=[
+            sample_observations=[
                 hashlib.sha256(sample).hexdigest()
                 for sample in unique_samples
             ],
@@ -1393,7 +1393,10 @@ class AsyncProducer:
                 observer.setdefault('msg_type', msg_type)
                 observer.setdefault('state_field', '')
                 observer.setdefault('evolved_from', 'init')
-                observer.setdefault('sample_hashes', [])
+                observer.setdefault(
+                    'sample_observations',
+                    observer.pop('sample_hashes', []),
+                )
                 self.observers.setdefault(msg_type, []).append(
                     ResponseObserver(**observer)
                 )

@@ -10,4 +10,4 @@ class ResponseObserver:
     path: str
     state_field: str = ''
     evolved_from: str = 'init'
-    sample_hashes: list[str] = field(default_factory=list)
+    sample_observations: list[str] = field(default_factory=list)

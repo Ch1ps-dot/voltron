@@ -86,6 +86,11 @@ class Fuzzer:
         configs.trans_layer = configs_yaml[self.target_name]['trans_layer']
         configs.port = configs_yaml[self.target_name]['port']
         configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
+        configs.sut_deployment = configs_yaml[self.target_name].get(
+            'sut_deployment',
+            'local',
+        )
+        configs.monitor = configs_yaml[self.target_name].get('monitor', {})
 
         # some file path 
         configs.run_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'run.sh'
