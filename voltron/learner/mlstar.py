@@ -313,7 +313,7 @@ class MealyLstar:
             logger.exception('LM: learning failed')
         return h
 
-    def havoc_run(
+    def berserker_run(
         self,
         id: str
     ):

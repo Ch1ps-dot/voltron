@@ -15,7 +15,7 @@ from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
 from voltron.executor.mapper import Mapper
-from voltron.scheduler.berserker import Havoc
+from voltron.scheduler.berserker import Berserker
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
@@ -336,7 +336,7 @@ class Fuzzer:
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
-            self.havoc_fuzz(hypothesis, stop_event)
+            self.berserker_fuzz(hypothesis, stop_event)
                 
             self.stop_event.set()
                 
@@ -445,19 +445,19 @@ class Fuzzer:
                 
         return h_lsit[-1]
     
-    def havoc_fuzz(
+    def berserker_fuzz(
         self,
         hypothesis: MealyMachine | None,
         stop_event
     ):
-        """--- havoc fuzzing ---"""
+        """--- berserker fuzzing ---"""
         with analyzer.lock:   
             analyzer.iter = 0
-            analyzer.stage = 'havoc fuzzing'
+            analyzer.stage = 'berserker fuzzing'
             analyzer.res_types_cnt = {}
             analyzer.resp_trans_cnt = {}
         
-        havoc = Havoc(
+        berserker = Berserker(
             self.mapper,
             self.exe,
             hypothesis,
@@ -471,7 +471,7 @@ class Fuzzer:
                 try:
                     # init new learning process with previous model and run fuzzer
 
-                    req_res = havoc.run(500)
+                    req_res = berserker.run(500)
                     if self.spec_knowledge:
                         self.producer.generator_mutate(req_res)
                     pre_resp = analyzer.cur_res_types_cnt.keys()
@@ -484,7 +484,7 @@ class Fuzzer:
 
                 except Exception:
                     fuzz_phase_status = 'failed'
-                    logger.exception('Fuzzer: havoc fuzzing failed')
+                    logger.exception('Fuzzer: berserker fuzzing failed')
                     stop_event.set()
 
                 if (configs.time_limit_s < time.time() - analyzer.start_time):
@@ -539,7 +539,7 @@ class Fuzzer:
                         f'Fuzzer: skip invalid replay testcase {item}'
                     )
             
-            analyzer.set_progress('havoc', 'replay', file_count)
+            analyzer.set_progress('berserker', 'replay', file_count)
             self.exe.cov_setup(cov_folder, cov_file)
             for i in range(file_count):
                 req_seq = []

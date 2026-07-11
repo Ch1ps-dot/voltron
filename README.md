@@ -32,7 +32,7 @@ Voltron is a protocol-aware fuzzer that combines RFC parsing, LLM-based code syn
     ├── learner/                  # LM*-style Mealy machine learning
     ├── llm/                      # LLM client and prompt assembly
     ├── rfcparser/                # RFC parsing and IR generation
-    ├── scheduler/                # sequence scheduling and havoc fuzzing
+    ├── scheduler/                # sequence scheduling and berserker fuzzing
     ├── synthesizer/              # generator/parser/mutator synthesis
     └── utils/
 ```
@@ -255,7 +255,7 @@ Voltron writes CSV metrics into the active result directory.
 
 - `doc_analysis`: RFC parsing and initial equipment synthesis
 - `model_learning`: active state-machine learning
-- `fuzzing`: havoc fuzzing and generator mutation
+- `fuzzing`: berserker fuzzing and generator mutation
 
 Each row records the phase status, start/end timestamps, wall-clock duration,
 LLM chat time, LLM call count, and prompt/completion/total token usage. If

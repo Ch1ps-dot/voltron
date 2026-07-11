@@ -7,8 +7,8 @@ from voltron.configs import configs
 from voltron.utils.logger import logger_fuzz as logger
 import base64, json, random, time, threading, os, math
 
-class Havoc:
-    """Havoc scheduler implementation for fuzzing the system under test (SUT) with random sequences of requests, aiming to explore the state space and find interesting behaviors.
+class Berserker:
+    """Berserker scheduler implementation for fuzzing the system under test (SUT) with random sequences of requests, aiming to explore the state space and find interesting behaviors.
     
     Attributes:
         unique_resp: A set of unique responses observed during fuzzing.
@@ -61,13 +61,12 @@ class Havoc:
          # new: select new sequences or messages that have not been observed before; 
         # generic: select from the useful sequences or messages observed so far; 
         # dependent: select sequences or messages based on the dependencies between requests
-        self.mutator_mode = ['new', 'generic', 'dependent']
-        self.prefix_mode = ['new', 'generic', 'dependent']
-        self.suffix_mode = ['new', 'generic']
+        self.mutated_seq_mode = ['random', 'interesting', 'specific']
+        self.base_state_mode = ['random', 'priority', 'specific']
+
         if not use_guidance:
-            self.mutator_mode = ['new']
-            self.prefix_mode = ['new']
-            self.suffix_mode = ['new']
+            self.mutated_seq_mode = ['random']
+            self.base_state_mode = ['random']
         
         # Initialize the automaton and related sets based on the provided Mealy machine, if available
         self.machine = machine
@@ -99,33 +98,27 @@ class Havoc:
         ]
         return self.mapper.select_generators(request_types)
 
-    def select_prefix(
+    def select_base_state(
         self
     ) -> list[tuple[str, bytes]]:
         """Select a prefix sequence of requests to be used for generating test sequences, based on the observed useful sequences and the dependencies between requests.
         """
         mode = ''
         if len(self.useful_seq) == 0:
-            mode = 'new'
+            mode = 'random'
         else:
-            mode = self.rand.choice(self.prefix_mode)
+            mode = self.rand.choice(self.base_state_mode)
         gs = []
         
-        if mode == 'new':
+        if mode == 'random':
             if self.S:
                 p = self.rand.choice(self.S)
                 w = list(p)
                 gs = self.mapper.select_generators(w)
             else:
                 gs = self.select_random_requests()
-           
-        elif mode == 'generic':
-            scope = self.rand.randint(1, 8)
-            gs = []
-            for i in range(scope):
-                gs += self.rand.choice(self.useful_seq)
             
-        elif mode == 'dependent':
+        elif mode == 'specific':
             if len(self.dep_alphabet) > 0:
                 cur_req = self.rand.choice(self.dep_alphabet)
                 req_seq = []
@@ -140,6 +133,10 @@ class Havoc:
                 gs = self.mapper.select_generators(req_seq)
             else:
                 gs = self.rand.choice(self.useful_seq)
+                
+        elif mode == 'priority':
+            pass
+        
         logger.debug(f'select prefix[{mode}]: {'/'.join([g[0] for g in gs])}')
         return gs
     
@@ -151,7 +148,7 @@ class Havoc:
             return self.mapper.select_generators(list(p))
         return self.select_random_requests()
     
-    def select_mutators(
+    def select_mutated_seq(
         self
     ) -> list[tuple[str, bytes]]:
         scope = self.rand.randint(1, 42)
@@ -159,11 +156,11 @@ class Havoc:
         ms = []
         mode = ''
         if len(self.useful_msg) == 0:
-            mode = 'new'
+            mode = 'random'
         else:
-            mode = self.rand.choice(self.mutator_mode)
+            mode = self.rand.choice(self.mutated_seq_mode)
             
-        if mode == 'new':
+        if mode == 'random':
             req_seq = []
             for i in range(scope):
                 a = self.rand.choice(self.alphabet)
@@ -174,12 +171,12 @@ class Havoc:
             else:
                 ms = self.mapper.select_generators(req_seq)
                 
-        elif mode == 'generic':
+        elif mode == 'interesting':
             for i in range(scope):
                 a = self.rand.choice(self.useful_msg)
                 ms.append(a)
             
-        elif mode == 'dependent':
+        elif mode == 'specific':
             if len(self.dep_alphabet) > 0:
                 cur_req = self.rand.choice(self.dep_alphabet)
                 req_seq = []
@@ -244,12 +241,12 @@ class Havoc:
                 f.write('\n')
 
             logger.debug(
-                'Havoc: saved new request-response relation '
+                'Berserker: saved new request-response relation '
                 f'{request_type}/{response_type} to {file_path.name}'
             )
         except Exception as e:
             logger.debug(
-                'Havoc: failed to save request-response relation '
+                'Berserker: failed to save request-response relation '
                 f'{request_type}/{response_type}: {e}'
             )
     
@@ -271,7 +268,7 @@ class Havoc:
         for i in range(len(cons.res_seq)):
             if i >= len(cons.req_seq):
                 logger.debug(
-                    f'Havoc: incomplete conversation state at index {i}'
+                    f'Berserker: incomplete conversation state at index {i}'
                 )
                 continue
 
@@ -352,7 +349,7 @@ class Havoc:
         """
         logger.debug(self.S)
         logger.debug(self.alphabet)
-        analyzer.set_progress('havoc', 'fuzz energy', times)
+        analyzer.set_progress('berserker', 'fuzz energy', times)
         energy = times
         analyzer.finished = energy
         
@@ -362,9 +359,9 @@ class Havoc:
             last_trans_nums = analyzer.resp_trans_num()
             
             ms = []
-            prefix = self.select_prefix()
+            prefix = self.select_base_state()
             if self.mapper.mutators != {}:
-                ms = self.select_mutators()
+                ms = self.select_mutated_seq()
             suffix = self.select_suffix()
             ms = ms + suffix
             req_seq = []
@@ -445,7 +442,7 @@ class Havoc:
             with analyzer.lock:
                 analyzer.useful_cons += 1
             logger.debug(
-                'Havoc: interesting conversation '
+                'Berserker: interesting conversation '
                 f'trans={trans_inc} types={type_inc} length={len_inc} '
                 f'unique_responses={unique_res_inc} '
                 f'request_response_relations={req_res_inc}'

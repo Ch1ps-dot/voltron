@@ -463,7 +463,7 @@ class AsyncProducer:
                         trace='\n'.join(req_res[msg_type] if msg_type in req_res.keys() else [])
                     )
                     
-                    # havoc_code = await self.chater.llm_mutator_havoc(
+                    # berserker_code = await self.chater.llm_mutator_berserker(
                     #     code=old_code,
                     #     pro_name=self.rfcp.pro_name,
                     #     msg_type=msg_type,
@@ -478,8 +478,8 @@ class AsyncProducer:
                     if msg == None or msg == b'':
                         raise Exception('mutate return empty')
                     
-                    # exec(havoc_code, name_space)
-                    # obj = name_space[f'havoc_{msg_type}']
+                    # exec(berserker_code, name_space)
+                    # obj = name_space[f'berserker_{msg_type}']
                     # obj()
                     with analyzer.lock:
                         analyzer.finished += 1
@@ -490,15 +490,37 @@ class AsyncProducer:
     async def _generator_mutate_async(
         self,
         doc_info: str,
-        req_res
+        req_res: dict[str, set],
+        mutated_types: list[str] | None = None
     ) -> list[tuple[str, str]]:
         sem = asyncio.Semaphore(configs.async_sem_fuzz)
+        req_types = (
+            sorted(self.req_types)
+            if mutated_types is None
+            else mutated_types
+        )
         tasks = [
             self._generator_mutate_one(msg_type=msg_type, doc_info=doc_info, req_res=req_res, sem=sem)
-            for msg_type in self.req_types
+            for msg_type in req_types
         ]
         results = await asyncio.gather(*tasks)
         return results
+
+    def _select_generator_mutate_types(self) -> list[str]:
+        """Select the request types to mutate in one generator-mutation round."""
+        req_types = sorted(self.req_types)
+        if not req_types:
+            return []
+
+        configured_limit = getattr(configs, 'async_sem_fuzz', len(req_types))
+        limit = max(1, min(configured_limit, len(req_types)))
+        cursor = getattr(self, '_generator_mutate_cursor', 0) % len(req_types)
+        selected = [
+            req_types[(cursor + offset) % len(req_types)]
+            for offset in range(limit)
+        ]
+        self._generator_mutate_cursor = (cursor + limit) % len(req_types)
+        return selected
 
     def generator_mutate(
         self,
@@ -509,15 +531,22 @@ class AsyncProducer:
         Attribute:
             req_res: the actual response for each request message, which provides the information for mutator
         """
+        mutated_types = self._select_generator_mutate_types()
         with analyzer.lock:
-            analyzer.set_progress('evolve', 'mutate', len(self.req_types))
+            analyzer.set_progress('evolve', 'mutate', len(mutated_types))
            
         doc_info = ''
         with open(self.info_path, 'r', encoding='utf-8') as f:
             doc_info = f.read()
         
         # produce new mutator
-        results = asyncio.run(self._generator_mutate_async(doc_info, req_res))
+        results = asyncio.run(
+            self._generator_mutate_async(
+                doc_info,
+                req_res,
+                mutated_types=mutated_types,
+            )
+        )
         
         # resolve mutator
         for msg_type, mutate_code in results:
@@ -535,7 +564,7 @@ class AsyncProducer:
             with open(mut_path, 'w', encoding='utf-8') as f:
                 f.write(mutate_code)
                 # f.write('\n\n')
-                # f.write(havoc_code)
+                # f.write(berserker_code)
                 
                 # construct and save information for new generator
                 old_name = self.generators[msg_type][0].name
