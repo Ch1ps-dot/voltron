@@ -5,7 +5,19 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.learner.automata import MealyMachine
 from voltron.configs import configs
 from voltron.utils.logger import logger_fuzz as logger
+from typing import TypedDict
 import base64, json, random, time, threading, os, math
+
+
+class StateStats(TypedDict):
+    state_id: int
+    depth: int
+    call_count: int
+    total_reward: float
+    out_degree: int
+    covered_transitions: set[str]
+    last_score: float
+
 
 class Berserker:
     """Berserker scheduler implementation for fuzzing the system under test (SUT) with random sequences of requests, aiming to explore the state space and find interesting behaviors.
@@ -24,6 +36,8 @@ class Berserker:
         dep_alphabet: A list of request types that have dependencies, used for generating dependent sequences.
         req_res: A dictionary mapping request types to the set of response types observed for those requests
     """
+    BUG_RESPONSES = {'CRASH'}
+
     def __init__(
         self,
         mapper: Mapper,
@@ -70,19 +84,155 @@ class Berserker:
         
         # Initialize the automaton and related sets based on the provided Mealy machine, if available
         self.machine = machine
-        self.S: list[tuple[str, ...]] = []
-        self.E: list[tuple[str, ...]] = []
+        self.states: list[tuple[str, ...]] = []
+        self.state_stats: dict[tuple[str, ...], StateStats] = {}
+        self.selected_base_state: tuple[str, ...] | None = None
+        self.selected_base_state_mode = ''
+        self.visited_machine_states: set[int] = set()
+        self.transit: list[tuple[str, ...]] = []
         if machine and use_guidance:
             self.machine = machine
             self.table = machine.table
-            self.E = list(self.table[1])
+            self.trans = list(self.table[1])
             self.T = self.table[2]
-            self.S = []
+
+            candidate_states = []
             for p in list(self.table[0]):
                 if len(p) == 1:
-                    self.S.append(p)
+                    candidate_states.append(p)
                 elif len(p) > 1 and self.T[p[:-1]][p[-1:]] != 'CRASH' and self.T[p[:-1]][p[-1:]] != 'TIMEOUT':
-                    self.S.append(p)
+                    candidate_states.append(p)
+
+            access_sequences: dict[int, tuple[str, ...]] = {}
+            for state in sorted(
+                candidate_states,
+                key=lambda item: (sum(symbol != '-' for symbol in item), item),
+            ):
+                state_id = self._machine_state_after(state)
+                if state_id is not None and state_id not in access_sequences:
+                    access_sequences[state_id] = state
+
+            self.states = list(access_sequences.values())
+            self.visited_machine_states.add(machine.start)
+
+            self.state_stats = {
+                state: {
+                    'state_id': state_id,
+                    'depth': sum(symbol != '-' for symbol in state),
+                    'call_count': 0,
+                    'total_reward': 0.0,
+                    'out_degree': len(self._outgoing_symbols(state_id)),
+                    'covered_transitions': set(),
+                    'last_score': 0.0,
+                }
+                for state_id, state in access_sequences.items()
+            }
+
+    def _machine_state_after(
+        self,
+        access_sequence: tuple[str, ...],
+    ) -> int | None:
+        if self.machine is None:
+            return None
+
+        state_id = self.machine.start
+        try:
+            for symbol in access_sequence:
+                if symbol != '-':
+                    state_id = self.machine.delta[(state_id, symbol)]
+        except KeyError:
+            logger.debug(
+                'Berserker: access sequence is absent from machine delta: '
+                f'{access_sequence}'
+            )
+            return None
+        return state_id
+
+    def _outgoing_symbols(self, state_id: int) -> set[str]:
+        if self.machine is None:
+            return set()
+        return {
+            symbol
+            for source, symbol in self.machine.delta
+            if source == state_id
+        }
+
+    def calculate_state_priority(
+        self,
+        state: tuple[str, ...],
+    ) -> float:
+        """Calculate the equally weighted reward, exploration, and structure score."""
+        stats = self.state_stats[state]
+        total_calls = sum(
+            item['call_count'] for item in self.state_stats.values()
+        )
+        average_rewards = {
+            candidate: item['total_reward'] / max(item['call_count'], 1)
+            for candidate, item in self.state_stats.items()
+        }
+        explorations = {
+            candidate: math.sqrt(
+                math.log(total_calls + 1) / (item['call_count'] + 1)
+            )
+            for candidate, item in self.state_stats.items()
+        }
+        max_average_reward = max(average_rewards.values(), default=0.0)
+        max_exploration = max(explorations.values(), default=0.0)
+        normalized_reward = (
+            average_rewards[state] / max_average_reward
+            if max_average_reward > 0.0
+            else 0.0
+        )
+        normalized_exploration = (
+            explorations[state] / max_exploration
+            if max_exploration > 0.0
+            else 0.0
+        )
+
+        max_depth = max(
+            (item['depth'] for item in self.state_stats.values()),
+            default=0,
+        )
+        max_out_degree = max(
+            (item['out_degree'] for item in self.state_stats.values()),
+            default=0,
+        )
+        depth = stats['depth'] / max(max_depth, 1)
+        uncovered = (
+            stats['out_degree'] - len(stats['covered_transitions'])
+        ) / max(max_out_degree, 1)
+        structure = (depth + uncovered) / 2
+        score = (
+            normalized_reward + normalized_exploration + structure
+        ) / 3
+        stats['last_score'] = score
+        return score
+
+    def select_priority_state(self) -> tuple[str, ...] | None:
+        if not self.states:
+            return None
+
+        scores = {
+            state: self.calculate_state_priority(state)
+            for state in self.states
+        }
+        best_score = max(scores.values())
+        candidates = [
+            state
+            for state, score in scores.items()
+            if math.isclose(score, best_score, rel_tol=1e-12, abs_tol=1e-12)
+        ]
+        return self.rand.choice(candidates)
+
+    def _use_machine_state(
+        self,
+        state: tuple[str, ...],
+        mode: str,
+    ) -> list[tuple[str, bytes]]:
+        self.selected_base_state = state
+        self.selected_base_state_mode = mode
+        self.state_stats[state]['call_count'] += 1
+        return self.mapper.select_generators(list(state))
 
     def select_random_requests(
         self,
@@ -103,6 +253,8 @@ class Berserker:
     ) -> list[tuple[str, bytes]]:
         """Select a prefix sequence of requests to be used for generating test sequences, based on the observed useful sequences and the dependencies between requests.
         """
+        self.selected_base_state = None
+        self.selected_base_state_mode = ''
         mode = ''
         if len(self.useful_seq) == 0:
             mode = 'random'
@@ -111,10 +263,9 @@ class Berserker:
         gs = []
         
         if mode == 'random':
-            if self.S:
-                p = self.rand.choice(self.S)
-                w = list(p)
-                gs = self.mapper.select_generators(w)
+            if self.states:
+                p = self.rand.choice(self.states)
+                gs = self._use_machine_state(p, mode)
             else:
                 gs = self.select_random_requests()
             
@@ -135,16 +286,79 @@ class Berserker:
                 gs = self.rand.choice(self.useful_seq)
                 
         elif mode == 'priority':
-            pass
+            p = self.select_priority_state()
+            if p is not None:
+                gs = self._use_machine_state(p, mode)
+            else:
+                gs = self.select_random_requests()
         
         logger.debug(f'select prefix[{mode}]: {'/'.join([g[0] for g in gs])}')
         return gs
-    
+
+    def update_state_feedback(
+        self,
+        request_sequence: list[tuple[str, bytes]],
+        prefix_length: int,
+        transition_increment: int,
+        response_increment: int,
+        conversation: Conversation | None,
+        bug_signal: bool = False,
+    ) -> None:
+        """Update reward and coverage for the state selected this round."""
+        state = self.selected_base_state
+        if state is None:
+            return
+
+        stats = self.state_stats[state]
+        state_id = stats['state_id']
+        expected_prefix = [symbol for symbol in state if symbol != '-']
+        actual_prefix = [
+            message_type
+            for message_type, _ in request_sequence[:prefix_length]
+        ]
+        if actual_prefix != expected_prefix:
+            logger.debug(
+                'Berserker: skip state feedback because the target state '
+                f'was not reached; expected={expected_prefix} '
+                f'actual={actual_prefix}'
+            )
+            return
+
+        discovered_state = state_id not in self.visited_machine_states
+        self.visited_machine_states.add(state_id)
+
+        if prefix_length < len(request_sequence):
+            outgoing_symbol = request_sequence[prefix_length][0]
+            if outgoing_symbol in self._outgoing_symbols(state_id):
+                stats['covered_transitions'].add(outgoing_symbol)
+                if self.machine is not None:
+                    destination = self.machine.delta[(state_id, outgoing_symbol)]
+                    if destination not in self.visited_machine_states:
+                        discovered_state = True
+                        self.visited_machine_states.add(destination)
+
+        responses = set(conversation.res_seq) if conversation is not None else set()
+        crashed = bool(responses & self.BUG_RESPONSES)
+
+        reward = (
+            1.0 * discovered_state
+            + 0.7 * (transition_increment > 0)
+            + 0.5 * (response_increment > 0)
+            + 2.0 * crashed
+            + 5.0 * (crashed or bug_signal)
+        )
+        stats['total_reward'] += reward
+        logger.debug(
+            'Berserker: update state reward '
+            f'state={state} reward={reward:.2f} '
+            f'total={stats["total_reward"]:.2f}'
+        )
+
     def select_suffix(
         self
     ) -> list[tuple[str, bytes]]:
-        if self.E:
-            p = self.rand.choice(self.E)
+        if self.transit:
+            p = self.rand.choice(self.transit)
             return self.mapper.select_generators(list(p))
         return self.select_random_requests()
     
@@ -347,7 +561,7 @@ class Berserker:
     ) -> dict[str, set[str]]:
         """fuzing the SUT with random sequences of requests.
         """
-        logger.debug(self.S)
+        logger.debug(self.states)
         logger.debug(self.alphabet)
         analyzer.set_progress('berserker', 'fuzz energy', times)
         energy = times
@@ -357,6 +571,7 @@ class Berserker:
         while (energy >= 0 if self.use_guidance else energy > 0):
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
+            last_non_compliant_num = analyzer.non_compliant_num
             
             ms = []
             prefix = self.select_base_state()
@@ -366,7 +581,11 @@ class Berserker:
             ms = ms + suffix
             req_seq = []
             
-            method = self.rand.choice(self.methods)
+            method = (
+                'cat'
+                if self.selected_base_state is not None
+                else self.rand.choice(self.methods)
+            )
             if (method == 'cat'):
                 req_seq = prefix + ms + suffix
             elif (method == 'int'):
@@ -386,9 +605,26 @@ class Berserker:
             )
             cur_trans_nums = analyzer.resp_trans_num()
             cur_resp_num = analyzer.res_types_num()
+            transition_increment = cur_trans_nums - last_trans_nums
+            response_increment = cur_resp_num - last_resp_num
+
+            self.update_state_feedback(
+                request_sequence=req_seq,
+                prefix_length=len(prefix),
+                transition_increment=transition_increment,
+                response_increment=response_increment,
+                conversation=cons,
+                bug_signal=(
+                    analyzer.non_compliant_num > last_non_compliant_num
+                ),
+            )
             
             if cons != None:
-                self.analyze_cons(cons, cur_trans_nums - last_trans_nums, cur_resp_num - last_resp_num)
+                self.analyze_cons(
+                    cons,
+                    transition_increment,
+                    response_increment,
+                )
                 analyzer.sent = '/'.join([msg_type for msg_type, _ in req_seq]) + f'({method})'
                 analyzer.recv = '/'.join(cons.res_seq)
                 logger.debug(f'sent({method}) -> {analyzer.sent}')

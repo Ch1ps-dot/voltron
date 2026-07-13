@@ -38,6 +38,14 @@ class Prompter:
             self._path_req_query = dir / "builder" / "request_query.md"
             with self._path_req_query.open('r+') as f:
                 self._tem_req_query = Template(f.read())
+
+            self._path_req_type_rules = dir / "builder" / "request_type_rules.md"
+            with self._path_req_type_rules.open('r+') as f:
+                self._tem_req_type_rules = Template(f.read())
+
+            self._path_res_type_rules = dir / "builder" / "response_type_rules.md"
+            with self._path_res_type_rules.open('r+') as f:
+                self._tem_res_type_rules = Template(f.read())
                 
             self._path_doc_analyze = dir / "builder" / "doc_analyze.md" 
             with self._path_doc_analyze.open('r+') as f:

@@ -451,6 +451,46 @@ class AsyncChater:
         )
 
         return pmp, self.json_extract(ans)
+
+    async def llm_request_type_rules(
+            self,
+            rfc_num: str,
+            pro_name: str,
+            field_info: str,
+            rfc_doc: str
+    ) -> tuple[str, str]:
+        tmp = self.pmp._tem_req_type_rules
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            field_info=field_info,
+            rfc_doc=rfc_doc,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="req_type_rules"
+        )
+        return pmp, self.json_extract(ans)
+
+    async def llm_response_type_rules(
+            self,
+            rfc_num: str,
+            pro_name: str,
+            field_info: str,
+            rfc_doc: str
+    ) -> tuple[str, str]:
+        tmp = self.pmp._tem_res_type_rules
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            field_info=field_info,
+            rfc_doc=rfc_doc,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="res_type_rules"
+        )
+        return pmp, self.json_extract(ans)
     
     async def llm_possible_res(
             self,

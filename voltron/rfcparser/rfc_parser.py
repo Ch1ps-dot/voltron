@@ -39,6 +39,8 @@ class AsyncRFCParser:
         # ir related value
         self.req_json: list[dict] # json data of request field
         self.res_json: list[dict] # json data of response field
+        self.req_type_rules: dict = {}
+        self.res_type_rules: dict = {}
         self.req_types: set[str] = set()
         self.res_types: set[str] = set()
         self.req_fields: list[str] = list()
@@ -142,6 +144,8 @@ class AsyncRFCParser:
             )
         self.req_fields = ['MessageType']
         self.res_json = []
+        self.req_type_rules = {}
+        self.res_type_rules = {}
         self.res_types = set()
         self.res_fields = []
         self.req_dep_map = {}
@@ -189,6 +193,8 @@ class AsyncRFCParser:
         """Key Field Parse"""
         req_path = self.ir_path / 'req.json'
         res_path = self.ir_path / 'res.json'
+        req_type_rules_path = self.ir_path / 'req_type_rules.json'
+        res_type_rules_path = self.ir_path / 'res_type_rules.json'
         
         if not req_path.is_file() or not res_path.is_file():
             res_task = asyncio.create_task(self._res_field(res_path))
@@ -209,11 +215,25 @@ class AsyncRFCParser:
                 res_json = json.load(f)
                 self.res_json = res_json
 
-        self.req_types = {str(v) for v in req_json[0]['value']}
-        self.res_types = {str(v) for v in res_json[0]['value']}
-
         self.req_fields = [str(v['field_name']) for v in req_json]
         self.res_fields = [str(v['field_name']) for v in res_json]
+
+        req_type_rules_task = asyncio.create_task(
+            self._req_type_rules(req_type_rules_path, req_json)
+        )
+        res_type_rules_task = asyncio.create_task(
+            self._res_type_rules(res_type_rules_path, res_json)
+        )
+        self.req_type_rules = await req_type_rules_task
+        self.res_type_rules = await res_type_rules_task
+
+        self.req_types = self._types_from_rules(self.req_type_rules)
+        self.res_types = self._types_from_rules(self.res_type_rules)
+
+        if not self.req_types:
+            self.req_types = self._types_from_field_values(req_json)
+        if not self.res_types:
+            self.res_types = self._types_from_field_values(res_json)
 
         logger.debug('RFCParser: finish key field extraction')
         
@@ -346,7 +366,7 @@ class AsyncRFCParser:
                     ans = None
                     if doc != None:
                         ans = await self.chater.llm_doc_parse(
-                            rfc_num = self.rfc_name,
+                            rfc_num = ' '.join(self.rfc_name),
                             pro_name = self.pro_name,
                             rfc_doc = doc,
                             error_msg = error_msg
@@ -374,7 +394,7 @@ class AsyncRFCParser:
                 req_json = None
                 try:
                     pmp, req_json = await self.chater.llm_request_query(
-                        rfc_num = self.rfc_name,
+                        rfc_num = ' '.join(self.rfc_name),
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.req_doc])
                     )
@@ -405,7 +425,7 @@ class AsyncRFCParser:
                 res_json = None
                 try:
                     pmp, res_json = await self.chater.llm_response_query(
-                        rfc_num = self.rfc_name,
+                        rfc_num = ' '.join(self.rfc_name),
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.res_doc])
                     )
@@ -420,6 +440,72 @@ class AsyncRFCParser:
                 except Exception as e:
                     logger.debug(res_json)
                     logger.debug(f'RFCParser: res field {e}')
+
+    async def _req_type_rules(
+            self,
+            req_type_rules_path: Path,
+            req_json: list[dict]
+    ) -> dict:
+        if req_type_rules_path.is_file():
+            with open(req_type_rules_path, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+            if self._type_rules_check(rules, 'request'):
+                return rules
+            logger.debug('RFCParser: invalid cached request type rules')
+
+        while True:
+            rules_json = None
+            try:
+                _, rules_json = await self.chater.llm_request_type_rules(
+                    rfc_num=' '.join(self.rfc_name),
+                    pro_name=self.pro_name,
+                    field_info=json.dumps(req_json),
+                    rfc_doc=''.join([s for s in self.req_doc]),
+                )
+                if rules_json is None:
+                    raise ValueError('empty request type rules')
+                rules = json.loads(rules_json)
+                if not self._type_rules_check(rules, 'request'):
+                    continue
+                with open(req_type_rules_path, 'w', encoding='utf-8') as f:
+                    json.dump(rules, f)
+                return rules
+            except Exception as e:
+                logger.debug(rules_json)
+                logger.debug(f'RFCParser: request type rules {e}')
+
+    async def _res_type_rules(
+            self,
+            res_type_rules_path: Path,
+            res_json: list[dict]
+    ) -> dict:
+        if res_type_rules_path.is_file():
+            with open(res_type_rules_path, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+            if self._type_rules_check(rules, 'response'):
+                return rules
+            logger.debug('RFCParser: invalid cached response type rules')
+
+        while True:
+            rules_json = None
+            try:
+                _, rules_json = await self.chater.llm_response_type_rules(
+                    rfc_num=' '.join(self.rfc_name),
+                    pro_name=self.pro_name,
+                    field_info=json.dumps(res_json),
+                    rfc_doc=''.join([s for s in self.res_doc]),
+                )
+                if rules_json is None:
+                    raise ValueError('empty response type rules')
+                rules = json.loads(rules_json)
+                if not self._type_rules_check(rules, 'response'):
+                    continue
+                with open(res_type_rules_path, 'w', encoding='utf-8') as f:
+                    json.dump(rules, f)
+                return rules
+            except Exception as e:
+                logger.debug(rules_json)
+                logger.debug(f'RFCParser: response type rules {e}')
     
     async def _msg_model_gen_one(
             self,
@@ -635,6 +721,73 @@ class AsyncRFCParser:
                     logger.debug('bad json')
                     return False
         return True
+
+    def _type_rules_check(
+            self,
+            data: dict,
+            direction: str
+    ) -> bool:
+        if not isinstance(data, dict):
+            return False
+        if data.get('message_direction') != direction:
+            return False
+        if not isinstance(data.get('primary_fields'), list):
+            return False
+        if not all(isinstance(field, str) for field in data['primary_fields']):
+            return False
+        if not isinstance(data.get('types'), list):
+            return False
+
+        for item in data['types']:
+            if not isinstance(item, dict):
+                return False
+            if not isinstance(item.get('type_name'), str):
+                return False
+            if not item['type_name'].strip():
+                return False
+            if not isinstance(item.get('field_values'), dict):
+                return False
+            if len(item['field_values']) == 0:
+                return False
+            if not all(
+                isinstance(name, str) and str(value).strip() != ''
+                for name, value in item['field_values'].items()
+            ):
+                return False
+            if not isinstance(item.get('explanation'), str):
+                return False
+        return True
+
+    def _types_from_rules(
+            self,
+            rules: dict
+    ) -> set[str]:
+        if not isinstance(rules, dict):
+            return set()
+        return {
+            item['type_name'].strip()
+            for item in rules.get('types', [])
+            if (
+                isinstance(item, dict)
+                and isinstance(item.get('type_name'), str)
+                and item['type_name'].strip()
+            )
+        }
+
+    def _types_from_field_values(
+            self,
+            fields: list[dict]
+    ) -> set[str]:
+        if not fields:
+            return set()
+        values = fields[0].get('value')
+        if not isinstance(values, list):
+            return set()
+        return {
+            str(value)
+            for value in values
+            if value is not None and str(value).strip() != ''
+        }
     
     def _escape_xml_attr(
             self,
