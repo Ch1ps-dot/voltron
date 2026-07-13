@@ -18,6 +18,9 @@ class Config:
         self.spec_knowledge: bool = True
         self.state_learning: bool = True
         self.guided_scheduling: bool = True
+        self.ir_evolution_enabled: bool = True
+        self.ir_evolution_failure_threshold: int = 3
+        self.ir_evolution_max_rounds_per_type: int = 1
         
         self.target_name: str
         self.trans_layer: str

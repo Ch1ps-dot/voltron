@@ -165,6 +165,32 @@ class AsyncChater:
         )
         return self.code_extract(ans)
 
+    async def llm_ir_evolve(
+            self,
+            pro_name: str,
+            direction: str,
+            msg_type: str,
+            current_ir: str,
+            type_rule: str,
+            section_context: str,
+            feedback: str
+    ) -> str:
+        tmp = self.pmp._tem_ir_evolve
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            direction=direction,
+            msg_type=msg_type,
+            current_ir=current_ir,
+            type_rule=type_rule,
+            section_context=section_context,
+            feedback=feedback,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="ir_evolve"
+        )
+        return self.xml_extract(ans)
+
     async def llm_generator_gen(
             self,
             pro_name: str,
@@ -205,6 +231,7 @@ class AsyncChater:
             field_name: str,
             msg_type: str,
             code: str,
+            msg_ir: str,
             info: str,
             trace: str,
             related_code: str
@@ -224,7 +251,16 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_generator_evolve
 
-        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, code=code, info=info, trace=trace, related_code=related_code)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            field_name=field_name,
+            msg_type=msg_type,
+            code=code,
+            msg_ir=msg_ir,
+            info=info,
+            trace=trace,
+            related_code=related_code,
+        )
         # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
@@ -273,6 +309,7 @@ class AsyncChater:
             field_name: str,
             msg_type: str,
             code: str,
+            msg_ir: str,
             info: str,
             poss_response: str,
             trace: str
@@ -292,7 +329,16 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_mutator_evolve
         
-        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, code=code, info=info, poss_response=poss_response, trace=trace)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            field_name=field_name,
+            msg_type=msg_type,
+            code=code,
+            msg_ir=msg_ir,
+            info=info,
+            poss_response=poss_response,
+            trace=trace,
+        )
         # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,

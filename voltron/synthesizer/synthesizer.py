@@ -96,6 +96,7 @@ class AsyncProducer:
         self.observers: dict[str, list[ResponseObserver]] = {}
         self.mutators: dict[str, list[Generator]] = {}
         self._response_sections = None
+        self._ir_evolution_rounds: dict[str, int] = {}
             
     def run(
         self
@@ -250,6 +251,7 @@ class AsyncProducer:
         with open(self.info_path, 'r', encoding='utf-8') as f:
             info = f.read()
         async with sem:
+            failure_count = 0
             while(True):
                 try:
                     # generate input generator and save it
@@ -351,6 +353,7 @@ class AsyncProducer:
                         pro_name=self.rfcp.pro_name,
                         field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
+                        msg_ir=self._request_ir_info(msg_type),
                         trace= '\n'.join(trace_list),
                         info=doc_info,
                         related_code='\n'.join(code_dep)
@@ -368,6 +371,20 @@ class AsyncProducer:
                         analyzer.finished += 1
                     return msg_type, input_code
                 except Exception as e:
+                    failure_count += 1
+                    if failure_count >= getattr(
+                        configs,
+                        'ir_evolution_failure_threshold',
+                        3,
+                    ):
+                        await self._maybe_evolve_request_ir(
+                            msg_type,
+                            (
+                                f'generator_evo failed {failure_count} '
+                                f'time(s): {type(e).__name__}: {e}'
+                            ),
+                        )
+                        failure_count = 0
                     logger.debug(f'Producer: generate error {e}')
 
     async def _generator_evo_async(
@@ -459,6 +476,7 @@ class AsyncProducer:
                         pro_name=self.rfcp.pro_name,
                         field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
+                        msg_ir=self._request_ir_info(msg_type),
                         info=doc_info,
                         poss_response='\n'.join(self.poss_response[msg_type]),
                         trace='\n'.join(req_res[msg_type] if msg_type in req_res.keys() else [])
@@ -1200,6 +1218,241 @@ class AsyncProducer:
             )
         return list(dict.fromkeys(str(value) for value in values))
 
+    def _request_ir_info(
+        self,
+        msg_type: str
+    ) -> str:
+        if not hasattr(self, 'req_ir'):
+            return ''
+
+        for message in self.req_ir.findall('message'):
+            if str(message.get('name', '')) == msg_type:
+                return etree.tostring(
+                    message,
+                    encoding='utf-8',
+                    pretty_print=True,
+                ).decode('utf-8')
+
+        return etree.tostring(
+            self.req_ir,
+            encoding='utf-8',
+            pretty_print=True,
+        ).decode('utf-8')
+
+    def _ir_evolution_allowed(
+        self
+    ) -> bool:
+        return (
+            getattr(configs, 'ir_evolution_enabled', True)
+            and getattr(configs, 'spec_knowledge', True)
+            and analyzer.active_phase == 'model_learning'
+        )
+
+    def _ir_evolution_round_available(
+        self,
+        direction: str,
+        msg_type: str
+    ) -> bool:
+        key = f'{direction}:{msg_type}'
+        max_rounds = getattr(configs, 'ir_evolution_max_rounds_per_type', 1)
+        return self._ir_evolution_rounds.get(key, 0) < max_rounds
+
+    def _record_ir_evolution_round(
+        self,
+        direction: str,
+        msg_type: str
+    ) -> None:
+        key = f'{direction}:{msg_type}'
+        self._ir_evolution_rounds[key] = (
+            self._ir_evolution_rounds.get(key, 0) + 1
+        )
+
+    async def _maybe_evolve_request_ir(
+        self,
+        msg_type: str,
+        feedback: str
+    ) -> bool:
+        if (
+            not self._ir_evolution_allowed()
+            or not self._ir_evolution_round_available('request', msg_type)
+        ):
+            return False
+
+        current_ir = self._request_ir_info(msg_type)
+        if not current_ir:
+            return False
+
+        evolved_ir = await self.chater.llm_ir_evolve(
+            pro_name=self.rfcp.pro_name,
+            direction='request',
+            msg_type=msg_type,
+            current_ir=current_ir,
+            type_rule=self._request_type_rule_info(msg_type),
+            section_context=self.rfcp._message_ir_context(msg_type, 'req'),
+            feedback=feedback,
+        )
+        if not evolved_ir:
+            return False
+
+        self._replace_request_ir(msg_type, evolved_ir)
+        self._record_ir_evolution(
+            direction='request',
+            msg_type=msg_type,
+            old_ir=current_ir,
+            new_ir=evolved_ir,
+            feedback=feedback,
+        )
+        self._record_ir_evolution_round('request', msg_type)
+        logger.info(f'Producer: evolved request IR [{msg_type}]')
+        return True
+
+    async def _maybe_evolve_response_ir(
+        self,
+        response: bytes,
+        feedback: str
+    ) -> bool:
+        msg_type = 'response'
+        if (
+            not self._ir_evolution_allowed()
+            or not self._ir_evolution_round_available('response', msg_type)
+            or not hasattr(self, 'res_ir')
+        ):
+            return False
+
+        current_ir = etree.tostring(
+            self.res_ir,
+            encoding='utf-8',
+            pretty_print=True,
+        ).decode('utf-8')
+        evolved_ir = await self.chater.llm_ir_evolve(
+            pro_name=self.rfcp.pro_name,
+            direction='response',
+            msg_type=msg_type,
+            current_ir=current_ir,
+            type_rule=self._response_type_rules_info(),
+            section_context=self.rfcp._message_ir_context(
+                f'response message of {self.rfcp.pro_name} protocol',
+                'res',
+            ),
+            feedback=(
+                f'{feedback}\n'
+                f'Response bytes repr: {response!r}\n'
+                f'Response bytes hex: {response.hex(" ")}'
+            ),
+        )
+        if not evolved_ir:
+            return False
+
+        self._replace_response_ir(evolved_ir)
+        self._record_ir_evolution(
+            direction='response',
+            msg_type=msg_type,
+            old_ir=current_ir,
+            new_ir=evolved_ir,
+            feedback=feedback,
+        )
+        self._record_ir_evolution_round('response', msg_type)
+        logger.info('Producer: evolved response IR')
+        return True
+
+    def _parse_evolved_ir(
+        self,
+        evolved_ir: str
+    ):
+        root = etree.fromstring(evolved_ir.encode('utf-8'))
+        if root.tag == 'ir':
+            return root
+
+        wrapper = etree.Element('ir')
+        wrapper.append(root)
+        return wrapper
+
+    def _replace_request_ir(
+        self,
+        msg_type: str,
+        evolved_ir: str
+    ) -> None:
+        evolved_root = self._parse_evolved_ir(evolved_ir)
+        replacement = None
+        for message in evolved_root.findall('message'):
+            if str(message.get('name', '')) == msg_type:
+                replacement = message
+                break
+
+        if replacement is None:
+            messages = evolved_root.findall('message')
+            if len(messages) == 1:
+                replacement = messages[0]
+
+        if replacement is None:
+            raise ValueError(f'evolved request IR lacks message {msg_type}')
+
+        for index, message in enumerate(self.req_ir.findall('message')):
+            if str(message.get('name', '')) == msg_type:
+                parent_index = self.req_ir.index(message)
+                self.req_ir[parent_index] = replacement
+                break
+        else:
+            self.req_ir.append(replacement)
+
+        self._write_ir_file('req', self.req_ir)
+        self.rfcp.req_ir = etree.ElementTree(self.req_ir)
+
+    def _replace_response_ir(
+        self,
+        evolved_ir: str
+    ) -> None:
+        self.res_ir = self._parse_evolved_ir(evolved_ir)
+        self.rfcp.res_ir = etree.ElementTree(self.res_ir)
+        self._write_ir_file('res', self.res_ir)
+
+    def _write_ir_file(
+        self,
+        direction: str,
+        root
+    ) -> None:
+        path = self.rfcp.ir_path / f'{direction}_ir.xml'
+        etree.ElementTree(root).write(
+            path,
+            encoding='UTF-8',
+            xml_declaration=True,
+            pretty_print=True,
+            standalone='yes',
+        )
+
+    def _record_ir_evolution(
+        self,
+        direction: str,
+        msg_type: str,
+        old_ir: str,
+        new_ir: str,
+        feedback: str
+    ) -> None:
+        log_path = self.rfcp.ir_path / 'ir_evolution_log.json'
+        try:
+            if log_path.is_file():
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    records = json.load(f)
+            else:
+                records = []
+
+            records.append({
+                'phase': analyzer.active_phase,
+                'direction': direction,
+                'message_type': msg_type,
+                'feedback': feedback,
+                'old_hash': hashlib.sha256(
+                    old_ir.encode('utf-8')
+                ).hexdigest(),
+                'new_hash': hashlib.sha256(
+                    new_ir.encode('utf-8')
+                ).hexdigest(),
+            })
+            with open(log_path, 'w', encoding='utf-8') as f:
+                json.dump(records, f, indent=2)
+        except Exception:
+            logger.exception('Producer: failed to write IR evolution log')
+
     def _checker_ir_for_response_type(
         self,
         response_type: str,
@@ -1261,6 +1514,13 @@ class AsyncProducer:
     ):
         res_info = self._primary_response_field_info()
         type_rules = self._response_type_rules_info()
+        await self._maybe_evolve_response_ir(
+            message,
+            (
+                'parser_evo was triggered by a response that the current '
+                'parser could not classify during model learning.'
+            ),
+        )
         old_code = ''
         old_p_name = f'{self.parsers[-1].name}.py'
         old_p_path = self.parser_path / old_p_name

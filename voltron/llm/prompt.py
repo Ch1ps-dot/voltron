@@ -64,6 +64,10 @@ class Prompter:
             self._path_ir_repair = dir / "builder" / "ir_repair.md"
             with self._path_ir_repair.open('r+') as f:
                 self._tem_ir_repair = Template(f.read())
+
+            self._path_ir_evolve = dir / "evolver" / "ir_evolve.md"
+            with self._path_ir_evolve.open('r+') as f:
+                self._tem_ir_evolve = Template(f.read())
             
             self._path_possible_response = dir / "builder" / "possible_response.md"
             with self._path_possible_response.open('r+') as f:

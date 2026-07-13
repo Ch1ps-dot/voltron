@@ -132,6 +132,16 @@ class Fuzzer:
         configs.spec_knowledge = self.spec_knowledge
         configs.state_learning = self.state_learning
         configs.guided_scheduling = self.guided_scheduling
+        ir_evolution = configs_yaml.get('ir_evolution', {})
+        configs.ir_evolution_enabled = ir_evolution.get('enabled', True)
+        configs.ir_evolution_failure_threshold = ir_evolution.get(
+            'failure_threshold',
+            3,
+        )
+        configs.ir_evolution_max_rounds_per_type = ir_evolution.get(
+            'max_rounds_per_type',
+            1,
+        )
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name
