@@ -46,6 +46,12 @@ class Prompter:
             self._path_res_type_rules = dir / "builder" / "response_type_rules.md"
             with self._path_res_type_rules.open('r+') as f:
                 self._tem_res_type_rules = Template(f.read())
+
+            self._path_section_type_annotation = (
+                dir / "builder" / "section_type_annotation.md"
+            )
+            with self._path_section_type_annotation.open('r+') as f:
+                self._tem_section_type_annotation = Template(f.read())
                 
             self._path_doc_analyze = dir / "builder" / "doc_analyze.md" 
             with self._path_doc_analyze.open('r+') as f:

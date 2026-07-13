@@ -37,6 +37,8 @@ class SectionNode:
         self.isLeaf: bool = False
         self.upper: SectionNode | None
         self.content_type: str = 'none'
+        self.related_request_types: list[str] = []
+        self.related_response_types: list[str] = []
 
         # debug
         # print(f'{name}: [{start}-{end}]')

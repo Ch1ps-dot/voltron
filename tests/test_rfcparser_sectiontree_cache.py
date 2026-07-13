@@ -60,6 +60,28 @@ def test_valid_sectiontree_cache_is_reused(tmp_path, monkeypatch):
     assert parser.tree_dict["rfc959"].name == "rfc959"
 
 
+def test_legacy_sectiontree_cache_gets_annotation_fields(tmp_path):
+    parser = make_parser(tmp_path)
+    tree = make_tree("rfc959", "message section")
+    from voltron.rfcparser.setciontree import SectionNode
+
+    node = SectionNode(1, 0, len(tree.doc_content), "1. Message")
+    delattr(node, "related_request_types")
+    delattr(node, "related_response_types")
+    tree.leafs = [node]
+
+    cache_path = tmp_path / "rfc959.pkl"
+    with cache_path.open("wb") as stream:
+        pickle.dump(tree, stream)
+
+    loaded = parser.load_st("rfc959")
+
+    assert loaded.leafs[0].related_request_types == []
+    assert loaded.leafs[0].related_response_types == []
+    assert loaded.section_type_annotation_req_types == []
+    assert loaded.section_type_annotation_res_types == []
+
+
 def test_wrong_pickle_type_is_regenerated(tmp_path, monkeypatch):
     parser = make_parser(tmp_path)
     cache_path = tmp_path / "rfc959.pkl"

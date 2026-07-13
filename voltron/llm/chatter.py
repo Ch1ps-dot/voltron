@@ -513,6 +513,32 @@ class AsyncChater:
             usage="res_type_rules"
         )
         return pmp, self.json_extract(ans)
+
+    async def llm_section_type_annotation(
+            self,
+            rfc_num: str,
+            pro_name: str,
+            request_types: str,
+            response_types: str,
+            content_type: str,
+            section_name: str,
+            section_content: str
+    ) -> tuple[str, str]:
+        tmp = self.pmp._tem_section_type_annotation
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            request_types=request_types,
+            response_types=response_types,
+            content_type=content_type,
+            section_name=section_name,
+            section_content=section_content,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="section_type_annotation"
+        )
+        return pmp, self.json_extract(ans)
     
     async def llm_possible_res(
             self,
