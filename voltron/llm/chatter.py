@@ -171,7 +171,8 @@ class AsyncChater:
             field_name: str,
             msg_type: str,
             msg_ir: str,
-            info: str
+            info: str,
+            type_rule: str = "{}"
     ) -> str:
         """Generate python code as fuzzer generator
 
@@ -183,7 +184,14 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_gen_generator
-        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, msg_ir=msg_ir, info=info)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            field_name=field_name,
+            msg_type=msg_type,
+            msg_ir=msg_ir,
+            info=info,
+            type_rule=type_rule,
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_gen"
@@ -230,7 +238,8 @@ class AsyncChater:
             pro_name: str,
             res_info: str,
             old_code: str,
-            message: bytes
+            message: bytes,
+            type_rules: str = "{}"
     ) -> str:
         """Repair teh python code
 
@@ -244,7 +253,13 @@ class AsyncChater:
         tmp = self.pmp._tem_parser_evolve
         if len(message) > 100:
             message = message[:99]
-        pmp = tmp.substitute(pro_name=pro_name, res_info=res_info, original_code=old_code, message=message)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            res_info=res_info,
+            type_rules=type_rules,
+            original_code=old_code,
+            message=message,
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "parser_evolve"
@@ -289,7 +304,8 @@ class AsyncChater:
     async def llm_parser_gen(
             self,
             pro_name: str,
-            res_info: str
+            res_info: str,
+            type_rules: str = "{}"
     ) -> str:
         """Generate python code as fuzzer parser
 
@@ -301,7 +317,11 @@ class AsyncChater:
             generated parser
         """
         tmp = self.pmp._tem_gen_parser
-        pmp = tmp.substitute(pro_name=pro_name, res_info=res_info)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            res_info=res_info,
+            type_rules=type_rules,
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "parser_gen"
@@ -314,7 +334,8 @@ class AsyncChater:
             pro_name: str,
             msg_ir: str,
             res_info: str,
-            response_type: str
+            response_type: str,
+            type_rule: str = "{}"
     ) -> str:
         """Generate a response conformance checker from response-message IR."""
         tmp = self.pmp._tem_gen_checker
@@ -322,7 +343,8 @@ class AsyncChater:
             pro_name=pro_name,
             msg_ir=msg_ir,
             res_info=res_info,
-            response_type=response_type
+            response_type=response_type,
+            type_rule=type_rule,
         )
         ans = await self.chat_llm(
             prompt=pmp,

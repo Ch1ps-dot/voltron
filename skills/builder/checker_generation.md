@@ -9,6 +9,7 @@ protocol specification.
 - Protocol name: $pro_name
 - Target response type: $response_type
 - Primary response-state field information: $res_info
+- Target response type rule: $type_rule
 - Response-message IR:
 
 ```xml
@@ -28,11 +29,11 @@ Typical field attributes include:
   `remaining bytes`, or `undefined`
 - `value`: an exact value, range, enumeration, grammar, or textual description
 
-`$res_info` contains exactly the first response-state field descriptor from the
-protocol response information file. `$response_type` is one value from that
-descriptor's `value` list. Generate a checker specifically for that response
+`$res_info` contains response-state field descriptors from the protocol response
+information file. `$type_rule` describes the field-value combination that
+identifies `$response_type`. Generate a checker specifically for that response
 type. The IR remains the source of message layout and conformance constraints;
-the state-field descriptor determines which response type this checker accepts.
+the type rule determines which response type this checker accepts.
 
 ## Required Program
 
@@ -51,9 +52,10 @@ an exception for arbitrary byte input.
 ## Validation Requirements
 
 1. Reject non-`bytes` input and handle an empty response according to the IR.
-2. Locate the primary state field described by `$res_info` and require its
-   decoded value to equal `$response_type`. Do not assume the response type
-   solely from the XML `message` name.
+2. Locate every field required by `$type_rule` and require the decoded values to
+   match the rule's `field_values`. Do not assume the response type solely from
+   the XML `message` name. If `$type_rule` is empty, fall back to the primary
+   state field described by `$res_info`.
 3. Parse fields in wire order. Maintain exact byte and, when required, bit
    offsets so that packed sub-byte fields are validated correctly.
 4. Validate every field described by the selected message definition:

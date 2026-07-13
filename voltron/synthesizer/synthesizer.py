@@ -258,7 +258,8 @@ class AsyncProducer:
                         field_name=self.rfcp.req_fields[0],
                         msg_type=msg_type,
                         msg_ir=msg_ir,
-                        info=info
+                        info=info,
+                        type_rule=self._request_type_rule_info(msg_type),
                     )
                     
                     # test generated code
@@ -587,12 +588,14 @@ class AsyncProducer:
             self
     ):
         res_info = self._primary_response_field_info()
+        type_rules = self._response_type_rules_info()
         while(True):
             try:
                 # generate input generator and save it
                 pkt_parser_code = await self.chater.llm_parser_gen(
                     pro_name=self.rfcp.pro_name,
-                    res_info=res_info
+                    res_info=res_info,
+                    type_rules=type_rules,
                 )
                 compile(pkt_parser_code, '<string>', 'exec')
                 return pkt_parser_code
@@ -640,7 +643,8 @@ class AsyncProducer:
                         pro_name=self.rfcp.pro_name,
                         msg_ir=msg_ir,
                         res_info=res_info,
-                        response_type=response_type
+                        response_type=response_type,
+                        type_rule=self._response_type_rule_info(response_type),
                     )
                     compile(checker_code, '<string>', 'exec')
                     namespace = {}
@@ -1167,7 +1171,27 @@ class AsyncProducer:
     def _response_types_from_primary_field(
         self
     ) -> list[str]:
-        field = json.loads(self._primary_response_field_info())[0]
+        rules = getattr(self.rfcp, 'res_type_rules', {})
+        if isinstance(rules, dict):
+            types = [
+                str(item['type_name']).strip()
+                for item in rules.get('types', [])
+                if (
+                    isinstance(item, dict)
+                    and isinstance(item.get('type_name'), str)
+                    and item['type_name'].strip()
+                )
+            ]
+            if types:
+                return list(dict.fromkeys(types))
+
+        field_info = json.loads(self._primary_response_field_info())
+        if not field_info:
+            raise RuntimeError(
+                'Response field information is empty; checker generation '
+                'requires at least one state-field descriptor'
+            )
+        field = field_info[0]
         values = field.get('value')
         if not isinstance(values, list) or not values:
             raise RuntimeError(
@@ -1236,6 +1260,7 @@ class AsyncProducer:
         message
     ):
         res_info = self._primary_response_field_info()
+        type_rules = self._response_type_rules_info()
         old_code = ''
         old_p_name = f'{self.parsers[-1].name}.py'
         old_p_path = self.parser_path / old_p_name
@@ -1249,6 +1274,7 @@ class AsyncProducer:
                     old_code=old_code,
                     pro_name=self.rfcp.pro_name,
                     res_info=res_info,
+                    type_rules=type_rules,
                     message=message,
                 )
                 
@@ -1263,19 +1289,72 @@ class AsyncProducer:
     def _primary_response_field_info(
         self
     ) -> str:
-        """Serialize only the first response-state field descriptor."""
+        """Serialize response-state field descriptors used by parser/checkers."""
         if not self.rfcp.res_json:
             raise RuntimeError(
                 'Response field information is empty; parser generation '
-                'requires the first state-field descriptor'
+                'requires at least one state-field descriptor'
             )
-        return json.dumps([self.rfcp.res_json[0]])
+        return json.dumps(self.rfcp.res_json)
 
     def _primary_response_field_name(
         self
     ) -> str:
-        field = json.loads(self._primary_response_field_info())[0]
+        rules = getattr(self.rfcp, 'res_type_rules', {})
+        if isinstance(rules, dict):
+            primary_fields = rules.get('primary_fields')
+            if isinstance(primary_fields, list) and primary_fields:
+                fields = [
+                    str(field)
+                    for field in primary_fields
+                    if str(field).strip()
+                ]
+                if fields:
+                    return '+'.join(fields)
+
+        field_info = json.loads(self._primary_response_field_info())
+        if not field_info:
+            return ''
+        field = field_info[0]
         return str(field.get('field_name') or field.get('name') or '')
+
+    def _request_type_rule_info(
+        self,
+        request_type: str
+    ) -> str:
+        rules = getattr(self.rfcp, 'req_type_rules', {})
+        if not isinstance(rules, dict):
+            return '{}'
+        for item in rules.get('types', []):
+            if (
+                isinstance(item, dict)
+                and str(item.get('type_name', '')).strip() == request_type
+            ):
+                return json.dumps(item)
+        return '{}'
+
+    def _response_type_rule_info(
+        self,
+        response_type: str
+    ) -> str:
+        rules = getattr(self.rfcp, 'res_type_rules', {})
+        if not isinstance(rules, dict):
+            return '{}'
+        for item in rules.get('types', []):
+            if (
+                isinstance(item, dict)
+                and str(item.get('type_name', '')).strip() == response_type
+            ):
+                return json.dumps(item)
+        return '{}'
+
+    def _response_type_rules_info(
+        self
+    ) -> str:
+        rules = getattr(self.rfcp, 'res_type_rules', {})
+        if isinstance(rules, dict):
+            return json.dumps(rules)
+        return '{}'
 
     def _parser_cache_matches_primary_field(
         self
