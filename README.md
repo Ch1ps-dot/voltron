@@ -191,6 +191,17 @@ Example:
 uv run cli.py -s lightftp -a state -t 30
 ```
 
+To parse only the RFC documents configured for a target into cached
+`SectionTree` objects, use:
+
+```bash
+uv run cli.py -s lightftp --rfc-parser
+```
+
+This mode does not require `--time` and does not initialize the producer,
+state learner, executor, or target process. It writes one pickle file per RFC
+to `component/ir/<protocol>/<rfc-name>.pkl`; an existing valid cache is reused.
+
 Remote targets use the same command; select the remote target name from
 `config/configs.yaml`:
 

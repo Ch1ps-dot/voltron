@@ -105,3 +105,82 @@ def test_atomic_save_removes_temporary_file(tmp_path):
 
     assert (tmp_path / "rfc959.pkl").is_file()
     assert list(tmp_path.glob("*.tmp-*")) == []
+
+
+def test_parse_section_trees_stops_before_ir_generation(
+    tmp_path,
+    monkeypatch,
+):
+    parser = make_parser(tmp_path)
+    parser.rfc_name = ["rfc959", "rfc2428"]
+    parser.doc_paths = [
+        tmp_path / "rfc959.txt",
+        tmp_path / "rfc2428.txt",
+    ]
+    calls = []
+
+    monkeypatch.setattr(
+        parser,
+        "ensure_rfc_documents",
+        lambda: calls.append("download"),
+    )
+    monkeypatch.setattr(
+        parser,
+        "prepare_section_tree",
+        lambda idx, name: calls.append((idx, name)) or "regenerated",
+    )
+    parser._query_prepare = lambda name: pytest.fail(
+        "standalone SectionTree parsing must not prepare IR queries"
+    )
+    parser.ir_generation = lambda: pytest.fail(
+        "standalone SectionTree parsing must not generate IR"
+    )
+
+    assert parser.parse_section_trees() == [
+        ("rfc959", "regenerated"),
+        ("rfc2428", "regenerated"),
+    ]
+    assert calls == [
+        "download",
+        (0, "rfc959"),
+        (1, "rfc2428"),
+    ]
+
+
+def test_parse_section_trees_rejects_mismatched_configuration(tmp_path):
+    parser = make_parser(tmp_path)
+    parser.rfc_name = ["rfc959"]
+    parser.doc_paths = []
+    parser.ensure_rfc_documents = lambda: None
+
+    with pytest.raises(ValueError, match="different lengths"):
+        parser.parse_section_trees()
+
+
+def test_normal_run_continues_from_section_trees_to_ir_generation(tmp_path):
+    parser = make_parser(tmp_path)
+    parser.req_doc = {"request section"}
+    parser.res_doc = {"response section"}
+    parser.all_doc = {"all section"}
+    calls = []
+
+    parser.parse_section_trees = lambda: [
+        ("rfc959", "loaded"),
+        ("rfc2428", "regenerated"),
+    ]
+    parser._query_prepare = lambda name: calls.append(("query", name))
+    parser.rag_init = lambda sections: calls.append(
+        ("rag", tuple(sections))
+    ) or object()
+    parser.ir_generation = lambda: calls.append(("ir",))
+
+    parser.run()
+
+    assert calls[:2] == [
+        ("query", "rfc959"),
+        ("query", "rfc2428"),
+    ]
+    assert ("rag", ("request section",)) in calls
+    assert ("rag", ("response section",)) in calls
+    assert ("rag", ("all section",)) in calls
+    assert calls[-1] == ("ir",)

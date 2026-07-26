@@ -68,7 +68,22 @@ class AsyncRFCParser:
             logger.debug('RFCParser: specification knowledge disabled')
             return
 
-        # Ensure RFC documents are available before parsing.
+        section_trees = self.parse_section_trees()
+        for name, _ in section_trees:
+            self._query_prepare(name)
+            logger.debug('RFCParser: finish parse')
+
+        self.rag_req_msg: fastbm25 = self.rag_init(list(self.req_doc))
+        self.rag_res_msg: fastbm25 = self.rag_init(list(self.res_doc))
+        self.rag_all: fastbm25 = self.rag_init(list(self.all_doc))
+
+        # ir generation
+        self.ir_generation()
+
+    def ensure_rfc_documents(
+        self,
+    ) -> None:
+        """Download configured RFC documents when the helper is available."""
         dl_script = configs.base_path / 'skills' / 'utils' / 'rfc_download.sh'
         if dl_script.is_file():
             rfc_args: list[str] = []
@@ -92,22 +107,37 @@ class AsyncRFCParser:
                     logger.warning(f'RFCParser: failed to download RFC docs with {dl_script}: {e}')
         else:
             logger.warning(f'RFCParser: download script not found: {dl_script}')
-        
-        # sectiontree parse pass
+
+    def parse_section_trees(
+        self,
+    ) -> list[tuple[str, str]]:
+        """Parse configured RFC documents into cached SectionTree objects only.
+
+        Returns:
+            A list of ``(RFC name, source)`` pairs. ``source`` is ``loaded``
+            when a valid cache was reused and ``regenerated`` when the source
+            document was parsed and persisted.
+        """
+        self.ensure_rfc_documents()
+        rfc_list = (
+            self.rfc_name
+            if isinstance(self.rfc_name, list)
+            else [self.rfc_name]
+        )
+        if len(self.doc_paths) != len(rfc_list):
+            raise ValueError(
+                'RFCParser: RFC names and document paths have different '
+                f'lengths ({len(rfc_list)} != {len(self.doc_paths)})'
+            )
+
+        results: list[tuple[str, str]] = []
         for i in range(len(self.doc_paths)):
-            name=configs.rfc_name[i]
+            name = str(rfc_list[i])
             logger.debug(f'create st: {name}')
             source = self.prepare_section_tree(i, name)
             logger.debug(f'RFCParser: sectiontree {source} [{name}]')
-            self._query_prepare(name)
-            logger.debug('RFCParser: finish parse')
-
-        self.rag_req_msg: fastbm25 = self.rag_init(list(self.req_doc))
-        self.rag_res_msg: fastbm25 = self.rag_init(list(self.res_doc))
-        self.rag_all: fastbm25 = self.rag_init(list(self.all_doc))
-
-        # ir generation
-        self.ir_generation()
+            results.append((name, source))
+        return results
 
     def load_seed_metadata(
         self
