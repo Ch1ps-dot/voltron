@@ -165,13 +165,40 @@ class AsyncChater:
         )
         return self.code_extract(ans)
 
+    async def llm_ir_evolve(
+            self,
+            pro_name: str,
+            direction: str,
+            msg_type: str,
+            current_ir: str,
+            type_rule: str,
+            section_context: str,
+            feedback: str
+    ) -> str:
+        tmp = self.pmp._tem_ir_evolve
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            direction=direction,
+            msg_type=msg_type,
+            current_ir=current_ir,
+            type_rule=type_rule,
+            section_context=section_context,
+            feedback=feedback,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="ir_evolve"
+        )
+        return self.xml_extract(ans)
+
     async def llm_generator_gen(
             self,
             pro_name: str,
             field_name: str,
             msg_type: str,
             msg_ir: str,
-            info: str
+            info: str,
+            type_rule: str = "{}"
     ) -> str:
         """Generate python code as fuzzer generator
 
@@ -183,7 +210,14 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_gen_generator
-        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, msg_ir=msg_ir, info=info)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            field_name=field_name,
+            msg_type=msg_type,
+            msg_ir=msg_ir,
+            info=info,
+            type_rule=type_rule,
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "generator_gen"
@@ -197,6 +231,7 @@ class AsyncChater:
             field_name: str,
             msg_type: str,
             code: str,
+            msg_ir: str,
             info: str,
             trace: str,
             related_code: str
@@ -216,7 +251,16 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_generator_evolve
 
-        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, code=code, info=info, trace=trace, related_code=related_code)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            field_name=field_name,
+            msg_type=msg_type,
+            code=code,
+            msg_ir=msg_ir,
+            info=info,
+            trace=trace,
+            related_code=related_code,
+        )
         # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
@@ -230,7 +274,8 @@ class AsyncChater:
             pro_name: str,
             res_info: str,
             old_code: str,
-            message: bytes
+            message: bytes,
+            type_rules: str = "{}"
     ) -> str:
         """Repair teh python code
 
@@ -244,7 +289,13 @@ class AsyncChater:
         tmp = self.pmp._tem_parser_evolve
         if len(message) > 100:
             message = message[:99]
-        pmp = tmp.substitute(pro_name=pro_name, res_info=res_info, original_code=old_code, message=message)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            res_info=res_info,
+            type_rules=type_rules,
+            original_code=old_code,
+            message=message,
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "parser_evolve"
@@ -258,6 +309,7 @@ class AsyncChater:
             field_name: str,
             msg_type: str,
             code: str,
+            msg_ir: str,
             info: str,
             poss_response: str,
             trace: str
@@ -277,7 +329,16 @@ class AsyncChater:
         """
         tmp = self.pmp._tem_mutator_evolve
         
-        pmp = tmp.substitute(pro_name=pro_name, field_name=field_name, msg_type=msg_type, code=code, info=info, poss_response=poss_response, trace=trace)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            field_name=field_name,
+            msg_type=msg_type,
+            code=code,
+            msg_ir=msg_ir,
+            info=info,
+            poss_response=poss_response,
+            trace=trace,
+        )
         # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
@@ -289,7 +350,8 @@ class AsyncChater:
     async def llm_parser_gen(
             self,
             pro_name: str,
-            res_info: str
+            res_info: str,
+            type_rules: str = "{}"
     ) -> str:
         """Generate python code as fuzzer parser
 
@@ -301,7 +363,11 @@ class AsyncChater:
             generated parser
         """
         tmp = self.pmp._tem_gen_parser
-        pmp = tmp.substitute(pro_name=pro_name, res_info=res_info)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            res_info=res_info,
+            type_rules=type_rules,
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "parser_gen"
@@ -314,7 +380,8 @@ class AsyncChater:
             pro_name: str,
             msg_ir: str,
             res_info: str,
-            response_type: str
+            response_type: str,
+            type_rule: str = "{}"
     ) -> str:
         """Generate a response conformance checker from response-message IR."""
         tmp = self.pmp._tem_gen_checker
@@ -322,7 +389,8 @@ class AsyncChater:
             pro_name=pro_name,
             msg_ir=msg_ir,
             res_info=res_info,
-            response_type=response_type
+            response_type=response_type,
+            type_rule=type_rule,
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -331,15 +399,15 @@ class AsyncChater:
 
         return self.code_extract(ans)
 
-    async def llm_hasher_gen(
+    async def llm_observer_gen(
             self,
             pro_name: str,
             msg_ir: str,
             res_info: str,
             response_type: str
     ) -> str:
-        """Generate a semantic response hasher from response-message IR."""
-        tmp = self.pmp._tem_gen_hasher
+        """Generate a semantic response observer from response-message IR."""
+        tmp = self.pmp._tem_gen_observer
         pmp = tmp.substitute(
             pro_name=pro_name,
             msg_ir=msg_ir,
@@ -348,11 +416,11 @@ class AsyncChater:
         )
         ans = await self.chat_llm(
             prompt=pmp,
-            usage="hasher_gen",
+            usage="observer_gen",
         )
         return self.code_extract(ans)
 
-    async def llm_hasher_evolve(
+    async def llm_observer_evolve(
             self,
             pro_name: str,
             response_type: str,
@@ -360,8 +428,8 @@ class AsyncChater:
             original_code: str,
             samples: str
     ) -> str:
-        """Evolve a hasher using same-type responses with different hashes."""
-        tmp = self.pmp._tem_hasher_evolve
+        """Evolve a observer using same-type responses with different observations."""
+        tmp = self.pmp._tem_observer_evolve
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
@@ -371,11 +439,11 @@ class AsyncChater:
         )
         ans = await self.chat_llm(
             prompt=pmp,
-            usage="hasher_evolve",
+            usage="observer_evolve",
         )
         return self.code_extract(ans)
 
-    async def llm_hasher_semantic_compare(
+    async def llm_observer_semantic_compare(
             self,
             pro_name: str,
             response_type: str,
@@ -384,7 +452,7 @@ class AsyncChater:
             new_response: bytes
     ) -> str:
         """Judge whether two responses have the same protocol semantics."""
-        tmp = self.pmp._tem_hasher_semantic_compare
+        tmp = self.pmp._tem_observer_semantic_compare
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
@@ -394,7 +462,7 @@ class AsyncChater:
         )
         ans = await self.chat_llm(
             prompt=pmp,
-            usage="hasher_semantic_compare",
+            usage="observer_semantic_compare",
         )
         return self.json_extract(ans)
 
@@ -450,6 +518,72 @@ class AsyncChater:
             usage = "res_query"
         )
 
+        return pmp, self.json_extract(ans)
+
+    async def llm_request_type_rules(
+            self,
+            rfc_num: str,
+            pro_name: str,
+            field_info: str,
+            rfc_doc: str
+    ) -> tuple[str, str]:
+        tmp = self.pmp._tem_req_type_rules
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            field_info=field_info,
+            rfc_doc=rfc_doc,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="req_type_rules"
+        )
+        return pmp, self.json_extract(ans)
+
+    async def llm_response_type_rules(
+            self,
+            rfc_num: str,
+            pro_name: str,
+            field_info: str,
+            rfc_doc: str
+    ) -> tuple[str, str]:
+        tmp = self.pmp._tem_res_type_rules
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            field_info=field_info,
+            rfc_doc=rfc_doc,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="res_type_rules"
+        )
+        return pmp, self.json_extract(ans)
+
+    async def llm_section_type_annotation(
+            self,
+            rfc_num: str,
+            pro_name: str,
+            request_types: str,
+            response_types: str,
+            content_type: str,
+            section_name: str,
+            section_content: str
+    ) -> tuple[str, str]:
+        tmp = self.pmp._tem_section_type_annotation
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            request_types=request_types,
+            response_types=response_types,
+            content_type=content_type,
+            section_name=section_name,
+            section_content=section_content,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage="section_type_annotation"
+        )
         return pmp, self.json_extract(ans)
     
     async def llm_possible_res(

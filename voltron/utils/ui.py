@@ -170,7 +170,7 @@ def make_progress_panel():
     
         return progress_panel
     
-    elif analyzer.show_progress == 'havoc':
+    elif analyzer.show_progress == 'berserker':
         data = {
             analyzer.progress_desc: f'{analyzer.finished}/{analyzer.total}',
             'sent': analyzer.sent,

@@ -1,6 +1,7 @@
 You are an expert in networking protocols and RFC analysis.
 
 ## Your task:
+
 Analyzing the format related sections of {$rfc_num} document of the {$pro_name} protocol, extract ONLY the fields from the **response message** that are response codes / status codes / result codes (or their protocol-specific equivalents). These are the fields explicitly used to distinguish different response types (for example: Status-Code, Result-Code, Response-Code, numeric/textual outcome codes).
 
 Focus only on code-like fields that directly identify response type. Do NOT include session IDs, sequence numbers, flags, transaction IDs, message names, or other payload fields. For each identified field, briefly explain how it is used to distinguish response types, and list the possible values if they are explicitly defined in the RFC. Only return the analysis result in a JSON array format as specified below, with one element per identified field.
@@ -12,6 +13,7 @@ Focus only on code-like fields that directly identify response type. Do NOT incl
 - If duplicates are found, keep only one canonical entry: prefer the clearer/more specific `field_name` and merge non-conflicting `value` items.
 
 ## **Format related document sections:**
+
 ${rfc_doc}
 
 ## **Output the result in the following JSON array format (required):**

@@ -12,9 +12,17 @@ from voltron.utils.logger import (
 from voltron.executor.mapper import Mapper
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
-from voltron.synthesizer.hasher import ResponseHasher
+from voltron.synthesizer.observer import ResponseObserver
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
+from voltron.executor.sut_monitor import (
+    CRASHED,
+    EXITED,
+    RUNNING,
+    UNREACHABLE,
+    RemoteSUTProcess,
+    build_sut_monitor,
+)
 import math, statistics, threading, sys, os, signal, re
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
@@ -78,6 +86,8 @@ class Executor:
         self.host = configs.host
         self.port = configs.port
         self.trans_layer = configs.trans_layer
+        self.sut_deployment = getattr(configs, 'sut_deployment', 'local')
+        self.sut_monitor = build_sut_monitor(configs)
         self.try_times_parser = 2
 
         # time related values
@@ -96,10 +106,10 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
-        self.hasher_funcs: dict[str, Callable[[bytes], str]] = {}
+        self.observer_funcs: dict[str, Callable[[bytes], str]] = {}
         if configs.fuzz_mode != 'replay':
             self.load_checkers(self.mapper.equip_checkers())
-            self.load_hashers(self.mapper.equip_hashers())
+            self.load_observers(self.mapper.equip_observers())
         self.checked_request_response_pairs: set[
             tuple[str, str, str]
         ] = set()
@@ -110,8 +120,8 @@ class Executor:
         self.reviewed_response_samples: dict[
             tuple[str, str, str], bytes
         ] = {}
-        self.hasher_evolution_failures: set[tuple[str, ...]] = set()
-        self.hasher_semantic_reviews: dict[
+        self.observer_evolution_failures: set[tuple[str, ...]] = set()
+        self.observer_semantic_reviews: dict[
             tuple[str, str, str], bool
         ] = {}
         self._invalid_response_lock = threading.Lock()
@@ -228,7 +238,7 @@ class Executor:
             f'stage={stage}',
             f'script={self.run_script}',
             f'transport={self.trans_layer}',
-            f'endpoint=localhost:{self.port}',
+            f'endpoint={getattr(self, "host", "localhost")}:{self.port}',
         ]
         if attempt is not None:
             fields.append(f'attempt={attempt}')
@@ -255,6 +265,34 @@ class Executor:
                     fields.append('output=<empty>')
 
         logger.debug('; '.join(fields))
+
+    def _is_remote_deployment(
+        self
+    ) -> bool:
+        return getattr(self, 'sut_deployment', 'local') == 'remote'
+
+    def _monitor(
+        self
+    ):
+        monitor = getattr(self, 'sut_monitor', None)
+        if monitor is None:
+            self.sut_monitor = build_sut_monitor(configs)
+            monitor = self.sut_monitor
+        return monitor
+
+    def _remote_status_summary(
+        self
+    ) -> str:
+        status = self._monitor().status()
+        fields = [
+            f'remote_state={status.state}',
+            f'returncode={status.returncode}',
+            f'process_running={status.process_running}',
+            f'port_listening={status.port_listening}',
+        ]
+        if status.detail:
+            fields.append(f'detail={status.detail}')
+        return '; '.join(fields)
 
     def interact(
         self,
@@ -347,21 +385,27 @@ class Executor:
         """
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
+        remote_deployment = self._is_remote_deployment()
         if self.stop_event.is_set():
             return False, None
-        self.kill_listeners(self.port)
-        if self.stop_event.is_set():
-            return False, None
-        clean = self.setup_exe()
-        if self.stop_event.is_set():
-            if clean is not None:
-                self._terminate_process_group(
-                    clean,
-                    signal.SIGKILL,
-                    timeout=1,
-                )
-            return False, None
-        proc = self.run_exe()
+        clean = None
+        proc = None
+        if remote_deployment:
+            self._monitor().start()
+        else:
+            self.kill_listeners(self.port)
+            if self.stop_event.is_set():
+                return False, None
+            clean = self.setup_exe()
+            if self.stop_event.is_set():
+                if clean is not None:
+                    self._terminate_process_group(
+                        clean,
+                        signal.SIGKILL,
+                        timeout=1,
+                    )
+                return False, None
+            proc = self.run_exe()
         
         
         # if proc is None:
@@ -373,54 +417,72 @@ class Executor:
         #     return False, None
         
         # avoid unexceptional crash of target
-        for attempt in range(1, 101):
-            if self.stop_event.is_set():
-                self._terminate_process_group(
-                    proc,
-                    signal.SIGTERM,
-                    timeout=1,
-                )
-                return False, None
-            if proc is not None and proc.poll() is not None:
+        if not remote_deployment:
+            for attempt in range(1, 101):
+                if self.stop_event.is_set():
+                    self._terminate_process_group(
+                        proc,
+                        signal.SIGTERM,
+                        timeout=1,
+                    )
+                    return False, None
+                if proc is not None and proc.poll() is not None:
+                    self._log_sut_start_failure(
+                        proc,
+                        stage='process-exited-before-ready-check',
+                        attempt=attempt,
+                    )
+                    if self.stop_event.wait(self.setup_time_s):
+                        return False, None
+                    proc = self.run_exe()
+                else:
+                    break
+
+            if proc is None:
                 self._log_sut_start_failure(
                     proc,
-                    stage='process-exited-before-ready-check',
-                    attempt=attempt,
+                    stage='process-launch-retries',
+                    detail='run_exe returned no process',
                 )
-                if self.stop_event.wait(self.setup_time_s):
-                    return False, None
-                proc = self.run_exe()
-            else:
-                break
-
-        if proc is None:
-            self._log_sut_start_failure(
-                proc,
-                stage='process-launch-retries',
-                detail='run_exe returned no process',
-            )
-            raise Exception('Execute: process close')
-        if proc.poll() is not None:
-            self._log_sut_start_failure(
-                proc,
-                stage='process-launch-retries',
-                detail='process still exited after launch retries',
-            )
-            raise Exception('Execute: process close')
+                raise Exception('Execute: process close')
+            if proc.poll() is not None:
+                self._log_sut_start_failure(
+                    proc,
+                    stage='process-launch-retries',
+                    detail='process still exited after launch retries',
+                )
+                raise Exception('Execute: process close')
         
         # wait for server setup
         sock = None
         for attempt in range(1, 101):
             if self.stop_event.wait(self.setup_time_s):
-                self._terminate_process_group(
-                    proc,
-                    signal.SIGTERM,
-                    timeout=1,
-                )
+                if not remote_deployment:
+                    self._terminate_process_group(
+                        proc,
+                        signal.SIGTERM,
+                        timeout=1,
+                    )
                 return False, None
             sock = self.setup_socket()
             if sock == None:
-                if proc != None and proc.poll() is not None:
+                if remote_deployment:
+                    status = self._monitor().status()
+                    logger.debug(
+                        'Executor: remote SUT not ready; '
+                        f'attempt={attempt}; state={status.state}; '
+                        f'process_running={status.process_running}; '
+                        f'port_listening={status.port_listening}'
+                    )
+                    if status.state in {EXITED, CRASHED}:
+                        self._log_sut_start_failure(
+                            proc,
+                            stage='remote-readiness-check',
+                            attempt=attempt,
+                            detail=self._remote_status_summary(),
+                        )
+                        raise Exception('Execute: remote process close')
+                elif proc != None and proc.poll() is not None:
                     self._log_sut_start_failure(
                         proc,
                         stage='socket-readiness-check',
@@ -442,14 +504,14 @@ class Executor:
             else:
                 break
             
-        if proc is None:
+        if not remote_deployment and proc is None:
             self._log_sut_start_failure(
                 proc,
                 stage='socket-readiness-check',
                 detail='restart returned no process',
             )
             raise Exception('Executor: process close')
-        if proc.poll() is not None:
+        if not remote_deployment and proc.poll() is not None:
             self._log_sut_start_failure(
                 proc,
                 stage='socket-readiness-check',
@@ -465,6 +527,11 @@ class Executor:
                 detail=(
                     f'service did not become reachable within '
                     f'{100 * self.setup_time_s:.2f}s'
+                    + (
+                        f'; {self._remote_status_summary()}'
+                        if remote_deployment
+                        else ''
+                    )
                 ),
             )
             self.stop_event.set()
@@ -483,11 +550,14 @@ class Executor:
         )
         if self.stop_event.is_set():
             sock.close()
-            self._terminate_process_group(
-                proc,
-                signal.SIGTERM,
-                timeout=1,
-            )
+            if remote_deployment:
+                self._monitor().stop()
+            else:
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGTERM,
+                    timeout=1,
+                )
             return False, None
         last_recv = '-'
         if(resp_code and resp_data):
@@ -517,7 +587,7 @@ class Executor:
             if self.stop_event.is_set():
                 break
             
-            if proc.poll() is not None:
+            if not remote_deployment and proc.poll() is not None:
                 if not self._handle_crash_if_detected(
                     cons,
                     proc,
@@ -653,7 +723,7 @@ class Executor:
             
             # If socket closed, stop sending
             else:
-                return_code = proc.poll()
+                return_code = proc.poll() if proc is not None else None
                 
                 # program exited unexpectly
                 self._handle_crash_if_detected(
@@ -686,8 +756,15 @@ class Executor:
         )
         
         # close process
-        close_signal = signal.SIGUSR1 if configs.fuzz_mode == 'replay' else signal.SIGTERM
-        self._terminate_process_group(proc, close_signal, timeout=3)
+        close_signal = (
+            signal.SIGUSR1
+            if getattr(configs, 'fuzz_mode', '') == 'replay'
+            else signal.SIGTERM
+        )
+        if remote_deployment:
+            self._monitor().stop()
+        else:
+            self._terminate_process_group(proc, close_signal, timeout=3)
         analyzer.sut_proc = None
         
         # ensure sub-subprocess die
@@ -706,7 +783,7 @@ class Executor:
         #             break
         
         # kill clean script
-        if clean != None:
+        if clean != None and not remote_deployment:
             self._terminate_process_group(clean, signal.SIGKILL, timeout=1)
                 
 
@@ -944,7 +1021,7 @@ class Executor:
             
             try:
                 if (self.trans_layer == 'tcp'):
-                    sock = socket.create_connection(('localhost', self.port))
+                    sock = socket.create_connection((self.host, self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 else:
@@ -1210,7 +1287,7 @@ class Executor:
     def handle_crash(
         self,
         cons: Conversation,
-        proc: subprocess.Popen,
+        proc: subprocess.Popen | RemoteSUTProcess | None,
         msg_type: str,
         msg: bytes,
         stdout: str = '',
@@ -1229,12 +1306,19 @@ class Executor:
             else:
                 cons.add_state('-', 'CRASH')
                 cons.add_data(bytes(), bytes())
-            logger.debug(f'Program crash exitcode {proc.returncode}')
+            logger.debug(
+                f'Program crash exitcode {getattr(proc, "returncode", None)}'
+            )
             with self.analyzer.lock:
                 self.analyzer.crash_num += 1
 
-            if configs.fuzz_mode != 'replay':
-                if stdout == '' and stderr == '':
+            if getattr(configs, 'fuzz_mode', '') != 'replay':
+                if (
+                    proc is not None
+                    and hasattr(proc, 'communicate')
+                    and stdout == ''
+                    and stderr == ''
+                ):
                     stdout, stderr = self._read_process_output(proc)
                 self.save_cons(cons, stdout, stderr, True)
                 self.generate_crash_report(
@@ -1249,11 +1333,20 @@ class Executor:
     def _handle_crash_if_detected(
         self,
         cons: Conversation,
-        proc: subprocess.Popen,
+        proc: subprocess.Popen | RemoteSUTProcess | None,
         msg_type: str,
         msg: bytes,
         request_recorded: bool = True,
     ) -> bool:
+        if self._is_remote_deployment():
+            return self._handle_remote_crash_if_detected(
+                cons,
+                msg_type,
+                msg,
+                request_recorded=request_recorded,
+            )
+        if proc is None:
+            return False
         return_code = proc.poll()
         if return_code is None:
             return False
@@ -1276,6 +1369,49 @@ class Executor:
             return True
 
         return False
+
+    def _handle_remote_crash_if_detected(
+        self,
+        cons: Conversation,
+        msg_type: str,
+        msg: bytes,
+        request_recorded: bool = True,
+    ) -> bool:
+        status = self._monitor().collect_failure_evidence()
+        if status.state == UNREACHABLE:
+            logger.debug(
+                'Executor: UNKNOWN_REMOTE_STATUS; '
+                f'detail={status.detail or "monitor unreachable"}'
+            )
+            return False
+        stdout = status.stdout
+        stderr = '\n'.join(
+            part
+            for part in (status.stderr, status.logs)
+            if part
+        )
+        crashed = status.state == CRASHED
+        if status.state == EXITED:
+            return_code = status.returncode
+            if return_code is None and (stdout or stderr):
+                return_code = 1
+            crashed = self._is_crash(return_code, stdout, stderr)
+        if not crashed:
+            if status.state == RUNNING:
+                logger.debug('Executor: remote SUT still running')
+            return False
+
+        proc = RemoteSUTProcess(status)
+        self.handle_crash(
+            cons,
+            proc,
+            msg_type,
+            msg,
+            stdout,
+            stderr,
+            request_recorded=request_recorded,
+        )
+        return True
     
     def _is_crash(
         self,
@@ -1388,6 +1524,7 @@ class Executor:
             'report_id': report_id,
             'target': getattr(configs, 'target_name', ''),
             'protocol': getattr(configs, 'pro_name', ''),
+            'sut_deployment': getattr(configs, 'sut_deployment', 'local'),
             'crash': {
                 'returncode': getattr(proc, 'returncode', None),
                 'trigger_request_type': msg_type,
@@ -1510,40 +1647,43 @@ class Executor:
                     f'Executor: checker load failure [{msg_type}] {e}'
                 )
 
-    def load_hashers(
+    def load_observers(
         self,
-        hashers: dict[str, ResponseHasher]
+        observers: dict[str, ResponseObserver]
     ) -> None:
-        """Load the latest generated semantic hasher for each response type."""
-        self.hasher_funcs = {}
-        for msg_type, hasher in hashers.items():
+        """Load the latest generated semantic observer for each response type."""
+        self.observer_funcs = {}
+        for msg_type, observer in observers.items():
             namespace = {}
             try:
-                with open(self.mapper.h_path(hasher), 'r', encoding='utf-8') as f:
+                with open(self.mapper.o_path(observer), 'r', encoding='utf-8') as f:
                     exec(f.read(), namespace)
-                hasher_func: Callable = namespace.get('packet_hasher')
-                if not callable(hasher_func):
-                    raise TypeError('packet_hasher is missing or not callable')
-                self.hasher_funcs[msg_type] = hasher_func
+                observer_func: Callable = (
+                    namespace.get('packet_observer')
+                    or namespace.get('packet_hasher')
+                )
+                if not callable(observer_func):
+                    raise TypeError('packet_observer is missing or not callable')
+                self.observer_funcs[msg_type] = observer_func
             except Exception:
                 logger.exception(
-                    f'Executor: hasher load failure [{msg_type}]'
+                    f'Executor: observer load failure [{msg_type}]'
                 )
 
-    def hash_response(
+    def observe_response(
         self,
         response_type: str,
         response: bytes
     ) -> str:
         """Return an IR-normalized digest, falling back to raw SHA-256."""
         fallback = hashlib.sha256(response).hexdigest()
-        hasher = self.hasher_funcs.get(response_type)
-        if hasher is None:
-            hasher = self.hasher_funcs.get('__all__')
-        if hasher is None:
+        observer = self.observer_funcs.get(response_type)
+        if observer is None:
+            observer = self.observer_funcs.get('__all__')
+        if observer is None:
             return fallback
         try:
-            digest = hasher(response)
+            digest = observer(response)
             if (
                 not isinstance(digest, str)
                 or len(digest) != 64
@@ -1551,37 +1691,37 @@ class Executor:
                 or any(char not in '0123456789abcdef' for char in digest)
             ):
                 raise TypeError(
-                    'packet_hasher must return lowercase SHA-256'
+                    'packet_observer must return lowercase SHA-256'
                 )
             return digest
         except Exception:
             logger.exception(
-                f'Executor: hasher failure [{response_type}]'
+                f'Executor: observer failure [{response_type}]'
             )
             return fallback
 
-    def hash_response_with_evolution(
+    def observe_response_with_evolution(
         self,
         response_type: str,
         response: bytes
     ) -> str:
-        """Evolve a hasher only for semantically equivalent hash divergence."""
+        """Evolve an observer only for semantically equivalent divergence."""
         if not hasattr(self, 'checked_response_samples'):
             self.checked_response_samples = {}
         if not hasattr(self, 'reviewed_response_samples'):
             self.reviewed_response_samples = {}
-        if not hasattr(self, 'hasher_evolution_failures'):
-            self.hasher_evolution_failures = set()
-        if not hasattr(self, 'hasher_semantic_reviews'):
-            self.hasher_semantic_reviews = {}
-        digest = self.hash_response(response_type, response)
-        if response_type not in self.hasher_funcs:
+        if not hasattr(self, 'observer_evolution_failures'):
+            self.observer_evolution_failures = set()
+        if not hasattr(self, 'observer_semantic_reviews'):
+            self.observer_semantic_reviews = {}
+        digest = self.observe_response(response_type, response)
+        if response_type not in self.observer_funcs:
             return digest
 
         previous_samples = self._historical_response_samples(response_type)
         samples_by_digest: dict[str, list[bytes]] = {}
         for sample in previous_samples:
-            sample_digest = self.hash_response(response_type, sample)
+            sample_digest = self.observe_response(response_type, sample)
             samples_by_digest.setdefault(sample_digest, []).append(sample)
         previous_digests = set(samples_by_digest)
         if not previous_samples or digest in previous_digests:
@@ -1605,9 +1745,9 @@ class Executor:
                     response_raw_hash,
                     old_raw_hash,
                 )
-                equivalent = self.hasher_semantic_reviews.get(review_key)
+                equivalent = self.observer_semantic_reviews.get(review_key)
                 if equivalent is None:
-                    equivalent = self.hasher_semantic_reviews.get(reverse_key)
+                    equivalent = self.observer_semantic_reviews.get(reverse_key)
                 if equivalent is None:
                     self._set_ui_operation(
                         'Comparing response semantics with LLM'
@@ -1620,7 +1760,7 @@ class Executor:
                             new_response=response,
                         )
                     )
-                    self.hasher_semantic_reviews[review_key] = equivalent
+                    self.observer_semantic_reviews[review_key] = equivalent
                 if equivalent:
                     equivalent_samples.extend(old_samples)
         except Exception:
@@ -1634,7 +1774,7 @@ class Executor:
 
         if not equivalent_samples:
             logger.debug(
-                f'Executor: preserve distinct semantic hashes '
+                f'Executor: preserve distinct semantic observations '
                 f'[{response_type}]'
             )
             return digest
@@ -1644,27 +1784,27 @@ class Executor:
             hashlib.sha256(sample).hexdigest()
             for sample in samples
         ))
-        if failure_key in self.hasher_evolution_failures:
+        if failure_key in self.observer_evolution_failures:
             return digest
 
         try:
-            self._set_ui_operation('Updating response hasher with LLM')
-            evolved = self.mapper.producer.evolve_hasher(
+            self._set_ui_operation('Updating response observer with LLM')
+            evolved = self.mapper.producer.evolve_observer(
                 response_type=response_type,
                 samples=samples,
             )
             if evolved is None:
-                self.hasher_evolution_failures.add(failure_key)
+                self.observer_evolution_failures.add(failure_key)
                 return digest
-            self.mapper.hashers = self.mapper.producer.hashers
-            self.load_hashers(self.mapper.equip_hashers())
-            self._rebuild_hash_indexes(response_type)
-            self._rehash_persisted_invalid_responses(response_type)
-            return self.hash_response(response_type, response)
+            self.mapper.observers = self.mapper.producer.observers
+            self.load_observers(self.mapper.equip_observers())
+            self._rebuild_observation_indexes(response_type)
+            self._reobserve_persisted_invalid_responses(response_type)
+            return self.observe_response(response_type, response)
         except Exception:
-            self.hasher_evolution_failures.add(failure_key)
+            self.observer_evolution_failures.add(failure_key)
             logger.exception(
-                f'Executor: hasher evolution failed [{response_type}]'
+                f'Executor: observer evolution failed [{response_type}]'
             )
             return digest
         finally:
@@ -1717,7 +1857,7 @@ class Executor:
         if not enabled:
             return True
 
-        response_hash = self.hash_response_with_evolution(
+        response_observation = self.observe_response_with_evolution(
             response_type,
             response,
         )
@@ -1725,7 +1865,7 @@ class Executor:
         dedup_key = (
             request_type,
             response_type,
-            response_hash,
+            response_observation,
         )
         with self._invalid_response_lock:
             if dedup_key in self.checked_request_response_pairs:
@@ -1733,7 +1873,7 @@ class Executor:
                     'checker.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_hash=dedup_key[2],
+                    response_observation=dedup_key[2],
                 ))
                 return True
             self.checked_request_response_pairs.add(dedup_key)
@@ -1760,13 +1900,13 @@ class Executor:
         if not response:
             return
 
-        response_hash = self.hash_response(response_type, response)
-        dedup_key = (request_type, response_type, response_hash)
+        response_observation = self.observe_response(response_type, response)
+        dedup_key = (request_type, response_type, response_observation)
         with self._invalid_response_lock:
             if dedup_key in self.reviewed_invalid_responses:
                 logger.debug(
                     'Executor: duplicate non-conforming response skipped '
-                    f'[{request_type}/{response_type}] {response_hash}'
+                    f'[{request_type}/{response_type}] {response_observation}'
                 )
                 return
             self.reviewed_invalid_responses.add(dedup_key)
@@ -1857,8 +1997,8 @@ class Executor:
         request, response = cons.content[-1]
         request_type = cons.req_seq[-1]
         response_digest = hashlib.sha256(response).hexdigest()
-        response_hash = self.hash_response(response_type, response)
-        dedup_key = (request_type, response_type, response_hash)
+        response_observation = self.observe_response(response_type, response)
+        dedup_key = (request_type, response_type, response_observation)
         marker_digest = hashlib.sha256(
             json.dumps(dedup_key, separators=(',', ':')).encode('utf-8')
         ).hexdigest()
@@ -1870,7 +2010,7 @@ class Executor:
                     'invalid_response.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_hash=response_hash,
+                    response_observation=response_observation,
                 ))
                 return False
 
@@ -1886,7 +2026,7 @@ class Executor:
                     'invalid_response.deduplicated',
                     request_type=request_type,
                     response_type=response_type,
-                    response_hash=response_hash,
+                    response_observation=response_observation,
                 ))
                 return False
 
@@ -1935,7 +2075,7 @@ class Executor:
                     'request_type': request_type,
                     'response_type': response_type,
                     'response_sha256': response_digest,
-                    'response_hash': response_hash,
+                    'response_observation': response_observation,
                     'request': {
                         'encoding': 'base64',
                         'data': base64.b64encode(request).decode('ascii'),
@@ -1965,7 +2105,7 @@ class Executor:
             request_type=request_type,
             response_type=response_type,
             response_sha256=response_digest,
-            response_hash=response_hash,
+            response_observation=response_observation,
         ))
         return True
 
@@ -1975,12 +2115,15 @@ class Executor:
         dedup_key: tuple[str, str, str]
     ) -> bool:
         """Check persisted analysis files, including files from older runs."""
-        request_type, response_type, response_hash = dedup_key
+        request_type, response_type, response_observation = dedup_key
         for path in target_folder.glob('cons_*.analysis.json'):
             try:
                 with path.open('r', encoding='utf-8') as f:
                     record = json.load(f)
-                saved_hash = record.get('response_hash')
+                saved_hash = (
+                    record.get('response_observation')
+                    or record.get('response_hash')
+                )
                 if not saved_hash:
                     encoded = record.get('response', {}).get('data')
                     if not isinstance(encoded, str):
@@ -1989,14 +2132,14 @@ class Executor:
                         encoded,
                         validate=True,
                     )
-                    saved_hash = self.hash_response(
+                    saved_hash = self.observe_response(
                         response_type,
                         saved_response,
                     )
                 if (
                     record.get('request_type') == request_type
                     and record.get('response_type') == response_type
-                    and saved_hash == response_hash
+                    and saved_hash == response_observation
                 ):
                     return True
             except Exception:
@@ -2035,7 +2178,7 @@ class Executor:
                     )
         return list(dict.fromkeys(samples))
 
-    def _rebuild_hash_indexes(
+    def _rebuild_observation_indexes(
         self,
         response_type: str
     ) -> None:
@@ -2056,7 +2199,7 @@ class Executor:
                 self.checked_request_response_pairs.add((
                     request_type,
                     saved_type,
-                    self.hash_response(saved_type, response),
+                    self.observe_response(saved_type, response),
                 ))
         for (request_type, saved_type, _), response in (
             self.reviewed_response_samples.items()
@@ -2065,10 +2208,10 @@ class Executor:
                 self.reviewed_invalid_responses.add((
                     request_type,
                     saved_type,
-                    self.hash_response(saved_type, response),
+                    self.observe_response(saved_type, response),
                 ))
 
-    def _rehash_persisted_invalid_responses(
+    def _reobserve_persisted_invalid_responses(
         self,
         response_type: str
     ) -> None:
@@ -2088,7 +2231,7 @@ class Executor:
                             encoded,
                             validate=True,
                         )
-                        record['response_hash'] = self.hash_response(
+                        record['response_observation'] = self.observe_response(
                             response_type,
                             response,
                         )
@@ -2104,7 +2247,7 @@ class Executor:
                 records.append(record)
             except Exception:
                 logger.exception(
-                    f'Executor: persisted response rehash failed {path}'
+                    f'Executor: persisted response reobserve failed {path}'
                 )
 
         for marker in target_folder.glob('.dedup_*'):
@@ -2112,7 +2255,10 @@ class Executor:
         for record in records:
             request_type = record.get('request_type')
             saved_type = record.get('response_type')
-            saved_hash = record.get('response_hash')
+            saved_hash = (
+                record.get('response_observation')
+                or record.get('response_hash')
+            )
             if (
                 isinstance(saved_type, str)
                 and not isinstance(saved_hash, str)
@@ -2120,13 +2266,13 @@ class Executor:
                 encoded = record.get('response', {}).get('data')
                 if isinstance(encoded, str):
                     try:
-                        saved_hash = self.hash_response(
+                        saved_hash = self.observe_response(
                             saved_type,
                             base64.b64decode(encoded, validate=True),
                         )
                     except Exception:
                         logger.exception(
-                            'Executor: marker hash reconstruction failed'
+                            'Executor: marker observation reconstruction failed'
                         )
             if not all(isinstance(value, str) for value in (
                 request_type,

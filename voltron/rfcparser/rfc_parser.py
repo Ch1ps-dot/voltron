@@ -23,6 +23,9 @@ class AsyncRFCParser:
         res_ir: message format information for response message 
         st: tree-like data structure of specification document
     """
+    ANNOTATION_MAX_ATTEMPTS = 3
+    ANNOTATION_TIMEOUT_S = 30.0
+
     def __init__(
             self, 
             chater: AsyncChater,
@@ -39,6 +42,8 @@ class AsyncRFCParser:
         # ir related value
         self.req_json: list[dict] # json data of request field
         self.res_json: list[dict] # json data of response field
+        self.req_type_rules: dict = {}
+        self.res_type_rules: dict = {}
         self.req_types: set[str] = set()
         self.res_types: set[str] = set()
         self.req_fields: list[str] = list()
@@ -48,8 +53,12 @@ class AsyncRFCParser:
         self.all_doc: set[str] = set()
         self.ir_base_path = configs.base_path / 'component' / 'ir'
         self.ir_path = configs.base_path / 'component' / 'ir' / configs.pro_name
+        self.tree_base_path = configs.base_path / 'component' / 'tree'
+        self.tree_path = self.tree_base_path / configs.pro_name
         self.ir_base_path.mkdir(parents=True, exist_ok=True)
         self.ir_path.mkdir(parents=True, exist_ok=True)
+        self.tree_base_path.mkdir(parents=True, exist_ok=True)
+        self.tree_path.mkdir(parents=True, exist_ok=True)
 
         self.poss_res: dict[str, list[str]] = {}
         self.req_dep_map: dict[str, dict[str, dict]] = {} # dependency between requests
@@ -66,7 +75,22 @@ class AsyncRFCParser:
             logger.debug('RFCParser: specification knowledge disabled')
             return
 
-        # Ensure RFC documents are available before parsing.
+        section_trees = self.parse_section_trees()
+        for name, _ in section_trees:
+            self._query_prepare(name)
+            logger.debug('RFCParser: finish parse')
+
+        self.rag_req_msg: fastbm25 = self.rag_init(list(self.req_doc))
+        self.rag_res_msg: fastbm25 = self.rag_init(list(self.res_doc))
+        self.rag_all: fastbm25 = self.rag_init(list(self.all_doc))
+
+        # ir generation
+        self.ir_generation()
+
+    def ensure_rfc_documents(
+        self,
+    ) -> None:
+        """Download configured RFC documents when the helper is available."""
         dl_script = configs.base_path / 'skills' / 'utils' / 'rfc_download.sh'
         if dl_script.is_file():
             rfc_args: list[str] = []
@@ -90,22 +114,37 @@ class AsyncRFCParser:
                     logger.warning(f'RFCParser: failed to download RFC docs with {dl_script}: {e}')
         else:
             logger.warning(f'RFCParser: download script not found: {dl_script}')
-        
-        # sectiontree parse pass
+
+    def parse_section_trees(
+        self,
+    ) -> list[tuple[str, str]]:
+        """Parse configured RFC documents into cached SectionTree objects only.
+
+        Returns:
+            A list of ``(RFC name, source)`` pairs. ``source`` is ``loaded``
+            when a valid cache was reused and ``regenerated`` when the source
+            document was parsed and persisted.
+        """
+        self.ensure_rfc_documents()
+        rfc_list = (
+            self.rfc_name
+            if isinstance(self.rfc_name, list)
+            else [self.rfc_name]
+        )
+        if len(self.doc_paths) != len(rfc_list):
+            raise ValueError(
+                'RFCParser: RFC names and document paths have different '
+                f'lengths ({len(rfc_list)} != {len(self.doc_paths)})'
+            )
+
+        results: list[tuple[str, str]] = []
         for i in range(len(self.doc_paths)):
-            name=configs.rfc_name[i]
+            name = str(rfc_list[i])
             logger.debug(f'create st: {name}')
             source = self.prepare_section_tree(i, name)
             logger.debug(f'RFCParser: sectiontree {source} [{name}]')
-            self._query_prepare(name)
-            logger.debug('RFCParser: finish parse')
-
-        self.rag_req_msg: fastbm25 = self.rag_init(list(self.req_doc))
-        self.rag_res_msg: fastbm25 = self.rag_init(list(self.res_doc))
-        self.rag_all: fastbm25 = self.rag_init(list(self.all_doc))
-
-        # ir generation
-        self.ir_generation()
+            results.append((name, source))
+        return results
 
     def load_seed_metadata(
         self
@@ -142,6 +181,8 @@ class AsyncRFCParser:
             )
         self.req_fields = ['MessageType']
         self.res_json = []
+        self.req_type_rules = {}
+        self.res_type_rules = {}
         self.res_types = set()
         self.res_fields = []
         self.req_dep_map = {}
@@ -189,6 +230,8 @@ class AsyncRFCParser:
         """Key Field Parse"""
         req_path = self.ir_path / 'req.json'
         res_path = self.ir_path / 'res.json'
+        req_type_rules_path = self.ir_path / 'req_type_rules.json'
+        res_type_rules_path = self.ir_path / 'res_type_rules.json'
         
         if not req_path.is_file() or not res_path.is_file():
             res_task = asyncio.create_task(self._res_field(res_path))
@@ -209,11 +252,27 @@ class AsyncRFCParser:
                 res_json = json.load(f)
                 self.res_json = res_json
 
-        self.req_types = {str(v) for v in req_json[0]['value']}
-        self.res_types = {str(v) for v in res_json[0]['value']}
-
         self.req_fields = [str(v['field_name']) for v in req_json]
         self.res_fields = [str(v['field_name']) for v in res_json]
+
+        req_type_rules_task = asyncio.create_task(
+            self._req_type_rules(req_type_rules_path, req_json)
+        )
+        res_type_rules_task = asyncio.create_task(
+            self._res_type_rules(res_type_rules_path, res_json)
+        )
+        self.req_type_rules = await req_type_rules_task
+        self.res_type_rules = await res_type_rules_task
+
+        self.req_types = self._types_from_rules(self.req_type_rules)
+        self.res_types = self._types_from_rules(self.res_type_rules)
+
+        if not self.req_types:
+            self.req_types = self._types_from_field_values(req_json)
+        if not self.res_types:
+            self.res_types = self._types_from_field_values(res_json)
+
+        await self._annotate_section_message_types()
 
         logger.debug('RFCParser: finish key field extraction')
         
@@ -339,26 +398,43 @@ class AsyncRFCParser:
         st: SectionTree
     ):
         async with sem:
-            error_msg = ""
-            while True:
+            doc = st.fetch_node_content(node)
+            for attempt in range(1, self.ANNOTATION_MAX_ATTEMPTS + 1):
                 try:
-                    doc = st.fetch_node_content(node)
-                    ans = None
-                    if doc != None:
-                        ans = await self.chater.llm_doc_parse(
-                            rfc_num = self.rfc_name,
-                            pro_name = self.pro_name,
-                            rfc_doc = doc,
-                            error_msg = error_msg
+                    ans = await asyncio.wait_for(
+                        self.chater.llm_doc_parse(
+                            rfc_num=' '.join(self.rfc_name),
+                            pro_name=self.pro_name,
+                            rfc_doc=doc,
+                        ),
+                        timeout=self.ANNOTATION_TIMEOUT_S,
+                    )
+                    normalized = (
+                        ans.strip().lower()
+                        if isinstance(ans, str)
+                        else ''
+                    )
+                    if normalized not in {'request', 'response', 'all', 'none'}:
+                        raise ValueError(
+                            f'invalid document annotation: {ans!r}'
                         )
-                        if ans is None: raise Exception
-                        if ans not in ['request', 'response', 'all', 'none']:
-                            continue
-                        logger.debug(f'[Tree Annotate]: {node.name}:{ans}')
-                        node.content_type = ans
-                        break
-                except Exception:
-                    logger.exception('RFCParser: specification parse error')
+                    logger.debug(
+                        f'[Tree Annotate]: {node.name}:{normalized}'
+                    )
+                    node.content_type = normalized
+                    return
+                except Exception as error:
+                    logger.debug(
+                        'RFCParser: specification annotation attempt '
+                        f'{attempt}/{self.ANNOTATION_MAX_ATTEMPTS} failed '
+                        f'[{node.name}]: {error}'
+                    )
+
+            node.content_type = 'none'
+            logger.warning(
+                'RFCParser: document annotation exhausted; using none '
+                f'[{st.name}] [{node.name}]'
+            )
 
     async def _req_field(
             self,
@@ -374,7 +450,7 @@ class AsyncRFCParser:
                 req_json = None
                 try:
                     pmp, req_json = await self.chater.llm_request_query(
-                        rfc_num = self.rfc_name,
+                        rfc_num = ' '.join(self.rfc_name),
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.req_doc])
                     )
@@ -405,7 +481,7 @@ class AsyncRFCParser:
                 res_json = None
                 try:
                     pmp, res_json = await self.chater.llm_response_query(
-                        rfc_num = self.rfc_name,
+                        rfc_num = ' '.join(self.rfc_name),
                         pro_name = self.pro_name,
                         rfc_doc = ''.join([s for s in self.res_doc])
                     )
@@ -420,19 +496,177 @@ class AsyncRFCParser:
                 except Exception as e:
                     logger.debug(res_json)
                     logger.debug(f'RFCParser: res field {e}')
+
+    async def _req_type_rules(
+            self,
+            req_type_rules_path: Path,
+            req_json: list[dict]
+    ) -> dict:
+        if req_type_rules_path.is_file():
+            with open(req_type_rules_path, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+            if self._type_rules_check(rules, 'request'):
+                return rules
+            logger.debug('RFCParser: invalid cached request type rules')
+
+        while True:
+            rules_json = None
+            try:
+                _, rules_json = await self.chater.llm_request_type_rules(
+                    rfc_num=' '.join(self.rfc_name),
+                    pro_name=self.pro_name,
+                    field_info=json.dumps(req_json),
+                    rfc_doc=''.join([s for s in self.req_doc]),
+                )
+                if rules_json is None:
+                    raise ValueError('empty request type rules')
+                rules = json.loads(rules_json)
+                if not self._type_rules_check(rules, 'request'):
+                    continue
+                with open(req_type_rules_path, 'w', encoding='utf-8') as f:
+                    json.dump(rules, f)
+                return rules
+            except Exception as e:
+                logger.debug(rules_json)
+                logger.debug(f'RFCParser: request type rules {e}')
+
+    async def _res_type_rules(
+            self,
+            res_type_rules_path: Path,
+            res_json: list[dict]
+    ) -> dict:
+        if res_type_rules_path.is_file():
+            with open(res_type_rules_path, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+            if self._type_rules_check(rules, 'response'):
+                return rules
+            logger.debug('RFCParser: invalid cached response type rules')
+
+        while True:
+            rules_json = None
+            try:
+                _, rules_json = await self.chater.llm_response_type_rules(
+                    rfc_num=' '.join(self.rfc_name),
+                    pro_name=self.pro_name,
+                    field_info=json.dumps(res_json),
+                    rfc_doc=''.join([s for s in self.res_doc]),
+                )
+                if rules_json is None:
+                    raise ValueError('empty response type rules')
+                rules = json.loads(rules_json)
+                if not self._type_rules_check(rules, 'response'):
+                    continue
+                with open(res_type_rules_path, 'w', encoding='utf-8') as f:
+                    json.dump(rules, f)
+                return rules
+            except Exception as e:
+                logger.debug(rules_json)
+                logger.debug(f'RFCParser: response type rules {e}')
+
+    async def _annotate_section_message_types(
+            self
+    ) -> None:
+        tree_dict = getattr(self, 'tree_dict', {})
+        if not tree_dict:
+            return
+        if not self.req_types and not self.res_types:
+            return
+
+        for st in tree_dict.values():
+            self._ensure_section_tree_compat(st)
+            if self._section_type_annotations_current(st):
+                continue
+
+            sem = asyncio.Semaphore(getattr(configs, 'async_sem_doc', 1))
+            tasks = [
+                self._annotate_section_message_types_one(st, node, sem)
+                for node in st.leafs
+            ]
+            await tqdm_asyncio.gather(
+                *tasks,
+                desc=f"Section Type Annotation {st.name}"
+            )
+            self._mark_section_type_annotations(st)
+            self.save_st(st)
+
+    async def _annotate_section_message_types_one(
+            self,
+            st: SectionTree,
+            node: SectionNode,
+            sem: asyncio.Semaphore
+    ) -> None:
+        self._ensure_section_node_compat(node)
+        if node.content_type == 'none':
+            node.related_request_types = []
+            node.related_response_types = []
+            return
+
+        request_types = sorted(self.req_types)
+        response_types = sorted(self.res_types)
+        allowed_request_types = set(request_types)
+        allowed_response_types = set(response_types)
+
+        async with sem:
+            annotation_json = None
+            for attempt in range(1, self.ANNOTATION_MAX_ATTEMPTS + 1):
+                try:
+                    _, annotation_json = await asyncio.wait_for(
+                        self.chater.llm_section_type_annotation(
+                            rfc_num=' '.join(self.rfc_name),
+                            pro_name=self.pro_name,
+                            request_types=json.dumps(request_types),
+                            response_types=json.dumps(response_types),
+                            content_type=node.content_type,
+                            section_name=node.name,
+                            section_content=st.fetch_node_content(node),
+                        ),
+                        timeout=self.ANNOTATION_TIMEOUT_S,
+                    )
+                    if annotation_json is None:
+                        raise ValueError('empty section type annotation')
+                    annotation = json.loads(annotation_json)
+                    if not self._section_type_annotation_check(
+                        annotation,
+                        allowed_request_types,
+                        allowed_response_types
+                    ):
+                        continue
+                    node.related_request_types = list(dict.fromkeys(
+                        str(item)
+                        for item in annotation['request_types']
+                    ))
+                    node.related_response_types = list(dict.fromkeys(
+                        str(item)
+                        for item in annotation['response_types']
+                    ))
+                    return
+                except Exception as e:
+                    logger.debug(annotation_json)
+                    logger.debug(
+                        'RFCParser: section type annotation attempt '
+                        f'{attempt}/{self.ANNOTATION_MAX_ATTEMPTS} failed '
+                        f'[{st.name}] [{node.name}]: {e}'
+                    )
+
+            node.related_request_types = []
+            node.related_response_types = []
+            logger.warning(
+                'RFCParser: section type annotation exhausted; using empty '
+                f'associations [{st.name}] [{node.name}]'
+            )
     
     async def _msg_model_gen_one(
             self,
             msg_type: str,
-            sem: asyncio.Semaphore
+            sem: asyncio.Semaphore,
+            field_type: str
     ):
-        query = [msg_type]
-        topk = self.rag_all.top_k_sentence(query, 5)
+        rfc_doc = self._message_ir_context(msg_type, field_type)
         async with sem:    
             msg_ir = await self.chater.llm_ir_generation(
                             pro_name=self.pro_name,
                             message_name=msg_type,
-                            rfc_doc=''.join([' '.join(item[0]) for item in topk])
+                            rfc_doc=rfc_doc
                         )
             while(True):
                 if msg_ir == None:
@@ -449,6 +683,51 @@ class AsyncRFCParser:
                             )
                     if (fix_ir != None):
                         msg_ir = fix_ir
+
+    def _message_ir_context(
+            self,
+            msg_type: str,
+            field_type: str
+    ) -> str:
+        """Collect SectionTree leaves annotated for the target message type."""
+        sections = []
+        fallback_sections = []
+
+        for st in getattr(self, 'tree_dict', {}).values():
+            self._ensure_section_tree_compat(st)
+            for node in st.leafs:
+                self._ensure_section_node_compat(node)
+                content = st.fetch_node_content(node)
+                if not content:
+                    continue
+
+                if field_type == 'req':
+                    if msg_type in node.related_request_types:
+                        sections.append(content)
+                    elif node.content_type in {'request', 'all'}:
+                        fallback_sections.append(content)
+                elif field_type == 'res':
+                    if (
+                        msg_type in node.related_response_types
+                        or (
+                            msg_type.startswith('response message of ')
+                            and node.related_response_types
+                        )
+                    ):
+                        sections.append(content)
+                    elif node.content_type in {'response', 'all'}:
+                        fallback_sections.append(content)
+
+        if not sections:
+            sections = fallback_sections
+        if not sections:
+            if field_type == 'req':
+                sections = list(self.req_doc)
+            elif field_type == 'res':
+                sections = list(self.res_doc)
+            else:
+                sections = list(self.all_doc)
+        return '\n\n'.join(sections)
     
     async def _msg_model_gen_async(
             self,
@@ -474,13 +753,19 @@ class AsyncRFCParser:
             if field_type == 'req':
                 m_types = self.req_types
                 tasks = [
-                    self._msg_model_gen_one(msg_type, sem)
+                    self._msg_model_gen_one(msg_type, sem, field_type)
                     for msg_type in m_types
                 ]
                 
             elif field_type == 'res':
                 m_types = self.res_types
-                tasks = [self._msg_model_gen_one(f'response message of {self.pro_name} protocol', sem)]
+                tasks = [
+                    self._msg_model_gen_one(
+                        f'response message of {self.pro_name} protocol',
+                        sem,
+                        field_type
+                    )
+                ]
 
             results = await tqdm_asyncio.gather(*tasks, desc=f"{field_type} msg ir")
             for ir_xml in results:
@@ -526,7 +811,7 @@ class AsyncRFCParser:
         sem
     ):
         async with sem:
-            info = self.rag_res_msg.top_k_sentence([req_type], 8)
+            info = self._possible_response_context(req_type)
             while(True):
                 ans_str = None
                 try:
@@ -534,7 +819,7 @@ class AsyncRFCParser:
                         pro_name=self.pro_name,
                         current_request=req_type,
                         response_types=json.dumps(list(self.res_types)),
-                        info=''.join([' '.join(item[0]) for item in info])
+                        info=info
                     )
                     cur_poss_res = json.loads(ans_str)
                     return req_type, cur_poss_res['possible_response']
@@ -575,8 +860,7 @@ class AsyncRFCParser:
             cur_req: str,
             sem
     ):
-        query = [last_req, cur_req]
-        results = self.rag_all.top_k_sentence(query, 8)
+        rfc_content = self._state_dependency_context(last_req, cur_req)
         async with sem:
             while(True):
                 try:
@@ -585,13 +869,72 @@ class AsyncRFCParser:
                         pro_name=self.pro_name,
                         current_request=cur_req,
                         response_types=json.dumps(list(self.res_types)),
-                        rfc_content=''.join([' '.join(item[0]) for item in results])
+                        rfc_content=rfc_content
                     )
                     relation = json.loads(ans_str)
                     return last_req, cur_req, relation
                 except Exception as e:
                     logger.debug(ans_str)
                     logger.debug(f'RFCParser: dependency failure {e}')
+
+    def _possible_response_context(
+            self,
+            req_type: str
+    ) -> str:
+        sections = []
+        fallback_sections = []
+
+        for st in getattr(self, 'tree_dict', {}).values():
+            self._ensure_section_tree_compat(st)
+            for node in st.leafs:
+                self._ensure_section_node_compat(node)
+                content = st.fetch_node_content(node)
+                if not content:
+                    continue
+
+                if (
+                    req_type in node.related_request_types
+                    or node.related_response_types
+                ):
+                    sections.append(content)
+                elif node.content_type in {'response', 'all'}:
+                    fallback_sections.append(content)
+
+        if not sections:
+            sections = fallback_sections
+        if not sections:
+            sections = list(self.res_doc)
+        return '\n\n'.join(sections)
+
+    def _state_dependency_context(
+            self,
+            last_req: str,
+            cur_req: str
+    ) -> str:
+        sections = []
+        fallback_sections = []
+
+        for st in getattr(self, 'tree_dict', {}).values():
+            self._ensure_section_tree_compat(st)
+            for node in st.leafs:
+                self._ensure_section_node_compat(node)
+                content = st.fetch_node_content(node)
+                if not content:
+                    continue
+
+                if (
+                    last_req in node.related_request_types
+                    or cur_req in node.related_request_types
+                ):
+                    sections.append(content)
+                elif node.content_type in {'request', 'all'}:
+                    fallback_sections.append(content)
+
+        if not sections:
+            sections = fallback_sections
+        if not sections:
+            sections = list(self.all_doc)
+        return '\n\n'.join(sections)
 
 
     def _req_field_check(
@@ -635,6 +978,141 @@ class AsyncRFCParser:
                     logger.debug('bad json')
                     return False
         return True
+
+    def _type_rules_check(
+            self,
+            data: dict,
+            direction: str
+    ) -> bool:
+        if not isinstance(data, dict):
+            return False
+        if data.get('message_direction') != direction:
+            return False
+        if not isinstance(data.get('primary_fields'), list):
+            return False
+        if not all(isinstance(field, str) for field in data['primary_fields']):
+            return False
+        if not isinstance(data.get('types'), list):
+            return False
+
+        for item in data['types']:
+            if not isinstance(item, dict):
+                return False
+            if not isinstance(item.get('type_name'), str):
+                return False
+            if not item['type_name'].strip():
+                return False
+            if not isinstance(item.get('field_values'), dict):
+                return False
+            if len(item['field_values']) == 0:
+                return False
+            if not all(
+                isinstance(name, str) and str(value).strip() != ''
+                for name, value in item['field_values'].items()
+            ):
+                return False
+            if not isinstance(item.get('explanation'), str):
+                return False
+        return True
+
+    def _types_from_rules(
+            self,
+            rules: dict
+    ) -> set[str]:
+        if not isinstance(rules, dict):
+            return set()
+        return {
+            item['type_name'].strip()
+            for item in rules.get('types', [])
+            if (
+                isinstance(item, dict)
+                and isinstance(item.get('type_name'), str)
+                and item['type_name'].strip()
+            )
+        }
+
+    def _types_from_field_values(
+            self,
+            fields: list[dict]
+    ) -> set[str]:
+        if not fields:
+            return set()
+        values = fields[0].get('value')
+        if not isinstance(values, list):
+            return set()
+        return {
+            str(value)
+            for value in values
+            if value is not None and str(value).strip() != ''
+        }
+
+    def _section_type_annotation_check(
+            self,
+            data: dict,
+            allowed_request_types: set[str],
+            allowed_response_types: set[str]
+    ) -> bool:
+        if not isinstance(data, dict):
+            return False
+        request_types = data.get('request_types')
+        response_types = data.get('response_types')
+        if not isinstance(request_types, list):
+            return False
+        if not isinstance(response_types, list):
+            return False
+        if not all(isinstance(item, str) for item in request_types):
+            return False
+        if not all(isinstance(item, str) for item in response_types):
+            return False
+        if not set(request_types).issubset(allowed_request_types):
+            return False
+        if not set(response_types).issubset(allowed_response_types):
+            return False
+        return True
+
+    def _ensure_section_node_compat(
+            self,
+            node: SectionNode
+    ) -> None:
+        if not hasattr(node, 'related_request_types'):
+            node.related_request_types = []
+        if not hasattr(node, 'related_response_types'):
+            node.related_response_types = []
+
+    def _ensure_section_tree_compat(
+            self,
+            st: SectionTree
+    ) -> None:
+        for node in getattr(st, 'leafs', []):
+            self._ensure_section_node_compat(node)
+        if not hasattr(st, 'section_type_annotation_req_types'):
+            st.section_type_annotation_req_types = []
+        if not hasattr(st, 'section_type_annotation_res_types'):
+            st.section_type_annotation_res_types = []
+
+    def _section_type_annotations_current(
+            self,
+            st: SectionTree
+    ) -> bool:
+        self._ensure_section_tree_compat(st)
+        return (
+            sorted(getattr(st, 'section_type_annotation_req_types', []))
+            == sorted(self.req_types)
+            and sorted(getattr(st, 'section_type_annotation_res_types', []))
+            == sorted(self.res_types)
+            and all(
+                hasattr(node, 'related_request_types')
+                and hasattr(node, 'related_response_types')
+                for node in st.leafs
+            )
+        )
+
+    def _mark_section_type_annotations(
+            self,
+            st: SectionTree
+    ) -> None:
+        st.section_type_annotation_req_types = sorted(self.req_types)
+        st.section_type_annotation_res_types = sorted(self.res_types)
     
     def _escape_xml_attr(
             self,
@@ -667,8 +1145,8 @@ class AsyncRFCParser:
         name: str
     ) -> SectionTree:
         """Load and validate one cached RFC SectionTree."""
-        tree_path = self.ir_path / f"{name}.pkl"
-        with tree_path.open("rb") as f:
+        target_path = self.tree_path / f"{name}.pkl"
+        with target_path.open("rb") as f:
             st = pickle.load(f)
         if not isinstance(st, SectionTree):
             raise TypeError(
@@ -678,6 +1156,7 @@ class AsyncRFCParser:
             raise ValueError("SectionTree leaf list is missing or invalid")
         if not isinstance(getattr(st, "doc_content", None), str):
             raise ValueError("SectionTree document content is missing")
+        self._ensure_section_tree_compat(st)
         self.tree_dict[name] = st
         return st
 
@@ -687,8 +1166,8 @@ class AsyncRFCParser:
         name: str,
     ) -> str:
         """Load a valid cache or regenerate it from the RFC document."""
-        tree_path = self.ir_path / f"{name}.pkl"
-        if tree_path.is_file():
+        target_path = self.tree_path / f"{name}.pkl"
+        if target_path.is_file():
             try:
                 self.load_st(name)
                 return "loaded"
@@ -696,7 +1175,7 @@ class AsyncRFCParser:
                 self.tree_dict.pop(name, None)
                 logger.exception(
                     f"RFCParser: damaged SectionTree cache; regenerating "
-                    f"[{name}] path={tree_path}"
+                    f"[{name}] path={target_path}"
                 )
 
         self.spe_parse(idx)
@@ -712,7 +1191,9 @@ class AsyncRFCParser:
         st: SectionTree
     ):
         """Atomically persist a SectionTree to avoid truncated caches."""
-        target_path = self.ir_path / f"{st.name}.pkl"
+        self._ensure_section_tree_compat(st)
+        self.tree_path.mkdir(parents=True, exist_ok=True)
+        target_path = self.tree_path / f"{st.name}.pkl"
         temp_path = target_path.with_suffix(
             f"{target_path.suffix}.tmp-{os.getpid()}"
         )

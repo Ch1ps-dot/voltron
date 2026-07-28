@@ -3,7 +3,7 @@ from voltron.synthesizer.synthesizer import AsyncProducer
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.synthesizer.checker import Checker
-from voltron.synthesizer.hasher import ResponseHasher
+from voltron.synthesizer.observer import ResponseObserver
 from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 from voltron.configs import configs
@@ -78,7 +78,12 @@ class Mapper:
         self.gs_path = producer.generator_path
         self.ps_path = producer.parser_path
         self.cs_path = producer.checker_path
-        self.hs_path = producer.hasher_path
+        self.os_path = producer.observer_path
+        self.legacy_os_path = getattr(
+            producer,
+            'legacy_observer_path',
+            producer.observer_path,
+        )
         self.ms_path = producer.mutator_path
         
         self.request_types: set[str] = producer.req_types
@@ -90,7 +95,7 @@ class Mapper:
         # self.cur_suite: Suite = Suite(producer.generators)
         self.parsers: list[Parser] = producer.parsers
         self.checkers: dict[str, list[Checker]] = producer.checkers
-        self.hashers: dict[str, list[ResponseHasher]] = producer.hashers
+        self.observers: dict[str, list[ResponseObserver]] = producer.observers
 
         self.exec_timeout_s = EXEC_TIMEOUT_S
         self.exec_retry_limit = EXEC_RETRY_LIMIT
@@ -133,20 +138,34 @@ class Mapper:
             return Path(checker.path)
         return typed_path
 
-    def h_path(
+    def o_path(
         self,
-        hasher: ResponseHasher
+        observer: ResponseObserver
     ) -> Path:
         typed_path = (
-            self.hs_path
-            / quote(hasher.msg_type, safe='._-')
-            / f'{hasher.name}.py'
+            self.os_path
+            / quote(observer.msg_type, safe='._-')
+            / f'{observer.name}.py'
         )
         if typed_path.is_file():
             return typed_path
-        if hasher.path:
-            return Path(hasher.path)
+        legacy_typed_path = (
+            self.legacy_os_path
+            / quote(observer.msg_type, safe='._-')
+            / f'{observer.name}.py'
+        )
+        if legacy_typed_path.is_file():
+            return legacy_typed_path
+        if observer.path:
+            return Path(observer.path)
         return typed_path
+
+    def h_path(
+        self,
+        observer: ResponseObserver
+    ) -> Path:
+        """Compatibility alias for older call sites."""
+        return self.o_path(observer)
     
     def m_path(
         self,
@@ -168,11 +187,11 @@ class Mapper:
             if checkers
         }
 
-    def equip_hashers(self) -> dict[str, ResponseHasher]:
+    def equip_observers(self) -> dict[str, ResponseObserver]:
         return {
-            msg_type: hashers[-1]
-            for msg_type, hashers in self.hashers.items()
-            if hashers
+            msg_type: observers[-1]
+            for msg_type, observers in self.observers.items()
+            if observers
         }
     
     def update_parser(

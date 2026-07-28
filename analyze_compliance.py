@@ -227,13 +227,13 @@ def load_pair(path: Path) -> PairRecord:
 def load_sections(protocol: str, rfc_names: list[str]) -> list[SectionRecord]:
     sections: list[SectionRecord] = []
     failures: list[str] = []
-    ir_path = configs.base_path / "component" / "ir" / protocol
+    tree_path = configs.base_path / "component" / "tree" / protocol
     for rfc_name in dict.fromkeys(rfc_names):
-        tree_path = ir_path / f"{rfc_name}.pkl"
+        cache_path = tree_path / f"{rfc_name}.pkl"
         try:
-            if not tree_path.is_file():
+            if not cache_path.is_file():
                 raise FileNotFoundError("cache file does not exist")
-            with tree_path.open("rb") as f:
+            with cache_path.open("rb") as f:
                 tree = pickle.load(f)
             if not isinstance(tree, SectionTree):
                 raise TypeError(
@@ -260,7 +260,7 @@ def load_sections(protocol: str, rfc_names: list[str]) -> list[SectionRecord]:
                     "cache contains no annotated protocol sections"
                 )
         except Exception as error:
-            reason = f"{tree_path}: {type(error).__name__}: {error}"
+            reason = f"{cache_path}: {type(error).__name__}: {error}"
             failures.append(reason)
             print(
                 "Warning: skipping unusable SectionTree cache: "
@@ -274,7 +274,7 @@ def load_sections(protocol: str, rfc_names: list[str]) -> list[SectionRecord]:
             f"no usable cached RFC SectionTrees found for protocol "
             f"{protocol}.\n{details}\n"
             "Run the normal specification-aware workflow again to "
-            "regenerate component/ir caches."
+            "regenerate component/tree caches."
         )
     if failures:
         print(

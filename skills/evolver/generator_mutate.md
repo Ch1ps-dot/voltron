@@ -26,6 +26,10 @@ You will be given:
 ### **Field Value**: 
 
   $msg_type
+
+### **Message syntax specification in protoIR format**:
+
+  $msg_ir
   
 ### **SUT (Server Under Test) Information**:
 
@@ -50,6 +54,7 @@ You will be given:
 ### 1. Analyze the Protocol Structure
 
 * Identify **key semantic fields** in protocol messages (e.g., method names, identifiers, lengths, URIs, version numbers, authentication fields).
+* Use the supplied protoIR to identify field order, constant fields, variable fields, length dependencies, legal values, encodings, delimiters, and payload boundaries.
 * Determine which fields:
 
   * directly influence protocol validation
@@ -78,6 +83,7 @@ You will be given:
 * Produce a single Python function that:
 
   * constructs **one mutated, error-triggering `$msg_type` message**
+  * starts from the supplied protoIR structure and mutates selected fields in controlled ways
   * uses **randomized values, boundary-covering mutations, and out-of-range values** for key fields
   * implements **compound anomalies** (multiple coordinated mutations in one message)
   * returns a `bytes` object

@@ -178,7 +178,7 @@ class Analyzer:
         stage = self.stage.lower()
         if 'model learning' in stage or 'fuzzer evolve' in stage:
             return 'model_learning'
-        if 'havoc' in stage or 'fuzz' in stage:
+        if 'berserker' in stage or 'fuzz' in stage:
             return 'fuzzing'
         return None
 

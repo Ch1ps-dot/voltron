@@ -15,7 +15,7 @@ from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
 
 from voltron.executor.mapper import Mapper
-from voltron.scheduler.berserker import Havoc
+from voltron.scheduler.berserker import Berserker
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
@@ -86,6 +86,11 @@ class Fuzzer:
         configs.trans_layer = configs_yaml[self.target_name]['trans_layer']
         configs.port = configs_yaml[self.target_name]['port']
         configs.rfc_name = configs_yaml[self.target_name]['rfc_name']
+        configs.sut_deployment = configs_yaml[self.target_name].get(
+            'sut_deployment',
+            'local',
+        )
+        configs.monitor = configs_yaml[self.target_name].get('monitor', {})
 
         # some file path 
         configs.run_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'run.sh'
@@ -127,6 +132,16 @@ class Fuzzer:
         configs.spec_knowledge = self.spec_knowledge
         configs.state_learning = self.state_learning
         configs.guided_scheduling = self.guided_scheduling
+        ir_evolution = configs_yaml.get('ir_evolution', {})
+        configs.ir_evolution_enabled = ir_evolution.get('enabled', True)
+        configs.ir_evolution_failure_threshold = ir_evolution.get(
+            'failure_threshold',
+            3,
+        )
+        configs.ir_evolution_max_rounds_per_type = ir_evolution.get(
+            'max_rounds_per_type',
+            1,
+        )
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name
@@ -331,7 +346,7 @@ class Fuzzer:
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
-            self.havoc_fuzz(hypothesis, stop_event)
+            self.berserker_fuzz(hypothesis, stop_event)
                 
             self.stop_event.set()
                 
@@ -440,19 +455,19 @@ class Fuzzer:
                 
         return h_lsit[-1]
     
-    def havoc_fuzz(
+    def berserker_fuzz(
         self,
         hypothesis: MealyMachine | None,
         stop_event
     ):
-        """--- havoc fuzzing ---"""
+        """--- berserker fuzzing ---"""
         with analyzer.lock:   
             analyzer.iter = 0
-            analyzer.stage = 'havoc fuzzing'
+            analyzer.stage = 'berserker fuzzing'
             analyzer.res_types_cnt = {}
             analyzer.resp_trans_cnt = {}
         
-        havoc = Havoc(
+        berserker = Berserker(
             self.mapper,
             self.exe,
             hypothesis,
@@ -466,7 +481,7 @@ class Fuzzer:
                 try:
                     # init new learning process with previous model and run fuzzer
 
-                    req_res = havoc.run(500)
+                    req_res = berserker.run(500)
                     if self.spec_knowledge:
                         self.producer.generator_mutate(req_res)
                     pre_resp = analyzer.cur_res_types_cnt.keys()
@@ -479,7 +494,7 @@ class Fuzzer:
 
                 except Exception:
                     fuzz_phase_status = 'failed'
-                    logger.exception('Fuzzer: havoc fuzzing failed')
+                    logger.exception('Fuzzer: berserker fuzzing failed')
                     stop_event.set()
 
                 if (configs.time_limit_s < time.time() - analyzer.start_time):
@@ -534,7 +549,7 @@ class Fuzzer:
                         f'Fuzzer: skip invalid replay testcase {item}'
                     )
             
-            analyzer.set_progress('havoc', 'replay', file_count)
+            analyzer.set_progress('berserker', 'replay', file_count)
             self.exe.cov_setup(cov_folder, cov_file)
             for i in range(file_count):
                 req_seq = []

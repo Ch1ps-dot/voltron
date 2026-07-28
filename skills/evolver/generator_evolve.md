@@ -17,6 +17,10 @@ You will be given:
 ### **Field value** 
    {$msg_type}
 
+### **Message syntax specification in protoIR format**:
+
+   $msg_ir
+
 ### **Previous Generated Program**:
    - This program may contain incorrect field values, invalid ordering, missing constraints, or violations of server expectations that restrict state transitions.
 
@@ -43,6 +47,7 @@ $trace
 
 ### 1. Root Cause Analysis for Error Response
 - **Analyze code defects**: Identify issues in the previous program (e.g., invalid field values, incorrect field ordering, missing mandatory fields, mismatched length/payload, non-compliant encodings) that caused error response of server.
+- **Analyze protoIR constraints**: Use the supplied message IR to verify field order, constant fields, variable fields, length dependencies, required fields, legal values, encodings, and framing.
 - **Analyze response trace patterns**: 
   - Map observed state transitions to protocol specification and SUT constraints
   - Identify untriggered legal state transitions (gaps between expected and observed behavior)
@@ -60,6 +65,7 @@ $trace
 
 ### 3. Repair and Enhance Message Generation Logic
 - Fix all code defects identified in root cause analysis (e.g., correct field ordering, adjust values to legal ranges, add missing mandatory fields, align length/payload)
+- Ensure the repaired generator follows the supplied protoIR message structure exactly unless the SUT information explicitly requires a compatible variant.
 - Ensure generated messages comply with SUT's state machine rules and preconditions for new transitions
 - If prompt-provided information is strongly related to protocol state (such as state preconditions, transition constraints, required context, or state-dependent semantic hints), the generated result must strictly satisfy those requirements
 - Maintain compatibility with the current server state (where applicable) while exploring new transition paths

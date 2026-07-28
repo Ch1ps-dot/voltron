@@ -89,10 +89,10 @@ def test_load_sections_skips_truncated_cache_when_another_is_valid(
     monkeypatch,
     capsys,
 ):
-    ir_path = tmp_path / "component" / "ir" / "ftp"
-    ir_path.mkdir(parents=True)
-    (ir_path / "broken.pkl").write_bytes(b"\x80\x05truncated")
-    write_section_tree(ir_path / "rfc959.pkl")
+    tree_path = tmp_path / "component" / "tree" / "ftp"
+    tree_path.mkdir(parents=True)
+    (tree_path / "broken.pkl").write_bytes(b"\x80\x05truncated")
+    write_section_tree(tree_path / "rfc959.pkl")
     monkeypatch.setattr(compliance_module.configs, "base_path", tmp_path)
 
     sections = load_sections("ftp", ["broken", "rfc959"])
@@ -109,9 +109,9 @@ def test_load_sections_reports_all_unusable_caches(
     tmp_path,
     monkeypatch,
 ):
-    ir_path = tmp_path / "component" / "ir" / "ftp"
-    ir_path.mkdir(parents=True)
-    (ir_path / "broken.pkl").write_bytes(b"\x80\x05truncated")
+    tree_path = tmp_path / "component" / "tree" / "ftp"
+    tree_path.mkdir(parents=True)
+    (tree_path / "broken.pkl").write_bytes(b"\x80\x05truncated")
     monkeypatch.setattr(compliance_module.configs, "base_path", tmp_path)
 
     with pytest.raises(RuntimeError) as error:
@@ -121,7 +121,7 @@ def test_load_sections_reports_all_unusable_caches(
     assert "no usable cached RFC SectionTrees" in message
     assert "broken.pkl" in message
     assert "missing.pkl" in message
-    assert "regenerate component/ir caches" in message
+    assert "regenerate component/tree caches" in message
 
 
 def test_retrieval_and_prompt_include_exchange_and_rfc_context(tmp_path):

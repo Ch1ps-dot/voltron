@@ -1,0 +1,650 @@
+Digital Audio Access Protocol (DAAP)
+
+Source: https://daap.sourceforge.net/docs/index.html
+Linked detail: https://daap.sourceforge.net/docs/server-info.html
+Linked detail: https://daap.sourceforge.net/docs/content-codes.html
+
+Document note: This is an unofficial, reverse-engineered and incomplete description of the DAAP protocol.
+
+1 Introduction
+
+This document describes the DAAP protocol and how to use it. It not complete at the moment, but it will hopefully point people in the right direction. We still don't know how iTunes actually plays music on another computer, but that's only because we haven't had time to look at it yet. Hopefully there won't be any nasty obstacles in the way.
+
+Disclaimer: All the following information has been figured out using a network dump program; the iTunes binary has not be reverse-engineered in any way, and neither have any of the libraries that it links to. In addition, we (the contributors to the project) make no claims that the following information is valid, so use it at your own risk.
+
+
+2 Basic Form
+
+The iTunes music sharing server listens on TCP port 3689. All the requests are HTTP GET requests with one or two extra headers and most use the gzip content encoding, but the server is capable of sending responses without the encoding. It uses this encoding to transparently compress the data so that the library listing takes less time to transfer. The content type of the data is application/x-dmap-tagged. All this makes it trivial to get unencoded data from the server using curl or wget.
+
+The only extra header on the request is Client-DAAP-Version, and iTunes sends "1.0" as the value. When using curl or wget this header does not get sent but iTunes doesn't seem to mind. The server returns a header called DAAP-Server whose value is "iTunes/4.0 (Mac OS X)".
+
+Here is a sample request and response:
+
+GET /server-info HTTP/1.1
+Host: daap.example.com
+Accept: */*
+User-Agent: iTunes/4.0 (Macintosh; N; PPC)
+Client-DAAP-Version: 1.0
+Accept-Encoding: gzip
+
+HTTP/1.1 200 OK
+Date: Thu, 01 May 2003 18:00:28 GMT
+DAAP-Server: iTunes/4.0 (Mac OS X)
+Content-Type: application/x-dmap-tagged
+Content-Length: 122
+Content-Encoding: gzip
+
+[binary data]
+
+
+3 Data Format
+
+It seems that the data is divided up into several named segments, which shall be called chunks in this project. Some of these chunks can contain other chunks, others contain data of various types. All numerical values are in big-endian format. The basic format of a chunk is the following:
+
+bytes | field | description
+0-3 | Content code | OSType (unsigned long), description of the contents of this chunk
+4-7 | Length | Length of the contents of this chunk (not the whole chunk)
+8- | Data | The data contained within the chunk
+
+I have discovered that, for some reason, the top-level chunk you get from a request sometimes has a bad length encoded in it. One of the responses returns a length 12 bytes too small and another two responses return lengths 12 bytes too long. Since a request can only contain one top-level chunk, I have found the best way to work around this is to simply ignore the length in the top-level chunk and figure it out manually (it must be the total length of the data minus the length of the content code and the length field). This kludge does not apply for children of the top-level chunk (where such surgery would be difficult).
+
+
+4 Request URIs
+
+These are the basic types of request that iTunes uses.
+
+
+4.1 /server-info
+
+Gets information about the server, such as protocol version, name, and capabilities. [more info]
+
+
+4.2 /content-codes
+
+A very interesting request that gave the whole protocol away to me. Information about all the content codes used by chunks, their long names, and basic data types contained within. [more info]
+
+
+4.3 /login
+
+Begins a session. You need to have a session active to retrieve any real information from the server (song list, playlists, etc...).
+
+
+4.4 /logout
+
+Ends a session.
+
+
+4.5 /update
+
+To ensure that the client has the latest version of the library and playlists, iTunes uses a "revision number". This request returns the current revision number.
+
+
+4.6 /databases
+
+Returns a list of databases. iTunes currently only uses one database, which represents all the songs and playlists that it knows about. Maybe a future version could show the songs and playlists on an iPod for example? (Maybe it does already, I don't have an iPod to try this with yet)
+
+
+4.7 /databases/[num]/items
+
+Returns all the songs in the database.
+
+
+4.8 /databases/[num]/containers
+
+Returns all the playlists in the database.
+
+
+4.9 /databases/[num]/containers/[num]/items
+
+Returns all the items contained within a playlist.
+
+
+4.10 /resolve
+
+I haven't yet yad a look at this request yet. I know that it is used to play music and link directly to playlists, but that is all I had time to figure out. More on this later.
+
+
+5 Server Info Request
+
+This request serves to return information about the server, such as the versions of the protocols it is using, its name, and its capabilities.
+
+
+5.1 Sample Request
+
+GET /server-info HTTP/1.1
+Host: daap.example.com
+Accept: */*
+User-Agent: iTunes/4.0 (Macintosh; N; PPC)
+Client-DAAP-Version: 1.0
+Accept-Encoding: gzip
+
+
+5.2 Sample Response
+
+HTTP/1.1 200 OK
+Date: Thu, 01 May 2003 18:00:28 GMT
+DAAP-Server: iTunes/4.0 (Mac OS X)
+Content-Type: application/x-dmap-tagged
+Content-Length: 122
+Content-Encoding: gzip
+
+
+5.3 Server Info Response Structure
+
+The dmap.serverinforesponse ('msrv') is the root container of the response. It contains the following fields:
+
+name | type | description
+dmap.status | mstt | Response status code as in every response
+dmap.protocolversion | mpro | Version of the DMAP protocol, currently 1.0.0
+daap.protocolversion | apro | Version of the DAAP protocol, currently 1.0.0
+dmap.itemname | minm | Server name
+dmap.loginrequired | mslr | If present, the client must log in to run queries
+dmap.timeoutinterval | mstm | The amount of time before a connection times out
+dmap.supportsautologout | msal | If present, the server can automatically log clients out
+dmap.supportsupdate | msup | If present, the server supports /update
+dmap.supportspersistentids | mspi | If present, the server supports persitent IDs
+dmap.supportsextensions | msex | If present, the server supports extensions (?)
+dmap.supportsbrowse | msbr | If present, the server supports browse (?)
+dmap.supportsquery | msqy | If present, the server supports query (?)
+dmap.supportsindex | msix | If present, the server supports index (?)
+dmap.supportsresolve | msrs | If present, the server supports /resolve
+dmap.databasescount | msdc | The number of databases the server knows about
+
+All the items with (?) after them are things that I'm not sure about. They most probably are request types that I haven't encountered yet. Also, I'm not entirely sure how iTunes would react to a server that claimed that it didn't have certain functionality, like login or persistent IDs.
+
+dmap.serverinforesponse = {
+  dmap.status = 200
+  dmap.protocolversion = "1.0"
+  daap.protocolversion = "1.0"
+  dmap.itemname = "Example Server"
+  dmap.loginrequired = 0
+  dmap.timeoutinterval = 1800
+  dmap.supportsautologout = 0
+  dmap.supportsupdate = 0
+  dmap.supportspersistentids = 0
+  dmap.supportsextensions = 0
+  dmap.supportsbrowse = 0
+  dmap.supportsquery = 0
+  dmap.supportsindex = 0
+  dmap.supportsresolve = 0
+  dmap.databasescount = 1
+}
+
+
+6 Content Codes Request
+
+This request serves to return the list of content codes in use by the server. This allows the server to be updated to contain new fields and older clients can still connect without trouble. In fact, this also allowed us to decode the entirety of the protocol very easily.
+
+
+6.1 Sample Request
+
+GET /content-codes HTTP/1.1
+Host: daap.example.com
+Client-DAAP-Version: 1.0
+User-Agent: iTunes/4.0 (Macintosh; N; PPC)
+Accept-Language: en-us, en;q=0.93, [many more]
+Accept-Encoding: gzip
+
+
+6.2 Sample Response
+
+HTTP/1.1 200 OK
+Date: Thu, 01 May 2003 18:00:29 GMT
+DAAP-Server: iTunes/4.0 (Mac OS X)
+Content-Type: application/x-dmap-tagged
+Content-Length: 1208
+Content-Encoding: gzip
+
+
+6.3 Content Codes
+
+The dmap.contentcodesresponse ('mccr') is the root container for the content codes response. It contains a dmap.status ('mstt') field and several dmap.dictionary ('mdcl') chunks that actually contain the information we're after.
+
+Each of the dmap.dictionary chunks contains the following chunks:
+
+name | type | description
+dmap.contentcodesnumber | mcnm | Four-letter chunk type*
+dmap.contentcodesname | mcna | Name of the type, such as "dmap.status"
+dmap.contentcodestype | mcty | Type of data contained within (see below)
+
+*the content types actually dictate that we show the dmap.contentcodesnumber as a number, but I have delibrately shown it as a string to make it easier to read.
+
+dmap.contentcodesresponse = {
+  dmap.status = 200
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "miid"
+    dmap.contentcodesname = "dmap.itemid"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "minm"
+    dmap.contentcodesname = "dmap.itemname"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mikd"
+    dmap.contentcodesname = "dmap.itemkind"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mper"
+    dmap.contentcodesname = "dmap.persistentid"
+    dmap.contentcodestype = 7
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mcon"
+    dmap.contentcodesname = "dmap.container"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mcti"
+    dmap.contentcodesname = "dmap.containeritemid"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mpco"
+    dmap.contentcodesname = "dmap.parentcontainerid"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mstt"
+    dmap.contentcodesname = "dmap.status"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msts"
+    dmap.contentcodesname = "dmap.statusstring"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mimc"
+    dmap.contentcodesname = "dmap.itemcount"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mctc"
+    dmap.contentcodesname = "dmap.containercount"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mrco"
+    dmap.contentcodesname = "dmap.returnedcount"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mtco"
+    dmap.contentcodesname = "dmap.specifiedtotalcount"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mlcl"
+    dmap.contentcodesname = "dmap.listing"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mlit"
+    dmap.contentcodesname = "dmap.listingitem"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mbcl"
+    dmap.contentcodesname = "dmap.bag"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mdcl"
+    dmap.contentcodesname = "dmap.dictionary"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msrv"
+    dmap.contentcodesname = "dmap.serverinforesponse"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msau"
+    dmap.contentcodesname = "dmap.authenticationmethod"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mslr"
+    dmap.contentcodesname = "dmap.loginrequired"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mpro"
+    dmap.contentcodesname = "dmap.protocolversion"
+    dmap.contentcodestype = 11
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msal"
+    dmap.contentcodesname = "dmap.supportsautologout"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msup"
+    dmap.contentcodesname = "dmap.supportsupdate"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mspi"
+    dmap.contentcodesname = "dmap.supportspersistentids"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msex"
+    dmap.contentcodesname = "dmap.supportsextensions"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msbr"
+    dmap.contentcodesname = "dmap.supportsbrowse"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msqy"
+    dmap.contentcodesname = "dmap.supportsquery"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msix"
+    dmap.contentcodesname = "dmap.supportsindex"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msrs"
+    dmap.contentcodesname = "dmap.supportsresolve"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mstm"
+    dmap.contentcodesname = "dmap.timeoutinterval"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "msdc"
+    dmap.contentcodesname = "dmap.databasescount"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mlog"
+    dmap.contentcodesname = "dmap.loginresponse"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mlid"
+    dmap.contentcodesname = "dmap.sessionid"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mupd"
+    dmap.contentcodesname = "dmap.updateresponse"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "musr"
+    dmap.contentcodesname = "dmap.serverrevision"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "muty"
+    dmap.contentcodesname = "dmap.updatetype"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mudl"
+    dmap.contentcodesname = "dmap.deletedidlisting"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mccr"
+    dmap.contentcodesname = "dmap.contentcodesresponse"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mcnm"
+    dmap.contentcodesname = "dmap.contentcodesnumber"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mcna"
+    dmap.contentcodesname = "dmap.contentcodesname"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "mcty"
+    dmap.contentcodesname = "dmap.contentcodestype"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "apro"
+    dmap.contentcodesname = "daap.protocolversion"
+    dmap.contentcodestype = 11
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "avdb"
+    dmap.contentcodesname = "daap.serverdatabases"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "abro"
+    dmap.contentcodesname = "daap.databasebrowse"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "abal"
+    dmap.contentcodesname = "daap.browsealbumlisting"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "abar"
+    dmap.contentcodesname = "daap.browseartistlisting"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "abcp"
+    dmap.contentcodesname = "daap.browsecomposerlisting"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "abgn"
+    dmap.contentcodesname = "daap.browsegenrelisting"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "adbs"
+    dmap.contentcodesname = "daap.databasesongs"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asal"
+    dmap.contentcodesname = "daap.songalbum"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asar"
+    dmap.contentcodesname = "daap.songartist"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asbt"
+    dmap.contentcodesname = "daap.songbeatsperminute"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asbr"
+    dmap.contentcodesname = "daap.songbitrate"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "ascm"
+    dmap.contentcodesname = "daap.songcomment"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asco"
+    dmap.contentcodesname = "daap.songcompilation"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "ascp"
+    dmap.contentcodesname = "daap.songcomposer"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asda"
+    dmap.contentcodesname = "daap.songdateadded"
+    dmap.contentcodestype = 10
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asdm"
+    dmap.contentcodesname = "daap.songdatemodified"
+    dmap.contentcodestype = 10
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asdc"
+    dmap.contentcodesname = "daap.songdisccount"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asdn"
+    dmap.contentcodesname = "daap.songdiscnumber"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asdb"
+    dmap.contentcodesname = "daap.songdisabled"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "aseq"
+    dmap.contentcodesname = "daap.songeqpreset"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asfm"
+    dmap.contentcodesname = "daap.songformat"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asgn"
+    dmap.contentcodesname = "daap.songgenre"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asdt"
+    dmap.contentcodesname = "daap.songdescription"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asrv"
+    dmap.contentcodesname = "daap.songrelativevolume"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "assr"
+    dmap.contentcodesname = "daap.songsamplerate"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "assz"
+    dmap.contentcodesname = "daap.songsize"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asst"
+    dmap.contentcodesname = "daap.songstarttime"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "assp"
+    dmap.contentcodesname = "daap.songstoptime"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "astm"
+    dmap.contentcodesname = "daap.songtime"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "astc"
+    dmap.contentcodesname = "daap.songtrackcount"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "astn"
+    dmap.contentcodesname = "daap.songtracknumber"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asur"
+    dmap.contentcodesname = "daap.songuserrating"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asyr"
+    dmap.contentcodesname = "daap.songyear"
+    dmap.contentcodestype = 3
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asdk"
+    dmap.contentcodesname = "daap.songdatakind"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "asul"
+    dmap.contentcodesname = "daap.songdataurl"
+    dmap.contentcodestype = 9
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "aply"
+    dmap.contentcodesname = "daap.databaseplaylists"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "abpl"
+    dmap.contentcodesname = "daap.baseplaylist"
+    dmap.contentcodestype = 1
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "apso"
+    dmap.contentcodesname = "daap.playlistsongs"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "arsv"
+    dmap.contentcodesname = "daap.resolve"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "arif"
+    dmap.contentcodesname = "daap.resolveinfo"
+    dmap.contentcodestype = 12
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "aeNV"
+    dmap.contentcodesname = "com.apple.itunes.norm-volume"
+    dmap.contentcodestype = 5
+  }
+  dmap.dictionary = {
+    dmap.contentcodesnumber = "aeSP"
+    dmap.contentcodesname = "com.apple.itunes.smart-playlist"
+    dmap.contentcodestype = 1
+  }
+}
+
+
+6.4 Content Types
+
+The following table describes the type numbers as provided in the above:
+
+type | name | description
+1 | char | 1-byte value, can be used as a boolean (true if the value is present, false if not)
+3 | short | 2-byte integer
+5 | long | 4-byte integer
+7 | long long | 8-byte integer, tends to be represented in hex rather than numerical form
+9 | string | string of characters (UTF-8)
+10 | date | 4-byte integer with seconds since 1970 (standard UNIX time format)
+11 | version | 2-bytes major version, next byte minor version, last byte patchlevel
+12 | container | contains a series of other chunks, one after the other

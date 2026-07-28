@@ -11,6 +11,8 @@ You will be given:
 * **Protocol name**: $pro_name
 * **field name**: {$field_name}
 * **Field value**: {$msg_type}
+* **Request type rule**:
+  $type_rule
 * **Message syntax specification in protoIR format**:
   $msg_ir
 
@@ -32,6 +34,9 @@ Using the protoIR description:
 1. Generate a **Python function** that constructs **semantically valid** of the ${msg_type} message.
 2. The generated message must:
    - Strictly respect the field order, data types, length constraints, and semantics defined in the protoIR.
+   - Satisfy every field setting in the Request type rule. If `field_values`
+     contains multiple fields, the generated message must encode the complete
+     field combination, not only the primary field.
    - Maintain protocol semantic correctness (e.g., length fields must accurately reflect payload size, mandatory fields are never empty, enum values match protocol definitions).
     - If any prompt-provided information is strongly related to protocol semantics (such as constraints, value meanings, state requirements, or behavioral hints), the generated result must comply with that information.
 3. The function must synthesize **concrete field values** for all variable fields that balance validity and state exploration.

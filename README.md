@@ -32,7 +32,7 @@ Voltron is a protocol-aware fuzzer that combines RFC parsing, LLM-based code syn
     ├── learner/                  # LM*-style Mealy machine learning
     ├── llm/                      # LLM client and prompt assembly
     ├── rfcparser/                # RFC parsing and IR generation
-    ├── scheduler/                # sequence scheduling and havoc fuzzing
+    ├── scheduler/                # sequence scheduling and berserker fuzzing
     ├── synthesizer/              # generator/parser/mutator synthesis
     └── utils/
 ```
@@ -76,8 +76,8 @@ Each target needs:
 
 - An entry in `config/configs.yaml`
 - A directory `config/subjects/<target>/`
-- A `run.sh` script to start the SUT
-- A `setup.sh` script to reset or prepare the SUT
+- A `run.sh` script to start the SUT in local mode
+- A `setup.sh` script to reset or prepare the SUT in local mode
 - An `info.md` file with protocol- or target-specific notes for synthesis
 
 Example target configuration:
@@ -92,7 +92,61 @@ lightftp:
   server: parent
 ```
 
-### 2. Configure the LLM
+### 2. Configure a remote target
+
+Use remote mode when the SUT runs on another machine and Voltron should not
+start, stop, or kill a local process. In this mode, `host` and `port` point to
+the remote protocol service, and `monitor` optionally points to a lightweight
+agent running beside the SUT.
+
+```yaml
+remote-lightftp:
+  protocol: ftp
+  host: 192.0.2.10
+  port: 2200
+  rfc_name: ["rfc959", "rfc2428", "rfc3659", "rfc2389", "rfc2228"]
+  trans_layer: tcp
+  server: parent
+  sut_deployment: remote
+  monitor:
+    mode: agent
+    url: http://192.0.2.10:9000
+    service_host: 192.0.2.10
+    service_port: 2200
+    timeout_s: 1.0
+    log_tail: 200
+```
+
+The agent endpoints are deliberately small:
+
+- `POST /start`: optional; start or restart the remote SUT.
+- `GET /health`: return process and service status as JSON.
+- `GET /logs?tail=N`: optional; return recent log lines for crash triage.
+- `POST /stop`: optional; stop the remote SUT.
+
+`GET /health` should return fields such as:
+
+```json
+{
+  "state": "RUNNING",
+  "process_running": true,
+  "port_listening": true,
+  "returncode": null,
+  "stderr": "",
+  "logs": ""
+}
+```
+
+Valid states are `RUNNING`, `EXITED`, `CRASHED`, `UNREACHABLE`, and `UNKNOWN`.
+If the agent is unavailable, Voltron falls back to black-box network behavior:
+it can still connect to the target and record protocol-level timeouts, but it
+cannot reliably distinguish a remote crash from a hang or network failure.
+
+Remote SUT support is still experimental and has not been fully validated across
+real deployments. Users should try it with their own target, agent, and network
+environment before relying on the results.
+
+### 3. Configure the LLM
 
 The `llm` section in `config/configs.yaml` controls the API endpoint, key, model, and concurrency:
 
@@ -106,7 +160,7 @@ llm:
 
 For safety, avoid committing real API keys to the repository.
 
-### 3. Provide RFC documents
+### 4. Provide RFC documents
 
 Place RFC text files in `config/rfcs/` using the filenames referenced in `rfc_name`, for example `rfc959.txt`.
 
@@ -127,6 +181,8 @@ Common options:
 - `-t, --time`: fuzzing time in minutes
 - `-c, --cmdline`: optional command line override, defaults to the target `run.sh`
 - `-o, --output`: optional custom results directory
+- `--rfc-parser`: only parse RFC documents into cached SectionTrees
+- `--generate-ir`: only parse protocol specifications and generate protocol IR
 - `--spec-knowledge/--no-spec-knowledge`: enable or ablate RFC/IR knowledge
 - `--state-learning/--no-state-learning`: enable or skip Mealy-machine learning
 - `--guided-scheduling/--no-guided-scheduling`: enable or ablate state/dependency-guided scheduling
@@ -135,6 +191,36 @@ Example:
 
 ```bash
 uv run cli.py -s lightftp -a state -t 30
+```
+
+To parse only the RFC documents configured for a target into cached
+`SectionTree` objects, use:
+
+```bash
+uv run cli.py -s lightftp --rfc-parser
+```
+
+This mode does not require `--time` and does not initialize the producer,
+state learner, executor, or target process. It writes one pickle file per RFC
+to `component/tree/<protocol>/<rfc-name>.pkl`; an existing valid cache is reused.
+
+To run the complete protocol-specification parsing process and generate the
+configured target's IR without starting fuzzing, use:
+
+```bash
+uv run cli.py -s lightftp --generate-ir
+```
+
+This mode also does not require `--time`. It creates or reuses the SectionTree
+caches, then generates the request/response message IR and state relationships
+under `component/ir/<protocol>/`. It does not initialize the producer, state
+learner, executor, or target process.
+
+Remote targets use the same command; select the remote target name from
+`config/configs.yaml`:
+
+```bash
+uv run cli.py -s remote-lightftp -a state -t 30
 ```
 
 For ablation runs, each switch can be disabled independently:
@@ -194,7 +280,7 @@ Voltron writes CSV metrics into the active result directory.
 
 - `doc_analysis`: RFC parsing and initial equipment synthesis
 - `model_learning`: active state-machine learning
-- `fuzzing`: havoc fuzzing and generator mutation
+- `fuzzing`: berserker fuzzing and generator mutation
 
 Each row records the phase status, start/end timestamps, wall-clock duration,
 LLM chat time, LLM call count, and prompt/completion/total token usage. If
@@ -229,14 +315,14 @@ llm_compliance:
 
 2. Run the normal specification-aware fuzzing workflow at least once. The
    required SectionTree caches must exist under
-   `component/ir/<protocol>/<rfc-name>.pkl`.
+   `component/tree/<protocol>/<rfc-name>.pkl`.
 3. Ensure the input contains the `pair_*.json` files generated under
    `request_response_pairs/`.
 
 If one cached RFC SectionTree is missing or damaged, the script prints a
 warning and continues with the remaining valid caches. If no usable cache
 remains, rerun the normal specification-aware workflow to regenerate
-`component/ir/<protocol>/*.pkl`.
+`component/tree/<protocol>/*.pkl`.
 
 Analyze all saved pairs in a fuzz result directory:
 
@@ -363,7 +449,7 @@ During replay, Voltron:
 4. Sends the saved raw request bytes in their original order.
 5. Runs `cov_collect.sh` after each successfully replayed testcase.
 
-Replay does not run response checkers or semantic hashers and does not modify
+Replay does not run response checkers or semantic observers and does not modify
 the saved testcase. Pressing `Ctrl+C` once stops the active SUT and exits the
 replay process.
 

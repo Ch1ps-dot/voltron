@@ -194,7 +194,7 @@ def test_crash_report_collects_feedback_and_messages(tmp_path, monkeypatch):
     assert "AddressSanitizer: SEGV" in chater.prompt
 
 
-def test_executor_does_not_load_checkers_or_hashers_in_replay(
+def test_executor_does_not_load_checkers_or_observers_in_replay(
     monkeypatch,
 ):
     mapper = SimpleNamespace(
@@ -202,8 +202,8 @@ def test_executor_does_not_load_checkers_or_hashers_in_replay(
         equip_checkers=lambda: (_ for _ in ()).throw(
             AssertionError("checker loaded")
         ),
-        equip_hashers=lambda: (_ for _ in ()).throw(
-            AssertionError("hasher loaded")
+        equip_observers=lambda: (_ for _ in ()).throw(
+            AssertionError("observer loaded")
         ),
     )
     monkeypatch.setattr(configs, "fuzz_mode", "replay", raising=False)
@@ -225,4 +225,4 @@ def test_executor_does_not_load_checkers_or_hashers_in_replay(
     )
 
     assert executor.checker_funcs == {}
-    assert executor.hasher_funcs == {}
+    assert executor.observer_funcs == {}
