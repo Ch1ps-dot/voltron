@@ -543,7 +543,8 @@ class AsyncProducer:
 
     def generator_mutate(
         self,
-        req_res
+        req_res,
+        iteration: int | None = None,
     ) -> None:
         """Generate and save input mutator
         
@@ -551,6 +552,14 @@ class AsyncProducer:
             req_res: the actual response for each request message, which provides the information for mutator
         """
         mutated_types = self._select_generator_mutate_types()
+        checkpoint_iteration = analyzer.iter if iteration is None else iteration
+        analyzer.record_generator_checkpoint(
+            phase='fuzzing',
+            checkpoint_type='before_generator_mutate',
+            phase_iteration=checkpoint_iteration,
+            operation_id=f'mutate-{checkpoint_iteration}',
+            mutated_types=mutated_types,
+        )
         with analyzer.lock:
             analyzer.set_progress('evolve', 'mutate', len(mutated_types))
            

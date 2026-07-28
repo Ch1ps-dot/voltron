@@ -321,6 +321,12 @@ class Fuzzer:
             begin_time = time.time()
             if self.state_learning:
                 analyzer.begin_phase('model_learning')
+                analyzer.record_generator_checkpoint(
+                    phase='model_learning',
+                    checkpoint_type='model_learning_baseline',
+                    phase_iteration=0,
+                    baseline_operation_id='initial_generator',
+                )
                 model_phase_status = 'completed'
                 try:
                     mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
@@ -400,6 +406,14 @@ class Fuzzer:
                         try_limit=try_limit,
                     )
                     if self.spec_knowledge:
+                        analyzer.record_generator_checkpoint(
+                            phase='model_learning',
+                            checkpoint_type='before_generator_evolve',
+                            phase_iteration=int(cur_id),
+                            operation_id=f'evolve-{cur_id}',
+                            model_id=str(h.id),
+                            iteration_status=iteration_status,
+                        )
                         self.producer.generator_evo(h)
                     continue
                 last_trans_num = len(h_lsit[-1].res_trans_types.keys())
@@ -442,6 +456,14 @@ class Fuzzer:
                         try_limit=try_limit,
                     )
                     if self.spec_knowledge:
+                        analyzer.record_generator_checkpoint(
+                            phase='model_learning',
+                            checkpoint_type='before_generator_evolve',
+                            phase_iteration=int(cur_id),
+                            operation_id=f'evolve-{cur_id}',
+                            model_id=str(h.id),
+                            iteration_status=iteration_status,
+                        )
                         self.producer.generator_evo(h)
                     continue
 
@@ -466,6 +488,13 @@ class Fuzzer:
             analyzer.stage = 'berserker fuzzing'
             analyzer.res_types_cnt = {}
             analyzer.resp_trans_cnt = {}
+
+        analyzer.record_generator_checkpoint(
+            phase='fuzzing',
+            checkpoint_type='fuzzing_baseline',
+            phase_iteration=0,
+            baseline_operation_id='initial_mutator',
+        )
         
         berserker = Berserker(
             self.mapper,
@@ -483,7 +512,10 @@ class Fuzzer:
 
                     req_res = berserker.run(500)
                     if self.spec_knowledge:
-                        self.producer.generator_mutate(req_res)
+                        self.producer.generator_mutate(
+                            req_res,
+                            iteration=analyzer.iter,
+                        )
                     pre_resp = analyzer.cur_res_types_cnt.keys()
 
                     # save the results
@@ -502,6 +534,9 @@ class Fuzzer:
                     stop_event.set()
                     analyzer.collect_results()
         finally:
+            analyzer.finalize_generator_metrics(
+                phase_iteration=analyzer.iter,
+            )
             if stop_event.is_set() and fuzz_phase_status == 'completed':
                 fuzz_phase_status = 'stopped'
             analyzer.end_phase('fuzzing', fuzz_phase_status)
@@ -692,6 +727,9 @@ class Fuzzer:
             return
         try:
             analyzer.finalize_open_phase()
+            analyzer.finalize_generator_metrics(
+                phase_iteration=analyzer.iter,
+            )
             analyzer.collect_results()
         except Exception:
             logger.exception('Fuzzer: collect results failure')
