@@ -181,6 +181,8 @@ Common options:
 - `-t, --time`: fuzzing time in minutes
 - `-c, --cmdline`: optional command line override, defaults to the target `run.sh`
 - `-o, --output`: optional custom results directory
+- `--rfc-parser`: only parse RFC documents into cached SectionTrees
+- `--generate-ir`: only parse protocol specifications and generate protocol IR
 - `--spec-knowledge/--no-spec-knowledge`: enable or ablate RFC/IR knowledge
 - `--state-learning/--no-state-learning`: enable or skip Mealy-machine learning
 - `--guided-scheduling/--no-guided-scheduling`: enable or ablate state/dependency-guided scheduling
@@ -200,7 +202,19 @@ uv run cli.py -s lightftp --rfc-parser
 
 This mode does not require `--time` and does not initialize the producer,
 state learner, executor, or target process. It writes one pickle file per RFC
-to `component/ir/<protocol>/<rfc-name>.pkl`; an existing valid cache is reused.
+to `component/tree/<protocol>/<rfc-name>.pkl`; an existing valid cache is reused.
+
+To run the complete protocol-specification parsing process and generate the
+configured target's IR without starting fuzzing, use:
+
+```bash
+uv run cli.py -s lightftp --generate-ir
+```
+
+This mode also does not require `--time`. It creates or reuses the SectionTree
+caches, then generates the request/response message IR and state relationships
+under `component/ir/<protocol>/`. It does not initialize the producer, state
+learner, executor, or target process.
 
 Remote targets use the same command; select the remote target name from
 `config/configs.yaml`:
@@ -301,14 +315,14 @@ llm_compliance:
 
 2. Run the normal specification-aware fuzzing workflow at least once. The
    required SectionTree caches must exist under
-   `component/ir/<protocol>/<rfc-name>.pkl`.
+   `component/tree/<protocol>/<rfc-name>.pkl`.
 3. Ensure the input contains the `pair_*.json` files generated under
    `request_response_pairs/`.
 
 If one cached RFC SectionTree is missing or damaged, the script prints a
 warning and continues with the remaining valid caches. If no usable cache
 remains, rerun the normal specification-aware workflow to regenerate
-`component/ir/<protocol>/*.pkl`.
+`component/tree/<protocol>/*.pkl`.
 
 Analyze all saved pairs in a fuzz result directory:
 

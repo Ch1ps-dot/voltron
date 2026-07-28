@@ -23,6 +23,9 @@ class AsyncRFCParser:
         res_ir: message format information for response message 
         st: tree-like data structure of specification document
     """
+    ANNOTATION_MAX_ATTEMPTS = 3
+    ANNOTATION_TIMEOUT_S = 30.0
+
     def __init__(
             self, 
             chater: AsyncChater,
@@ -50,8 +53,12 @@ class AsyncRFCParser:
         self.all_doc: set[str] = set()
         self.ir_base_path = configs.base_path / 'component' / 'ir'
         self.ir_path = configs.base_path / 'component' / 'ir' / configs.pro_name
+        self.tree_base_path = configs.base_path / 'component' / 'tree'
+        self.tree_path = self.tree_base_path / configs.pro_name
         self.ir_base_path.mkdir(parents=True, exist_ok=True)
         self.ir_path.mkdir(parents=True, exist_ok=True)
+        self.tree_base_path.mkdir(parents=True, exist_ok=True)
+        self.tree_path.mkdir(parents=True, exist_ok=True)
 
         self.poss_res: dict[str, list[str]] = {}
         self.req_dep_map: dict[str, dict[str, dict]] = {} # dependency between requests
@@ -391,26 +398,43 @@ class AsyncRFCParser:
         st: SectionTree
     ):
         async with sem:
-            error_msg = ""
-            while True:
+            doc = st.fetch_node_content(node)
+            for attempt in range(1, self.ANNOTATION_MAX_ATTEMPTS + 1):
                 try:
-                    doc = st.fetch_node_content(node)
-                    ans = None
-                    if doc != None:
-                        ans = await self.chater.llm_doc_parse(
-                            rfc_num = ' '.join(self.rfc_name),
-                            pro_name = self.pro_name,
-                            rfc_doc = doc,
-                            error_msg = error_msg
+                    ans = await asyncio.wait_for(
+                        self.chater.llm_doc_parse(
+                            rfc_num=' '.join(self.rfc_name),
+                            pro_name=self.pro_name,
+                            rfc_doc=doc,
+                        ),
+                        timeout=self.ANNOTATION_TIMEOUT_S,
+                    )
+                    normalized = (
+                        ans.strip().lower()
+                        if isinstance(ans, str)
+                        else ''
+                    )
+                    if normalized not in {'request', 'response', 'all', 'none'}:
+                        raise ValueError(
+                            f'invalid document annotation: {ans!r}'
                         )
-                        if ans is None: raise Exception
-                        if ans not in ['request', 'response', 'all', 'none']:
-                            continue
-                        logger.debug(f'[Tree Annotate]: {node.name}:{ans}')
-                        node.content_type = ans
-                        break
-                except Exception:
-                    logger.exception('RFCParser: specification parse error')
+                    logger.debug(
+                        f'[Tree Annotate]: {node.name}:{normalized}'
+                    )
+                    node.content_type = normalized
+                    return
+                except Exception as error:
+                    logger.debug(
+                        'RFCParser: specification annotation attempt '
+                        f'{attempt}/{self.ANNOTATION_MAX_ATTEMPTS} failed '
+                        f'[{node.name}]: {error}'
+                    )
+
+            node.content_type = 'none'
+            logger.warning(
+                'RFCParser: document annotation exhausted; using none '
+                f'[{st.name}] [{node.name}]'
+            )
 
     async def _req_field(
             self,
@@ -584,10 +608,10 @@ class AsyncRFCParser:
 
         async with sem:
             annotation_json = None
-            while True:
+            for attempt in range(1, self.ANNOTATION_MAX_ATTEMPTS + 1):
                 try:
-                    _, annotation_json = (
-                        await self.chater.llm_section_type_annotation(
+                    _, annotation_json = await asyncio.wait_for(
+                        self.chater.llm_section_type_annotation(
                             rfc_num=' '.join(self.rfc_name),
                             pro_name=self.pro_name,
                             request_types=json.dumps(request_types),
@@ -595,7 +619,8 @@ class AsyncRFCParser:
                             content_type=node.content_type,
                             section_name=node.name,
                             section_content=st.fetch_node_content(node),
-                        )
+                        ),
+                        timeout=self.ANNOTATION_TIMEOUT_S,
                     )
                     if annotation_json is None:
                         raise ValueError('empty section type annotation')
@@ -617,7 +642,18 @@ class AsyncRFCParser:
                     return
                 except Exception as e:
                     logger.debug(annotation_json)
-                    logger.debug(f'RFCParser: section type annotation {e}')
+                    logger.debug(
+                        'RFCParser: section type annotation attempt '
+                        f'{attempt}/{self.ANNOTATION_MAX_ATTEMPTS} failed '
+                        f'[{st.name}] [{node.name}]: {e}'
+                    )
+
+            node.related_request_types = []
+            node.related_response_types = []
+            logger.warning(
+                'RFCParser: section type annotation exhausted; using empty '
+                f'associations [{st.name}] [{node.name}]'
+            )
     
     async def _msg_model_gen_one(
             self,
@@ -1109,8 +1145,8 @@ class AsyncRFCParser:
         name: str
     ) -> SectionTree:
         """Load and validate one cached RFC SectionTree."""
-        tree_path = self.ir_path / f"{name}.pkl"
-        with tree_path.open("rb") as f:
+        target_path = self.tree_path / f"{name}.pkl"
+        with target_path.open("rb") as f:
             st = pickle.load(f)
         if not isinstance(st, SectionTree):
             raise TypeError(
@@ -1130,8 +1166,8 @@ class AsyncRFCParser:
         name: str,
     ) -> str:
         """Load a valid cache or regenerate it from the RFC document."""
-        tree_path = self.ir_path / f"{name}.pkl"
-        if tree_path.is_file():
+        target_path = self.tree_path / f"{name}.pkl"
+        if target_path.is_file():
             try:
                 self.load_st(name)
                 return "loaded"
@@ -1139,7 +1175,7 @@ class AsyncRFCParser:
                 self.tree_dict.pop(name, None)
                 logger.exception(
                     f"RFCParser: damaged SectionTree cache; regenerating "
-                    f"[{name}] path={tree_path}"
+                    f"[{name}] path={target_path}"
                 )
 
         self.spe_parse(idx)
@@ -1156,7 +1192,8 @@ class AsyncRFCParser:
     ):
         """Atomically persist a SectionTree to avoid truncated caches."""
         self._ensure_section_tree_compat(st)
-        target_path = self.ir_path / f"{st.name}.pkl"
+        self.tree_path.mkdir(parents=True, exist_ok=True)
+        target_path = self.tree_path / f"{st.name}.pkl"
         temp_path = target_path.with_suffix(
             f"{target_path.suffix}.tmp-{os.getpid()}"
         )

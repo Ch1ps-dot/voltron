@@ -80,8 +80,21 @@ def parse_target_section_trees(
     return [
         SectionTreeParseResult(
             rfc_name=name,
-            output_path=parser.ir_path / f'{name}.pkl',
+            output_path=parser.tree_path / f'{name}.pkl',
             source=source,
         )
         for name, source in parsed
     ]
+
+
+def generate_target_ir(target_name: str) -> Path:
+    """Parse one target's RFC documents and generate its protocol IR."""
+    _configure_rfc_parser(target_name)
+    chater = AsyncChater(
+        configs.base_url_doc,
+        configs.api_key_doc,
+        configs.model_doc,
+    )
+    parser = AsyncRFCParser(chater=chater)
+    parser.run()
+    return parser.ir_path

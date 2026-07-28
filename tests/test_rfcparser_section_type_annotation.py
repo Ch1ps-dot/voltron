@@ -21,7 +21,7 @@ class FakeChater:
 
 def make_parser(tmp_path: Path) -> AsyncRFCParser:
     parser = AsyncRFCParser.__new__(AsyncRFCParser)
-    parser.ir_path = tmp_path
+    parser.tree_path = tmp_path
     parser.chater = FakeChater()
     parser.rfc_name = ["mqtt-v5.0"]
     parser.pro_name = "mqtt"
@@ -74,3 +74,26 @@ def test_section_type_annotation_reuses_current_cache(tmp_path):
     asyncio.run(parser._annotate_section_message_types())
 
     assert tree.leafs[0].related_request_types == ["CONNECT"]
+
+
+def test_section_type_annotation_falls_back_after_bounded_attempts(tmp_path):
+    parser = make_parser(tmp_path)
+    tree = make_tree()
+    parser.tree_dict = {"mqtt-v5.0": tree}
+    calls = []
+
+    class InvalidChater:
+        async def llm_section_type_annotation(self, **kwargs):
+            calls.append(kwargs)
+            return "", "not-json"
+
+    parser.chater = InvalidChater()
+
+    asyncio.run(parser._annotate_section_message_types())
+
+    node = tree.leafs[0]
+    assert len(calls) == parser.ANNOTATION_MAX_ATTEMPTS
+    assert node.related_request_types == []
+    assert node.related_response_types == []
+    assert tree.section_type_annotation_req_types == ["CONNECT", "PUBLISH"]
+    assert tree.section_type_annotation_res_types == ["CONNACK", "PUBACK"]

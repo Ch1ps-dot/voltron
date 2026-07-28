@@ -2,7 +2,10 @@
 
 from voltron.fuzz import Fuzzer
 from voltron.configs import configs
-from voltron.rfcparser.standalone import parse_target_section_trees
+from voltron.rfcparser.standalone import (
+    generate_target_ir,
+    parse_target_section_trees,
+)
 import click
 
 @click.command(help='fuzzer')
@@ -17,6 +20,13 @@ import click
     help=(
         "Only parse the target's configured RFC documents into SectionTree "
         "cache files"
+    ),
+)
+@click.option(
+    "--generate-ir",
+    is_flag=True,
+    help=(
+        "Only parse the target's protocol specifications and generate its IR"
     ),
 )
 @click.option(
@@ -44,10 +54,16 @@ def main(
     cmdline: str,
     output: str,
     rfc_parser: bool,
+    generate_ir: bool,
     spec_knowledge: bool,
     state_learning: bool,
     guided_scheduling: bool,
 ):
+    if rfc_parser and generate_ir:
+        raise click.UsageError(
+            "--rfc-parser and --generate-ir cannot be used together."
+        )
+
     if rfc_parser:
         try:
             results = parse_target_section_trees(sut)
@@ -58,6 +74,14 @@ def main(
                 f'{result.rfc_name}: {result.source} -> '
                 f'{result.output_path}'
             )
+        return
+
+    if generate_ir:
+        try:
+            ir_path = generate_target_ir(sut)
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"IR generated for {sut} -> {ir_path}")
         return
 
     if time is None:

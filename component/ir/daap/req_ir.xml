@@ -1,0 +1,259 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="Update">
+  <!-- Request to the DAAP server to obtain a list of updates since a given revision. The request uses HTTP GET with specific headers. -->
+
+  <field name="Method" type="constant" length="3B" value="GET"/>
+  <!-- HTTP method token, always GET for DAAP requests -->
+
+  <field name="Space" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separator between method and request target -->
+
+  <field name="RequestTarget" type="variable" length="undefined" value="ASCII printable characters excluding SP and CRLF"/>
+  <!-- The request URI including path and query parameters (e.g., /update?session-id=xxx&revision-number=yyy). The path must start with '/' -->
+
+  <field name="Space" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separator between request target and HTTP version -->
+
+  <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+  <!-- Protocol version string, always HTTP/1.1 -->
+
+  <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Carriage Return and Line Feed terminating the request line -->
+
+  <field name="HeaderHostName" type="constant" length="6B" value="Host: "/>
+  <!-- Header field name for the Host header, followed by a space -->
+
+  <field name="HostValue" type="variable" length="undefined" value="host:port or hostname in ASCII"/>
+  <!-- The target server host and optional port, as specified in the Host header -->
+
+  <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF terminating the Host header line -->
+
+  <field name="HeaderDAAPVersionName" type="constant" length="22B" value="Client-DAAP-Version: "/>
+  <!-- Header field name for the Client-DAAP-Version header -->
+
+  <field name="DAAPVersionValue" type="constant" length="3B" value="1.0"/>
+  <!-- Value of the Client-DAAP-Version header; always "1.0" per the protocol -->
+
+  <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF terminating the Client-DAAP-Version header line -->
+
+  <field name="HeaderEnd" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Empty line (CRLF) signaling the end of the header section and the start of the message body (which is empty for GET requests) -->
+</message>
+  <message name="ServerInfo">
+    <!--
+    Response to the DAAP /server-info request.
+    Contains server metadata wrapped in a DMAP container (content code 'msrv').
+    The payload is a binary sequence of TLV (Tag-Length-Value) chunks.
+    Numeric fields are big‐endian.
+    Note: The length field of the top‑level container may be erroneous;
+    implementors should ignore it and use the total response body size minus 8.
+    -->
+
+    <!-- Top-level container: dmap.serverinforesponse -->
+    <field name="top_container_code" type="constant" length="4B" value="0x6d737276"/>
+    <!-- ASCII "msrv" – identifies the response as server info container -->
+
+    <field name="top_container_length" type="variable" length="4B" value="0-0xFFFFFFEF"/>
+    <!-- Length of data following this header (excl. code and length fields).
+         The total DMAP body length minus 8 should be used instead if this value seems incorrect. -->
+
+    <!-- dmap.status (content code 'mstt'): status code -->
+    <field name="mstt_code" type="constant" length="4B" value="0x6d737474"/>
+    <!-- ASCII "mstt" -->
+
+    <field name="mstt_length" type="constant" length="4B" value="4"/>
+    <!-- 4 bytes for a 32‑bit integer -->
+
+    <field name="dmap_status" type="variable" length="4B" value="200"/>
+    <!-- Response status code. Typically 200 for success.
+         Range: 0x00000000 – 0xFFFFFFFF -->
+
+    <!-- dmap.protocolversion (content code 'mpro'): DMAP version -->
+    <field name="mpro_code" type="constant" length="4B" value="0x6d70726f"/>
+    <!-- ASCII "mpro" -->
+
+    <field name="mpro_length" type="constant" length="4B" value="4"/>
+    <!-- 4 bytes (major.minor.patch, each 1 byte) -->
+
+    <field name="dmap_protocolversion" type="variable" length="4B" value="1.0.0 (0x01000000)"/>
+    <!-- DMAP protocol version in big‑endian: [major, minor, patch, 0] -->
+
+    <!-- daap.protocolversion (content code 'apro'): DAAP version -->
+    <field name="apro_code" type="constant" length="4B" value="0x6170726f"/>
+    <!-- ASCII "apro" -->
+
+    <field name="apro_length" type="constant" length="4B" value="4"/>
+    <!-- 4 bytes -->
+
+    <field name="daap_protocolversion" type="variable" length="4B" value="1.0.0 (0x01000000)"/>
+    <!-- DAAP protocol version -->
+
+    <!-- dmap.itemname (content code 'minm'): server name -->
+    <field name="minm_code" type="constant" length="4B" value="0x6d696e6d"/>
+    <!-- ASCII "minm" -->
+
+    <field name="minm_length" type="variable" length="4B" value="0-0xFFFFFFFF"/>
+    <!-- Length of the UTF‑8 string that follows -->
+
+    <field name="dmap_itemname" type="variable" length="undefined" value="UTF‑8 string (e.g. &quot;Example Server&quot;)"/>
+    <!-- Human‑readable name of the server (UTF‑8, no null terminator) -->
+
+    <!-- dmap.loginrequired (content code 'mslr'): boolean -->
+    <field name="mslr_code" type="constant" length="4B" value="0x6d736c72"/>
+    <!-- ASCII "mslr" -->
+
+    <field name="mslr_length" type="constant" length="4B" value="1"/>
+    <!-- 1 byte (char type) -->
+
+    <field name="dmap_loginrequired" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, client must log in before querying -->
+
+    <!-- dmap.timeoutinterval (content code 'mstm'): timeout in seconds -->
+    <field name="mstm_code" type="constant" length="4B" value="0x6d73746d"/>
+    <!-- ASCII "mstm" -->
+
+    <field name="mstm_length" type="constant" length="4B" value="4"/>
+    <!-- 4 bytes (long) -->
+
+    <field name="dmap_timeoutinterval" type="variable" length="4B" value="0-0xFFFFFFFF (e.g. 1800)"/>
+    <!-- Timeout interval in seconds before the server will drop the connection -->
+
+    <!-- dmap.supportsautologout (content code 'msal'): boolean -->
+    <field name="msal_code" type="constant" length="4B" value="0x6d73616c"/>
+    <!-- ASCII "msal" -->
+
+    <field name="msal_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportsautologout" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server can automatically log out idle clients -->
+
+    <!-- dmap.supportsupdate (content code 'msup'): boolean -->
+    <field name="msup_code" type="constant" length="4B" value="0x6d737570"/>
+    <!-- ASCII "msup" -->
+
+    <field name="msup_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportsupdate" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server supports the /update request -->
+
+    <!-- dmap.supportspersistentids (content code 'mspi'): boolean -->
+    <field name="mspi_code" type="constant" length="4B" value="0x6d737069"/>
+    <!-- ASCII "mspi" -->
+
+    <field name="mspi_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportspersistentids" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server supports persistent IDs -->
+
+    <!-- dmap.supportsextensions (content code 'msex'): boolean -->
+    <field name="msex_code" type="constant" length="4B" value="0x6d736578"/>
+    <!-- ASCII "msex" -->
+
+    <field name="msex_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportsextensions" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server supports extensions (purpose uncertain) -->
+
+    <!-- dmap.supportsbrowse (content code 'msbr'): boolean -->
+    <field name="msbr_code" type="constant" length="4B" value="0x6d736272"/>
+    <!-- ASCII "msbr" -->
+
+    <field name="msbr_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportsbrowse" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server supports the /browse request -->
+
+    <!-- dmap.supportsquery (content code 'msqy'): boolean -->
+    <field name="msqy_code" type="constant" length="4B" value="0x6d737179"/>
+    <!-- ASCII "msqy" -->
+
+    <field name="msqy_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportsquery" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server supports the /databases request with query parameters -->
+
+    <!-- dmap.supportsindex (content code 'msix'): boolean -->
+    <field name="msix_code" type="constant" length="4B" value="0x6d736978"/>
+    <!-- ASCII "msix" -->
+
+    <field name="msix_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportsindex" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server supports the /databases/index request -->
+
+    <!-- dmap.supportsresolve (content code 'msrs'): boolean -->
+    <field name="msrs_code" type="constant" length="4B" value="0x6d737273"/>
+    <!-- ASCII "msrs" -->
+
+    <field name="msrs_length" type="constant" length="4B" value="1"/>
+
+    <field name="dmap_supportsresolve" type="variable" length="1B" value="0 or 1"/>
+    <!-- If present and non‑zero, server supports the /resolve request -->
+
+    <!-- dmap.databasescount (content code 'msdc'): number of databases -->
+    <field name="msdc_code" type="constant" length="4B" value="0x6d736463"/>
+    <!-- ASCII "msdc" -->
+
+    <field name="msdc_length" type="constant" length="4B" value="4"/>
+    <!-- 4 bytes (long) -->
+
+    <field name="dmap_databasescount" type="variable" length="4B" value="0-0xFFFFFFFF (e.g. 1)"/>
+    <!-- Number of databases (shares) available on the server -->
+</message>
+  <message name="DatabaseContainers">
+    <!-- Response body for the /databases/[num]/containers request; returns all playlists in the database as a DMAP container chunk -->
+    <field name="ContentCode" type="constant" length="4B" value="0x6d6c636c"/>
+    <!-- DMAP content code 'mlcl' (ASCII: 'm','l','c','l') indicating a listing/container of items -->
+    <field name="Length" type="variable" length="4B" value="0..2^32-1"/>
+    <!-- Big-endian 4-byte length of the data that follows (the container's payload, not including ContentCode and Length fields) -->
+    <field name="Data" type="variable" length="dependent: inferred from Length field" value="sequence of DMAP child chunks (each with 4B content code, 4B length, and payload)"/>
+    <!-- Payload containing one or more DMAP child chunks. Each child typically has its own content code (e.g., 'mlit' for a playlist item) and length. The total octets in Data must equal the value of the Length field. -->
+</message>
+  <message name="Logout">
+  <!-- Request to terminate a DAAP session; sent as an HTTP GET request to the /logout resource -->
+  <field name="Method" type="constant" length="3B" value="0x474554"/>
+  <!-- HTTP method token "GET" (0x47, 0x45, 0x54) -->
+  <field name="SP1" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separator between method and request-target -->
+  <field name="RequestTarget" type="constant" length="7B" value="0x2F6C6F676F7574"/>
+  <!-- Absolute path "/logout" (0x2F, 0x6C, 0x6F, 0x67, 0x6F, 0x75, 0x74) -->
+  <field name="SP2" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separator between request-target and HTTP version -->
+  <field name="HTTPVersion" type="constant" length="8B" value="0x485454502F312E31"/>
+  <!-- Protocol version "HTTP/1.1" (0x48,0x54,0x54,0x50,0x2F,0x31,0x2E,0x31) -->
+  <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF terminating the request-line -->
+  <field name="HostHeader" type="variable" length="undefined" value="ASCII printable excluding CR, LF; ends with CRLF">
+  <!-- Mandatory host header line, e.g., "Host: daap.example.com" followed by CRLF -->
+    <dependency>value depends on target server, but must be present per HTTP/1.1</dependency>
+  </field>
+  <field name="ClientDAAPVersion" type="constant" length="26B" value="0x436C69656E742D444141502D56657273696F6E3A20312E300D0A"/>
+  <!-- Extra DAAP-specific header: "Client-DAAP-Version: 1.0" followed by CRLF (26 bytes) -->
+  <field name="UserAgentHeader" type="variable" length="undefined" value="ASCII printable excluding CR, LF; ends with CRLF">
+  <!-- User-Agent header line, typically "User-Agent: iTunes/4.0 (Macintosh; N; PPC)" -->
+  </field>
+  <field name="AcceptEncodingHeader" type="constant" length="23B" value="0x4163636570742D456E636F64696E673A20677A69700D0A"/>
+  <!-- Accept-Encoding header: "Accept-Encoding: gzip" followed by CRLF (23 bytes) -->
+  <field name="AcceptHeader" type="variable" length="undefined" value="ASCII printable excluding CR, LF; ends with CRLF">
+  <!-- Optional Accept header, e.g., "Accept: */*" -->
+    <dependency>may be omitted; if present ends with CRLF</dependency>
+  </field>
+  <field name="AdditionalHeaders" type="variable" length="undefined" value="zero or more HTTP header lines each ending with CRLF">
+  <!-- Any other header fields the client chooses to send -->
+  </field>
+  <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Empty line (CRLF) terminating the header section; no message body for logout request -->
+</message>
+  <message name="ContentCodes">
+    <!-- Response to GET /content-codes request, returning a DMAP-tagged list of all content codes used by the server. -->
+    <field name="ContentCode" type="constant" length="4B" value="cmlg"/>
+    <!-- Top-level DMAP chunk code for 'Content Codes Listing'. -->
+    <field name="Length" type="variable" length="4B" value="0 to (response size - 8)"/>
+    <!-- Length of the chunk data following this field. Note: per protocol, this length may be unreliable for top-level chunk; actual data length should be determined from HTTP Content-Length or by parsing until end of message. -->
+    <field name="ContentCodeList" type="variable" length="undefined" value="Sequence of DMAP sub-chunks"/>
+    <!-- Payload containing child chunks. Each entry is a container (code 'cmo') that includes sub-chunks: 'ccid' (content code, 4-byte OSType), 'cmnm' (long name, UTF-8 string), and 'cmty' (type number, 1-byte integer). -->
+</message>
+</ir>

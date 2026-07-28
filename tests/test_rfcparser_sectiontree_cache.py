@@ -1,8 +1,10 @@
+import asyncio
 import pickle
 from pathlib import Path
 
 import pytest
 
+from voltron.configs import configs
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.rfcparser.setciontree import SectionTree
 
@@ -17,9 +19,49 @@ def make_tree(name: str, content: str = "protocol section") -> SectionTree:
 
 def make_parser(tmp_path: Path) -> AsyncRFCParser:
     parser = AsyncRFCParser.__new__(AsyncRFCParser)
-    parser.ir_path = tmp_path
+    parser.tree_path = tmp_path
     parser.tree_dict = {}
     return parser
+
+
+def test_parser_separates_tree_cache_from_ir(tmp_path, monkeypatch):
+    monkeypatch.setattr(configs, "base_path", tmp_path)
+    monkeypatch.setattr(configs, "doc_paths", [])
+    monkeypatch.setattr(configs, "pro_name", "ftp", raising=False)
+    monkeypatch.setattr(configs, "rfc_name", [], raising=False)
+
+    parser = AsyncRFCParser(chater=object())
+
+    assert parser.ir_path == tmp_path / "component" / "ir" / "ftp"
+    assert parser.tree_path == tmp_path / "component" / "tree" / "ftp"
+    assert parser.ir_path.is_dir()
+    assert parser.tree_path.is_dir()
+
+
+def test_document_annotation_falls_back_after_bounded_attempts():
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.rfc_name = ["rfc959"]
+    parser.pro_name = "ftp"
+    calls = []
+
+    class InvalidChater:
+        async def llm_doc_parse(self, **kwargs):
+            calls.append(kwargs)
+            return "invalid"
+
+    parser.chater = InvalidChater()
+    tree = make_tree("rfc959", "protocol section")
+    from voltron.rfcparser.setciontree import SectionNode
+
+    node = SectionNode(1, 0, len(tree.doc_content), "1. Message")
+    tree.leafs = [node]
+
+    asyncio.run(
+        parser._spe_parse_one(node, asyncio.Semaphore(1), tree)
+    )
+
+    assert len(calls) == parser.ANNOTATION_MAX_ATTEMPTS
+    assert node.content_type == "none"
 
 
 def test_damaged_sectiontree_cache_is_regenerated(tmp_path, monkeypatch):
