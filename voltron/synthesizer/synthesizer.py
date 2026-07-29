@@ -479,7 +479,10 @@ class AsyncProducer:
                         msg_ir=self._request_ir_info(msg_type),
                         info=doc_info,
                         poss_response='\n'.join(self.poss_response[msg_type]),
-                        trace='\n'.join(req_res[msg_type] if msg_type in req_res.keys() else [])
+                        trace=json.dumps(
+                            sorted(req_res.get(msg_type, set())),
+                            ensure_ascii=False,
+                        ),
                     )
                     
                     # berserker_code = await self.chater.llm_mutator_berserker(

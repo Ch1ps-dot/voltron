@@ -71,9 +71,9 @@ lighttpd:
   server: child
 
 llm_doc:
-  base_url: none
-  api_key: none
-  model: none
+  base_url: https://api.deepseek.com
+  api_key: sk-55e804851013417f9d6eae1746d5cdfe
+  model: deepseek-v4-flash
   async_sem: 8
 
 llm_fuzz:

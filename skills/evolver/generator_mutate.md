@@ -47,6 +47,15 @@ You will be given:
 
   $poss_response
 
+### **Observed response types from the current fuzzing session**
+
+  $trace
+
+  The value above is a JSON array containing the response types that the SUT
+  has actually returned for the current request type. It is runtime feedback,
+  not a list of all responses allowed by the RFC. An empty array means that no
+  response type has been observed for this request type yet.
+
 ---
 
 ## **Your Task**
@@ -60,6 +69,10 @@ You will be given:
   * directly influence protocol validation
   * are mapped to **exceptional behaviors**
   * are sensitive to boundary values or malformed content
+* Compare the RFC-derived possible responses with the runtime-observed
+  responses. Identify response types that have not yet been reached and infer
+  which field values, semantic conflicts, or boundary conditions may exercise
+  those missing paths.
 
 ### 2. Message Generation Strategy
 
@@ -70,6 +83,14 @@ You will be given:
   * **capable of triggering new types of responses**
   * **likely to execute uncommon error-handling branches**
   * **likely to expose parser edge bugs (desync, over-read assumptions, stale state reuse)**
+* Use the runtime-observed response types as feedback:
+
+  * prioritize structured mutations that may trigger RFC-derived response
+    types not present in the observed JSON array
+  * avoid merely repeating mutation patterns that only reproduce the same
+    already-observed response types
+  * retain useful structural properties that allow the request to reach deep
+    server-side validation before introducing controlled anomalies
 * For each critical field type, explicitly include candidate value families when applicable:
 
   * numeric fields: very long numeric strings, negative numbers, zero, or out-of-range values
