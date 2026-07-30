@@ -1,0 +1,115 @@
+import asyncio
+from types import SimpleNamespace
+import threading
+import time
+
+import pytest
+
+import voltron.fuzz as fuzz_module
+from voltron.analyzer.analyzer import analyzer
+from voltron.configs import configs
+from voltron.fuzz import Fuzzer
+from voltron.llm.chatter import AsyncChater, LLMDeadlineExceeded
+from voltron.synthesizer.synthesizer import AsyncProducer
+
+
+def test_llm_request_is_not_started_after_fuzz_deadline(monkeypatch):
+    calls = []
+
+    async def create(**_kwargs):
+        calls.append(True)
+        return None
+
+    stop_event = threading.Event()
+    chatter = AsyncChater.__new__(AsyncChater)
+    chatter.clt = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=create),
+        )
+    )
+    chatter.model = "test-model"
+
+    monkeypatch.setattr(configs, "time_limit_s", 1, raising=False)
+    monkeypatch.setattr(analyzer, "start_time", time.time() - 2, raising=False)
+    monkeypatch.setattr(analyzer, "stop_event", stop_event, raising=False)
+
+    with pytest.raises(LLMDeadlineExceeded):
+        asyncio.run(chatter.chat_llm("prompt", "test"))
+
+    assert calls == []
+    assert stop_event.is_set()
+
+
+def test_model_learning_returns_cleanly_when_llm_deadline_is_reached(
+    tmp_path,
+    monkeypatch,
+):
+    class DeadlineLearning:
+        def __init__(self, *_args):
+            pass
+
+        def run(self, _model_id):
+            raise LLMDeadlineExceeded("deadline")
+
+    fuzzer = Fuzzer.__new__(Fuzzer)
+    fuzzer.stop_event = threading.Event()
+
+    monkeypatch.setattr(configs, "models_path", tmp_path, raising=False)
+    monkeypatch.setattr(fuzz_module, "MealyLstar", DeadlineLearning)
+    monkeypatch.setattr(analyzer, "iter", 0, raising=False)
+
+    assert fuzzer.model_learning(object(), object(), fuzzer.stop_event) is None
+    assert fuzzer.stop_event.is_set()
+
+
+def test_parser_generation_does_not_retry_after_llm_deadline():
+    class DeadlineChater:
+        async def llm_parser_gen(self, **_kwargs):
+            raise LLMDeadlineExceeded("deadline")
+
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.chater = DeadlineChater()
+    producer.rfcp = SimpleNamespace(pro_name="example")
+    producer._primary_response_field_info = lambda: "response fields"
+    producer._response_type_rules_info = lambda: "rules"
+
+    with pytest.raises(LLMDeadlineExceeded):
+        asyncio.run(producer._parser_gen_async())
+
+
+def test_state_fuzz_does_not_start_berserker_after_model_timeout(
+    tmp_path,
+    monkeypatch,
+):
+    stop_event = threading.Event()
+    fuzzer = Fuzzer.__new__(Fuzzer)
+    fuzzer.stop_event = stop_event
+    fuzzer.state_learning = True
+    fuzzer.spec_knowledge = True
+    fuzzer.mapper = SimpleNamespace()
+    fuzzer.exe = object()
+
+    monkeypatch.setattr(configs, "models_path", tmp_path, raising=False)
+    monkeypatch.setattr(fuzz_module, "MembershipOracle", lambda **_kwargs: object())
+    monkeypatch.setattr(fuzz_module, "EquOracle", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        fuzzer,
+        "model_learning",
+        lambda *_args: stop_event.set() or None,
+    )
+    monkeypatch.setattr(
+        fuzzer,
+        "berserker_fuzz",
+        lambda *_args: pytest.fail("berserker must not start after timeout"),
+    )
+    monkeypatch.setattr(analyzer, "begin_phase", lambda *_args: None)
+    monkeypatch.setattr(analyzer, "end_phase", lambda *_args: None)
+    monkeypatch.setattr(
+        analyzer,
+        "record_generator_checkpoint",
+        lambda **_kwargs: None,
+    )
+
+    fuzzer.state_fuzz(stop_event)
+
+    assert stop_event.is_set()

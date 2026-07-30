@@ -23,6 +23,10 @@ class Prompter:
             with self._path_gen_parser.open('r+') as f:
                 self._tem_gen_parser = Template(f.read())
 
+            self._path_code_repair = dir / "builder" / "code_repair.md"
+            with self._path_code_repair.open('r+') as f:
+                self._tem_code_repair = Template(f.read())
+
             self._path_gen_checker = dir / "builder" / "checker_generation.md"
             with self._path_gen_checker.open('r+') as f:
                 self._tem_gen_checker = Template(f.read())

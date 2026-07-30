@@ -115,3 +115,38 @@ def test_mutator_prompt_includes_runtime_response_feedback():
     assert "Saved Best Generator Program" in captured["prompt"]
     assert '["ERROR", "PONG"]' in captured["prompt"]
     assert "not yet been reached" in captured["prompt"]
+
+
+def test_code_repair_prompt_includes_failed_code_and_validation_error():
+    prompt_path = (
+        Path(__file__).resolve().parents[1]
+        / "skills"
+        / "builder"
+        / "code_repair.md"
+    )
+    chater = AsyncChater.__new__(AsyncChater)
+    chater.pmp = SimpleNamespace(
+        _tem_code_repair=Template(prompt_path.read_text(encoding="utf-8"))
+    )
+    captured = {}
+
+    async def fake_chat_llm(prompt, usage):
+        captured["prompt"] = prompt
+        captured["usage"] = usage
+        return "def generate():\n    return b'PING\\r\\n'\n"
+
+    chater.chat_llm = fake_chat_llm
+
+    result = asyncio.run(
+        chater.llm_code_repair(
+            code="def generate(:\n",
+            error="SyntaxError: invalid syntax (<string>, line 1)",
+            function_name="generate",
+        )
+    )
+
+    assert result == "def generate():\n    return b'PING\\r\\n'\n"
+    assert captured["usage"] == "code_repair"
+    assert "def generate(:" in captured["prompt"]
+    assert "SyntaxError: invalid syntax" in captured["prompt"]
+    assert "function named `generate`" in captured["prompt"]
