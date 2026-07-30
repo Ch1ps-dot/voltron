@@ -1,2 +1,4 @@
 #!/bin/bash
-/home/ubuntu/experiments/LightFTP/Source/Release/fftp /home/ubuntu/experiments/fftp.conf 2200
+
+exec /home/ubuntu/experiments/LightFTP/Source/Release/fftp \
+  /home/ubuntu/experiments/LightFTP/Source/Release/fftp.conf 2200

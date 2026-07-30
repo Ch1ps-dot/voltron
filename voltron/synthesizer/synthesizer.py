@@ -587,7 +587,9 @@ class AsyncProducer:
             old_code = f.read()
                 
         async with sem:
-            while(True):
+            retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+            failure_count = 0
+            while failure_count < retry_limit:
                 try:
                     # generate input generator and save it
                     logger.debug(self.poss_response)
@@ -628,14 +630,21 @@ class AsyncProducer:
                         analyzer.finished += 1
                     return msg_type, mutate_code
                 except Exception:
+                    failure_count += 1
                     logger.exception('Producer: mutator generation failed')
+            logger.error(
+                'Producer: giving up mutator generation for %s after %d attempts',
+                msg_type,
+                retry_limit,
+            )
+            return None
 
     async def _generator_mutate_async(
         self,
         doc_info: str,
         req_res: dict[str, set],
         mutated_types: list[str] | None = None
-    ) -> list[tuple[str, str]]:
+    ) -> list[tuple[str, str] | None]:
         sem = asyncio.Semaphore(configs.async_sem_fuzz)
         req_types = (
             sorted(self.req_types)
@@ -701,7 +710,10 @@ class AsyncProducer:
         )
         
         # resolve mutator
-        for msg_type, mutate_code in results:
+        for result in results:
+            if result is None:
+                continue
+            msg_type, mutate_code = result
             msg_dir = self.mutator_path / f'{msg_type}'
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
@@ -788,7 +800,9 @@ class AsyncProducer:
         ).decode('utf-8')
 
         async with sem:
-            while True:
+            retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+            failure_count = 0
+            while failure_count < retry_limit:
                 try:
                     checker_code = await self.chater.llm_checker_gen(
                         pro_name=self.rfcp.pro_name,
@@ -810,14 +824,21 @@ class AsyncProducer:
                         raise TypeError('packet_checker must return bool')
                     return response_type, checker_code
                 except Exception as e:
+                    failure_count += 1
                     logger.debug(
                         f'[Checker Generation][{response_type}]: '
                         f'invalid checker {e}'
                     )
+            logger.error(
+                'Producer: giving up checker generation for %s after %d attempts',
+                response_type,
+                retry_limit,
+            )
+            return None
 
     async def _checker_gen_async(
             self
-    ) -> list[tuple[str, str]]:
+    ) -> list[tuple[str, str] | None]:
         if not hasattr(self, 'res_ir'):
             raise RuntimeError('Response IR is unavailable for checker generation')
 
@@ -849,7 +870,10 @@ class AsyncProducer:
         results = asyncio.run(self._checker_gen_async())
         self.checkers = {}
 
-        for msg_type, checker_code in results:
+        for result in results:
+            if result is None:
+                continue
+            msg_type, checker_code = result
             msg_dir = self.checker_path / quote(msg_type, safe='._-')
             msg_dir.mkdir(parents=True, exist_ok=True)
             checker_path = msg_dir / 'id0.py'
@@ -883,7 +907,9 @@ class AsyncProducer:
             pretty_print=True,
         ).decode('utf-8')
         async with sem:
-            while True:
+            retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+            failure_count = 0
+            while failure_count < retry_limit:
                 try:
                     observer_code = await self.chater.llm_observer_gen(
                         pro_name=self.rfcp.pro_name,
@@ -911,11 +937,18 @@ class AsyncProducer:
                             )
                     return response_type, observer_code
                 except Exception:
+                    failure_count += 1
                     logger.exception(
                         f'Producer: invalid observer [{response_type}]'
                     )
+            logger.error(
+                'Producer: giving up observer generation for %s after %d attempts',
+                response_type,
+                retry_limit,
+            )
+            return None
 
-    async def _observer_gen_async(self) -> list[tuple[str, str]]:
+    async def _observer_gen_async(self) -> list[tuple[str, str] | None]:
         if not hasattr(self, 'res_ir'):
             raise RuntimeError('Response IR is unavailable for observer generation')
         messages = self.res_ir.findall('message')
@@ -939,7 +972,10 @@ class AsyncProducer:
         """Generate one semantic response observer for each response type."""
         results = asyncio.run(self._observer_gen_async())
         self.observers = {}
-        for msg_type, observer_code in results:
+        for result in results:
+            if result is None:
+                continue
+            msg_type, observer_code = result
             msg_dir = self.observer_path / quote(msg_type, safe='._-')
             msg_dir.mkdir(parents=True, exist_ok=True)
             observer_path = msg_dir / 'id0.py'

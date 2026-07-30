@@ -102,6 +102,8 @@ class Executor:
         self.analyzer = analyzer # runtime analyzer
         self.crash_testcases: dict[str, list[bytes]] = {}
         self.unable_parse_request: set[str] = set()
+        self._saved_seed_digests: set[str] = set()
+        self._saved_seed_lock = threading.Lock()
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
@@ -2292,9 +2294,24 @@ class Executor:
         stdout: str = '',
         stderr: str = '',
         crash: bool = False
-    ):
+    ) -> bool:
         """Use pickle to store section tree instance
         """
+        seed_digest = self._seed_digest(cons, crash)
+        seed_lock = getattr(self, '_saved_seed_lock', None)
+        if seed_lock is None:
+            seed_lock = threading.Lock()
+            self._saved_seed_lock = seed_lock
+        with seed_lock:
+            saved_seed_digests = getattr(self, '_saved_seed_digests', None)
+            if saved_seed_digests is None:
+                saved_seed_digests = set()
+                self._saved_seed_digests = saved_seed_digests
+            if seed_digest in saved_seed_digests:
+                logger.debug('Executor: skip duplicate replayable seed')
+                return False
+            saved_seed_digests.add(seed_digest)
+
         pending = ''
         if crash:
             pending = '_crash'
@@ -2348,3 +2365,28 @@ class Executor:
             f.write('-'.join(cons.res_seq) + '\n')
             f.write(f'stdout: {stdout}' + '\n')
             f.write(f'stderr: {stderr}' + '\n')
+        return True
+
+    @staticmethod
+    def _seed_digest(cons: Conversation, crash: bool) -> str:
+        """Return a stable digest for a replayable conversation.
+
+        Retention happens in both model learning and fuzzing.  Include the
+        symbolic sequences and raw byte pairs so only an exact replay seed is
+        deduplicated; crashes retain a separate corpus from normal traffic.
+        """
+        digest = hashlib.sha256()
+        digest.update(b'crash=' + (b'1' if crash else b'0') + b'\0')
+        for sequence in (cons.req_seq, cons.res_seq):
+            digest.update(len(sequence).to_bytes(8, 'big'))
+            for item in sequence:
+                encoded = item.encode('utf-8', errors='surrogatepass')
+                digest.update(len(encoded).to_bytes(8, 'big'))
+                digest.update(encoded)
+        digest.update(len(cons.content).to_bytes(8, 'big'))
+        for request, response in cons.content:
+            digest.update(len(request).to_bytes(8, 'big'))
+            digest.update(request)
+            digest.update(len(response).to_bytes(8, 'big'))
+            digest.update(response)
+        return digest.hexdigest()
