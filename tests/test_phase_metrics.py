@@ -56,13 +56,16 @@ def test_phase_metrics_reset_removes_previous_csv(tmp_path, monkeypatch):
     metric = Analyzer()
     csv_path = tmp_path / "phase_metrics.csv"
     iteration_csv_path = tmp_path / "model_learning_iterations.csv"
+    generator_csv_path = tmp_path / "generator_iteration_metrics.csv"
     csv_path.write_text("old\n", encoding="utf-8")
     iteration_csv_path.write_text("old\n", encoding="utf-8")
+    generator_csv_path.write_text("old\n", encoding="utf-8")
 
     metric.reset_phase_metrics()
 
     assert not csv_path.exists()
     assert not iteration_csv_path.exists()
+    assert not generator_csv_path.exists()
 
 
 def test_model_learning_iteration_metrics_are_recorded(tmp_path, monkeypatch):
@@ -72,6 +75,12 @@ def test_model_learning_iteration_metrics_are_recorded(tmp_path, monkeypatch):
     metric.cur_resp_trans_cnt = {"USER->331": 2}
     metric.res_types_cnt = {"331": 5, "230": 1, "500": 1}
     metric.resp_trans_cnt = {"USER->331": 4, "PASS->230": 1}
+    metric.lifetime_res_types_cnt = {"220": 2, "331": 5, "230": 1}
+    metric.lifetime_resp_trans_cnt = {
+        "-->220": 2,
+        "220->331": 5,
+        "331->230": 1,
+    }
     hypothesis = SimpleNamespace(
         states={1, 2, 3},
         alphabet={"USER", "PASS"},
@@ -121,3 +130,132 @@ def test_model_learning_iteration_metrics_are_recorded(tmp_path, monkeypatch):
     assert row["current_response_transition_events"] == "2"
     assert row["total_response_types"] == "3"
     assert row["total_response_transitions"] == "2"
+    assert row["lifetime_response_types"] == "3"
+    assert row["lifetime_response_type_events"] == "8"
+    assert row["lifetime_response_transitions"] == "3"
+    assert row["lifetime_response_transition_events"] == "8"
+
+
+def test_lifetime_response_metrics_survive_phase_resets():
+    metric = Analyzer()
+
+    metric.res_types_update("220")
+    metric.resp_trans_update("-/220")
+    metric.res_types_update("331")
+    metric.resp_trans_update("220/331")
+    metric.res_types_update("331")
+    metric.resp_trans_update("220/331")
+
+    metric.reset_automata_cnt()
+    metric.res_types_cnt = {}
+    metric.resp_trans_cnt = {}
+
+    assert metric.res_types_num() == 0
+    assert metric.resp_trans_num() == 0
+    assert metric.lifetime_res_events_num() == 3
+    assert metric.lifetime_res_types_num() == 2
+    assert metric.lifetime_resp_trans_events_num() == 3
+    assert metric.lifetime_resp_trans_num() == 2
+
+
+def test_generator_checkpoints_record_cumulative_values_and_deltas(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
+    metric = Analyzer()
+    metric.start_time = 0
+    metric.reset_phase_metrics()
+
+    metric.record_generator_checkpoint(
+        phase="model_learning",
+        checkpoint_type="model_learning_baseline",
+        phase_iteration=0,
+        baseline_operation_id="initial_generator",
+    )
+    metric.res_types_update("220")
+    metric.resp_trans_update("-/220")
+    metric.res_types_update("331")
+    metric.resp_trans_update("220/331")
+    metric.record_generator_checkpoint(
+        phase="model_learning",
+        checkpoint_type="before_generator_evolve",
+        phase_iteration=0,
+        operation_id="evolve-0",
+        model_id="0",
+        iteration_status="initial",
+    )
+
+    metric.res_types_update("331")
+    metric.resp_trans_update("220/331")
+    metric.res_types_update("230")
+    metric.resp_trans_update("331/230")
+    metric.record_generator_checkpoint(
+        phase="model_learning",
+        checkpoint_type="before_generator_evolve",
+        phase_iteration=1,
+        operation_id="evolve-1",
+        model_id="1",
+        iteration_status="improved",
+    )
+
+    metric.record_generator_checkpoint(
+        phase="fuzzing",
+        checkpoint_type="fuzzing_baseline",
+        phase_iteration=0,
+        baseline_operation_id="initial_mutator",
+    )
+    metric.res_types_update("500")
+    metric.resp_trans_update("230/500")
+    metric.record_generator_checkpoint(
+        phase="fuzzing",
+        checkpoint_type="before_generator_mutate",
+        phase_iteration=0,
+        operation_id="mutate-0",
+        mutated_types=["PASS", "USER"],
+    )
+    metric.res_types_update("500")
+    metric.resp_trans_update("230/500")
+    metric.finalize_generator_metrics(phase_iteration=1)
+    metric.finalize_generator_metrics(phase_iteration=1)
+
+    rows = read_phase_rows(
+        tmp_path / "generator_iteration_metrics.csv"
+    )
+    assert len(rows) == 6
+
+    assert rows[0]["checkpoint_type"] == "model_learning_baseline"
+    assert rows[0]["delta_response_types"] == "0"
+    assert rows[0]["delta_response_transitions"] == "0"
+
+    assert rows[1]["operation_id"] == "evolve-0"
+    assert rows[1]["evaluated_operation_id"] == "initial_generator"
+    assert rows[1]["lifetime_response_types"] == "2"
+    assert rows[1]["delta_response_types"] == "2"
+    assert rows[1]["lifetime_response_transitions"] == "2"
+    assert rows[1]["delta_response_transitions"] == "2"
+
+    assert rows[2]["operation_id"] == "evolve-1"
+    assert rows[2]["evaluated_operation_id"] == "evolve-0"
+    assert rows[2]["delta_response_events"] == "2"
+    assert rows[2]["delta_response_types"] == "1"
+    assert rows[2]["delta_transition_events"] == "2"
+    assert rows[2]["delta_response_transitions"] == "1"
+
+    assert rows[3]["checkpoint_type"] == "fuzzing_baseline"
+    assert rows[3]["evaluated_operation_id"] == "initial_mutator"
+    assert rows[3]["delta_response_types"] == "0"
+    assert rows[3]["delta_response_transitions"] == "0"
+
+    assert rows[4]["operation_id"] == "mutate-0"
+    assert rows[4]["evaluated_operation_id"] == "initial_mutator"
+    assert rows[4]["mutated_types"] == '["PASS","USER"]'
+    assert rows[4]["delta_response_types"] == "1"
+    assert rows[4]["delta_response_transitions"] == "1"
+
+    assert rows[5]["checkpoint_type"] == "run_final"
+    assert rows[5]["evaluated_operation_id"] == "mutate-0"
+    assert rows[5]["delta_response_events"] == "1"
+    assert rows[5]["delta_response_types"] == "0"
+    assert rows[5]["delta_transition_events"] == "1"
+    assert rows[5]["delta_response_transitions"] == "0"

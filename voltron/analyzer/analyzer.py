@@ -1,5 +1,6 @@
 import csv
 from datetime import datetime
+import json
 import threading, time, pprint
 from pathlib import Path
 from voltron.utils.logger import logger_fuzz as logger
@@ -17,6 +18,10 @@ class Analyzer:
         self.cur_res_types_cnt: dict[str, int] = {}
         self.resp_trans_cnt: dict[str, int] = {}
         self.cur_resp_trans_cnt: dict[str, int] = {}
+        # Whole-process counters. Unlike the phase counters above, these are
+        # never reset when model learning or fuzzing starts a new iteration.
+        self.lifetime_res_types_cnt: dict[str, int] = {}
+        self.lifetime_resp_trans_cnt: dict[str, int] = {}
         self.req_num = 0
         self.res_num = 0
         self.path_num = 0
@@ -62,6 +67,11 @@ class Analyzer:
         self.active_phase: str | None = None
         self.phase_metrics_path: Path | None = None
         self.model_learning_iteration_path: Path | None = None
+        self.generator_iteration_metrics_path: Path | None = None
+        self._generator_checkpoint_id = 0
+        self._last_generator_checkpoint: dict | None = None
+        self._last_generator_operation_id: str | None = None
+        self._generator_metrics_finalized = False
         
         self.iter = 0 # fuzzer generation iteration
         
@@ -79,6 +89,13 @@ class Analyzer:
             self.active_phase = None
             self.phase_metrics_path = None
             self.model_learning_iteration_path = None
+            self.generator_iteration_metrics_path = None
+            self._generator_checkpoint_id = 0
+            self._last_generator_checkpoint = None
+            self._last_generator_operation_id = None
+            self._generator_metrics_finalized = False
+            self.lifetime_res_types_cnt = {}
+            self.lifetime_resp_trans_cnt = {}
             try:
                 csv_path = configs.results_path / 'phase_metrics.csv'
                 csv_path.unlink(missing_ok=True)
@@ -87,6 +104,11 @@ class Analyzer:
                     / 'model_learning_iterations.csv'
                 )
                 iteration_csv_path.unlink(missing_ok=True)
+                generator_csv_path = (
+                    configs.results_path
+                    / 'generator_iteration_metrics.csv'
+                )
+                generator_csv_path.unlink(missing_ok=True)
             except Exception:
                 logger.exception('Analyzer: reset phase metrics failure')
 
@@ -302,6 +324,10 @@ class Analyzer:
                     'current_response_transition_events',
                     'total_response_types',
                     'total_response_transitions',
+                    'lifetime_response_types',
+                    'lifetime_response_type_events',
+                    'lifetime_response_transitions',
+                    'lifetime_response_transition_events',
                 ]
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 if write_header:
@@ -330,11 +356,191 @@ class Analyzer:
                     ),
                     'total_response_types': len(self.res_types_cnt),
                     'total_response_transitions': len(self.resp_trans_cnt),
+                    'lifetime_response_types': (
+                        self.lifetime_res_types_num()
+                    ),
+                    'lifetime_response_type_events': (
+                        self.lifetime_res_events_num()
+                    ),
+                    'lifetime_response_transitions': (
+                        self.lifetime_resp_trans_num()
+                    ),
+                    'lifetime_response_transition_events': (
+                        self.lifetime_resp_trans_events_num()
+                    ),
                 })
         except Exception:
             logger.exception(
                 'Analyzer: write model learning iteration metrics failure'
             )
+
+    def record_generator_checkpoint(
+            self,
+            phase: str,
+            checkpoint_type: str,
+            phase_iteration: int | None = None,
+            operation_id: str = '',
+            model_id: str = '',
+            iteration_status: str = '',
+            mutated_types: list[str] | None = None,
+            baseline_operation_id: str = '',
+    ) -> None:
+        """Persist one whole-run response snapshot around generator updates."""
+        with self.lock:
+            if (
+                checkpoint_type == 'run_final'
+                and self._generator_metrics_finalized
+            ):
+                return
+
+            now = time.time()
+            current = {
+                'response_events': self.lifetime_res_events_num(),
+                'response_types': self.lifetime_res_types_num(),
+                'transition_events': (
+                    self.lifetime_resp_trans_events_num()
+                ),
+                'response_transitions': (
+                    self.lifetime_resp_trans_num()
+                ),
+            }
+            is_baseline = checkpoint_type.endswith('_baseline')
+            previous = self._last_generator_checkpoint
+            if previous is None or is_baseline:
+                deltas = {
+                    'response_events': 0,
+                    'response_types': 0,
+                    'transition_events': 0,
+                    'response_transitions': 0,
+                }
+            else:
+                deltas = {
+                    key: current[key] - previous[key]
+                    for key in current
+                }
+
+            evaluated_operation_id = (
+                baseline_operation_id
+                if is_baseline
+                else (self._last_generator_operation_id or '')
+            )
+            csv_path = (
+                configs.results_path
+                / 'generator_iteration_metrics.csv'
+            )
+            write_header = (
+                not csv_path.is_file()
+                or csv_path.stat().st_size == 0
+            )
+            fieldnames = [
+                'checkpoint_id',
+                'timestamp',
+                'elapsed_s',
+                'phase',
+                'checkpoint_type',
+                'phase_iteration',
+                'operation_id',
+                'evaluated_operation_id',
+                'model_id',
+                'iteration_status',
+                'mutated_types',
+                'lifetime_response_events',
+                'lifetime_response_types',
+                'delta_response_events',
+                'delta_response_types',
+                'lifetime_transition_events',
+                'lifetime_response_transitions',
+                'delta_transition_events',
+                'delta_response_transitions',
+            ]
+            try:
+                with csv_path.open(
+                    mode='a',
+                    encoding='utf-8',
+                    newline='',
+                ) as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    if write_header:
+                        writer.writeheader()
+                    writer.writerow({
+                        'checkpoint_id': self._generator_checkpoint_id,
+                        'timestamp': self._format_time(now),
+                        'elapsed_s': (
+                            f'{max(0.0, now - self.start_time):.6f}'
+                        ),
+                        'phase': phase,
+                        'checkpoint_type': checkpoint_type,
+                        'phase_iteration': (
+                            '' if phase_iteration is None else phase_iteration
+                        ),
+                        'operation_id': operation_id,
+                        'evaluated_operation_id': evaluated_operation_id,
+                        'model_id': model_id,
+                        'iteration_status': iteration_status,
+                        'mutated_types': json.dumps(
+                            mutated_types or [],
+                            separators=(',', ':'),
+                        ),
+                        'lifetime_response_events': (
+                            current['response_events']
+                        ),
+                        'lifetime_response_types': (
+                            current['response_types']
+                        ),
+                        'delta_response_events': (
+                            deltas['response_events']
+                        ),
+                        'delta_response_types': (
+                            deltas['response_types']
+                        ),
+                        'lifetime_transition_events': (
+                            current['transition_events']
+                        ),
+                        'lifetime_response_transitions': (
+                            current['response_transitions']
+                        ),
+                        'delta_transition_events': (
+                            deltas['transition_events']
+                        ),
+                        'delta_response_transitions': (
+                            deltas['response_transitions']
+                        ),
+                    })
+                    f.flush()
+            except Exception:
+                logger.exception(
+                    'Analyzer: write generator iteration metrics failure'
+                )
+                return
+
+            self.generator_iteration_metrics_path = csv_path
+            self._generator_checkpoint_id += 1
+            self._last_generator_checkpoint = current
+            if is_baseline:
+                self._last_generator_operation_id = (
+                    baseline_operation_id or None
+                )
+            elif operation_id:
+                self._last_generator_operation_id = operation_id
+            if checkpoint_type == 'run_final':
+                self._generator_metrics_finalized = True
+
+    def finalize_generator_metrics(
+            self,
+            phase_iteration: int | None = None,
+    ) -> None:
+        """Record the final delta once, if generator metrics were started."""
+        with self.lock:
+            if (
+                self._last_generator_checkpoint is None
+                or self._generator_metrics_finalized
+            ):
+                return
+        self.record_generator_checkpoint(
+            phase='final',
+            checkpoint_type='run_final',
+            phase_iteration=phase_iteration,
+        )
 
     def collect_results(
             self
@@ -351,6 +557,22 @@ class Analyzer:
                 f.write(f'{"recv_resp":<15}: {self.res_num}\n')
                 f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
                 f.write(f'{"resp_transitions":<15}: {self.resp_trans_num()}\n')
+                f.write(
+                    f'{"lifetime_resp_events":<31}: '
+                    f'{self.lifetime_res_events_num()}\n'
+                )
+                f.write(
+                    f'{"lifetime_distinct_resp":<31}: '
+                    f'{self.lifetime_res_types_num()}\n'
+                )
+                f.write(
+                    f'{"lifetime_resp_transition_events":<31}: '
+                    f'{self.lifetime_resp_trans_events_num()}\n'
+                )
+                f.write(
+                    f'{"lifetime_resp_transitions":<31}: '
+                    f'{self.lifetime_resp_trans_num()}\n'
+                )
                 f.write(f'{"crash_num":<15}: {self.crash_num}\n')
                 f.write(
                     f'{"non_compliant":<15}: '
@@ -375,6 +597,16 @@ class Analyzer:
                 f.write(f'{"response transitions":<15}:\n')
                 pprint.pprint(
                     self.resp_trans_cnt.keys(),
+                    stream=f
+                )
+                f.write(f'{"lifetime response types":<31}:\n')
+                pprint.pprint(
+                    self.lifetime_res_types_cnt.keys(),
+                    stream=f
+                )
+                f.write(f'{"lifetime response transitions":<31}:\n')
+                pprint.pprint(
+                    self.lifetime_resp_trans_cnt.keys(),
                     stream=f
                 )
         except Exception:
@@ -421,6 +653,34 @@ class Analyzer:
                         'time': minute,
                         'data': self.resp_trans_num()
                     })
+                    writer.writerow({
+                        'subject': self.target_name,
+                        'fuzzer': 'voltron',
+                        'data_type': 'lifetime_response_events',
+                        'time': minute,
+                        'data': self.lifetime_res_events_num()
+                    })
+                    writer.writerow({
+                        'subject': self.target_name,
+                        'fuzzer': 'voltron',
+                        'data_type': 'lifetime_response_types',
+                        'time': minute,
+                        'data': self.lifetime_res_types_num()
+                    })
+                    writer.writerow({
+                        'subject': self.target_name,
+                        'fuzzer': 'voltron',
+                        'data_type': 'lifetime_response_transition_events',
+                        'time': minute,
+                        'data': self.lifetime_resp_trans_events_num()
+                    })
+                    writer.writerow({
+                        'subject': self.target_name,
+                        'fuzzer': 'voltron',
+                        'data_type': 'lifetime_response_transitions',
+                        'time': minute,
+                        'data': self.lifetime_resp_trans_num()
+                    })
 
             self._metric_series_last_minute = elapsed_minute
         except Exception:
@@ -450,6 +710,11 @@ class Analyzer:
         else:
             self.cur_res_types_cnt[res_code] = 1
 
+        if res_code in self.lifetime_res_types_cnt:
+            self.lifetime_res_types_cnt[res_code] += 1
+        else:
+            self.lifetime_res_types_cnt[res_code] = 1
+
     def resp_trans_update(
             self,
             trans: str
@@ -464,6 +729,11 @@ class Analyzer:
             self.cur_resp_trans_cnt[trans] +=  1
         else:
             self.cur_resp_trans_cnt[trans] = 1
+
+        if trans in self.lifetime_resp_trans_cnt:
+            self.lifetime_resp_trans_cnt[trans] += 1
+        else:
+            self.lifetime_resp_trans_cnt[trans] = 1
 
     
     def req_types_num(
@@ -480,6 +750,26 @@ class Analyzer:
             self
     ):
         return len(self.resp_trans_cnt.keys())
+
+    def lifetime_res_events_num(
+            self
+    ):
+        return sum(self.lifetime_res_types_cnt.values())
+
+    def lifetime_res_types_num(
+            self
+    ):
+        return len(self.lifetime_res_types_cnt)
+
+    def lifetime_resp_trans_events_num(
+            self
+    ):
+        return sum(self.lifetime_resp_trans_cnt.values())
+
+    def lifetime_resp_trans_num(
+            self
+    ):
+        return len(self.lifetime_resp_trans_cnt)
     
     def unseen_res_types(
         self

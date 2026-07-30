@@ -322,7 +322,8 @@ class AsyncChater:
             code: the original mutator code to be evolved
             info: the information to be used for mutator evolution
             poss_response: the possible response for the current request message, which provides the information for mutator evolution
-            trace: the execution trace of the current mutator, which provides the information for mutator
+            trace: JSON list of response types observed for the current
+                request type during fuzzing
 
         Returns:
             generated mutator
