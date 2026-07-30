@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="RTSPResponse">
+    <!-- Response message in RTSP protocol, from server to client, after processing a request -->
+
+    <!-- Status-Line: RTSP-Version SP Status-Code SP Reason-Phrase CRLF -->
+    <field name="RTSPVersion" type="variable" length="undefined" value="'RTSP/2.0' or other version"/>
+    <!-- Protocol version string, e.g., "RTSP/2.0"; variable length up to 19 digits plus prefix -->
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between version and status code -->
+    <field name="StatusCode" type="variable" length="3B" value="1*3DIGIT"/>
+    <!-- Three-digit numeric status code indicating result (e.g., 200 for OK, 404 for Not Found) -->
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between status code and reason phrase -->
+    <field name="ReasonPhrase" type="variable" length="undefined" value="TEXT-UTF8char / HT / SP"/>
+    <!-- Textual reason phrase associated with the status code (e.g., "OK", "Not Found") -->
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the Status-Line -->
+
+    <!-- Headers: zero or more header lines, each ending with CRLF -->
+    <field name="Headers" type="variable" length="undefined" value="1*OCTET"/>
+    <!-- One or more RTSP header fields (general-header, response-header, message-body-header).
+         Each header is a name: value pair terminated by CRLF.
+         This field contains all headers as raw octets; parsing follows RFC syntax.
+         Common headers include CSeq, Date, Session, etc. -->
+
+    <field name="CRLF2" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (a CRLF alone) separating headers from message body; indicates end of headers -->
+
+    <!-- Optional message body -->
+    <field name="MessageBody" type="variable" length="undefined" value="1*OCTET"/>
+    <!-- Message body data, if present. Length is determined by the value of the Content-Length header.
+         If no Content-Length header is present, body length is zero. -->
+</message>
+</ir>

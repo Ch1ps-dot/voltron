@@ -71,8 +71,8 @@ lighttpd:
   server: child
 
 llm_doc:
-  base_url: https://api.deepseek.com
-  api_key: sk-55e804851013417f9d6eae1746d5cdfe
+  base_url: https://vip.yinli.one/v1
+  api_key: sk-lwBsE0yn0ECGWJBBnjLQl71T1yNAar48cmQYbB6i9KGjyeTN
   model: deepseek-v4-flash
   async_sem: 8
 

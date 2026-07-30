@@ -319,7 +319,7 @@ class AsyncChater:
         Args:
             pro_name: name of protocol
             msg_type: required protocol message type
-            code: the original mutator code to be evolved
+            code: saved best generator code used as the mutation baseline
             info: the information to be used for mutator evolution
             poss_response: the possible response for the current request message, which provides the information for mutator evolution
             trace: JSON list of response types observed for the current
