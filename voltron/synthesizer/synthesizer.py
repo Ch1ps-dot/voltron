@@ -20,7 +20,7 @@ from voltron.analyzer.compliance import (
     parse_compliance_result,
     retrieve_response_sections,
 )
-from voltron.llm.chatter import AsyncChater
+from voltron.llm.chatter import AsyncChater, LLMDeadlineExceeded
 from voltron.learner.automata import MealyMachine
 from dataclasses import dataclass, asdict, field
     
@@ -370,17 +370,26 @@ class AsyncProducer:
             info = f.read()
         async with sem:
             failure_count = 0
+            failed_code: str | None = None
+            failure_error = ''
             while(True):
+                input_code: str | None = None
                 try:
-                    # generate input generator and save it
-                    input_code = await self.chater.llm_generator_gen(
-                        pro_name=self.rfcp.pro_name,
-                        field_name=self.rfcp.req_fields[0],
-                        msg_type=msg_type,
-                        msg_ir=msg_ir,
-                        info=info,
-                        type_rule=self._request_type_rule_info(msg_type),
-                    )
+                    if failed_code is None:
+                        input_code = await self.chater.llm_generator_gen(
+                            pro_name=self.rfcp.pro_name,
+                            field_name=self.rfcp.req_fields[0],
+                            msg_type=msg_type,
+                            msg_ir=msg_ir,
+                            info=info,
+                            type_rule=self._request_type_rule_info(msg_type),
+                        )
+                    else:
+                        input_code = await self.chater.llm_code_repair(
+                            code=failed_code,
+                            error=failure_error,
+                            function_name='generate',
+                        )
                     
                     # test generated code
                     name_space = {}
@@ -389,7 +398,12 @@ class AsyncProducer:
                     obj()
                     
                     return msg_type, input_code
+                except LLMDeadlineExceeded:
+                    raise
                 except Exception as e:
+                    if input_code is not None:
+                        failed_code = input_code
+                    failure_error = f'{type(e).__name__}: {e}'
                     logger.debug(f'Producer :generate error {str(e)}')
 
     async def _generator_gen_async(
@@ -441,10 +455,27 @@ class AsyncProducer:
             doc_info: the document information to be used for generator evolution
             machine: the current MealyMachine which provides the state transition information for generator evolution
         """
-        old_code = ''
-        old_g_name = f'id{machine.id}.py'
-        old_g_path = self.generator_path / msg_type / old_g_name
-        with open(old_g_path, 'r', encoding='utf-8') as f:
+        generator_versions = self.generators.get(msg_type, [])
+        if not generator_versions:
+            logger.error(
+                'Producer: skipping generator evolution for %s: '
+                'no generated baseline exists',
+                msg_type,
+            )
+            return None
+
+        old_generator = generator_versions[-1]
+        old_g_name = old_generator.name
+        old_g_path = self.generator_path / msg_type / f'{old_g_name}.py'
+        if not old_g_path.is_file():
+            logger.error(
+                'Producer: skipping generator evolution for %s: '
+                'baseline is missing at %s',
+                msg_type,
+                old_g_path,
+            )
+            return None
+        with old_g_path.open('r', encoding='utf-8') as f:
             old_code = f.read()
             
         # extract state trace of request pair which has dependency and the code of related generators 
@@ -453,8 +484,26 @@ class AsyncProducer:
         if msg_type in self.req_dep.keys():
             for last_req, relation in self.req_dep[msg_type].items():
                 trace_list.add(machine.get_relation(last_req, msg_type))
-                code_dep_path = self.generator_path / last_req / old_g_name
-                with open(code_dep_path, 'r', encoding='utf-8') as f:
+                dependency_generators = self.generators.get(last_req, [])
+                if not dependency_generators:
+                    logger.debug(
+                        'Producer: dependency generator is unavailable: %s',
+                        last_req,
+                    )
+                    continue
+                dependency_generator = dependency_generators[-1]
+                code_dep_path = (
+                    self.generator_path
+                    / last_req
+                    / f'{dependency_generator.name}.py'
+                )
+                if not code_dep_path.is_file():
+                    logger.debug(
+                        'Producer: dependency generator source is missing: %s',
+                        code_dep_path,
+                    )
+                    continue
+                with code_dep_path.open('r', encoding='utf-8') as f:
                     code_dep.append(f.read())
         # for pair in self.req_dep.keys():
         #     last_request = pair.split('/')[0]
@@ -463,19 +512,31 @@ class AsyncProducer:
         #         trace_list.add(machine.get_relation(last_request, current_request))
                 
         async with sem:
-            while(True):
+            failure_count = 0
+            failed_code: str | None = None
+            failure_error = ''
+            retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+            ir_evolution_attempted = False
+            while failure_count < retry_limit:
+                input_code: str | None = None
                 try:
-                    # generate input generator and save it
-                    input_code = await self.chater.llm_generator_evolve(
-                        code=old_code,
-                        pro_name=self.rfcp.pro_name,
-                        field_name=self.rfcp.req_fields[0],
-                        msg_type=msg_type,
-                        msg_ir=self._request_ir_info(msg_type),
-                        trace= '\n'.join(trace_list),
-                        info=doc_info,
-                        related_code='\n'.join(code_dep)
-                    )
+                    if failed_code is None:
+                        input_code = await self.chater.llm_generator_evolve(
+                            code=old_code,
+                            pro_name=self.rfcp.pro_name,
+                            field_name=self.rfcp.req_fields[0],
+                            msg_type=msg_type,
+                            msg_ir=self._request_ir_info(msg_type),
+                            trace= '\n'.join(trace_list),
+                            info=doc_info,
+                            related_code='\n'.join(code_dep)
+                        )
+                    else:
+                        input_code = await self.chater.llm_code_repair(
+                            code=failed_code,
+                            error=failure_error,
+                            function_name='generate',
+                        )
                     
                     # test generated code
                     name_space = {}
@@ -488,13 +549,18 @@ class AsyncProducer:
                     with analyzer.lock:
                         analyzer.finished += 1
                     return msg_type, input_code
+                except LLMDeadlineExceeded:
+                    raise
                 except Exception as e:
+                    if input_code is not None:
+                        failed_code = input_code
+                    failure_error = f'{type(e).__name__}: {e}'
                     failure_count += 1
                     if failure_count >= getattr(
                         configs,
                         'ir_evolution_failure_threshold',
                         3,
-                    ):
+                    ) and not ir_evolution_attempted:
                         await self._maybe_evolve_request_ir(
                             msg_type,
                             (
@@ -502,8 +568,14 @@ class AsyncProducer:
                                 f'time(s): {type(e).__name__}: {e}'
                             ),
                         )
-                        failure_count = 0
+                        ir_evolution_attempted = True
                     logger.debug(f'Producer: generate error {e}')
+            logger.error(
+                'Producer: giving up generator evolution for %s after %d attempts',
+                msg_type,
+                retry_limit,
+            )
+            return None
 
     async def _generator_evo_async(
         self,
@@ -537,7 +609,10 @@ class AsyncProducer:
         
         # produce new generator
         results = asyncio.run(self._generator_evo_async(doc_info, machine))
-        for msg_type, input_code in results:
+        for result in results:
+            if result is None:
+                continue
+            msg_type, input_code = result
             msg_dir = self.generator_path / f'{msg_type}'
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
@@ -549,7 +624,7 @@ class AsyncProducer:
                 f.write(input_code)
                 # construct and save information for new generator
                 
-                old_name = f'id{machine.id}'
+                old_name = self.generators[msg_type][-1].name
                 new_name = f'id{cur_id}'
                 info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(gen_path.resolve())}
                 self.generators.setdefault(msg_type, [])
@@ -752,17 +827,31 @@ class AsyncProducer:
     ):
         res_info = self._primary_response_field_info()
         type_rules = self._response_type_rules_info()
+        failed_code: str | None = None
+        failure_error = ''
         while(True):
+            pkt_parser_code: str | None = None
             try:
-                # generate input generator and save it
-                pkt_parser_code = await self.chater.llm_parser_gen(
-                    pro_name=self.rfcp.pro_name,
-                    res_info=res_info,
-                    type_rules=type_rules,
-                )
+                if failed_code is None:
+                    pkt_parser_code = await self.chater.llm_parser_gen(
+                        pro_name=self.rfcp.pro_name,
+                        res_info=res_info,
+                        type_rules=type_rules,
+                    )
+                else:
+                    pkt_parser_code = await self.chater.llm_code_repair(
+                        code=failed_code,
+                        error=failure_error,
+                        function_name='packet_parser',
+                    )
                 compile(pkt_parser_code, '<string>', 'exec')
                 return pkt_parser_code
+            except LLMDeadlineExceeded:
+                raise
             except Exception as e:
+                if pkt_parser_code is not None:
+                    failed_code = pkt_parser_code
+                failure_error = f'{type(e).__name__}: {e}'
                 logger.debug(f'[Parser Generation]: syntax error {e}')
                 
     def parser_gen(
@@ -1696,23 +1785,37 @@ class AsyncProducer:
         with open(old_p_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
                 
+        failed_code: str | None = None
+        failure_error = ''
         while(True):
+            pkt_parser_code: str | None = None
             try:
-                # generate input generator and save it
-                pkt_parser_code = await self.chater.llm_parser_evolve(
-                    old_code=old_code,
-                    pro_name=self.rfcp.pro_name,
-                    res_info=res_info,
-                    type_rules=type_rules,
-                    message=message,
-                )
+                if failed_code is None:
+                    pkt_parser_code = await self.chater.llm_parser_evolve(
+                        old_code=old_code,
+                        pro_name=self.rfcp.pro_name,
+                        res_info=res_info,
+                        type_rules=type_rules,
+                        message=message,
+                    )
+                else:
+                    pkt_parser_code = await self.chater.llm_code_repair(
+                        code=failed_code,
+                        error=failure_error,
+                        function_name='packet_parser',
+                    )
                 
                 # test generated code
                 with analyzer.lock:
                     analyzer.finished += 1
                 compile(pkt_parser_code, '<string>', 'exec')
                 return pkt_parser_code
+            except LLMDeadlineExceeded:
+                raise
             except Exception as e:
+                if pkt_parser_code is not None:
+                    failed_code = pkt_parser_code
+                failure_error = f'{type(e).__name__}: {e}'
                 logger.debug(f'Producer: generate error {e}')
 
     def _primary_response_field_info(

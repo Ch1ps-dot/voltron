@@ -6,7 +6,11 @@ from voltron.learner.mem_oracle import MembershipOracle
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
-import pprint, pickle, threading, sys, time, copy
+import pprint, pickle, threading, time, copy
+
+
+class ModelLearningStopped(RuntimeError):
+    """Signal that model learning stopped before producing a hypothesis."""
 
 
 class ObTable:
@@ -37,6 +41,10 @@ class ObTable:
         self.mq = mq
         self.eq = eq
         self.stop_event = stop_event
+
+    def _stop_learning(self, reason: str) -> None:
+        self.stop_event.set()
+        raise ModelLearningStopped(reason)
         
     def table_init(self):
         self._fill_table()
@@ -65,8 +73,8 @@ class ObTable:
                     if (configs.time_limit_s < time.time() - analyzer.start_time):
                         logger.debug('Fuzzer: timeout')
                         self.stop_event.set()
-                    if self.stop_event.is_set(): 
-                        sys.exit(0)
+                    if self.stop_event.is_set():
+                        self._stop_learning('model learning stopped')
                         
                     if(len(s) != 1 and self.T[s[:-1]][s[-1:]] == ('CLOSED',)):
                         self.T[s][e] = ('CLOSED',)
@@ -96,7 +104,7 @@ class ObTable:
                         logger.debug(f'query entry: {s}:{e} => {self.T[s][e]}')
                     else:
                         logger.debug('fill table: no out')
-                        sys.exit(0)
+                        self._stop_learning('model learning received no output')
                         
 
         with analyzer.lock:
@@ -118,8 +126,8 @@ class ObTable:
                         logger.debug('Fuzzer: timeout')
                         self.stop_event.set()
                         
-                    if self.stop_event.is_set(): 
-                        sys.exit(0)
+                    if self.stop_event.is_set():
+                        self._stop_learning('model learning stopped')
                         
                     if e in self.T[si].keys():
                         logger.debug(f'existed entry: {si}:{e} => {self.T[si][e]}')
@@ -167,7 +175,9 @@ class ObTable:
                                 break
                             else:
                                 logger.debug('fill table: no out')
-                                sys.exit(0)
+                                self._stop_learning(
+                                    'model learning received no output'
+                                )
         with analyzer.lock:
             analyzer.clean_progress()
 
@@ -230,8 +240,8 @@ class ObTable:
         """
         logger.debug('Ob: make consistent')
         while True:
-            if self.stop_event.is_set(): 
-                sys.exit(0)
+            if self.stop_event.is_set():
+                self._stop_learning('model learning stopped')
             ok, data = self.is_consistent()
             if ok or data == None:
                 return
@@ -309,6 +319,8 @@ class MealyLstar:
             self.table.make_close()
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)
+        except ModelLearningStopped:
+            raise
         except Exception:
             logger.exception('LM: learning failed')
         return h
@@ -336,6 +348,8 @@ class MealyLstar:
             self.table.make_close()
             self.table.make_consistent()
             h = self.table.build_hypothesis(id)
+        except ModelLearningStopped:
+            raise
         except Exception:
             logger.exception('LM: learning with existing table failed')
         return h

@@ -5,7 +5,7 @@ from voltron.executor.conversation import Conversation
 
 from voltron.utils.logger import configure_file_logging, logger_fuzz as logger
 
-from voltron.llm.chatter import AsyncChater
+from voltron.llm.chatter import AsyncChater, LLMDeadlineExceeded
 
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 
@@ -20,7 +20,13 @@ from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
 
-from voltron.learner.mlstar import MealyLstar, MembershipOracle, EquOracle, ObTable
+from voltron.learner.mlstar import (
+    MealyLstar,
+    MembershipOracle,
+    EquOracle,
+    ObTable,
+    ModelLearningStopped,
+)
 from voltron.learner.automata import MealyMachine
 
 def exit_handler():
@@ -352,6 +358,9 @@ class Fuzzer:
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
+            if stop_event.is_set():
+                logger.debug('Fuzzer: model learning stopped at timeout')
+                return
             self.berserker_fuzz(hypothesis, stop_event)
                 
             self.stop_event.set()
@@ -365,7 +374,7 @@ class Fuzzer:
         mq,
         eq,
         stop_event
-    ) -> MealyMachine:
+    ) -> MealyMachine | None:
         """--- model learning ---"""
         h_lsit: list[MealyMachine] = []
         best_generators = {}
@@ -489,6 +498,10 @@ class Fuzzer:
                         self.producer.generator_evo(h)
                     continue
 
+            except (LLMDeadlineExceeded, ModelLearningStopped):
+                logger.debug('Fuzzer: model learning stopped')
+                stop_event.set()
+                break
             except Exception:
                 logger.exception('Fuzzer: model learning failed')
                 stop_event.set()
@@ -497,7 +510,7 @@ class Fuzzer:
                 logger.debug('Fuzzer: timeout')
                 stop_event.set()
                 
-        return h_lsit[-1]
+        return h_lsit[-1] if h_lsit else None
     
     def berserker_fuzz(
         self,

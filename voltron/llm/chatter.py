@@ -10,6 +10,11 @@ from voltron.utils.logger import format_event, logger_llm as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
 
+
+class LLMDeadlineExceeded(RuntimeError):
+    """Raised when an LLM request would outlive the fuzzing deadline."""
+
+
 class AsyncChater:
     """Chat with llm through api and manage the context.
     """
@@ -28,6 +33,24 @@ class AsyncChater:
 
         self.clt = client
         self.pmp = Prompter(configs.pmp_path)
+
+    @staticmethod
+    def _remaining_fuzz_time_s() -> float | None:
+        """Return the remaining fuzzing budget, if a fuzzing run is active."""
+        time_limit_s = getattr(configs, 'time_limit_s', None)
+        start_time = getattr(analyzer, 'start_time', None)
+        if not isinstance(time_limit_s, (int, float)):
+            return None
+        if not isinstance(start_time, (int, float)):
+            return None
+        return time_limit_s - (time.time() - start_time)
+
+    @staticmethod
+    def _stop_for_deadline() -> None:
+        stop_event = getattr(analyzer, 'stop_event', None)
+        if stop_event is not None:
+            stop_event.set()
+        logger.debug('LLM: fuzzing deadline reached; cancelling request')
 
     async def chat_llm(
             self, 
@@ -49,13 +72,27 @@ class AsyncChater:
         for _ in range(50):
             try:
                 start = time.perf_counter()
-                completion = await self.clt.chat.completions.create(
+                remaining_s = self._remaining_fuzz_time_s()
+                if remaining_s is not None and remaining_s <= 0:
+                    self._stop_for_deadline()
+                    raise LLMDeadlineExceeded(
+                        'fuzzing deadline reached before LLM request'
+                    )
+
+                request = self.clt.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": "You are a protocol analyzer."},
                         {"role": "user", "content": prompt}
                     ]
                 )
+                if remaining_s is None:
+                    completion = await request
+                else:
+                    completion = await asyncio.wait_for(
+                        request,
+                        timeout=remaining_s,
+                    )
                 if completion == None:
                     logger.debug("Chat Error")
                 end = time.perf_counter()
@@ -105,8 +142,21 @@ class AsyncChater:
                         ),
                     )
                 break
+            except asyncio.TimeoutError as exc:
+                self._stop_for_deadline()
+                raise LLMDeadlineExceeded(
+                    'LLM request exceeded remaining fuzzing time'
+                ) from exc
             except OpenAIError as e:
-                await asyncio.sleep(0.5)
+                remaining_s = self._remaining_fuzz_time_s()
+                if remaining_s is not None and remaining_s <= 0:
+                    self._stop_for_deadline()
+                    raise LLMDeadlineExceeded(
+                        'fuzzing deadline reached while retrying LLM request'
+                    )
+                await asyncio.sleep(
+                    0.5 if remaining_s is None else min(0.5, remaining_s)
+                )
                 logger.debug(
                     format_event(
                         'llm.api_error',
@@ -223,6 +273,25 @@ class AsyncChater:
             usage = "generator_gen"
         )
 
+        return self.code_extract(ans)
+
+    async def llm_code_repair(
+            self,
+            code: str,
+            error: str,
+            function_name: str,
+    ) -> str:
+        """Repair generated Python code using its local validation error."""
+        tmp = self.pmp._tem_code_repair
+        pmp = tmp.substitute(
+            code=code,
+            error=error,
+            function_name=function_name,
+        )
+        ans = await self.chat_llm(
+            prompt=pmp,
+            usage='code_repair',
+        )
         return self.code_extract(ans)
         
     async def llm_generator_evolve(

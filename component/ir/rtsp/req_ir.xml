@@ -53,7 +53,7 @@
   <field name="OptionalHeaders" type="variable" length="undefined" value="Zero or more RTSP header lines: Media-Properties, Media-Range, Scale, RTP-Info (all conditional); Date, Server, Timestamp, Via etc."/>
   <!-- May include Media-Properties (to indicate new properties), Media-Range -->
 </message>
-  <message name="PLAY_NOTIFY_scale-change">
+  <message name="PLAY_NOTIFY (scale-change)">
     <!-- Server-to-client notification that the playback scale has been changed due to media constraints.
          This is a request with method PLAY_NOTIFY and Notify-Reason header set to scale-change. -->
     
