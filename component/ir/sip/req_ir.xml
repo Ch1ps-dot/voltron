@@ -1,0 +1,1255 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="MESSAGE">
+    <!-- SIP MESSAGE request: one-shot instant message (pager-model) sent via SIP.
+         Text-based UTF-8 protocol message consisting of a Request-Line, header fields,
+         an empty CRLF line, and an optional MIME message-body. -->
+
+    <field name="Method" type="constant" length="7B" value="MESSAGE"/>
+    <!-- The SIP method token for this request. Case-sensitive; fixed literal "MESSAGE". -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Method and Request-URI per Request-Line grammar. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP / SIPS / absolute-URI; ASCII/UTF-8; no unescaped SP or CTLs"/>
+    <!-- Request-URI: target URI for the message (often a SIP/SIPS URI or resolved IM->SIP).
+         Must not contain unescaped spaces or control characters. If an IM URI was given,
+         it SHOULD be translated to a SIP/SIPS URI before sending. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Request-URI and SIP-Version per Request-Line grammar. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version string. Case-insensitive semantics but SHOULD be sent uppercase "SIP/2.0". -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage-Return Line-Feed terminating the Request-Line. Required even if no headers follow. -->
+
+    <field name="Top-Via" type="variable" length="undefined" value="sent-protocol SP sent-by [;params]; branch MUST start with 'z9hG4bK'"/>
+    <!-- Topmost Via header value inserted by the UAC. Indicates transport used and where responses should be sent.
+         For compliance the branch parameter MUST begin with the magic cookie "z9hG4bK". May include received/maddr/ttl/etc.
+         There can be multiple Via header rows; this models the topmost one. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="integer; recommended default 70; textual decimal"/>
+    <!-- Max-Forwards header: hop-count limiter decremented at each hop. If value reaches 0 proxies must not forward.
+         Recommended initial value is 70 when originating a request. -->
+
+    <field name="From" type="variable" length="undefined" value="name-addr or addr-spec (SIP/SIPS URI preferred); MUST include tag parameter in new requests"/>
+    <!-- From header: logical identity of the initiator. For requests outside dialogs the From MUST include a freshly chosen tag parameter.
+         Display-name optional. URIs and parameters follow SIP URI rules; encoding is UTF-8 for display text. -->
+
+    <field name="To" type="variable" length="undefined" value="name-addr or addr-spec (SIP/SIPS URI preferred); outside-dialog MUST NOT include tag"/>
+    <!-- To header: logical recipient/address-of-record. For a MESSAGE outside a dialog the To MUST NOT contain a tag parameter.
+         Display-name optional. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque identifier; case-sensitive; globally unique recommended"/>
+    <!-- Call-ID header: globally-unique identifier grouping messages belonging to the same call/registration context.
+         Compared byte-by-byte, case-sensitive. UAC should generate unique values (e.g., random or localid@host). -->
+
+    <field name="CSeq-Number" type="variable" length="undefined" value="0..4294967295 (decimal ASCII); must be representable in 32-bit unsigned"/>
+    <!-- CSeq sequence number: textual decimal expressing a 32-bit unsigned integer used to order transactions within a dialog.
+         When retrying with credentials or sending a new request, the CSeq number SHOULD be incremented. -->
+
+    <field name="CSeq-Method" type="constant" length="7B" value="MESSAGE"/>
+    <!-- The method token accompanying the CSeq number. Case-sensitive; must equal the request method ("MESSAGE"). -->
+
+    <field name="Optional-Headers-Block" type="variable" length="undefined" value="zero or more message-header lines (e.g., Supported, Require, Route, Proxy-Require, Authorization, Proxy-Authorization, User-Agent, Accept-*, etc.)"/>
+    <!-- Generic container for additional SIP header fields allowed in a MESSAGE request.
+         Header lines follow 'field-name: field-value' terminated by CRLF. Implementations must accept long and compact forms per spec.
+         NOTE: UACs MUST NOT insert a Contact header into MESSAGE requests (per MESSAGE rules). -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="MIME media-type (e.g., text/plain; charset=UTF-8 or message/cpim); required if body present"/>
+    <!-- Content-Type header for the message-body. If a body is present this header MUST be present and indicate the media type.
+         UAs MUST support text/plain bodies and MAY support message/cpim. Text subtypes default to UTF-8 if charset omitted. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal octets &gt;= 0; required for stream transports and if body is present"/>
+    <!-- Content-Length header: size in bytes of the message-body. MUST be present when bodies are non-empty and for stream-oriented transports.
+         The body length in bytes equals this value. -->
+
+    <field name="Empty-Line-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line indicating end of header fields. MUST be present even if message-body is empty. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="*OCTET; octet length MUST equal Content-Length if present; charset UTF-8 for text/*; MIME encoded"/>
+    <!-- Optional MIME message-body carrying the instant message payload. May be any MIME type; typical values: text/plain (UTF-8) or message/cpim.
+         If Content-Length present it defines the body length. Bodies MAY be S/MIME-protected (signed/encrypted) for end-to-end security.
+         If no Content-Length and transport is datagram, body ends at end of datagram. -->
+
+</message>
+  <message name="NOTIFY">
+    <!-- NOTIFY request: informs a subscriber of event state changes (e.g., refer event).
+         For the "refer" event package, NOTIFY bodies are of type message/sipfrag and
+         the body MUST begin with a SIP Response Status-Line (e.g., "SIP/2.0 200 OK"). -->
+
+    <field name="Method" type="constant" length="6B" value="NOTIFY"/>
+    <!-- Request method token identifying this as a NOTIFY request (exact ASCII "NOTIFY"). -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating start-line tokens per Request-Line: Method SP Request-URI. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP-URI / SIPS-URI / absoluteURI (UTF-8, no unescaped SP/CTL)"/>
+    <!-- Target URI of this NOTIFY request. MUST be a SIP/SIPS or general URI; no unescaped spaces or controls.
+         Length in bytes depends on the URI string. -->
+
+    <field name="SP_2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Request-URI and SIP-Version in Request-Line. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version literal (case-insensitive but MUST be sent uppercase per spec). -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of start-line: CRLF (required even if no headers follow). -->
+
+    <field name="Via" type="variable" length="undefined" value="sent-protocol SP sent-by [;params] (may occur multiple times)"/>
+    <!-- Topmost Via header value (protocol/transport and sent-by host[:port] and params).
+         Notifier MUST include branch parameter that for compliant clients begins with "z9hG4bK".
+         Multiple Via header rows MAY be present; model here is for one header-value instance. -->
+
+    <field name="To" type="variable" length="undefined" value="display-name and SIP/SIPS URI [;tag=token] (UTF-8)"/>
+    <!-- To header: logical recipient of the NOTIFY (subscriber). May include display name and optional tag.
+         When matching NOTIFY to subscriptions, To-tag and From-tag matching rules apply. -->
+
+    <field name="From" type="variable" length="undefined" value="display-name and SIP/SIPS URI ;tag=token (UTF-8)"/>
+    <!-- From header: originator of the NOTIFY (notifier). MUST include a tag parameter for dialog identification. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque token (byte-string; case-sensitive)"/>
+    <!-- Call-ID header: global identifier grouping related requests/responses. Compared byte-by-byte. -->
+
+    <field name="CSeq" type="variable" length="undefined" value="sequence-number SP 'NOTIFY' (sequence is 32-bit unsigned decimal)"/>
+    <!-- CSeq header: ordering/transaction identifier. Sequence number (decimal) and method name "NOTIFY".
+         The method token is case-sensitive per grammar. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="decimal integer (recommended initial value 70; range 0-255 suggested)"/>
+    <!-- Max-Forwards header: hop count limit decremented by proxies. Subscriber/notifier SHOULD include when present.
+         Value is textual decimal; notifier/proxies adjust as they forward. -->
+
+    <field name="Event" type="variable" length="undefined" value="event-package [ .template ] *(; event-param ) ; e.g., 'refer' [;id=token]"/>
+    <!-- Event header: identifies the event package for this NOTIFY. For REFER must be 'refer' and MAY include id parameter
+         (id used to disambiguate multiple REFERs in same dialog). Matching is byte-by-byte for event-type and id token. -->
+
+    <field name="Subscription-State" type="variable" length="undefined" value="active / pending / terminated [;expires=delta-seconds] [;reason=token] [;retry-after=delta-seconds]"/>
+    <!-- Subscription-State header: indicates subscription lifecycle status for this NOTIFY.
+         - active: subscription accepted; may include expires parameter (authoritative remaining seconds).
+         - pending: subscription received but not authorized yet; may include expires.
+         - terminated: subscription ended; SHOULD include reason (e.g., noresource, timeout, rejected) and MAY include retry-after.
+         Notifier MUST include this header in every NOTIFY. -->
+
+    <field name="Contact" type="variable" length="undefined" value="SIP/SIPS/absoluteURI [;params] (optional)"/>
+    <!-- Contact header: URI where notifier can be reached; used in examples and for routing responses.
+         Presence is optional but commonly included. If URI contains commas/semicolons it should be angle-bracketed. -->
+
+    <field name="Content-Type" type="constant" length="27B" value="message/sipfrag;version=2.0"/>
+    <!-- Content-Type header for refer NOTIFY MUST be 'message/sipfrag' and typically includes 'version=2.0'.
+         Value is constant for refer event bodies as defined in RFC3515. Length is byte count of the ASCII token. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal octet count (&gt;=0); for stream transports MUST be present"/>
+    <!-- Content-Length header: decimal number of octets in the message-body. For stream transports (TCP) this header MUST be present.
+         This value MUST equal the length in bytes of the Message-Body field below. -->
+
+    <field name="Additional-Headers" type="variable" length="undefined" value="zero or more header-line values (TEXT-UTF8)"/>
+    <!-- Place-holder for any additional header fields that MAY appear (e.g., User-Agent, Via duplicates, Subscription-State parameters).
+         Each header line is CRLF-terminated per SIP; implementations MUST accept unknown headers. -->
+
+    <field name="Empty-Line" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line separating headers from body; MUST be present even if no body. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="message/sipfrag body (starts with SIP Response Status-Line; additional SIP headers optional)"/>
+    <!-- Body of the NOTIFY for refer event: MIME part of type message/sipfrag. MUST begin with a SIP Response Status-Line
+         (e.g., 'SIP/2.0 100 Trying' or 'SIP/2.0 200 OK' or 'SIP/2.0 603 Declined'). The byte-length of this field MUST match Content-Length.
+         Contents MAY include additional SIP header fields relevant to the referenced action. -->
+
+</message>
+  <message name="SUBSCRIBE">
+    <!-- SUBSCRIBE request: request to create/refresh/unsubscribe a subscription for an event (SIP/2.0 textual message, UTF-8) -->
+
+    <field name="Method" type="constant" length="9B" value="SUBSCRIBE"/>
+    <!-- Request method token: "SUBSCRIBE" (case-sensitive per RFC3261); starts the Request-Line -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Method and Request-URI in Request-Line (SP, 0x20) -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS/absolute-URI; UTF-8; no unescaped spaces; not enclosed in &lt;&gt;"/>
+    <!-- Request-URI identifying the resource being subscribed to. May be a SIP, SIPS or other absoluteURI per RFC2396; must not contain unescaped spaces or control chars. Length depends on URI. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI and SIP-Version in Request-Line -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version token; MUST be 'SIP/2.0' (case-insensitive in grammar but implementations MUST send uppercase) -->
+
+    <field name="StartLineCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Request-Line (required). All header lines and the empty line MUST also be terminated by CRLF. -->
+
+    <field name="Via" type="variable" length="undefined" value="sent-protocol SP sent-by *(;param=value); branch parameter must start with 'z9hG4bK' ; UTF-8 / ASCII"/>
+    <!-- Topmost Via header value: indicates transport/protocol and return path; MUST contain a branch parameter beginning with magic cookie 'z9hG4bK'. Sent-by is host[:port] (FQDN or IP). This header line itself is terminated by CRLF. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="0..4294967295 (recommended default 70)"/>
+    <!-- Max-Forwards header: hop-count limit (decimal seconds), decremented by proxies. UAC SHOULD insert with value ~70. If present and zero, proxy must not forward. Header line ends with CRLF. -->
+
+    <field name="From" type="variable" length="undefined" value="name-addr / addr-spec ; tag=token (tag MUST be present for requests)"/>
+    <!-- From header: logical identity of originator. For requests, a 'tag' parameter MUST be present (From tag chosen by UAC). Display-name optional. Header line terminated by CRLF. -->
+
+    <field name="To" type="variable" length="undefined" value="name-addr / addr-spec ; tag parameter disallowed for initial out-of-dialog SUBSCRIBE (usually absent)"/>
+    <!-- To header: logical recipient/address-of-record. For SUBSCRIBE outside a dialog the To tag MUST NOT be present; in-dialog SUBSCRIBE may include To tag. Header line terminated by CRLF. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque UTF-8 token; case-sensitive; recommended form 'localid@host'"/>
+    <!-- Call-ID: globally unique identifier grouping messages; case-sensitive byte-by-byte comparison. Header line terminated by CRLF. -->
+
+    <field name="CSeq-Number" type="variable" length="undefined" value="0..4294967295 (32-bit unsigned integer)"/>
+    <!-- CSeq sequence number: 32-bit unsigned integer used to order requests within a dialog and distinguish retries. -->
+
+    <field name="CSeq-Method" type="constant" length="9B" value="SUBSCRIBE"/>
+    <!-- CSeq method must equal the request method. Included here explicitly: SUBSCRIBE (ensures CSeq entry corresponds to this method). -->
+
+    <field name="Contact" type="variable" length="undefined" value="SIP/SIPS/absoluteURI (UA's contact; for dialog-creating requests a globally routable SIP/SIPS URI SHOULD be present)"/>
+    <!-- Contact header: URI where subscriber can be reached; for dialog-creation (SUBSCRIBE) UAC SHOULD include a SIP/SIPS URI with global scope. Header line terminated by CRLF. -->
+
+    <field name="Event" type="variable" length="undefined" value="event-token[.template] *(;param=value) ; token characters; exactly one Event header required"/>
+    <!-- Event header: identifies the event package (IANA-registered token) being subscribed to. Exactly one Event header field MUST be present in SUBSCRIBE. Comparison for matching NOTIFY uses byte-by-byte event-type and (if present) 'id' parameter. Header line terminated by CRLF. -->
+
+    <field name="Expires" type="variable" length="undefined" value="0..4294967295 (seconds); default per event package; 0 indicates unsubscribe and triggers immediate NOTIFY with terminated)"/>
+    <!-- Expires header (recommended in SUBSCRIBE): requested subscription duration in seconds. Notifier may shorten but MUST NOT lengthen. Expires=0 requests unsubscription and also performs a state fetch. Header line terminated by CRLF. -->
+
+    <field name="Accept" type="variable" length="undefined" value="media-range list (optional; indicates allowed NOTIFY body types)"/>
+    <!-- Optional Accept header: indicates body formats acceptable in subsequent NOTIFY requests. Event package defines default behavior if absent. Header line terminated by CRLF. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="media-type (optional; type of message-body, if any)"/>
+    <!-- Content-Type header: media type of message body if present (e.g., application/pidf+xml for presence). Must be present if body non-empty. Header line terminated by CRLF. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="0..4294967295 (decimal octet count); REQUIRED on stream transports"/>
+    <!-- Content-Length header: number of octets in message-body. MUST be present on stream transports (TCP). If absent on datagram transports, body ends at end of packet. Header line terminated by CRLF. -->
+
+    <field name="Additional-Headers" type="variable" length="undefined" value="other SIP headers allowed per RFC3261 (Via, Route, Authorization, etc.)"/>
+    <!-- Placeholder for any additional optional headers (Authorization, Supported, Accept-Language, etc.). Each header line MUST be terminated by CRLF. Do not invent specific semantics here. -->
+
+    <field name="EndOfHeaders-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) indicating end of header fields and start of optional message-body. Required even if no body is present. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="opaque octets; media type given by Content-Type; when absent Content-Length typically 0; commonly UTF-8 XML (e.g., application/pidf+xml) or other package-defined body"/>
+    <!-- Optional message body: interpretation depends on Event package and Content-Type. If present, its length in octets is given by Content-Length. Bodies may be binary; default text char set UTF-8 when unspecified for text/* media types. -->
+</message>
+  <message name="ACK">
+    <!-- ACK request: SIP request used by a UAC to acknowledge receipt of a final response to an INVITE.
+         - For non-2xx final responses the ACK is a transaction-layer ACK (RFC 3261): contains same branch as original INVITE request top Via.
+         - For 2xx responses the ACK is generated by the UAC core (end-to-end); may carry an SDP answer only when the 2xx contains an offer.
+    -->
+
+    <field name="Method" type="constant" length="3B" value="ACK"/>
+    <!-- SIP request method token identifying this as an ACK request (ASCII "ACK"). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between Method and Request-URI. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS/absolute-URI; UTF-8; no unescaped SP or control chars"/>
+    <!-- Request-URI to which this ACK is addressed (sip:, sips: or other absoluteURI).  MUST NOT be enclosed in '<>' and MUST NOT contain unescaped spaces.
+         For ACK to 2xx, the Request-URI is constructed per dialog routing rules (often the remote target URI learned from Contact).
+    -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between Request-URI and SIP-Version. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version literal.  Case-insensitive but MUST be sent upper-case by compliant implementations ("SIP/2.0"). -->
+
+    <field name="CRLF_StartLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the start-line (Request-Line). -->
+
+    <field name="Via" type="variable" length="undefined" value="SIP Via header textual value; contains sent-protocol/sent-by; branch param begins 'z9hG4bK' for RFC3261-compliant clients"/>
+    <!-- Topmost Via header field value for this ACK.  MUST be equal to the top Via of the original request that created the transaction
+         (client transaction inserts its own Via when sending), and for ACK generated by the client transaction it MUST be the same Via
+         as the original request.  Branch parameter usage: when present and starting with magic cookie, it identifies the transaction.
+    -->
+
+    <field name="Max-Forwards" type="variable" length="1B" value="0-255 (decimal)"/>
+    <!-- Max-Forwards header numeric value decremented by proxies; UAC SHOULD insert (default 70).  Present in requests to limit hops.
+         Represented as a decimal integer; range 0..255 (1 byte sufficient to represent recommended range).
+    -->
+
+    <field name="To" type="variable" length="undefined" value="name-addr or addr-spec; may include ';tag=' parameter (required for ACK to a final response)"/>
+    <!-- To header field identifying the logical recipient; for ACK acknowledging a final response the To MUST equal the To header from the final response
+         and therefore typically contains the To-tag supplied by the UAS (used to distinguish dialogs).
+    -->
+
+    <field name="From" type="variable" length="undefined" value="name-addr or addr-spec; MUST include 'tag' parameter chosen by UAC"/>
+    <!-- From header field indicating originator identity.  In requests outside a dialog the From must contain a tag parameter chosen by the UAC.
+         The From tag plus Call-ID and To-tag form the dialog identifier.
+    -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque string; globally unique identifier for the call (case-sensitive)"/>
+    <!-- Call-ID header field grouping messages into a call/dialog.  Must be identical for all requests/responses in the dialog generated by either UA.
+         Typically in form 'localid@host' or a random token; compared byte-for-byte.
+    -->
+
+    <field name="CSeq-Number" type="variable" length="4B" value="0..4294967295 (decimal)"/>
+    <!-- CSeq sequence number (decimal, expressible as 32-bit unsigned).  For ACK, the CSeq number MUST be the same numeric value as the INVITE being acknowledged.
+         Represented here as a 32-bit unsigned range (4B) for modeling; in wire text it's ASCII decimal digits.
+    -->
+
+    <field name="CSeq-Method" type="constant" length="3B" value="ACK"/>
+    <!-- CSeq method token MUST be 'ACK' for ACK requests (textual method part of the CSeq header). -->
+
+    <field name="Call-Info-Optional" type="variable" length="undefined" value="optional URI(s); purpose param tokens"/>
+    <!-- OPTIONAL Call-Info header (not normally present in ACK).  Included only if application requires delivering caller/callee info; otherwise omitted.
+         Present here for completeness only; implementers SHOULD NOT invent application headers unless required.
+    -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="0..(2^32-1) octets; indicates octet count of message body"/>
+    <!-- Content-Length header indicates message-body length in bytes.  For ACKs it is typically 0 (no body).  If stream transport (TCP) is used, Content-Length MUST be present.
+         If body is present, this value equals the body octet count.  If absent and using datagram transport, body is allowed to end at packet boundary.
+    -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero or more header fields (e.g., Supported, Route) as ASCII UTF-8 lines"/>
+    <!-- Place-holder for any additional headers that may be included (SIP allows many header fields).  ACK SHOULD include only headers necessary for routing/authentication.
+         Any header-specific semantics (e.g., Require, Proxy-Authorization) follow SIP rules; this field models their variable presence.
+    -->
+
+    <field name="CRLF_HeadersTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line marking end of header section (required even if no message-body). -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="octet sequence as indicated by Content-Type and Content-Length; optional; often absent for ACK">
+    </field>
+    <!-- Optional message-body carried by ACK.  Generally discouraged for ACK of non-2xx but permitted with restrictions: body types SHOULD be those that appeared in the INVITE
+         or are acceptable per a prior 415/Accept negotiation.  If present, the length is defined by Content-Length and content processing follows Content-Type.
+    -->
+</message>
+  <message name="PRACK">
+    <!-- PRACK: Provisional Response ACKnowledgement request used by a UAC
+         to acknowledge reception of a reliable provisional (1xx) SIP response.
+         Carries the RAck header which references the provisional response's
+         RSeq and CSeq values; traverses proxies and is itself hop-by-hop
+         reliable (stateful proxy processing applies). -->
+
+    <field name="Method" type="constant" length="5B" value="PRACK"/>
+    <!-- Request method token: literal "PRACK" (ASCII). Identifies this as a PRACK request. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method and Request-URI in the Request-Line. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP-URI / SIPS-URI / absoluteURI (UTF-8)"/>
+    <!-- The Request-URI for the PRACK request (typically the dialog's remote target).
+         UTF-8 allowed; must not contain unescaped CR or LF. Length depends on URI. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI and SIP-Version in the Request-Line. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- SIP version literal. Must be "SIP/2.0" (ASCII). -->
+
+    <field name="CRLF_RequestLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF ending the Request-Line. -->
+
+    <field name="Via" type="variable" length="undefined" value="SIP/2.0/&lt;transport&gt; &lt;sent-by&gt; [;branch=z9hG4bK...] [;received=...] ..."/>
+    <!-- Via header (topmost) conveying transport and sent-by; MUST contain a branch
+         parameter beginning with magic cookie "z9hG4bK" for transactions per RFC3261.
+         Used for routing responses and loop detection; may include received/maddr/ttl. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="0..255 (default SHOULD be 70)"/>
+    <!-- Max-Forwards header numeric value limiting proxy hops. UAC SHOULD set (commonly 70).
+         Decremented by proxies; if 0 proxies MUST not forward. -->
+
+    <field name="From" type="variable" length="undefined" value="name-addr (URI) ; tag=token"/>
+    <!-- From header (address-of-originator). MUST include a 'tag' parameter chosen by the UAC.
+         Used (with To, Call-ID) to identify dialog originator. -->
+
+    <field name="To" type="variable" length="undefined" value="name-addr (URI) ; tag=token"/>
+    <!-- To header identifying the dialog peer. For PRACK (a mid-dialog request) the To
+         header MUST contain the dialog's To-tag so that the PRACK is sent within the dialog. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque-token (globally unique string)"/>
+    <!-- Call-ID header uniquely groups messages for the dialog/transaction. Case-sensitive
+         opaque string selected by the UAC; must remain constant within a dialog. -->
+
+    <field name="CSeq-Number" type="variable" length="undefined" value="1..4294967295"/>
+    <!-- CSeq header sequence number for this PRACK request (32-bit unsigned range).
+         Orders requests within a dialog; MUST be present. -->
+
+    <field name="CSeq-Method" type="constant" length="5B" value="PRACK"/>
+    <!-- Method token part of the CSeq header for this request; must match the request method
+         (case-sensitive in RAck comparisons, but CSeq method here is PRACK). -->
+
+    <field name="RAck_response-num" type="variable" length="undefined" value="1..4294967295"/>
+    <!-- RAck: first numeric component equal to the RSeq value of the provisional response being acknowledged.
+         Carries the RSeq sequence number (decimal). Range per RSeq up to 2^32-1; implementations choose <=2^31-1 initially. -->
+
+    <field name="RAck_CSeq-num" type="variable" length="undefined" value="1..4294967295"/>
+    <!-- RAck: second numeric component copied from the CSeq number of the provisional response being acknowledged.
+         Decimal sequence number identifying the referenced request's CSeq. -->
+
+    <field name="RAck_Method" type="variable" length="undefined" value="Method token (case-sensitive) e.g., INVITE"/>
+    <!-- RAck: method-name token copied from the CSeq method of the provisional response being acknowledged.
+         This token is case-sensitive and used when matching PRACK to the provisional response. -->
+
+    <field name="Supported" type="variable" length="undefined" value="option-tag list (e.g., 100rel)"/>
+    <!-- Optional Supported header: lists option-tags the UAC supports. UACs SHOULD include 100rel in INVITEs;
+         PRACK may include Supported but it's optional. Ignore unknown tags. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="MIME media-type (e.g., application/sdp)"/>
+    <!-- Content-Type header for any message body. MUST be present if a body exists. Indicates media type
+         (e.g., SDP) and any charset; UTF-8 default for text types if not specified. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="0..max (decimal bytes)"/>
+    <!-- Content-Length header indicating the size in octets of the message-body.
+         MUST be present on stream transports (e.g., TCP) and MUST match the actual body length. -->
+
+    <field name="CRLF_HeadersTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that terminates the header section and precedes an optional message-body. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="binary or UTF-8; length = Content-Length; optional (e.g., session-description)"/>
+    <!-- Optional message body (e.g., SDP offer/answer carried in PRACK as required by offer/answer rules).
+         Its presence and semantics are determined by Content-Type and Content-Disposition. Length determined by Content-Length. -->
+</message>
+  <message name="UPDATE">
+    <!-- UPDATE: SIP request method to update session parameters within a dialog
+         (early or confirmed) without changing dialog state. Typically carries
+         an offer/answer payload (e.g., SDP) in the message-body. -->
+
+    <field name="Method" type="constant" length="6B" value="UPDATE"/>
+    <!-- The SIP method token. For this message the method is the literal "UPDATE".
+         Case-insensitive by grammar, but implementations MUST send uppercase "UPDATE". -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Method and Request-URI (SP). -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS URI or absoluteURI in UTF-8; no unescaped spaces or controls"/>
+    <!-- The Request-URI indicates the target of the request. Per RFC3261 it is
+         a SIP or SIPS URI or a general URI. Must not be enclosed in '<' '>'.
+         Character set UTF-8; must not contain unescaped spaces or control chars. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI and SIP-Version (SP). -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version string. Must be sent uppercase "SIP/2.0" for compliance. -->
+
+    <field name="StartLine-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Request-Line (carriage return + line feed). Mandatory. -->
+
+    <field name="Via" type="variable" length="undefined" value="Via header per RFC3261; transport/sent-by; MUST contain branch param beginning 'z9hG4bK' for compliant clients"/>
+    <!-- Via header indicates transport and network hop information and carries the
+         branch parameter used for transaction identification. Multiple Via rows
+         allowed; order is significant. 'sent-by' and branch used for transaction matching. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="decimal integer (0..n); typical default 70"/>
+    <!-- Max-Forwards limits hop count. UAC SHOULD insert this header with default 70
+         on initial requests. If present with value 0 proxies must not forward. -->
+
+    <field name="From" type="variable" length="undefined" value="name-addr or addr-spec with optional ;tag parameter; UTF-8 display-name allowed"/>
+    <!-- From header indicates logical initiator of the request. Must include a
+         'tag' parameter when originating a request outside a dialog. Display-name optional. -->
+
+    <field name="To" type="variable" length="undefined" value="name-addr or addr-spec; may include tag in dialoged requests"/>
+    <!-- To header indicates logical recipient / target address-of-record. For requests
+         inside a dialog, To commonly contains the dialog's remote tag; for requests
+         outside a dialog it MUST NOT contain a tag. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque globally-unique identifier; case-sensitive bytes"/>
+    <!-- Call-ID groups messages belonging to the same call/dialog. UAC MUST select a
+         globally unique value for new dialogs. Compared byte-by-byte, case-sensitive. -->
+
+    <field name="CSeq" type="variable" length="undefined" value="32-bit unsigned decimal sequence-number SP Method (e.g., '314163 UPDATE')"/>
+    <!-- CSeq orders transactions within a dialog and differentiates retransmissions.
+         Sequence number must fit 32-bit unsigned integer. Method token follows the number. -->
+
+    <field name="Contact" type="variable" length="undefined" value="SIP/SIPS/absoluteURI; used to indicate request sender contact"/>
+    <!-- Contact header provides a URI where the UA can be directly reached. For UPDATE
+         used when updating remote target or contact information; optional in some contexts. -->
+
+    <field name="Allow" type="variable" length="undefined" value="comma-separated methods tokens; e.g., MAY contain 'UPDATE'"/>
+    <!-- Allow advertises methods supported by the UA (e.g., 'UPDATE'). UAs SHOULD
+         include 'UPDATE' in Allow when they can accept UPDATE requests. Optional. -->
+
+    <field name="Supported" type="variable" length="undefined" value="comma-separated option-tags per RFC3261; e.g., '100rel'"/>
+    <!-- Supported lists option-tags (extension features) the UA understands. Optional.
+         Used to advertise support (does not request behavior). -->
+
+    <field name="Require" type="variable" length="undefined" value="comma-separated option-tags; indicates required extensions"/>
+    <!-- Require lists option-tags that MUST be supported by the receiver to process
+         the request. If an option-tag is not understood the receiver must return 420. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="media-type token (e.g., application/sdp)"/>
+    <!-- Content-Type indicates media type of message-body. MUST be present if a body is present.
+         For SDP offers typically 'application/sdp'. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal octet count (&gt;= 0)"/>
+    <!-- Content-Length indicates the size of the message-body in octets. MUST be present
+         for stream transports and when a message-body is present. The MessageBody length equals this field. -->
+
+    <field name="Message-Headers-Other" type="variable" length="undefined" value="zero-or-more additional header-field lines per RFC3261 (each 'Name: value' terminated by CRLF)"/>
+    <!-- Placeholder for any other valid SIP header fields applicable to UPDATE, e.g.
+         Record-Route, Route, Proxy-Require, Proxy-Authorization, Timestamp, User-Agent, etc.
+         Each header-line must be CRLF-terminated. Order of different header names is not significant. -->
+
+    <field name="HeaderTerminator-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that MUST appear after the last header field to indicate end of headers.
+         This CRLF is mandatory even when there is no message-body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Content-Length octets; optional; semantics per Content-Type (e.g., SDP offer/answer); default text charset UTF-8 for text/*"/>
+    <!-- Optional message-body for the UPDATE. If present, Content-Type and Content-Length MUST
+         be set appropriately. When Content-Length is 0, body is empty. Content-Length determines
+         the exact byte length; MessageBody parsing depends on transport framing rules. -->
+</message>
+  <message name="OPTIONS">
+    <!-- SIP OPTIONS request: query a UA or proxy for its capabilities (methods, supported media types, extensions). Conforms to SIP/2.0 text format: start-line, header fields, blank line, optional body. -->
+
+    <field name="Method" type="constant" length="7B" value="OPTIONS"/>
+    <!-- Request method token indicating capability query. ASCII text "OPTIONS" (7 bytes). -->
+
+    <field name="SP_after_Method" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Method and Request-URI. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS/absolute-URI (UTF-8); no unescaped spaces or control chars"/>
+    <!-- Request-URI indicating the target of the OPTIONS (e.g., sip:carol@chicago.com). May be a sip:, sips:, tel:, or general URI. Length varies; must not contain unescaped spaces. -->
+
+    <field name="SP_after_Request-URI" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Request-URI and SIP-Version. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version string. SIP implementations MUST send "SIP/2.0". ASCII 7 bytes. -->
+
+    <field name="CRLF_after_start_line" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for the start-line. Required end-of-line marker. -->
+
+    <!-- Header: Via -->
+    <field name="ViaName" type="constant" length="4B" value="Via:"/>
+    <!-- Header field name "Via:" (case-insensitive). -->
+
+    <field name="SP_after_ViaName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="ViaValue" type="variable" length="undefined" value="e.g. 'SIP/2.0/UDP host[:port];branch=z9hG4bK...;received=ip' (UTF-8)"/>
+    <!-- Transport and sent-by information plus parameters. 'branch' parameter MUST start with the magic cookie "z9hG4bK" and be unique across requests; sent-by may include host and optional port; 'received' may contain source IP. Length varies. -->
+
+    <field name="CRLF_after_Via" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for Via header line. -->
+
+    <!-- Header: Max-Forwards -->
+    <field name="MaxForwardsName" type="constant" length="12B" value="Max-Forwards:"/>
+    <!-- Header field name "Max-Forwards:" (case-insensitive). -->
+
+    <field name="SP_after_MaxForwardsName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="MaxForwardsValue" type="variable" length="undefined" value="integer (0-255), recommended default 70"/>
+    <!-- Number of hops remaining; decremented by proxies. If 0, proxy may respond instead of forwarding. Default recommended value is 70. -->
+
+    <field name="CRLF_after_MaxForwards" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for Max-Forwards header line. -->
+
+    <!-- Header: To -->
+    <field name="ToName" type="constant" length="3B" value="To:"/>
+    <!-- Header field name "To:" (case-insensitive). -->
+
+    <field name="SP_after_ToName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="ToValue" type="variable" length="undefined" value="display-name (optional) and a SIP/SIPS URI or other URI; angle-brackets required if URI contains ',', ';', '?'"/>
+    <!-- Logical recipient of the request. May include display-name and SIP/SIPS URI. No To-tag for requests outside a dialog. -->
+
+    <field name="CRLF_after_To" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for To header line. -->
+
+    <!-- Header: From -->
+    <field name="FromName" type="constant" length="5B" value="From:"/>
+    <!-- Header field name "From:" (case-insensitive). -->
+
+    <field name="SP_after_FromName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="FromValue" type="variable" length="undefined" value="display-name (optional) and a SIP/SIPS URI; MUST include 'tag' parameter for requests"/>
+    <!-- Identity of the originator. For new requests outside a dialog, From MUST include a tag parameter chosen by the UAC (globally unique, >=32 bits randomness). -->
+
+    <field name="CRLF_after_From" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for From header line. -->
+
+    <!-- Header: Call-ID -->
+    <field name="CallIDName" type="constant" length="7B" value="Call-ID:"/>
+    <!-- Header field name "Call-ID:" (case-insensitive). -->
+
+    <field name="SP_after_CallIDName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="CallIDValue" type="variable" length="undefined" value="opaque globally-unique identifier (case-sensitive)"/>
+    <!-- Unique identifier for correlating requests and responses across a dialog. Typically 'random@host'. Must be globally unique. -->
+
+    <field name="CRLF_after_CallID" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for Call-ID header line. -->
+
+    <!-- Header: CSeq -->
+    <field name="CSeqName" type="constant" length="4B" value="CSeq:"/>
+    <!-- Header field name "CSeq:" (case-insensitive). -->
+
+    <field name="SP_after_CSeqName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="CSeqNumber" type="variable" length="undefined" value="decimal 0..4294967295 (32-bit unsigned)"/>
+    <!-- Sequence number used to order requests within a dialog; incremented for new requests. -->
+
+    <field name="SP_between_CSeqNumber_and_Method" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating CSeq number and method token. -->
+
+    <field name="CSeqMethod" type="constant" length="7B" value="OPTIONS"/>
+    <!-- Method token repeated in CSeq; must match the request method. -->
+
+    <field name="CRLF_after_CSeq" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for CSeq header line. -->
+
+    <!-- Header: Contact (optional) -->
+    <field name="ContactName" type="constant" length="8B" value="Contact:"/>
+    <!-- Header field name "Contact:" (case-insensitive). -->
+
+    <field name="SP_after_ContactName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="ContactValue" type="variable" length="undefined" value="SIP/SIPS URI or '*' ; optional in OPTIONS"/>
+    <!-- Direct route URI for future requests or contact methods. May be omitted. If present, may be one or more comma-separated URIs. -->
+
+    <field name="CRLF_after_Contact" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for Contact header line. -->
+
+    <!-- Header: Accept (SHOULD) -->
+    <field name="AcceptName" type="constant" length="7B" value="Accept:"/>
+    <!-- Header field name "Accept:" (case-insensitive). -->
+
+    <field name="SP_after_AcceptName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="AcceptValue" type="variable" length="undefined" value="media-range list; default application/sdp if absent"/>
+    <!-- Media types acceptable in response body. For OPTIONS, application/sdp is commonly used to request SDP capabilities. -->
+
+    <field name="CRLF_after_Accept" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for Accept header line. -->
+
+    <!-- Header: Content-Length -->
+    <field name="ContentLengthName" type="constant" length="15B" value="Content-Length:"/>
+    <!-- Header field name "Content-Length:" (case-insensitive). Required on stream transports and indicates octet count of message-body. -->
+
+    <field name="SP_after_ContentLengthName" type="constant" length="1B" value="0x20"/>
+    <!-- SP separating header name and value. -->
+
+    <field name="ContentLengthValue" type="variable" length="undefined" value="decimal octet count; typical 0 for OPTIONS with no body"/>
+    <!-- Number of octets in message-body. If zero, no body follows. For stream transports (e.g., TCP) Content-Length MUST be present. -->
+
+    <field name="CRLF_after_ContentLength" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminator for Content-Length header line. -->
+
+    <!-- End of header section: empty CRLF line -->
+    <field name="HeaderSectionTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line indicating end of header fields and start of optional message-body. Mandatory even if body is absent. -->
+
+    <!-- Optional message body -->
+    <field name="MessageBody" type="variable" length="undefined" value="octet sequence as described by Content-Type and Content-Length; may be absent (Content-Length=0)"/>
+    <!-- Optional body (e.g., application/sdp) whose length in bytes is given by Content-Length. If Content-Length is zero, no body is present. Interpret per Content-Type and any Content-Encoding. -->
+</message>
+  <message name="REGISTER">
+    <!-- SIP REGISTER request: registers an address-of-record (To) with a registrar, creating bindings to Contact URIs -->
+
+    <field name="Method" type="constant" length="8B" value="REGISTER"/>
+    <!-- The SIP method token for this request; REGISTER is fixed for registration operations -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method and Request-URI -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP or SIPS URI containing only host (no userinfo/@); ASCII excluding SP and CTLs"/>
+    <!-- The Request-URI for REGISTER names the registrar's domain (e.g., sip:chicago.com). Per RFC, userinfo and '@' MUST NOT be present for REGISTER. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI and SIP-Version -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version string; MUST be 'SIP/2.0' (case-insensitive but uppercase is normative) -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Request-Line (CRLF) -->
+
+    <!-- Header: Via -->
+    <field name="Via-Name" type="constant" length="3B" value="Via"/>
+    <!-- Header field name indicating transport used and where responses should be sent -->
+
+    <field name="HCOLON" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon and single space that separate header name and value (recommended form ': ') -->
+
+    <field name="Via-Value" type="variable" length="undefined" value="format 'SIP/2.0/&lt;TRANSPORT&gt; &lt;sent-by&gt;[;params]'; branch param MUST start with 'z9hG4bK'; may include received/maddr/ttl"/>
+    <!-- Via value indicates protocol/transport (UDP/TCP/TLS/SCTP), sent-by host[:port], and parameters like branch (transaction id). Branch MUST begin with magic cookie 'z9hG4bK' for compliant UAs. -->
+
+    <field name="CRLF_Via" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Via header line -->
+
+    <!-- Header: Max-Forwards -->
+    <field name="Max-Forwards-Name" type="constant" length="12B" value="Max-Forwards"/>
+    <!-- Header field name used to limit hop count -->
+
+    <field name="HCOLON2" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="Max-Forwards-Value" type="variable" length="undefined" value="integer (recommended default 70); range 0..255"/>
+    <!-- Integer decremented at each hop; if reaches 0 and destination not reached, server returns 483 (Too Many Hops). UAC SHOULD insert this header; recommended initial value 70. -->
+
+    <field name="CRLF_MaxForwards" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Max-Forwards header line -->
+
+    <!-- Header: To -->
+    <field name="To-Name" type="constant" length="2B" value="To"/>
+    <!-- Header field name indicating the address-of-record being registered -->
+
+    <field name="HCOLON3" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="To-Value" type="variable" length="undefined" value="display-name (optional) and URI (SIP/SIPS or other); for REGISTER this MUST be the address-of-record and MUST NOT contain a To-tag"/>
+    <!-- The logical recipient / address-of-record (e.g., sip:carol@chicago.com). For requests outside a dialog (REGISTER) the To header MUST NOT include a tag parameter. -->
+
+    <field name="CRLF_To" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of To header line -->
+
+    <!-- Header: From -->
+    <field name="From-Name" type="constant" length="4B" value="From"/>
+    <!-- Header field name indicating the initiator of the request -->
+
+    <field name="HCOLON4" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="From-Value" type="variable" length="undefined" value="display-name (optional) and URI; MUST include a 'tag' parameter chosen by the UAC (32+ bits randomness)"/>
+    <!-- From contains the identity asserting who is registering. For REGISTER, From typically equals To unless third-party registration. The From header MUST include a tag parameter selected by the UAC (globally unique, cryptographically random with >=32 bits). -->
+
+    <field name="CRLF_From" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of From header line -->
+
+    <!-- Header: Call-ID -->
+    <field name="Call-ID-Name" type="constant" length="7B" value="Call-ID"/>
+    <!-- Header field name providing a globally-unique identifier for this registration series -->
+
+    <field name="HCOLON5" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="Call-ID-Value" type="variable" length="undefined" value="opaque globally-unique string; recommended cryptographic randomness or 'localid@host'; case-sensitive"/>
+    <!-- Call-ID groups related requests/responses. Must be unique across space/time for new requests; registrars SHOULD reuse same Call-ID for registrations from a UA during a boot cycle. -->
+
+    <field name="CRLF_CallID" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Call-ID header line -->
+
+    <!-- Header: CSeq -->
+    <field name="CSeq-Name" type="constant" length="4B" value="CSeq"/>
+    <!-- Header field name indicating command sequence and method -->
+
+    <field name="HCOLON6" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="CSeq-Number" type="variable" length="undefined" value="32-bit unsigned integer; MUST be incremented for each new REGISTER with same Call-ID"/>
+    <!-- Sequence number used to order requests within a dialog or for registrations; representable as 32-bit unsigned integer. -->
+
+    <field name="SP_CSeq" type="constant" length="1B" value="0x20"/>
+    <!-- Space separating sequence number and method token in CSeq header -->
+
+    <field name="CSeq-Method" type="constant" length="8B" value="REGISTER"/>
+    <!-- Method name repeated in CSeq; must match the request method (REGISTER) -->
+
+    <field name="CRLF_CSeq" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of CSeq header line -->
+
+    <!-- Header: Contact (MAY be present) -->
+    <field name="Contact-Name" type="constant" length="7B" value="Contact"/>
+    <!-- Header field name used to convey one or more contact binding URIs for the address-of-record -->
+
+    <field name="HCOLON7" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="Contact-Value" type="variable" length="undefined" value="list of Contact entries (comma-separated) OR special value '*'; each entry: name-addr or addr-spec with optional parameters (q, expires); URIs typically SIP/SIPS; '*' allowed only with Expires: 0"/>
+    <!-- Contact provides the actual binding targets (e.g., sip:bob@192.0.2.4). The expires parameter on a per-contact basis (seconds) can override the Expires header. The special Contact value '*' is used to remove all bindings and MUST NOT be used unless Expires header is present and equals 0. -->
+
+    <field name="CRLF_Contact" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Contact header line -->
+
+    <!-- Header: Expires (optional; used if per-contact 'expires' absent) -->
+    <field name="Expires-Name" type="constant" length="7B" value="Expires"/>
+    <!-- Header field name indicating suggested expiration interval in seconds for Contact bindings when not provided per-contact -->
+
+    <field name="HCOLON8" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="Expires-Value" type="variable" length="undefined" value="integer seconds; range 0..4294967295 (2**32-1); malformed -&gt; treat as 3600; registrar may select smaller value or reject with 423 and Min-Expires"/>
+    <!-- Suggests how long the registrar should keep the binding. If absent, server picks default. Registrar may reject registrations with too short an interval using 423 (Interval Too Brief) and Min-Expires header. -->
+
+    <field name="CRLF_Expires" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Expires header line -->
+
+    <!-- Header: Content-Type (present if body exists) -->
+    <field name="Content-Type-Name" type="constant" length="12B" value="Content-Type"/>
+    <!-- Header field name indicating media type of message body -->
+
+    <field name="HCOLON9" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="Content-Type-Value" type="variable" length="undefined" value="MIME media-type (e.g., application/sdp); required if body present"/>
+    <!-- The Internet media type of the message body; e.g., application/sdp when carrying SDP. Absent if no body. -->
+
+    <field name="CRLF_ContentType" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Content-Type header line -->
+
+    <!-- Header: Content-Length (MUST be present on stream transports; indicates body size) -->
+    <field name="Content-Length-Name" type="constant" length="14B" value="Content-Length"/>
+    <!-- Header field name indicating the octet count of the message body -->
+
+    <field name="HCOLON10" type="constant" length="2B" value="0x3A20"/>
+    <!-- Colon + space separator -->
+
+    <field name="Content-Length-Value" type="variable" length="undefined" value="decimal octet count; 0..4294967295; MUST be present for stream transports (TCP)"/>
+    <!-- Number of bytes in the message body. If zero, indicates no body. For stream transports this header MUST be present. -->
+
+    <field name="CRLF_ContentLength" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Content-Length header line -->
+
+    <!-- Other optional headers may appear per SIP -->
+
+    <!-- End-of-headers empty line -->
+    <field name="Header-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that MUST be present to separate headers from optional message-body (even if no body) -->
+
+    <!-- Optional message body follows; semantics depend on Content-Type -->
+    <field name="Message-Body" type="variable" length="undefined" value="opaque octet sequence; length equals Content-Length; interpretation depends on Content-Type (e.g., application/sdp)"/>
+    <!-- Optional registration body (often empty). When present, its byte length MUST equal Content-Length; SDP bodies or other MIME parts may be carried. If Content-Type absent yet body present, behavior is undefined; registrar may reject. -->
+</message>
+  <message name="BYE">
+    <!-- BYE: SIP request used to terminate a specific session/dialog between two User Agents. Sent only within a dialog. -->
+
+    <field name="Request-Line:Method" type="constant" length="3B" value="BYE"/>
+    <!-- Method token indicating this is a BYE request to terminate the session. ASCII characters "B","Y","E" (3 bytes). -->
+
+    <field name="Request-Line:SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between method and Request-URI. -->
+
+    <field name="Request-Line:Request-URI" type="variable" length="undefined" value="SIP-URI / SIPS-URI / absoluteURI (UTF-8, no CR/LF)"/>
+    <!-- Request-URI identifying the dialog peer or contact (e.g., sip:alice@pc33.atlanta.com). Must not contain unescaped spaces or CR/LF. For BYE this is the dialog target (remote target). -->
+
+    <field name="Request-Line:SP-2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between Request-URI and SIP-Version. -->
+
+    <field name="Request-Line:SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version token. MUST be "SIP/2.0" (7 ASCII bytes). Case-insensitive but MUST be sent uppercase by implementations. -->
+
+    <field name="Request-Line:CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End-of-line CRLF terminating the start-line. Required even if no headers (RFC mandates an empty header terminator). -->
+
+    <field name="Header:Via" type="variable" length="undefined" value="sent-protocol SP sent-by [;params]; branch param MUST begin with 'z9hG4bK'"/>
+    <!-- Via header indicating transport and return route for responses. Sent-protocol (e.g., 'SIP/2.0/UDP'), sent-by (host[:port] or IP), and parameters such as branch (transaction id), received, maddr, ttl. Branch MUST start with magic cookie 'z9hG4bK' for compliant elements. -->
+
+    <field name="Header:Max-Forwards" type="variable" length="undefined" value="decimal 0..255 (UAC SHOULD set 70)"/>
+    <!-- Hop-count limiter decremented by each hop. When reaches 0 the request must not be forwarded. UAC SHOULD initialize to 70 unless local policy differs. -->
+
+    <field name="Header:From" type="variable" length="undefined" value="display-name (opt) + SIP-URI + ;tag=token (tag: 32+ bits random)"/>
+    <!-- Logical identity of the request originator. Includes optional display-name and a From-tag parameter chosen by the UAC. From.tag MUST be present in requests. Tag is used as half of the dialog identifier; SHOULD be globally unique (>=32 bits randomness). -->
+
+    <field name="Header:To" type="variable" length="undefined" value="display-name (opt) + SIP-URI + ;tag=token (To tag expected for in-dialog BYE)"/>
+    <!-- Logical recipient/address-of-record. For BYE (a mid-dialog request) the To header MUST contain the tag that identifies the dialog peer (the remote tag assigned when dialog was established). -->
+
+    <field name="Header:Call-ID" type="variable" length="undefined" value="opaque string unique over space and time (case-sensitive)"/>
+    <!-- Globally-unique identifier for the call/dialog. Combined with From-tag and To-tag to form the dialog identifier. Case-sensitive and compared byte-for-byte. -->
+
+    <field name="Header:CSeq" type="variable" length="undefined" value="sequence-number (0..2^32-1) SP Method (here: 'BYE')"/>
+    <!-- Command sequence for ordering requests within a dialog. CSeq number is a 32-bit unsigned integer; method token must be 'BYE' for this request. The sequence number MUST be greater than or equal to prior values per dialog rules. -->
+
+    <field name="Header:Content-Length" type="variable" length="undefined" value="decimal octet count &gt;= 0 (for BYE typically 0)"/>
+    <!-- Number of octets in the message-body. When using stream transports (e.g., TCP) this header MUST be present. For a typical BYE there is no body and value is 0. -->
+
+    <field name="Header-Section-Terminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line separating headers from the optional message-body. MUST be present even if Content-Length is zero. -->
+
+    <field name="Message-Body" type="variable" length="0B" value="none"/>
+    <!-- BYE normally carries no message-body. If present, Content-Length must reflect its octet length. If body is present, its interpretation depends on Content-Type; not typical for BYE. -->
+</message>
+  <message name="REFER">
+    <!-- SIP REFER request: requests the recipient to refer (contact) a third-party resource (Refer-To) and creates an implicit refer subscription reported via NOTIFY. -->
+
+    <field name="Method" type="constant" length="5B" value="REFER"/>
+    <!-- The SIP method token for this request. Fixed ASCII characters "REFER". -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between Method and Request-URI (0x20). -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS or other absolute-URI per RFC2396; UTF-8">
+    <!-- The Request-URI indicating the primary recipient of the REFER (may be a SIP, SIPS, or other URI). MUST NOT contain unescaped spaces or be enclosed in <>. Length and form per URI grammar; used to route the request. -->
+    </field>
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between Request-URI and SIP-Version (0x20). -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version string. Exactly "SIP/2.0" (case-insensitive in comparison but implementations MUST send upper-case). -->
+
+    <field name="CRLF-StartLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the start-line. Mandatory even if no headers follow. -->
+
+    <field name="Via" type="variable" length="undefined" value="one or more header-values; sent-protocol must be SIP/2.0; transport token (UDP/TCP/TLS/SCTP) ; sent-by host[:port]; params">
+    <!-- Via header value(s). Indicates transport and path. For compliant agents branch parameter MUST be present and its value MUST begin with the magic cookie "z9hG4bK". Multiple Via header rows are allowed; ordering is significant. The sent-by and branch are used for transaction matching. -->
+    </field>
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="decimal 0..255 (recommended default 70)">
+    <!-- Max-Forwards header that limits hop count; decimal ASCII digits. If present and =0, proxy MUST NOT forward; UAC SHOULD insert with default 70. -->
+    </field>
+
+    <field name="To" type="variable" length="undefined" value="URI (name-addr or addr-spec); may include header-params; tag optional (absent for requests outside a dialog)">
+    <!-- The logical recipient of the request. For requests outside a dialog the To tag MUST NOT be present. Contains SIP/SIPS/other URI and optional display-name. Used in dialog establishment when applicable. -->
+    </field>
+
+    <field name="From" type="variable" length="undefined" value="URI (name-addr or addr-spec) ; tag token required by UAC">
+    <!-- The logical identity of the request originator. MUST contain a 'tag' parameter chosen by the UAC for requests (provides half of dialog identifier). Display-name optional. Callers SHOULD use "Anonymous" display-name when hiding identity. -->
+    </field>
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque octet sequence; globally unique identifier; case-sensitive (byte-by-byte)">
+    <!-- Call-ID header uniquely groups messages belonging to the same call/dialog. Must be globally unique for new requests outside dialogs (recommend cryptographic randomness). Comparison is byte-by-byte and case-sensitive. -->
+    </field>
+
+    <field name="CSeq-Number" type="variable" length="4B" value="0..4294967295 (32-bit unsigned decimal)">
+    <!-- The decimal sequence number in the CSeq header. MUST be representable as a 32-bit unsigned integer; used for ordering within a dialog and to distinguish new requests from retransmissions. -->
+    </field>
+
+    <field name="CSeq-Method" type="constant" length="5B" value="REFER"/>
+    <!-- The method token included in the CSeq header; must match the request method (here "REFER"). Method part is case-sensitive. -->
+
+    <field name="Contact" type="variable" length="undefined" value="single contact header value (URI); SIP or SIPS URI required for dialog-establishing REFER; angle-brackets if URI contains special chars">
+    <!-- Contact header: a single Contact value MUST be present for REFER (the request MAY create a dialog and is subject to Record-Route logic). Contact contains a globally routable SIP/SIPS URI for future requests. If Contact URI contains ',' '?' or ';' it MUST be enclosed in <>. -->
+    </field>
+
+    <field name="Refer-To" type="variable" length="undefined" value="single header-value containing target URI (SIP/SIPS/other) ; URI grammar per RFC 3261/2396">
+    <!-- Refer-To header (mandatory for REFER): provides the URI of the resource the recipient should contact. The request MUST contain exactly one Refer-To; zero or more than one causes a 400 Bad Request. The Refer-To value may include URI-parameters and headers. -->
+    </field>
+
+    <field name="Require" type="variable" length="undefined" value="option-tag list (option tags per RFC 3261/19.2) ; optional">
+    <!-- Require header: lists option-tags the UAC requires the UAS/proxies to understand. If present and unknown option-tag is encountered, UAS MUST respond 420 Bad Extension and include Unsupported header. Not used in CANCEL/ACK for non-2xx responses. -->
+    </field>
+
+    <field name="Supported" type="variable" length="undefined" value="option-tag list ; optional">
+    <!-- Supported header: option-tags the sender supports. Used to advertise supported extensions (only standards-track option-tags). Optional in REFER. -->
+    </field>
+
+    <field name="Content-Type" type="variable" length="undefined" value="media-type if body present; e.g., message/sipfrag for NOTIFY bodies or application/sdp for bodies">
+    <!-- Content-Type header: indicates media type of the message-body. MUST be present if a body is present. For REFER itself bodies are optional; NOTIFYs reporting refer status MUST use message/sipfrag. -->
+    </field>
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal number of octets &gt;= 0; MUST be present for stream transports; =0 when no body">
+    <!-- Content-Length header: byte length of the message-body. For stream-oriented transports (TCP) it MUST be present. Value determines end of body; if absent for datagram transports body ends at packet end. Content-Length must match actual body size. -->
+    </field>
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero or more additional headers per SIP (e.g., Route, Record-Route, Authorization, Proxy-Authorization) ">
+    <!-- Placeholder for any other valid SIP header fields. SIP allows many headers; their presence/semantics follow RFC 3261 rules (some headers are request-only/response-only and some can be combined). -->
+    </field>
+
+    <field name="CRLF-HeaderTerminator" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that separates header section from optional message-body. MUST be present even if message-body is empty. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="optional octet sequence; interpretation given by Content-Type; default text charset UTF-8 for text/*; may be absent">
+    <!-- Optional message-body. For REFER the body is generally not required. When present, Content-Type character set rules apply (UTF-8 default for text types). Content-Length value depends on this field. NOTE: REFER implicitly creates a refer subscription (NOTIFYs use message/sipfrag bodies to report status). -->
+    </field>
+
+</message>
+  <message name="PUBLISH">
+    <!-- PUBLISH request: SIP method used by a User Agent Client (EPA) to create, refresh, modify, or remove event state at an Event State Compositor (ESC). 
+         This definition models the SIP request start-line, common required/request headers for PUBLISH, the mandatory empty-line separator, and an optional message-body. All textual fields use UTF-8 (SIP uses UTF-8). -->
+
+    <field name="Method" type="constant" length="7B" value="PUBLISH"/>
+    <!-- The SIP method token. For PUBLISH requests this literal MUST be "PUBLISH" (case-sensitive per SIP ABNF for Method). -->
+
+    <field name="SP_after_Method" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Method and Request-URI as required by Request-Line grammar. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS or absoluteURI; no unescaped spaces or control chars; not enclosed in &lt;&gt;"/>
+    <!-- Request-URI indicating target resource whose event state is being published. Typically a SIP or SIPS URI or other absoluteURI. Must not contain unescaped spaces/controls.
+         Length is undefined (variable). -->
+
+    <field name="SP_after_Request-URI" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI and SIP-Version. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version token. SIP requires "SIP/2.0" and implementations must send upper-case. -->
+
+    <field name="CRLF_after_start_line" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Request-Line (start-line). No CR or LF allowed elsewhere in elements (only this terminating CRLF). -->
+
+    <!--
+        Message header fields follow. Each header line is terminated by CRLF.
+        The ESC requires particular headers for correct processing of PUBLISH:
+         - Via, From, To, Call-ID, CSeq, Max-Forwards, Event are expected
+         - SIP-If-Match is used when modifying/refreshing/removing (optional)
+         - Expires, Content-Type, Content-Length appear when applicable
+         - Supported/Require/Proxy-Require are optional per extension usage
+        Each header field modelled below is the entire header line value excluding its terminating CRLF.
+    -->
+
+    <field name="Via" type="variable" length="undefined" value="SIP/2.0/&lt;transport&gt; &lt;sent-by&gt; [;params]; branch MUST begin with 'z9hG4bK' for compliant clients"/>
+    <!-- Via header line indicating transport/protocol and sent-by (host[:port]); MUST contain a branch parameter that begins with the magic cookie "z9hG4bK" for RFC3261-compliant endpoints. May include received, maddr, ttl params.
+         Length undefined; header MUST be present in requests. -->
+
+    <field name="From" type="variable" length="undefined" value="display-name (optional) and addr-spec (SIP/SIPS URI) ;tag=token (From tag MUST be present on requests)"/>
+    <!-- From header identifying the initiator of the request. MUST include a tag parameter on PUBLISH requests (UA chooses a unique tag). Display name optional. Use name-addr form if addr-spec contains comma, '?' or ';'. -->
+
+    <field name="To" type="variable" length="undefined" value="display-name (optional) and addr-spec (SIP/SIPS URI); MUST NOT contain a tag for requests outside dialogs"/>
+    <!-- To header identifying logical recipient (address-of-record). For requests outside a dialog, To MUST NOT contain a tag. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque token (case-sensitive), recommended globally unique such as 'localid@host' or random UUID"/>
+    <!-- Call-ID header uniquely groups messages belonging to the same dialog/registration. Treated as opaque case-sensitive byte-by-byte identifier. -->
+
+    <field name="CSeq" type="variable" length="undefined" value="decimal sequence number (32-bit unsigned) SP Method (case-sensitive)"/>
+    <!-- CSeq header orders transactions; contains a 32-bit unsigned sequence number and the request method token (e.g., PUBLISH). Both fields together identify transaction ordering. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="integer 0..4294967295; UAC SHOULD set to 70 when originating"/>
+    <!-- Max-Forwards header limits number of hops; decremented by proxies. UAC SHOULD insert value 70 for originated requests. If zero, proxies must not forward. -->
+
+    <field name="Event" type="variable" length="undefined" value="single event-package token (e.g., 'presence') [ + optional package-specific parameters ]"/>
+    <!-- Event header is mandatory for PUBLISH and MUST contain a single event package token (identifies event package being published). Event header parameters (if any) behavior is package-defined. -->
+
+    <field name="SIP-If-Match" type="variable" length="undefined" value="single entity-tag token assigned by ESC (opaque token); optional"/>
+    <!-- SIP-If-Match conditions the request to a specific previously-assigned entity-tag. Used for Refresh/Modify/Remove operations. MUST contain at most one entity-tag. Optional for initial publications (must be absent). -->
+
+    <field name="Expires" type="variable" length="undefined" value="decimal seconds 0..4294967295 (unsigned 32-bit); may be omitted to allow ESC to choose"/>
+    <!-- Expires header suggests the requested lifetime (in seconds) for the publication. If omitted, ESC chooses a default. ESC may reduce but not extend requested lifetime. Value 0 requests immediate removal. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="MIME media-type (e.g., application/pidf+xml for presence) ; required if body present"/>
+    <!-- Content-Type indicates the media type of the message-body (format determined by event package). For presence PUBLISH, application/pidf+xml is the mandated format. Required when body is non-empty. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal octet count 0..4294967295; MUST be present on stream transports; if absent for datagram, body ends with packet end"/>
+    <!-- Content-Length gives size of message-body in bytes. MUST be present when using stream-oriented transports (e.g., TCP). For datagram transports (UDP), if absent body ends at packet end. If no body, Content-Length SHOULD be 0 on stream transports. -->
+
+    <field name="Supported" type="variable" length="undefined" value="comma-separated option-tags (option-tag = token); optional"/>
+    <!-- Supported header lists extensions (option-tags) the UAC supports. Option-tags MUST correspond to standards-track RFCs. Optional in PUBLISH requests. -->
+
+    <field name="Require" type="variable" length="undefined" value="comma-separated option-tags (token); optional; if present and unsupported by UAS, ESC MUST 420"/>
+    <!-- Require header indicates extensions that the sender expects the server to support. If a UAS does not understand an option-tag in Require, it MUST respond with 420 (Bad Extension) and include an Unsupported header. Not to be used in CANCEL or ACK for non-2xx. -->
+
+    <field name="Proxy-Require" type="variable" length="undefined" value="comma-separated option-tags (token); optional; relates to proxies"/>
+    <!-- Proxy-Require similar to Require but applies to proxies; if a proxy does not understand an option-tag listed, it MUST respond with 420 and Unsupported. Optional in PUBLISH requests. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="other generic headers (e.g., Authorization/Proxy-Authorization, Accept, Accept-Encoding) as applicable; each header CRLF-terminated"/>
+    <!-- Placeholder for other optional or extension headers not modeled individually above. Implementations MUST accept known and unknown headers per RFC3261 rules. -->
+
+    <field name="CRLF_end_of_headers" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line denoting end of header fields. This empty line MUST be present even if message-body is absent. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="octet sequence as indicated by Content-Length; media format defined by Event+Content-Type (e.g., application/pidf+xml for presence)"/>
+    <!-- Optional message body carrying the published event state. Length is determined by Content-Length when present (dependency). Body content and semantics depend on the event package (e.g., for presence the PIDF format). If Content-Length absent on datagram transport, body ends at packet end.
+         Note: For requests that are 'Initial' or 'Modify' operations a body MUST be present; for 'Refresh' a body MUST NOT be present; 'Remove' uses SIP-If-Match with Expires: 0 and MUST NOT have a body. -->
+
+</message>
+  <message name="INFO">
+    <!-- INFO request: SIP method used within an existing INVITE dialog to transport application-level information (may be associated with an Info Package or legacy INFO usage). -->
+
+    <field name="Method" type="constant" length="4B" value="INFO"/>
+    <!-- Request-Line method token. Fixed literal "INFO" identifying the SIP method. -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator (SP) between method and Request-URI in Request-Line. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS URI or absoluteURI in UTF-8; no CR or LF; must not be enclosed in &lt;&gt; here"/>
+    <!-- Request-URI identifying target of this request (typically the dialog remote target). Contains a SIP or SIPS URI (or other acceptable URI). Character set: UTF-8. Length depends on URI; no CR/LF. -->
+
+    <field name="SP_after_URI" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between Request-URI and SIP-Version. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- SIP version literal. MUST be "SIP/2.0" (case-insensitive, but implementations SHOULD send upper-case). -->
+
+    <field name="CRLF_after_StartLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Request-Line. Required even if no headers/body follow. -->
+
+    <field name="Via" type="variable" length="undefined" value="sent-protocol/sent-by with optional params; branch param MUST start with 'z9hG4bK' for RFC3261-compliant UAs; transport token (UDP/TCP/TLS/SCTP), sent-by host[:port], optional params (received,branch,maddr,ttl)"/>
+    <!-- Topmost Via header value inserted by sender: indicates transport/protocol and the address where responses should be sent. The branch parameter (transaction id) must be present and, for compliant UAs, begin with the magic cookie 'z9hG4bK'. This field may appear multiple times (proxy insertion), but here models the topmost Via. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="integer &gt;= 0 (recommended default 70)"/>
+    <!-- Max-Forwards header: hop-count limiter decremented by proxies. Sender SHOULD initialize to 70. If zero, proxies must not forward. Represented as decimal digits; practical reasonable range documented (0..65535 inferred). -->
+
+    <field name="From" type="variable" length="undefined" value="name-addr or addr-spec (display-name optional, SIP/SIPS URI), plus tag parameter token (From tag present for dialog identification)"/>
+    <!-- From header: logical identity of request originator. For in-dialog INFO requests this contains the originating UA's URI and its tag parameter (the From tag forms half of the dialog identifier). Display-name optional; URI and tag must be well-formed. -->
+
+    <field name="To" type="variable" length="undefined" value="name-addr or addr-spec (display-name optional, SIP/SIPS URI), may include tag parameter identifying remote dialog peer"/>
+    <!-- To header: logical recipient and, in-dialog requests, typically contains the remote dialog partner's URI and tag. For INFO inside an INVITE dialog the To tag must match the dialog remote tag. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque token (case-sensitive); recommended globally unique (e.g., random@host); ASCII excluding CR/LF"/>
+    <!-- Call-ID groups together messages belonging to the same dialog; must be identical for all requests/responses in a dialog. Case-sensitive and compared byte-by-byte. -->
+
+    <field name="CSeq-Number" type="variable" length="undefined" value="decimal 0..4294967295 (32-bit unsigned)"/>
+    <!-- CSeq sequence number: 32-bit unsigned integer expressed in decimal. Used to order requests within a dialog and to detect retransmissions. Must be incremented for new requests. -->
+
+    <field name="CSeq-Method" type="constant" length="4B" value="INFO"/>
+    <!-- CSeq method token: must equal the method name for this request ("INFO"). Case-sensitive in CSeq method portion. -->
+
+    <field name="Info-Package" type="variable" length="undefined" value="token (Info-package-name) [;params] -- OPTIONAL; present only when INFO is associated with an Info Package"/>
+    <!-- Info-Package header (optional): identifies the Info Package associated with this INFO request. MUST NOT be present for legacy INFO usage. Comparison to Recv-Info is octet-by-octet on the package name (case-sensitive). -->
+
+    <field name="Content-Disposition" type="variable" length="undefined" value="If present for an Info-Package payload: 'Info-Package' ; otherwise any valid disposition token"/>
+    <!-- Content-Disposition header: when the INFO request carries an Info-Package-associated message-body, this header MUST be present and have value 'Info-Package'. Other dispositions allowed for non-Info-Package bodies. Presence is conditional on carrying a body associated with an Info Package. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="MIME media-type token (e.g., application/sdp, application/foo); UTF-8 where applicable"/>
+    <!-- Content-Type header: indicates media type of message-body. Mandatory if a message-body is present. The Accept header rules still apply for supported MIME types. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal octet count &gt;= 0"/>
+    <!-- Content-Length header: length in bytes of the message-body. MUST be present on stream transports; if no body present it MUST be 0. This value determines how many bytes of message-body follow the header section. -->
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero or more other SIP header fields (e.g., Supported, Supported-OptionTags, Proxy-*), each as tokenized header lines"/>
+    <!-- Placeholder for additional, optional headers not specifically enumerated here (e.g., Supported, User-Agent, Proxy-Authorization). The order of headers with different names is not significant; multiple headers with same name must follow combining rules unless explicitly disallowed by that header's grammar. -->
+
+    <field name="CRLF_EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line separating header section and optional message-body. This blank line MUST be present even if there is no message-body. -->
+
+    <field name="Message-Body" type="variable" length="undefined" value="octet sequence per Content-Length and Content-Type; if associated with Info Package must be Content-Disposition: Info-Package; may be MIME multipart (RFC 5621)"/>
+    <!-- Application payload carried by the INFO request. Optional. If the INFO is associated with an Info Package, the body parts MUST conform to that Info Package's MIME types and rules (may be single part or multipart). Contents must comply with Content-Length and Content-Type headers. For confidentiality/integrity, end-to-end protections (e.g., S/MIME) may be required by the application. -->
+
+    <field name="EndOfMessage" type="constant" length="0B" value=""/>
+    <!-- End marker: implicit end of SIP message at end of transport record (for datagram transports) or after Content-Length bytes (for stream transports). Not an on-the-wire octet sequence beyond the message-body. -->
+</message>
+  <message name="INVITE">
+    <!-- SIP INVITE request: initiates session establishment (Request-Line + headers + optional message-body like SDP).
+         This model focuses on fields relevant to dialog establishment and reliable provisional response negotiation (100rel). -->
+
+    <field name="Method" type="constant" length="6B" value="INVITE"/>
+    <!-- SIP request method token. For an INVITE request this is the literal "INVITE" (6 ASCII octets). -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Method and Request-URI in the Request-Line. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP-URI or SIPS-URI; UTF-8 / ASCII; e.g., sip:user@host"/>
+    <!-- Request-URI indicates the target resource (scheme sip or sips or other URIs per SIP rules).
+         When outside a dialog this names the address-of-record; MUST NOT contain unescaped spaces or CR/LF.
+         Length depends on URI; modelled as undefined. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Request-URI and SIP-Version. -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- SIP version literal identifying protocol and version. Must be "SIP/2.0" for compliant implementations. -->
+
+    <field name="Request-LineTerminators" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF terminating the Request-Line (required). -->
+
+    <field name="Via" type="variable" length="undefined" value="SIP/2.0/transport host[:port];branch=token [;received=ip]"/>
+    <!-- Topmost Via header value indicating transport and sent-by and providing branch parameter.
+         For RFC3261-compliant UAs branch MUST start with magic cookie "z9hG4bK"; sent-by used when matching responses.
+         Can be multiple Via header rows; modelled here as one logical field (retransmissions/preservation by proxies). -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="0..255 (recommended default 70)"/>
+    <!-- Max-Forwards numeric header used to limit hops; decremented by proxies.
+         UAC SHOULD insert this header (recommended 70). -->
+
+    <field name="To" type="variable" length="undefined" value="SIP-URI; tag MUST NOT be present for initial request"/>
+    <!-- To header names logical recipient (address-of-record). For requests outside a dialog, To MUST NOT contain a tag.
+         If present in a request it must be ignored for dialog-creation semantics. -->
+
+    <field name="From" type="variable" length="undefined" value="SIP-URI;tag=token (cryptographically-random &gt;=32bits)"/>
+    <!-- From header identifies originator. MUST include a 'tag' parameter chosen by the UAC (globally unique, >=32 bits randomness).
+         Tag contributes to dialog identifier (From-tag + To-tag + Call-ID). -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque globally-unique string (case-sensitive)"/>
+    <!-- Call-ID groups messages belonging to the same call/dialog; globally unique identifier generated by UA. -->
+
+    <field name="CSeq" type="variable" length="undefined" value="0..4294967295 INVITE"/>
+    <!-- CSeq contains a 32-bit unsigned sequence number and method name (here method must be INVITE).
+         Sequence numbers order requests within a dialog; increment for new requests. -->
+
+    <field name="Contact" type="variable" length="undefined" value="SIP-URI (global-scope)"/>
+    <!-- Contact header MUST be present in an INVITE that can establish a dialog.
+         Contact contains a URI where the UA wishes to receive future requests; should be globally routable. -->
+
+    <field name="Supported" type="variable" length="undefined" value="option-tag list; e.g., 100rel"/>
+    <!-- Supported header lists option-tags (RFC-defined extensions) the UAC supports.
+         UAC SHOULD include this in INVITE requests; use 100rel to indicate support for reliable provisional responses. -->
+
+    <field name="Require" type="variable" length="undefined" value="option-tag list; e.g., 100rel"/>
+    <!-- Require header lists option-tags that the UAC insists the UAS support for this request.
+         If present and UAS does not understand a listed option-tag, UAS MUST return 420 with Unsupported.  (100rel only valid in INVITE). -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="MIME media type; e.g., application/sdp"/>
+    <!-- Indicates media type of the message-body. If body present this header MUST be present. SDP (application/sdp) is common for INVITE. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal octet count (&gt;=0)"/>
+    <!-- Number of octets in the message-body. REQUIRED on stream transports (TCP); MUST be present when a body exists.
+         If zero, indicates empty body. -->
+
+    <field name="HeaderSectionEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line that separates header section from message-body (mandatory even if no body). -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="opaque octet sequence (e.g., SDP in UTF-8); length = Content-Length"/>
+    <!-- Optional message-body. For INVITE commonly contains SDP offer (Content-Disposition 'session').
+         If Content-Length > 0, this body MUST be present and parsable according to Content-Type.
+         Offer/answer rules: initial offer may be in INVITE or in first reliable non-failure response; follow RFC3264 semantics. -->
+
+    <field name="EndOfMessage" type="constant" length="0B" value=""/>
+    <!-- Logical end of message. No trailing constant bytes required beyond message-body length and transport framing.
+         Included for explicitness in model. -->
+</message>
+  <message name="CANCEL">
+    <!-- CANCEL request: hop-by-hop SIP method used to ask the server to cease processing a previously-sent request (typically an INVITE). 
+         It must mirror key header values of the request being cancelled so the server can match and terminate that transaction. -->
+
+    <field name="Method" type="constant" length="6B" value="CANCEL"/>
+    <!-- SIP method token identifying this as a CANCEL request (ASCII "CANCEL", 6 bytes). -->
+
+    <field name="SP_after_Method" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the method from the Request-URI (0x20). -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="SIP/SIPS/absolute-URI; no unescaped SP or CTLs">
+    </field>
+    <!-- Request-URI indicating the target of the original request being cancelled.
+         MUST be identical to the Request-URI of the original request (examples: sip:bob@biloxi.com or sips:alice@atlanta.com).
+         Value must not contain unescaped spaces or control characters; not enclosed in <> here.
+         When original request had Route header values and strict-routing applied, the same Request-URI form used to locate the original transaction must be used. -->
+
+    <field name="SP_after_Request-URI" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating Request-URI and SIP-Version (0x20). -->
+
+    <field name="SIP-Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- SIP version literal; per RFC MUST be "SIP/2.0" (ASCII, 7 bytes). -->
+
+    <field name="Start-Line-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF (CR=0x0D LF=0x0A) terminating the start-line. Required even if no message-body. -->
+
+    <field name="Top-Via" type="variable" length="undefined" value="SIP/2.0/transport sent-by [;branch=...] (single Via header value)">
+    </field>
+    <!-- Topmost Via header field value. For a CANCEL it MUST be a single Via value identical to the top Via of the request being cancelled (including sent-protocol, sent-by and branch parameter).
+         The branch parameter in that Via typically begins with the magic cookie "z9hG4bK" when the originator used modern branch IDs. 
+         Transport/token text follows Via syntax (UDP/TCP/TLS/SCTP). This field is required to match the original transaction's top Via. -->
+
+    <field name="Max-Forwards" type="variable" length="undefined" value="integer 0..65535 (recommended default 70)">
+    </field>
+    <!-- Max-Forwards header: integer decremented by proxies; if 0 the element MUST NOT forward. UAC SHOULD insert this header when originating (recommended default 70). -->
+
+    <field name="Route" type="variable" length="undefined" value="optional; present iff original request contained Route values; list of URIs">
+    </field>
+    <!-- Optional Route header field(s). If the original request being cancelled contained Route header values, CANCEL MUST include those same Route header values so that stateless proxies can route the CANCEL identically to the original request. -->
+
+    <field name="To" type="variable" length="undefined" value="name-addr / addr-spec ; may include tag">
+    </field>
+    <!-- To header: MUST be identical to the To of the request being cancelled, including any tag parameter. Serves to help identify the exact request/dialog being targeted. -->
+
+    <field name="From" type="variable" length="undefined" value="name-addr / addr-spec ; MUST include tag selected by originator">
+    </field>
+    <!-- From header: MUST be identical to the From of the request being cancelled, including the From tag parameter chosen by the original UAC. The From tag is used as part of the dialog/transaction identifier. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque token ; case-sensitive">
+    </field>
+    <!-- Call-ID header: global identifier that groups the messages of a call; MUST be identical to the Call-ID of the request being cancelled. Case-sensitive string compared byte-for-byte. -->
+
+    <field name="CSeq-Number" type="variable" length="undefined" value="32-bit unsigned integer (numeric part) ; MUST match original numeric part">
+    </field>
+    <!-- CSeq numeric part: integer used to order requests within a dialog/transaction. For CANCEL the numeric part MUST be identical to that of the request being cancelled (the method subfield differs). -->
+
+    <field name="CSeq-Method" type="constant" length="6B" value="CANCEL"/>
+    <!-- CSeq method token: for CANCEL the method portion of CSeq MUST be the literal "CANCEL" (ASCII, 6 bytes). This distinguishes the CANCEL transaction while reusing the numeric sequence from the original request. -->
+
+    <field name="Contact" type="variable" length="undefined" value="optional; name-addr / addr-spec">
+    </field>
+    <!-- Optional Contact header: may be present per local policy. Not required for matching the cancelled transaction; included only if present in original or needed by UA policy. -->
+
+    <field name="Content-Length" type="constant" length="1B" value="0"/>
+    <!-- Content-Length header: numeric decimal count of message-body octets. For CANCEL no body is carried; set to "0" indicating zero-length body.
+         Note: Content-Length must be present on stream-oriented transports. Representation here is ASCII "0" (one byte). -->
+
+    <field name="EndOf-Headers-CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty CRLF line separating headers from (optional) message-body. MUST be present even when there is no body. -->
+
+    <field name="Message-Body" type="constant" length="0B" value=""/>
+    <!-- CANCEL carries no message-body. Length is explicitly zero bytes. -->
+
+    <!-- Implementation notes (semantic constraints, not fields):
+         - The CANCEL request MUST NOT contain Require or Proxy-Require header fields (these are forbidden in CANCEL).
+         - The Request-URI, To, From (including tags), Call-ID, and numeric part of CSeq MUST be identical to those of the request being cancelled to allow correct transaction matching.
+         - The CANCEL MUST have only a single Via header value (the one matching the top Via of the original request).
+         - If the original request had Route header values, they MUST be included in CANCEL so stateless proxies route it correctly.
+         - The destination (address:port:transport) used to send the CANCEL MUST be identical to the destination used for the original request's transmission.
+    -->
+</message>
+</ir>

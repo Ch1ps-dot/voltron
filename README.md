@@ -256,6 +256,9 @@ During and after execution, the repository accumulates several kinds of outputs:
 
 - `component/ir/<protocol>/`: parsed RFC trees, field descriptions, message IR, and state dependencies
 - `component/models/<target>/`: learned or evolved automata models
+- `component/models/<target>/best_equipment/`: generator and parser source
+  snapshots associated with the learned model that exposed the most response
+  transition types; mutator synthesis uses these saved generators
 - `component/equipment/<target>/`: synthesized generators, parsers,
   per-response-type checkers, and mutators
 - `results-<target>-voltron-<timestamp>/`: final run statistics and discovered state information

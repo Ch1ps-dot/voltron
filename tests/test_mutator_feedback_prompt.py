@@ -14,7 +14,12 @@ def test_generator_mutation_serializes_observed_responses_deterministically(
 ):
     generator_path = tmp_path / "generator.py"
     generator_path.write_text(
-        "def generate():\n    return b'PING\\r\\n'\n",
+        "def generate():\n    return b'LATEST\\r\\n'\n",
+        encoding="utf-8",
+    )
+    best_generator_path = tmp_path / "best_generator.py"
+    best_generator_path.write_text(
+        "def generate():\n    return b'BEST\\r\\n'\n",
         encoding="utf-8",
     )
     captured = {}
@@ -34,6 +39,14 @@ def test_generator_mutation_serializes_observed_responses_deterministically(
                 path=str(generator_path),
             )
         ]
+    }
+    producer.best_generators = {
+        "PING": Generator(
+            msg_type="PING",
+            evolved_from="id0",
+            name="id1",
+            path=str(best_generator_path),
+        )
     }
     producer.chater = FakeChater()
     producer.rfcp = SimpleNamespace(
@@ -55,6 +68,8 @@ def test_generator_mutation_serializes_observed_responses_deterministically(
     assert result[0] == "PING"
     assert json.loads(captured["trace"]) == ["ERROR", "PONG"]
     assert captured["trace"] == '["ERROR", "PONG"]'
+    assert "return b'BEST" in captured["code"]
+    assert "return b'LATEST" not in captured["code"]
 
 
 def test_mutator_prompt_includes_runtime_response_feedback():
@@ -97,5 +112,6 @@ def test_mutator_prompt_includes_runtime_response_feedback():
     assert "Observed response types from the current fuzzing session" in (
         captured["prompt"]
     )
+    assert "Saved Best Generator Program" in captured["prompt"]
     assert '["ERROR", "PONG"]' in captured["prompt"]
     assert "not yet been reached" in captured["prompt"]

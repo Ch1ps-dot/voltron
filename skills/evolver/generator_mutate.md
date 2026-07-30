@@ -39,7 +39,11 @@ You will be given:
 
   * server/client configuration files
 
-### **Previous Generated Program**:
+### **Saved Best Generator Program**:
+
+   This generator was saved with the best model-learning hypothesis. Preserve
+   its protocol structure and state-reaching properties as the baseline for
+   mutation.
 
    $code
 

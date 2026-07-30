@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="SIP_Response">
+    <!-- A SIP response message (SIP/2.0). Conveys status of a request and carries header fields and an optional message-body. -->
+
+    <field name="SIP_Version" type="constant" length="7B" value="SIP/2.0"/>
+    <!-- Protocol version token identifying SIP version. Fixed literal "SIP/2.0" in all SIP/2.0 responses. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating version and status code. -->
+
+    <field name="Status_Code" type="variable" length="3B" value="100-699"/>
+    <!-- 3-digit numeric response code indicating result class (1xx..6xx). Used for automated processing. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating status code and reason phrase. -->
+
+    <field name="Reason_Phrase" type="variable" length="undefined" value="UTF-8 text excluding CR and LF (human-readable)"/>
+    <!-- Human-readable short description of Status_Code. Not relied upon by automata; may be localized. -->
+
+    <field name="CRLF_StartLine_End" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed terminating the Status-Line. Mandatory. -->
+
+    <field name="Via" type="variable" length="undefined" value="one-or-more Via header values; each: protocol/version/transport sent-by [;params]; copied from request"/>
+    <!-- Topmost Via header values indicate the reverse path for sending this response. Responses MUST contain the Via values from the request in same order. -->
+
+    <field name="From" type="variable" length="undefined" value="URI with optional tag; case-insensitive scheme and host"/>
+    <!-- From header copied from request; identifies originator of the request. Tag present in most client requests. -->
+
+    <field name="To" type="variable" length="undefined" value="URI with mandatory tag for dialog-establishing responses except 100; tag may be added by UAS"/>
+    <!-- To header equals request To; UAS adds To tag if request lacked one (except 100). Tag becomes part of dialog identifier. -->
+
+    <field name="Call-ID" type="variable" length="undefined" value="opaque token; globally unique string"/>
+    <!-- Unique identifier for the call/dialog; must match the Call-ID of the associated request. Case-sensitive; used to correlate messages. -->
+
+    <field name="CSeq" type="variable" length="undefined" value="1*DIGIT SP Method (e.g., 314159 INVITE)"/>
+    <!-- Command sequence from the request that produced this response. CSeq number and method are used to correlate and order transactions. -->
+
+    <field name="Contact" type="variable" length="undefined" value="zero-or-more Contact header values; each a SIP/SIPS/URI"/>
+    <!-- Contact header(s) indicate reachable URIs for the responder. Common in 2xx and redirect (3xx) responses; may be absent in many responses. -->
+
+    <field name="Allow" type="variable" length="undefined" value="comma-separated method tokens"/>
+    <!-- Lists methods supported by the UAS for use in a dialog or generally. Often present in 405 responses and in 2xx to indicate supported methods. -->
+
+    <field name="Supported" type="variable" length="undefined" value="comma-separated option-tags (extensions)"/>
+    <!-- Option-tags for SIP extensions understood by the responder. Used by endpoints to decide features to apply. -->
+
+    <field name="Event" type="variable" length="undefined" value="token identifying event package (e.g., presence)"/>
+    <!-- Event header used in subscription/notification contexts; indicates which event package a notification or subscription pertains to. -->
+
+    <field name="Subscription-State" type="variable" length="undefined" value="active / pending / terminated ; optional parameters: expires, reason, retry-after"/>
+    <!-- Subscription state header used in NOTIFY responses; indicates subscription lifecycle state and parameters. -->
+
+    <field name="SIP-ETag" type="variable" length="undefined" value="opaque entity-tag token"/>
+    <!-- Server-assigned entity-tag used by PUBLISH responses to identify a publication. EPA stores tag for subsequent modify/refresh/remove operations. -->
+
+    <field name="RSeq" type="variable" length="undefined" value="1*DIGIT (sequence number for reliable provisional responses)"/>
+    <!-- RSeq header in provisional reliable responses (101-199) carrying sequence number for PRACK correlation. Present only for reliable 1xx. -->
+
+    <field name="Content-Type" type="variable" length="undefined" value="media type token or multipart token (e.g., application/sdp, message/cpim)"/>
+    <!-- Media type of the message body. Required when a non-empty body is present. Determines how body is interpreted. -->
+
+    <field name="Content-Length" type="variable" length="undefined" value="decimal octet count (&gt;=0)"/>
+    <!-- Size in octets of the message body. Mandatory for stream transports (e.g., TCP). Used to locate end of body. -->
+
+    <field name="Header_Trailing_CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Blank CRLF line separating header fields from the optional message-body. Mandatory even if no body. -->
+
+    <field name="Message_Body" type="variable" length="undefined" value="OCTET sequence; length equals Content-Length; media indicated by Content-Type"/>
+    <!-- Optional message body (e.g., SDP, PIDF, message/cpim). Content-Length governs exact byte length. May be absent (length 0). -->
+
+    <field name="Extension_Headers" type="variable" length="undefined" value="zero-or-more additional header fields: token HCOLON header-value CRLF"/>
+    <!-- Placeholder for any optional or extension header fields not explicitly modeled above (e.g., WWW-Authenticate, Retry-After). Preserves extensibility. -->
+</message>
+</ir>

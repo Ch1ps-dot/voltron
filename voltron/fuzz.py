@@ -368,6 +368,8 @@ class Fuzzer:
     ) -> MealyMachine:
         """--- model learning ---"""
         h_lsit: list[MealyMachine] = []
+        best_generators = {}
+        best_parser = None
         h_path = configs.models_path / 'evolved_hypothesis.pkl'
         try_limit = 3
         while not stop_event.is_set():
@@ -398,6 +400,11 @@ class Fuzzer:
                     analyzer.stage = 'fuzzer evolve'
                 if len(h_lsit) == 0:
                     h_lsit.append(h)
+                    best_generators, best_parser = (
+                        self.producer.capture_current_equipment(
+                            self.mapper.cur_parser
+                        )
+                    )
                     analyzer.record_model_learning_iteration(
                         iteration=int(cur_id),
                         hypothesis=h,
@@ -424,13 +431,23 @@ class Fuzzer:
                     try_limit -= 1
                     if try_limit <= 0:
                         iteration_status = 'accepted_final'
+                        best_hypothesis = h_lsit[-1]
                         with open(h_path, 'wb') as f:
-                            pickle.dump(h, f)
-                        h.graph('evolved')
+                            pickle.dump(best_hypothesis, f)
+                        if best_parser is None:
+                            raise RuntimeError(
+                                'No parser was captured for the best model'
+                            )
+                        self.producer.save_best_equipment(
+                            model_id=str(best_hypothesis.id),
+                            generators=best_generators,
+                            parser=best_parser,
+                        )
+                        best_hypothesis.graph('evolved')
                         logger.debug('ml: save evolved model')
                         analyzer.record_model_learning_iteration(
                             iteration=int(cur_id),
-                            hypothesis=h,
+                            hypothesis=best_hypothesis,
                             duration_s=iteration_duration,
                             status=iteration_status,
                             try_limit=try_limit,
@@ -448,6 +465,11 @@ class Fuzzer:
                 elif last_trans_num < cur_trans_num:
                     iteration_status = 'improved'
                     h_lsit.append(h)
+                    best_generators, best_parser = (
+                        self.producer.capture_current_equipment(
+                            self.mapper.cur_parser
+                        )
+                    )
                     analyzer.record_model_learning_iteration(
                         iteration=int(cur_id),
                         hypothesis=h,

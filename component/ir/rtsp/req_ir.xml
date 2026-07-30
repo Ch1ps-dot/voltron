@@ -1,0 +1,477 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="PLAY_NOTIFY (media-properties-update)">
+  <!-- Server-to-client notification: server updates the client about changed media properties (e.g., Random-Access, Content Modifications, Retention, Supported Scale, Media-Range). -->
+  
+  <!-- Start-Line: Method SP Request-URI SP RTSP-Version CRLF -->
+  <field name="Method" type="constant" length="11B" value="PLAY_NOTIFY"/>
+  <!-- RTSP method name for this notification. Must be exactly "PLAY_NOTIFY". -->
+  <field name="SP1" type="constant" length="1B" value="0x20"/>
+  <!-- Single space (0x20) separating method from request URI. -->
+  <field name="Request-URI" type="variable" length="undefined" value="RTSP-REQ-URI (schemes &quot;rtsp&quot; or &quot;rtsps&quot; followed by hier-part, possibly &quot;*&quot;)"/>
+  <!-- Identifies the presentation or stream resource to which the notification applies. See Section 20.2.1 for full ABNF. -->
+  <field name="SP2" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separating URI from protocol version. -->
+  <field name="RTSP-Version" type="constant" length="8B" value="RTSP/2.0"/>
+  <!-- Protocol version string. Must be exactly "RTSP/2.0". -->
+  <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Carriage Return Line Feed terminating the request line. -->
+
+  <!-- Mandatory Header: CSeq -->
+  <field name="CSeqName" type="constant" length="6B" value="CSeq: "/>
+  <!-- Header name "CSeq" followed by colon and a space. -->
+  <field name="CSeqValue" type="variable" length="undefined" value="1*9DIGIT"/>
+  <!-- Sequence number for request/response pair. Integer from 0 to 999,999,999. Must match response. -->
+  <field name="CRLF2" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF after CSeq header. -->
+
+  <!-- Mandatory Header: Session -->
+  <field name="SessionName" type="constant" length="9B" value="Session: "/>
+  <!-- Header name "Session" followed by colon and a space. -->
+  <field name="SessionID" type="variable" length="undefined" value="1*256(ALPHA / DIGIT / safe)"/>
+  <!-- Session identifier assigned by server at SETUP. Optionally followed by ";timeout=<delta-seconds>". -->
+  <field name="CRLF3" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF after Session header. -->
+
+  <!-- Mandatory Header: Notify-Reason -->
+  <field name="NotifyReasonName" type="constant" length="15B" value="Notify-Reason: "/>
+  <!-- Header name "Notify-Reason" followed by colon and a space. -->
+  <field name="NotifyReasonValue" type="constant" length="23B" value="media-properties-update"/>
+  <!-- Fixed reason value indicating that the media properties have changed during playout. -->
+  <field name="CRLF4" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF after Notify-Reason header. -->
+
+  <!-- Mandatory Header: Range -->
+  <field name="RangeName" type="constant" length="7B" value="Range: "/>
+  <!-- Header name "Range" followed by colon and a space. -->
+  <field name="RangeValue" type="variable" length="undefined" value="ranges-spec (npt-range / utc-range / smpte-range)"/>
+  <!-- Time range that the notification applies to. For media-properties-update, typically includes current media range. -->
+  <field name="CRLF5" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF after Range header. -->
+
+  <!-- Optional additional headers (sent as needed, per RFC 7826) -->
+  <field name="OptionalHeaders" type="variable" length="undefined" value="Zero or more RTSP header lines: Media-Properties, Media-Range, Scale, RTP-Info (all conditional); Date, Server, Timestamp, Via etc."/>
+  <!-- May include Media-Properties (to indicate new properties), Media-Range -->
+</message>
+  <message name="PLAY_NOTIFY_scale-change">
+    <!-- Server-to-client notification that the playback scale has been changed due to media constraints.
+         This is a request with method PLAY_NOTIFY and Notify-Reason header set to scale-change. -->
+    
+    <!-- Request Line -->
+    <field name="Method" type="constant" length="11B" value="PLAY_NOTIFY"/>
+    <!-- The method name for this RTSP request, fixed to PLAY_NOTIFY -->
+    
+    <field name="Request-URI" type="variable" length="undefined" value="RTSP-REQ-URI (absolute URI)"/>
+    <!-- The resource identifier (presentation or stream) the notification applies to; an absolute RTSP URI -->
+    
+    <field name="Space" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method from request URI -->
+    
+    <field name="RTSP-Version" type="constant" length="8B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier, fixed to RTSP/2.0 -->
+    
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the request line -->
+    
+    <!-- Required General Headers (order not significant but follows typical example) -->
+    <field name="DateHeaderName" type="constant" length="4B" value="Date"/>
+    <!-- Header name for Date: -->
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <!-- Colon and space separating header name from value -->
+    <field name="DateValue" type="variable" length="undefined" value="RTSP-date (RFC5322 format)"/>
+    <!-- Server wallclock time when the scale-change occurred -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <field name="CSeqHeaderName" type="constant" length="4B" value="CSeq"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="CSeqValue" type="variable" length="undefined" value="1*9DIGIT (sequence number)"/>
+    <!-- Integer sequence number for the request/response pair, mandatory in all RTSP messages -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <field name="Notify-ReasonHeaderName" type="constant" length="13B" value="Notify-Reason"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="Notify-ReasonValue" type="constant" length="11B" value="scale-change"/>
+    <!-- Indicator why the server sends PLAY_NOTIFY; fixed to scale-change -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <field name="SessionHeaderName" type="constant" length="7B" value="Session"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="SessionValue" type="variable" length="undefined" value="1*256(ALPHA / DIGIT / safe)"/>
+    <!-- Identifier for the RTSP session to which this notification applies -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <!-- Conditional Headers (mandatory for time-progressing content) -->
+    <field name="Media-PropertiesHeaderName" type="constant" length="15B" value="Media-Properties"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="Media-PropertiesValue" type="variable" length="undefined" value="media-prop-list (e.g., Time-Progressing, Scales, etc.)"/>
+    <!-- Current media properties; must be included if scale change due to content changing supported scales -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <field name="Media-RangeHeaderName" type="constant" length="11B" value="Media-Range"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="Media-RangeValue" type="variable" length="undefined" value="ranges-spec (npt/clock/smpte format)"/>
+    <!-- Time range of the media as known at the time of change; mandatory for time-progressing content -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <field name="RangeHeaderName" type="constant" length="5B" value="Range"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="RangeValue" type="variable" length="undefined" value="ranges-spec (e.g., npt=00:00:00-01:37:21.394)"/>
+    <!-- Media time when the scale change took effect -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <field name="ScaleHeaderName" type="constant" length="5B" value="Scale"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="ScaleValue" type="variable" length="undefined" value="FLOAT (e.g., 1, -2.5)"/>
+    <!-- New scale factor now in use by the server -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <!-- RTP-Info Header (mandatory for media streams delivered over RTP) -->
+    <field name="RTP-InfoHeaderName" type="constant" length="8B" value="RTP-Info"/>
+    <field name="ColonSpace" type="constant" length="2B" value=": "/>
+    <field name="RTP-InfoValue" type="variable" length="undefined" value="rtsp-info-spec *(COMMA rtsp-info-spec)"/>
+    <!-- RTP stream information (ssrc, rtptime, seq) at the point of scale change -->
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    
+    <!-- Empty line signaling end of header section -->
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- CRLF with no preceding header value marks the end of headers; no message body is allowed in scale-change notifications -->
+</message>
+  <message name="DESCRIBE">
+    <!-- RTSP DESCRIBE request: retrieves a presentation or media object description from a server -->
+
+    <field name="Method" type="constant" length="8B" value="DESCRIBE"/>
+    <!-- Command token indicating the DESCRIBE method -->
+
+    <field name="Whitespace1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method from Request-URI -->
+
+    <field name="RequestURI" type="variable" length="undefined" value="absolute RTSP URI (scheme://authority/path)"/>
+    <!-- Absolute URI of the media resource to be described; may include query but no fragment -->
+
+    <field name="Whitespace2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI from RTSP version -->
+
+    <field name="Version" type="constant" length="8B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier, always "RTSP/2.0" for this specification -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed terminating the request line -->
+
+    <field name="HeaderBlock" type="variable" length="undefined" value="UTF-8 text of zero or more header lines, each terminated by CRLF, ending with an empty line (CRLF)"/>
+    <!-- All headers (general, request, message-body) and the terminating empty line; for DESCRIBE request, no message body is present per Table 8 -->
+</message>
+  <message name="PLAY_NOTIFY (end-of-stream)">
+    <!-- Server-to-client notification indicating completion or near completion of a PLAY request and the ending delivery of the media stream(s). -->
+
+    <field name="Method" type="constant" length="11B" value="PLAY_NOTIFY"/>
+    <!-- Method name identifying this as a PLAY_NOTIFY request. -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Space separator between method and Request-URI. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="RTSP-REQ-URI (absolute URI or relative reference)"/>
+    <!-- Identifies the presentation or stream resource for which the notification is sent. For aggregated sessions, the aggregate control URI is typically used. -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Space separator between Request-URI and protocol version. -->
+
+    <field name="RTSP-Version" type="constant" length="8B" value="RTSP/2.0"/>
+    <!-- Protocol version indicator. -->
+
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of request line. -->
+
+    <field name="Notify-Reason" type="constant" length="24B" value="Notify-Reason: end-of-stream"/>
+    <!-- Header indicating the reason for the PLAY_NOTIFY. For end-of-stream, the value is exactly &quot;end-of-stream&quot;. Followed by CRLF. -->
+    <field name="CRLF2" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="Request-Status" type="variable" length="undefined" value="cseq=&lt;1*9DIGIT&gt; status=&lt;Status-Code&gt; reason=&quot;&lt;Reason-Phrase&gt;&quot;"/>
+    <!-- Header indicating which PLAY request this notification refers to and its completion status. Format: cseq=&lt;CSeq&gt; status=&lt;status code&gt; reason=&quot;&lt;reason&gt;&quot;. Example: cseq=853 status=200 reason=&quot;OK&quot;. Followed by CRLF. -->
+    <field name="CRLF3" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="Range" type="variable" length="undefined" value="npt=&lt;end-time&gt; (or other range format)"/>
+    <!-- Indicates the point in the stream where delivery is ending. The end time must be an actual numeric value, not &quot;now&quot;. Typically expressed in NPT. Followed by CRLF. -->
+    <field name="CRLF4" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="RTP-Info" type="variable" length="undefined" value="url=&quot;&lt;stream-uri&gt;&quot; ssrc=&lt;ssrc&gt;:seq=&lt;last-seq&gt;;rtptime=&lt;last-rtptime&gt; [, ...]"/>
+    <!-- Required if RTP transport is used. Contains the last sequence number and RTP timestamp for each stream. Followed by CRLF. -->
+    <field name="CRLF5" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="Scale" type="variable" length="undefined" value="Scale: &lt;float&gt; (optional)"/>
+    <!-- Headers included if the scale value is not 1. Indicates the playback rate. Followed by CRLF. -->
+    <field name="CRLF6" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="Session" type="variable" length="undefined" value="Session: &lt;session-id&gt; [; timeout=&lt;seconds&gt;]"/>
+    <!-- Identifies the RTSP session for which this notification is sent. Mandatory. Followed by CRLF. -->
+    <field name="CRLF7" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="CSeq" type="variable" length="undefined" value="CSeq: &lt;1*9DIGIT&gt;"/>
+    <!-- Sequence number for this request/response pair. Mandatory. Followed by CRLF. -->
+    <field name="CRLF8" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="Date" type="variable" length="undefined" value="Date: &lt;RTSP-date&gt;"/>
+    <!-- Date and time at which the message was originated. Recommended for all messages. Followed by CRLF. -->
+    <field name="CRLF9" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="Other-Headers" type="variable" length="undefined" value="zero or more additional header lines (extension-headers)"/>
+    <!-- Additional headers may appear (e.g., Via, Supported, etc.). Each header line ends with CRLF. The order of headers is not significant. -->
+    <field name="CRLF10" type="constant" length="2B" value="0x0D0A"/>
+
+    <field name="Empty-Line" type="constant" length="2B" value="0x0D0A"/>
+    <!-- A single empty line (CRLF) marks the end of the header section. Since end-of-stream notifications MUST NOT carry a message body, this terminates the message. -->
+</message>
+  <message name="SET_PARAMETER">
+  <!-- RTSP SET_PARAMETER request message: used to set parameter values for a presentation or stream. 
+       The message is text-based with CRLF line endings. -->
+  <field name="Method" type="constant" length="13B" value="SET_PARAMETER"/>
+  <!-- Method name for the request; constant string -->
+
+  <field name="SP1" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separating method from Request-URI -->
+
+  <field name="Request-URI" type="variable" length="undefined" value="RTSP-URI or '*'"/>
+  <!-- Absolute RTSP URI (rtsp://...) or asterisk '*' for server-wide operations -->
+
+  <field name="SP2" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separating Request-URI from RTSP version -->
+
+  <field name="RTSP-Version" type="constant" length="8B" value="RTSP/2.0"/>
+  <!-- Protocol version string for RTSP 2.0 -->
+
+  <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Carriage Return Line Feed marking end of request line -->
+
+  <field name="CSeq-Header-Name" type="constant" length="5B" value="CSeq:"/>
+  <!-- Header name for the mandatory CSeq sequence number -->
+
+  <field name="CSeq-SP" type="constant" length="1B" value="0x20"/>
+  <!-- Space after colon (per HCOLON definition) -->
+
+  <field name="CSeq-Number" type="variable" length="undefined" value="1*9DIGIT (0-9)"/>
+  <!-- Sequential number for request/response correlation; integer 1-999999999 -->
+
+  <field name="CRLF2" type="constant" length="2B" value="0x0D0A"/>
+  <!-- End of CSeq header line -->
+
+  <field name="Optional-Headers" type="variable" length="undefined" value="zero or more header lines (key: value CRLF)"/>
+  <!-- Additional headers (e.g., Session, User-Agent, Content-Type, Content-Length). 
+       Each header line follows the pattern: header-name ":" SWS header-value CRLF. 
+       This field may include multiple lines. -->
+
+  <field name="Header-Terminator" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Empty line (CRLF) separating headers from message body -->
+
+  <field name="Message-Body" type="variable" length="undefined" value="optional body (e.g., text/parameters)"/>
+  <!-- Optional message body; length is indicated by Content-Length header (if present). 
+       For SET_PARAMETER, body typically contains parameters in text/parameters format. 
+       This field is absent if no body is included. -->
+</message>
+  <message name="OPTIONS">
+    <!-- An RTSP OPTIONS request used to query the capabilities of a server, proxy, or resource. The method may be issued in either direction (client to server or server to client). -->
+
+    <field name="Method" type="constant" length="7B" value="OPTIONS"/>
+    <!-- Method token identifying the request as OPTIONS -->
+
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the method from the request URI -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="'*' or valid RTSP-REQ-URI (e.g., 'rtsp://host/path')"/>
+    <!-- The resource to which the OPTIONS request applies. An asterisk '*' indicates the next hop (proxy/server itself); otherwise an absolute RTSP URI. -->
+
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separating the request URI from the RTSP version -->
+
+    <field name="RTSP-Version" type="constant" length="8B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier string, must be exactly "RTSP/2.0" for this specification -->
+
+    <field name="RequestLineCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the request line -->
+
+    <field name="Headers" type="variable" length="undefined" value="Zero or more header lines each ending with CRLF, followed by an empty line (CRLF). Each header line: header-name HCOLON header-value CRLF. Mandatory headers include CSeq; optional headers include User-Agent, Supported, Proxy-Require, etc."/>
+    <!-- Block containing all request headers. The order is not significant but good practice is general headers first, then request headers. The block MUST end with an empty line (CRLF) to separate headers from the optional message body. The Content-Length header is required if a message body is present, but OPTIONS typically has no body. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Octets of message body data; length determined by Content-Length header. OPTIONS requests usually omit the body, but extension may define one."/>
+    <!-- Optional message body that follows the empty line after headers. For OPTIONS, a body is generally not present. If present, the Content-Type and Content-Length headers must be included in the Headers section. -->
+</message>
+  <message name="GET_PARAMETER">
+    <!-- RTSP request to retrieve the value of specified parameters for a presentation or stream. Can also be used for keep-alive without a body. -->
+
+    <field name="Method" type="constant" length="13B" value="GET_PARAMETER"/>
+    <!-- The method name, case-sensitive, indicating this is a GET_PARAMETER request -->
+
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between method and Request-URI -->
+
+    <field name="RequestURI" type="variable" length="undefined" value="UTF-8 characters; absolute URI (rtsp://... or rtsps://...) or asterisk '*'"/>
+    <!-- The resource URI the request applies to; must be an absolute URI as per RFC 7826 Section 7.1; can be '*' for server-wide requests -->
+
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between Request-URI and RTSP version -->
+
+    <field name="Version" type="constant" length="9B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier; currently RTSP/2.0 -->
+
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the request line -->
+
+    <field name="Headers" type="variable" length="undefined" value="Zero or more header lines, each formatted as 'Header-Name: value' terminated by CRLF; values may contain UTF-8 text and LWS (folding) per RFC 7826 Section 5.2; mandatory header: CSeq; optional: Session, Content-Length, Content-Type, etc."/>
+    <!-- Header section: general, request, and message-body headers. The order is not significant but CSeq is mandatory. Content-Length and Content-Type must be present if a message body follows. -->
+
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- An empty line (CRLF) indicating the end of headers and the start of the message body (if any). -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Optional octet stream; length determined by Content-Length header (if absent assumed zero). Content-Type header specifies the media type (e.g., text/parameters). For GET_PARAMETER, body lists requested parameters in text/parameters format or is empty for keep-alive."/>
+    <!-- Optional message body containing parameter requests or empty for keep-alive. When present, must include Content-Type and Content-Length headers. -->
+</message>
+  <message name="REDIRECT">
+    <!-- Server-to-client request to inform the client that the service will be terminated and to redirect to an alternative server (RFC 7826 Section 13.10) -->
+    <field name="Method" type="constant" length="7B" value="REDIRECT"/>
+    <!-- RTSP method name, always "REDIRECT" -->
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method from Request-URI -->
+    <field name="RequestURI" type="variable" length="undefined" value="RTSP-REQ-URI (absolute URI with scheme, host, port, path)"/>
+    <!-- Resource identifier to which the redirect applies (presentation or stream URI) -->
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating Request-URI from RTSP version -->
+    <field name="Version" type="constant" length="8B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier -->
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of request line -->
+    <field name="CSeqHeader" type="variable" length="undefined" value="CSeq: 1*9DIGIT CRLF"/>
+    <!-- Mandatory header: CSeq sequence number for request/response pairing -->
+    <field name="LocationHeader" type="variable" length="undefined" value="Location: RTSP-REQ-URI CRLF"/>
+    <!-- Mandatory header: absolute URI of the alternative server/resource the client should connect to -->
+    <field name="TerminateReasonHeader" type="variable" length="undefined" value="Terminate-Reason: TR-Info CRLF"/>
+    <!-- Mandatory header: reason for termination (e.g., Server-Admin, Session-Timeout, Internal-Error) with optional time and user-msg parameters -->
+    <field name="OptionalHeaders" type="variable" length="undefined" value="(Session, Date, User-Agent, etc.) each ending with CRLF"/>
+    <!-- Optional headers may include Session, Date, User-Agent, Require, Proxy-Require, etc. as per header tables. Each header line: header-name HCOLON header-value CRLF -->
+    <field name="EndOfHeaders" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) marking the end of the header section and beginning of message body (if present) -->
+    <field name="MessageBody" type="variable" length="undefined" value="optional; typically none for REDIRECT"/>
+    <!-- Message body is allowed only if Content-Type and Content-Length headers are present; REDIRECT usually has no body -->
+</message>
+  <message name="SETUP">
+    <!-- RTSP SETUP request message. Used to create a new RTSP session or change transport parameters of an existing session. The message consists of a request line, zero or more header lines, an empty line, and an optional message body. -->
+
+    <field name="Method" type="constant" length="3B" value="SETUP"/>
+    <!-- The method name indicating a session setup request. Constant uppercase token. -->
+
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method from request URI. -->
+
+    <field name="Request-URI" type="variable" length="undefined" value="RTSP-REQ-URI (absolute URI with scheme rtsp/rtsps, or asterisk)"/>
+    <!-- Absolute RTSP URI identifying the media resource (or stream) to set up. Must include scheme, host, port, and path. Asterisk allowed only for non-resource-specific requests (e.g., OPTIONS). -->
+
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating request URI from protocol version. -->
+
+    <field name="RTSP-Version" type="constant" length="8B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier. Constant string "RTSP/2.0". -->
+
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End-of-line marker after the request line. -->
+
+    <field name="Headers" type="variable" length="undefined" value="zero or more header lines: (header-name ':' SWS header-value CRLF)"/>
+    <!-- Sequence of header fields. Each header line ends with CRLF. Mandatory headers include CSeq (sequence number), Accept-Ranges (range format support), and Transport (transport parameters). Other headers (e.g., Require, Session, Blocksize, User-Agent) are optional. The order of headers is not significant. Header names are case-insensitive tokens, values may be folded. -->
+
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF with nothing preceding) indicating the end of the header section. In the message stream, this appears as a line with only a CRLF, i.e., two consecutive CRLF sequences if the previous line is a header. -->
+
+    <field name="MessageBody" type="variable" length="0" value="optional; length determined by Content-Length header (decimal octets)"/>
+    <!-- Optional message body. Present only if the request includes a non-empty body (e.g., for SET_PARAMETER or DESCRIBE). The length is given by the Content-Length header (mandatory when body present). Body data may be binary or text. -->
+</message>
+  <message name="PLAY">
+    <!-- Request from client to server to start media delivery. Mandatory headers: CSeq and Session. Optional headers like Range, Scale, Speed, Seek-Style may follow. -->
+    <field name="Method" type="constant" length="3B" value="PLAY"/>
+    <!-- RTSP method indicating a play request -->
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separates method from request URI -->
+    <field name="RequestURI" type="variable" length="undefined" value="RTSP-REQ-URI (rtsp:// URI or '*')"/>
+    <!-- Absolute RTSP URI identifying the media resource or presentation; an asterisk '*' is allowed for server-wide requests but unusual for PLAY -->
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separates request URI from protocol version -->
+    <field name="RTSPVersion" type="constant" length="8B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier -->
+    <field name="CRLF_RL" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed terminating the request line -->
+    <field name="CSeqHeaderName" type="constant" length="5B" value="CSeq:"/>
+    <!-- Header name for the sequence number; MUST be present in all requests -->
+    <field name="SWSAfterCSeqName" type="constant" length="1B" value="0x20"/>
+    <!-- Optional whitespace after colon (here modeled as a single space) -->
+    <field name="CSeqValue" type="variable" length="undefined" value="1*9DIGIT"/>
+    <!-- Integer sequence number uniquely identifying this request/response pair; must be incremented for each new request -->
+    <field name="CRLF_CSeq" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of CSeq header line -->
+    <field name="SessionHeaderName" type="constant" length="8B" value="Session:"/>
+    <!-- Header name for the session identifier; MUST be present in PLAY requests -->
+    <field name="SWSAfterSessionName" type="constant" length="1B" value="0x20"/>
+    <!-- Optional whitespace -->
+    <field name="SessionID" type="variable" length="undefined" value="1*256(ALPHA / DIGIT / safe)"/>
+    <!-- Session identifier as returned by the server in the SETUP response -->
+    <field name="OptionalSessionParams" type="variable" length="undefined" value="[;timeout=delta-seconds]"/>
+    <!-- Optional timeout parameter; may be omitted or may not be present in request (usually present only in responses) -->
+    <field name="CRLF_Session" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End of Session header line -->
+    <!-- Additional optional headers may follow (e.g., Range, Scale, Speed, Seek-Style, User-Agent). They are not modeled individually due to variable order and presence. -->
+    <!-- The header section ends with an empty line (CRLF). -->
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) indicating end of headers; no message body is allowed in a PLAY request per specification -->
+</message>
+  <message name="PAUSE">
+  <!-- The PAUSE request causes the stream delivery to immediately be interrupted (halted). -->
+  <field name="Method" type="constant" length="4B" value="PAUSE"/>
+  <!-- RTSP method name for pausing the stream. -->
+  <field name="Space1" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separator between method and Request-URI. -->
+  <field name="RequestURI" type="variable" length="undefined" value="RTSP-URI"/>
+  <!-- Absolute RTSP URI identifying the presentation or stream to pause. Must be an aggregated control URI for aggregated sessions. -->
+  <field name="Space2" type="constant" length="1B" value="0x20"/>
+  <!-- Single space separator between Request-URI and RTSP version. -->
+  <field name="Version" type="constant" length="8B" value="RTSP/2.0"/>
+  <!-- RTSP version identifier fixed as "RTSP/2.0". -->
+  <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Carriage Return and Line Feed ending the request line. -->
+  <field name="CSeqHeader" type="variable" length="undefined" value="CSeq: 1*9DIGIT"/>
+  <!-- CSeq general-header field: mandatory sequence number for the request/response pair. Value is a positive integer. -->
+  <field name="CRLF2" type="constant" length="2B" value="0x0D0A"/>
+  <!-- End of CSeq header line. -->
+  <field name="SessionHeader" type="variable" length="undefined" value="Session: 1*256(ALPHA / DIGIT / safe) [; timeout=delta-seconds]"/>
+  <!-- Session general-header field: mandatory for PAUSE requests. Identifies the RTSP session. Optionally includes a timeout parameter. -->
+  <field name="CRLF3" type="constant" length="2B" value="0x0D0A"/>
+  <!-- End of Session header line. -->
+  <field name="OptionalHeaders" type="variable" length="undefined" value="other header fields as per RTSP specification"/>
+  <!-- Zero or more additional header lines (e.g., User-Agent, Require, Date, etc.). Each line follows the format: header-name ":" header-value CRLF. The exact set is optional; receivers must ignore unknown headers. -->
+  <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+  <!-- Empty line (CRLF) marking the end of headers and indicating no message body (PAUSE request carries no body). -->
+</message>
+  <message name="TEARDOWN">
+    <!-- TEARDOWN request: stops stream delivery and frees resources. Client to server. -->
+
+    <field name="Method" type="constant" length="3B" value="TEARDOWN"/>
+    <!-- RTSP method name, indicates resource teardown. -->
+
+    <field name="Space_After_Method" type="constant" length="1B" value="0x20"/>
+    <!-- Space separator between method and Request-URI. -->
+
+    <field name="Request_URI" type="variable" length="undefined" value="RTSP-REQ-URI (absolute URI or '*')"/>
+    <!-- Resource to teardown: aggregated control URI or media stream URI. -->
+
+    <field name="Space_After_URI" type="constant" length="1B" value="0x20"/>
+    <!-- Space separator between Request-URI and RTSP version. -->
+
+    <field name="RTSP_Version" type="constant" length="9B" value="RTSP/2.0"/>
+    <!-- Protocol version identifier. -->
+
+    <field name="CRLF_After_Version" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return + Line Feed ending the request line. -->
+
+    <field name="Headers" type="variable" length="undefined" value="RTSP header fields per RFC 7826 Section 20.2.2; includes mandatory CSeq and Session headers; each header line terminated by CRLF"/>
+    <!-- Zero or more header lines (general, request, or message‑body headers). Must include CSeq (sequence number) and Session (session identifier). -->
+
+    <field name="Empty_Line" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) indicating end of header section. -->
+
+    <field name="Message_Body" type="variable" length="undefined" value="If present, length indicated by Content‑Length header; typically absent for TEARDOWN"/>
+    <!-- Optional message body. TEARDOWN requests usually have no body. -->
+</message>
+</ir>

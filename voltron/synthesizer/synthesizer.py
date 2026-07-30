@@ -61,6 +61,12 @@ class AsyncProducer:
         self.checker_path = self.synthesizer_path / 'checkers'
         self.observer_path = self.synthesizer_path / 'observers'
         self.legacy_observer_path = self.synthesizer_path / 'hashers'
+        self.best_equipment_path = configs.models_path / 'best_equipment'
+        self.best_generator_path = self.best_equipment_path / 'generators'
+        self.best_parser_path = self.best_equipment_path / 'parser.py'
+        self.best_equipment_info_path = (
+            self.best_equipment_path / 'best_equipment.json'
+        )
         self.info_path = configs.info_path
         
         self.generator_info_path = self.generator_path / 'generator_info.json'
@@ -95,6 +101,8 @@ class AsyncProducer:
         self.checkers: dict[str, list[Checker]] = {}
         self.observers: dict[str, list[ResponseObserver]] = {}
         self.mutators: dict[str, list[Generator]] = {}
+        self.best_generators: dict[str, Generator] = {}
+        self.best_parser_info: dict = {}
         self._response_sections = None
         self._ir_evolution_rounds: dict[str, int] = {}
             
@@ -162,6 +170,8 @@ class AsyncProducer:
             except Exception as e:
                 logger.debug(f'Mutator: load error {e}')
 
+        self.load_best_equipment()
+
         if not configs.spec_knowledge:
             self.generators = {
                 msg_type: generators[:1]
@@ -180,6 +190,114 @@ class AsyncProducer:
                 if observers
             }
             self.mutators = {}
+
+    def capture_current_equipment(
+        self,
+        parser: Parser | None = None,
+    ) -> tuple[dict[str, Generator], Parser]:
+        """Capture the equipment versions used by the current hypothesis."""
+        generators = {
+            msg_type: Generator(**asdict(versions[-1]))
+            for msg_type, versions in self.generators.items()
+            if versions
+        }
+        selected_parser = parser or self.parsers[-1]
+        return generators, Parser(**asdict(selected_parser))
+
+    def save_best_equipment(
+        self,
+        model_id: str,
+        generators: dict[str, Generator],
+        parser: Parser,
+    ) -> None:
+        """Persist the generator/parser set associated with the best model."""
+        self.best_generator_path.mkdir(parents=True, exist_ok=True)
+        saved_generators: dict[str, Generator] = {}
+
+        for msg_type, generator in generators.items():
+            source_path = Path(generator.path)
+            if not source_path.is_file():
+                source_path = (
+                    self.generator_path
+                    / msg_type
+                    / f'{generator.name}.py'
+                )
+            snapshot_path = (
+                self.best_generator_path
+                / f'{quote(msg_type, safe="._-")}.py'
+            )
+            snapshot_path.write_text(
+                source_path.read_text(encoding='utf-8'),
+                encoding='utf-8',
+            )
+            saved_generators[msg_type] = Generator(
+                msg_type=generator.msg_type,
+                evolved_from=generator.evolved_from,
+                name=generator.name,
+                path=str(snapshot_path.resolve()),
+                cur_res=list(generator.cur_res),
+                pre_res=list(generator.pre_res),
+                fut_res=list(generator.fut_res),
+                was_used=generator.was_used,
+                broken=generator.broken,
+            )
+
+        parser_source_path = self.parser_path / f'{parser.name}.py'
+        self.best_parser_path.write_text(
+            parser_source_path.read_text(encoding='utf-8'),
+            encoding='utf-8',
+        )
+        parser_info = {
+            **asdict(parser),
+            'path': str(self.best_parser_path.resolve()),
+        }
+        manifest = {
+            'model_id': str(model_id),
+            'selection_metric': 'max_response_transition_types',
+            'generators': {
+                msg_type: asdict(generator)
+                for msg_type, generator in saved_generators.items()
+            },
+            'parser': parser_info,
+        }
+        self.best_equipment_info_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False) + '\n',
+            encoding='utf-8',
+        )
+        self.best_generators = saved_generators
+        self.best_parser_info = parser_info
+        logger.debug(
+            f'Producer: saved best equipment for model {model_id}'
+        )
+
+    def load_best_equipment(self) -> None:
+        """Load a previously saved best-equipment snapshot when available."""
+        self.best_generators = {}
+        self.best_parser_info = {}
+        if not self.best_equipment_info_path.is_file():
+            return
+
+        try:
+            manifest = json.loads(
+                self.best_equipment_info_path.read_text(encoding='utf-8')
+            )
+            for msg_type, info in manifest.get('generators', {}).items():
+                generator = Generator(**info)
+                if Path(generator.path).is_file():
+                    self.best_generators[msg_type] = generator
+
+            parser_info = manifest.get('parser', {})
+            parser_path = parser_info.get('path', '')
+            if parser_path and Path(parser_path).is_file():
+                self.best_parser_info = parser_info
+            logger.debug(
+                'Producer: loaded best equipment for model '
+                f'{manifest.get("model_id", "")}'
+            )
+        except Exception:
+            self.best_generators = {}
+            self.best_parser_info = {}
+            logger.exception('Producer: failed to load best equipment')
 
     def _load_checkers(self) -> None:
         """Load or synthesize response checkers outside replay mode."""
@@ -459,7 +577,10 @@ class AsyncProducer:
             doc_info: the document information to be used for mutator evolution
             req_res: the actual response for each request message, which provides the information for mutator evolution
         """
-        old_m = self.generators[msg_type][-1]
+        best_generators = getattr(self, 'best_generators', {})
+        old_m = best_generators.get(msg_type)
+        if old_m is None:
+            old_m = self.generators[msg_type][-1]
         old_m_path = old_m.path
         old_code = ''
         with open(old_m_path, 'r', encoding='utf-8') as f:
