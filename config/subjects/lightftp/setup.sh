@@ -1,5 +1,7 @@
 #!/bin/bash
 
-rm -rf ~/ftpshare/*
+set -euo pipefail
 
-rm ~/fftplog
+mkdir -p /home/ubuntu/ftpshare
+rm -f /home/ubuntu/fftplog
+: > /home/ubuntu/fftplog

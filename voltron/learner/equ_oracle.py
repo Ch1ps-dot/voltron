@@ -21,6 +21,7 @@ class EquOracle:
         generators = self.mapper.select_generators(word)
         flag, cons = self.executor.interact(generators)
         if (flag and cons):
+            self.executor.save_cons(cons)
             return cons.content
 
     def compare_mealy(
