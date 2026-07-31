@@ -4,6 +4,7 @@ from voltron.executor.executor import Executor, Conversation
 from voltron.analyzer.analyzer import analyzer
 from voltron.learner.automata import MealyMachine
 from voltron.configs import configs
+from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from voltron.utils.logger import logger_fuzz as logger
 from typing import TypedDict
 import base64, json, random, time, threading, os, math
@@ -45,13 +46,14 @@ class Berserker:
         machine: MealyMachine | None,
         use_guidance: bool = True,
     ) -> None:
-        self.unique_resp: set[str] = set()
+        self.seed_retention = SeedRetentionPolicy()
+        self.unique_resp = self.seed_retention.unique_responses
         self.max_unique_resp_num = 0
         self.unique_resp_trans: set[str] = set()
         self.useful_msg: list[tuple[str, bytes]] = []
         self.useful_seq: list[list[tuple[str, bytes]]] = []
         self.max_seq_len = 0
-        self.seen_req_res_pairs: set[tuple[str, str]] = set()
+        self.seen_req_res_pairs = self.seed_retention.seen_request_response_pairs
         self._req_res_pair_next_id = 0
 
         self.mapper = mapper
@@ -127,6 +129,22 @@ class Berserker:
                 }
                 for state_id, state in access_sequences.items()
             }
+
+    @property
+    def max_seq_len(self) -> int:
+        return self.seed_retention.max_sequence_length
+
+    @max_seq_len.setter
+    def max_seq_len(self, value: int) -> None:
+        self.seed_retention.max_sequence_length = value
+
+    @property
+    def max_unique_resp_num(self) -> int:
+        return self.seed_retention.max_unique_response_count
+
+    @max_unique_resp_num.setter
+    def max_unique_resp_num(self, value: int) -> None:
+        self.seed_retention.max_unique_response_count = value
 
     def _machine_state_after(
         self,
@@ -477,76 +495,45 @@ class Berserker:
             trans_inc: The increment in the number of response transitions observed compared to the last interaction
             type_inc: The increment in the number of unique response types observed compared to the last interaction
         """
-        seq = []
-        req_res_inc = 0
-        for i in range(len(cons.res_seq)):
-            if i >= len(cons.req_seq):
-                logger.debug(
-                    f'Berserker: incomplete conversation state at index {i}'
-                )
-                continue
+        novelty = self.seed_retention.observe(cons, trans_inc, type_inc)
+        self.max_seq_len = self.seed_retention.max_sequence_length
+        self.max_unique_resp_num = (
+            self.seed_retention.max_unique_response_count
+        )
 
-            req = cons.req_seq[i]
-            res = cons.res_seq[i]
-            if req == '-' or res == '-':
-                continue
-            
-            if res in {'TIMEOUT', 'CRASH', 'CLOSED', 'POLLERR'}:
-                break
-
-            content = cons.content[i] if i < len(cons.content) else None
-            if content is not None:
-                request, response = content
-                relation = (req, res)
-                if (
-                    request
-                    and response
-                    and relation not in self.seen_req_res_pairs
-                ):
-                    self.seen_req_res_pairs.add(relation)
-                    req_res_inc += 1
-                    self.save_request_response_pair(
-                        req,
-                        res,
-                        request,
-                        response,
-                    )
-            
-            if res not in self.unique_resp:
-                self.unique_resp.add(res)
-                if content is not None:
-                    self.useful_msg.append((req, content[0]))
-                    seq = []
-                    prefix_length = min(
-                        i + 1,
-                        len(cons.req_seq),
-                        len(cons.content),
-                    )
-                    for j in range(prefix_length):
-                        if cons.req_seq[j] != '-':
-                            seq.append(
-                                (cons.req_seq[j], cons.content[j][0])
-                            )
-                    self.useful_seq.append(seq)
-            
-            response_types = self.req_res.setdefault(req, set())
-            response_types.add(res)
-            
-        seq_len = len(cons.res_seq)
-        unique_res_num = len(set(cons.res_seq))
-        unique_res_inc = unique_res_num - self.max_unique_resp_num
-            
-        len_inc = seq_len - self.max_seq_len
-        self.max_seq_len = max(seq_len, self.max_seq_len)
-        self.max_unique_resp_num = max(unique_res_num, self.max_unique_resp_num)
-        
-        if self.is_interesting(
-            trans_inc,
-            type_inc,
-            len_inc,
-            unique_res_inc,
-            req_res_inc,
+        for request_type, response_type, request, response in (
+            novelty.new_request_response_pairs
         ):
+            self.save_request_response_pair(
+                request_type,
+                response_type,
+                request,
+                response,
+            )
+
+        for index, _response_type in novelty.new_responses:
+            content = cons.content[index] if index < len(cons.content) else None
+            if content is None or index >= len(cons.req_seq):
+                continue
+            request_type = cons.req_seq[index]
+            self.useful_msg.append((request_type, content[0]))
+            sequence = []
+            prefix_length = min(index + 1, len(cons.req_seq), len(cons.content))
+            for prefix_index in range(prefix_length):
+                if cons.req_seq[prefix_index] != '-':
+                    sequence.append(
+                        (cons.req_seq[prefix_index], cons.content[prefix_index][0])
+                    )
+            self.useful_seq.append(sequence)
+
+        for request_type, response_type in novelty.request_response_relations:
+            response_types = self.req_res.setdefault(request_type, set())
+            response_types.add(response_type)
+
+        if novelty.interesting:
+            with analyzer.lock:
+                analyzer.useful_cons += 1
+            logger.debug('Berserker: interesting conversation')
             self.exe.save_cons(cons)
         # seq = []
         # if len(cons.res_seq) > self.max_seq_len:
@@ -668,12 +655,12 @@ class Berserker:
             req_res_inc: The number of newly observed request-response type
                 relations in the current conversation.
         """
-        if (
-            trans_inc > 0
-            or type_inc > 0
-            or len_inc > 0
-            or unique_res_inc > 0
-            or req_res_inc > 0
+        if SeedRetentionPolicy.is_interesting(
+            trans_inc,
+            type_inc,
+            len_inc,
+            unique_res_inc,
+            req_res_inc,
         ):
             with analyzer.lock:
                 analyzer.useful_cons += 1
