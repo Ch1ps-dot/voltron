@@ -16,6 +16,7 @@ from voltron.analyzer.analyzer import analyzer
 
 from voltron.executor.mapper import Mapper
 from voltron.scheduler.berserker import Berserker
+from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
@@ -335,8 +336,17 @@ class Fuzzer:
                 )
                 model_phase_status = 'completed'
                 try:
-                    mq = MembershipOracle(mapper=self.mapper, executor=self.exe)
-                    eq = EquOracle(mapper=self.mapper, executor=self.exe)
+                    model_learning_seed_retention = SeedRetentionPolicy()
+                    mq = MembershipOracle(
+                        mapper=self.mapper,
+                        executor=self.exe,
+                        seed_retention=model_learning_seed_retention,
+                    )
+                    eq = EquOracle(
+                        mapper=self.mapper,
+                        executor=self.exe,
+                        seed_retention=model_learning_seed_retention,
+                    )
                     h_path = configs.models_path / 'evolved_hypothesis.pkl'
                     if h_path.is_file():
                         with open(h_path, 'rb') as f:

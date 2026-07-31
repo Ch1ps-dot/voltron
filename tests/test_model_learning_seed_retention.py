@@ -5,6 +5,7 @@ from voltron.executor.conversation import Conversation
 from voltron.executor.executor import Executor
 from voltron.learner.equ_oracle import EquOracle
 from voltron.learner.mem_oracle import MembershipOracle
+from voltron.scheduler.seed_retention import SeedRetentionPolicy
 
 
 def make_conversation(request: bytes = b'PING\r\n') -> Conversation:
@@ -14,7 +15,7 @@ def make_conversation(request: bytes = b'PING\r\n') -> Conversation:
     return conversation
 
 
-def test_model_learning_retains_each_valid_conversation_as_a_seed():
+def test_model_learning_retains_only_interesting_conversations_as_seeds():
     conversation = make_conversation()
 
     class Mapper:
@@ -37,6 +38,8 @@ def test_model_learning_retains_each_valid_conversation_as_a_seed():
     executor = ExecutorStub()
     oracle = MembershipOracle(Mapper(), executor)
 
+    assert oracle.query(('PING',)) == ['PONG']
+    assert executor.saved == [conversation]
     assert oracle.query(('PING',)) == ['PONG']
     assert executor.saved == [conversation]
 
@@ -63,6 +66,36 @@ def test_equivalence_queries_also_retain_valid_model_learning_seeds():
     oracle = EquOracle(Mapper(), executor)
 
     assert oracle.query(['PING']) == [(b'PING\r\n', b'PONG\r\n')]
+    assert executor.saved == [conversation]
+
+
+def test_membership_and_equivalence_share_model_learning_novelty_state():
+    conversation = make_conversation()
+
+    class Mapper:
+        request_types = {'PING'}
+
+        def select_generators(self, *_args, **_kwargs):
+            return [('PING', b'PING\r\n')]
+
+    class ExecutorStub:
+        def __init__(self):
+            self.saved = []
+
+        def interact(self, _messages):
+            return True, conversation
+
+        def save_cons(self, saved_conversation):
+            self.saved.append(saved_conversation)
+            return True
+
+    executor = ExecutorStub()
+    retention = SeedRetentionPolicy()
+    membership = MembershipOracle(Mapper(), executor, retention)
+    equivalence = EquOracle(Mapper(), executor, retention)
+
+    assert membership.query(('PING',)) == ['PONG']
+    assert equivalence.query(['PING']) == [(b'PING\r\n', b'PONG\r\n')]
     assert executor.saved == [conversation]
 
 

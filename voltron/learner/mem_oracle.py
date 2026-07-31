@@ -1,6 +1,8 @@
 from voltron.executor.executor import Executor
 from voltron.executor.conversation import Conversation
 from voltron.executor.mapper import Mapper
+from voltron.analyzer.analyzer import analyzer
+from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 import pprint
@@ -16,11 +18,13 @@ class MembershipOracle:
     def __init__(
         self,
         mapper: Mapper,
-        executor: Executor
+        executor: Executor,
+        seed_retention: SeedRetentionPolicy | None = None,
     ) -> None:
         self.mapper = mapper
         self.executor = executor
         self.alphabet = list(mapper.request_types)
+        self.seed_retention = seed_retention or SeedRetentionPolicy()
     
     def query(
         self, 
@@ -28,9 +32,25 @@ class MembershipOracle:
     ) -> list[str] | None:
         for i in range(3):
             msg_seq = self.mapper.select_generators(list(word), cache_mode=True, select_mode='new')
+            with analyzer.lock:
+                previous_response_types = analyzer.res_types_num()
+                previous_transitions = analyzer.resp_trans_num()
             flag, cons = self.executor.interact(msg_seq)
             if (flag and cons):
-                self.executor.save_cons(cons)
+                with analyzer.lock:
+                    response_type_increment = (
+                        analyzer.res_types_num() - previous_response_types
+                    )
+                    transition_increment = (
+                        analyzer.resp_trans_num() - previous_transitions
+                    )
+                novelty = self.seed_retention.observe(
+                    cons,
+                    transition_increment,
+                    response_type_increment,
+                )
+                if novelty.interesting:
+                    self.executor.save_cons(cons)
                 logger.debug(f'sent seq -> {cons.req_seq}')
                 logger.debug(f'recv seq <- {cons.res_seq}')
                 return cons.res_seq

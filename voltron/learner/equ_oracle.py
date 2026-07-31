@@ -1,6 +1,8 @@
 from voltron.executor.executor import Executor
 from voltron.executor.mapper import Mapper
+from voltron.analyzer.analyzer import analyzer
 from voltron.learner.automata import MealyMachine
+from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from collections import deque
 
 class EquOracle:
@@ -9,19 +11,37 @@ class EquOracle:
     def __init__(
         self,
         mapper: Mapper,
-        executor: Executor
+        executor: Executor,
+        seed_retention: SeedRetentionPolicy | None = None,
     ) -> None:
         self.mapper = mapper
         self.executor = executor
+        self.seed_retention = seed_retention or SeedRetentionPolicy()
     
     def query(
         self, 
         word: list[str]
     ):
         generators = self.mapper.select_generators(word)
+        with analyzer.lock:
+            previous_response_types = analyzer.res_types_num()
+            previous_transitions = analyzer.resp_trans_num()
         flag, cons = self.executor.interact(generators)
         if (flag and cons):
-            self.executor.save_cons(cons)
+            with analyzer.lock:
+                response_type_increment = (
+                    analyzer.res_types_num() - previous_response_types
+                )
+                transition_increment = (
+                    analyzer.resp_trans_num() - previous_transitions
+                )
+            novelty = self.seed_retention.observe(
+                cons,
+                transition_increment,
+                response_type_increment,
+            )
+            if novelty.interesting:
+                self.executor.save_cons(cons)
             return cons.content
 
     def compare_mealy(
