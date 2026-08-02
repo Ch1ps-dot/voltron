@@ -8,9 +8,13 @@ from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 from voltron.configs import configs
 import multiprocessing as mp
+import base64
+import hashlib
+import json
+import time
 import traceback
 from voltron.utils.logger import logger_fuzz as logger
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import threading
 from urllib.parse import quote
 
@@ -19,6 +23,17 @@ from pathlib import Path
 
 EXEC_TIMEOUT_S = 3.0
 EXEC_RETRY_LIMIT = 3
+
+
+@dataclass(frozen=True)
+class DynamicExecutionResult:
+    status: str
+    value: object | None = None
+    error: str = ''
+
+
+class RuntimeComponentRepairError(RuntimeError):
+    """A required generated component could not be repaired or rolled back."""
 
 
 def _dynamic_code_worker(
@@ -107,6 +122,13 @@ class Mapper:
         self._dynamic_conn = None
         self._dynamic_proc = None
         self._dynamic_lock = threading.Lock()
+        self._runtime_repair_lock = threading.RLock()
+        self._runtime_manifest_lock = threading.Lock()
+        self._runtime_repair_cache: dict[
+            tuple[str, str, str], tuple[object, str] | None
+        ] = {}
+        self._quarantined_components: set[tuple[str, str, str]] = set()
+        self._last_known_good: dict[tuple[str, str], object] = {}
         
         self.cur_parser: Parser  = self.equip_parser()
         
@@ -325,20 +347,30 @@ class Mapper:
         req_type: str,
         mode: str = 'new'
     ) -> Generator:
+        versions = self.generators[req_type]
         if mode == 'new':
-            return self.generators[req_type][-1]
-        else:
-            return self.generators[req_type][0]
+            for generator in reversed(versions):
+                if not self._component_quarantined(
+                    'generator', req_type, generator.name
+                ):
+                    return generator
+            return versions[0]
+        return versions[0]
         
     def select_mutator(
         self,
         req_type: str,
         mode: str = 'new'
     ) -> Generator:
+        versions = self.mutators[req_type]
         if mode == 'new':
-            return self.mutators[req_type][-1]
-        else:
-            return self.mutators[req_type][0]
+            for mutator in reversed(versions):
+                if not self._component_quarantined(
+                    'mutator', req_type, mutator.name
+                ):
+                    return mutator
+            return versions[0]
+        return versions[0]
     
     def exe_generator(
         self,
@@ -347,10 +379,12 @@ class Mapper:
         try:
             with open(self.g_path(g), 'r', encoding='utf-8') as f:
                 code = f.read()
-                msg = self._run_dynamic_code(code, 'generate')
-                if msg is not None:
-                    g.was_used += 1
-                return msg
+            msg = self._execute_message_component(
+                'generator', g.msg_type, g, code, 'generate'
+            )
+            if msg is not None:
+                g.was_used += 1
+            return msg
         except Exception:
             logger.exception('Mapper: generator execution failed')
             return None
@@ -362,10 +396,234 @@ class Mapper:
         try:
             with open(self.m_path(m), 'r', encoding='utf-8') as f:
                 code = f.read()
-                return self._run_dynamic_code(code, 'mutate')
+            return self._execute_message_component(
+                'mutator', m.msg_type, m, code, 'mutate'
+            )
         except Exception:
             logger.exception('Mapper: mutator execution failed')
             return None
+
+    def _runtime_state(self) -> None:
+        if not hasattr(self, '_runtime_repair_lock'):
+            self._runtime_repair_lock = threading.RLock()
+        if not hasattr(self, '_runtime_manifest_lock'):
+            self._runtime_manifest_lock = threading.Lock()
+        if not hasattr(self, '_runtime_repair_cache'):
+            self._runtime_repair_cache = {}
+        if not hasattr(self, '_quarantined_components'):
+            self._quarantined_components = set()
+        if not hasattr(self, '_last_known_good'):
+            self._last_known_good = {}
+
+    def _component_quarantined(
+        self,
+        component: str,
+        component_type: str,
+        version: str,
+    ) -> bool:
+        self._runtime_state()
+        return (component, component_type, version) in self._quarantined_components
+
+    @staticmethod
+    def _valid_generated_message(value: object) -> bool:
+        return (
+            isinstance(value, bytes)
+            and bool(value)
+            and len(value) <= getattr(
+                configs, 'generated_message_max_bytes', 1024 * 1024
+            )
+        )
+
+    def _execute_message_component(
+        self,
+        component: str,
+        component_type: str,
+        metadata: Generator,
+        code: str,
+        function_name: str,
+    ) -> bytes | None:
+        self._runtime_state()
+        result = self._run_dynamic_code_result(code, function_name)
+        if result.status == 'ok' and self._valid_generated_message(result.value):
+            self._last_known_good[(component, component_type)] = metadata
+            return result.value
+
+        error = result.error
+        if not error:
+            error = (
+                'invalid_return: expected non-empty bytes no larger than '
+                f'{getattr(configs, "generated_message_max_bytes", 1024 * 1024)}; '
+                f'got {type(result.value).__name__}'
+            )
+        repaired = self.repair_runtime_component(
+            component=component,
+            component_type=component_type,
+            version=metadata.name,
+            source_code=code,
+            error=error,
+        )
+        if repaired is not None:
+            repaired_metadata, repaired_code = repaired
+            replay = self._run_dynamic_code_result(
+                repaired_code,
+                function_name,
+            )
+            if replay.status == 'ok' and self._valid_generated_message(
+                replay.value
+            ):
+                self._last_known_good[(component, component_type)] = (
+                    repaired_metadata
+                )
+                return replay.value
+
+        fallback = self._last_known_good.get((component, component_type))
+        if fallback is None or fallback is metadata:
+            return None
+        try:
+            path = (
+                self.g_path(fallback)
+                if component == 'generator'
+                else self.m_path(fallback)
+            )
+            fallback_code = path.read_text(encoding='utf-8')
+            fallback_result = self._run_dynamic_code_result(
+                fallback_code,
+                function_name,
+            )
+            if (
+                fallback_result.status == 'ok'
+                and self._valid_generated_message(fallback_result.value)
+            ):
+                return fallback_result.value
+        except Exception:
+            logger.exception(
+                'Mapper: last-known-good %s fallback failed [%s]',
+                component,
+                component_type,
+            )
+        return None
+
+    @staticmethod
+    def _runtime_input_record(runtime_input: bytes | None) -> dict | None:
+        if runtime_input is None:
+            return None
+        sample = runtime_input[:4096]
+        return {
+            'length': len(runtime_input),
+            'sha256': hashlib.sha256(runtime_input).hexdigest(),
+            'truncated': len(sample) < len(runtime_input),
+            'base64': base64.b64encode(sample).decode('ascii'),
+            'repr': repr(sample),
+        }
+
+    def _append_runtime_record(self, filename: str, record: dict) -> None:
+        try:
+            path = configs.results_path / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with self._runtime_manifest_lock:
+                with path.open('a', encoding='utf-8') as stream:
+                    json.dump(record, stream, ensure_ascii=False)
+                    stream.write('\n')
+        except Exception:
+            logger.exception('Mapper: runtime component manifest write failed')
+
+    def repair_runtime_component(
+        self,
+        component: str,
+        component_type: str,
+        version: str,
+        source_code: str,
+        error: str,
+        runtime_input: bytes | None = None,
+    ) -> tuple[object, str] | None:
+        """Deduplicate a runtime repair and record its complete evidence."""
+        self._runtime_state()
+        source_sha = hashlib.sha256(source_code.encode('utf-8')).hexdigest()
+        normalized_error = error.strip().splitlines()[0][:500]
+        fingerprint = hashlib.sha256(
+            f'{component}\0{source_sha}\0{normalized_error}'.encode('utf-8')
+        ).hexdigest()
+        key = (component, source_sha, fingerprint)
+        failure_record = {
+            'timestamp': time.time(),
+            'kind': 'runtime_contract_failure',
+            'component': component,
+            'component_type': component_type,
+            'component_version': version,
+            'source_sha256': source_sha,
+            'phase': getattr(analyzer, 'stage', ''),
+            'error': error[:12000],
+            'error_fingerprint': fingerprint,
+            'input': self._runtime_input_record(runtime_input),
+            'contract': {
+                'parser': 'bytes -> bytes (non-empty for triggering input)',
+                'generator': '() -> non-empty bytes',
+                'mutator': '() -> non-empty bytes',
+                'checker': 'bytes -> bool',
+                'observer': 'bytes -> lowercase sha256',
+            }.get(component, ''),
+        }
+        self._append_runtime_record(
+            'component_runtime_failures.jsonl', failure_record
+        )
+        self._quarantined_components.add(
+            (component, component_type, version)
+        )
+
+        with self._runtime_repair_lock:
+            if key in self._runtime_repair_cache:
+                return self._runtime_repair_cache[key]
+            repair = getattr(
+                self.producer, 'repair_runtime_component', None
+            )
+            result = None
+            repair_error = ''
+            started = time.monotonic()
+            try:
+                if not callable(repair):
+                    raise RuntimeError(
+                        'producer does not support runtime component repair'
+                    )
+                error_with_evidence = (
+                    f'{error}\nRuntime trigger evidence: '
+                    f'{json.dumps(failure_record["input"], ensure_ascii=False)}'
+                )
+                result = repair(
+                    component=component,
+                    component_type=component_type,
+                    source_code=source_code,
+                    error=error_with_evidence,
+                    runtime_input=runtime_input,
+                )
+            except Exception as exception:
+                repair_error = f'{type(exception).__name__}: {exception}'
+                logger.exception(
+                    'Mapper: runtime %s repair failed [%s]',
+                    component,
+                    component_type,
+                )
+            self._runtime_repair_cache[key] = result
+            repair_record = {
+                'timestamp': time.time(),
+                'component': component,
+                'component_type': component_type,
+                'failed_version': version,
+                'source_sha256': source_sha,
+                'error_fingerprint': fingerprint,
+                'status': 'published' if result is not None else 'failed',
+                'replacement_version': (
+                    getattr(result[0], 'name', '') if result is not None else ''
+                ),
+                'attempts': getattr(
+                    self.producer, '_last_runtime_repair_attempts', 0
+                ),
+                'duration_s': time.monotonic() - started,
+                'error': repair_error,
+            }
+            self._append_runtime_record(
+                'component_repairs.jsonl', repair_record
+            )
+            return result
 
     def _run_dynamic_code(
         self,
@@ -373,46 +631,73 @@ class Mapper:
         func_name: str,
         args: tuple = (),
     ) -> object | None:
+        result = self._run_dynamic_code_result(code, func_name, args)
+        return result.value if result.status == 'ok' else None
+
+    def _run_dynamic_code_result(
+        self,
+        code: str,
+        func_name: str,
+        args: tuple = (),
+    ) -> DynamicExecutionResult:
         with self._dynamic_lock:
             if not self._ensure_dynamic_worker():
                 logger.debug(f'Executor: {func_name} worker setup failed')
-                return None
+                return DynamicExecutionResult(
+                    'worker_error', error='dynamic worker setup failed'
+                )
 
             conn = self._dynamic_conn
             if conn is None:
                 logger.debug(f'Executor: {func_name} worker connection missing')
-                return None
+                return DynamicExecutionResult(
+                    'worker_error', error='dynamic worker connection missing'
+                )
 
             try:
                 conn.send((code, func_name, args))
             except (BrokenPipeError, EOFError, OSError):
                 if not self._restart_dynamic_worker():
                     logger.debug(f'Executor: {func_name} worker restart failed')
-                    return None
+                    return DynamicExecutionResult(
+                        'worker_error', error='dynamic worker restart failed'
+                    )
 
                 conn = self._dynamic_conn
                 if conn is None:
                     logger.debug(f'Executor: {func_name} worker connection missing after restart')
-                    return None
+                    return DynamicExecutionResult(
+                        'worker_error',
+                        error='dynamic worker connection missing after restart',
+                    )
                 conn.send((code, func_name, args))
 
             if not conn.poll(self.exec_timeout_s):
                 logger.debug(f'Executor: {func_name} timeout after {self.exec_timeout_s}s')
                 self._restart_dynamic_worker()
-                return None
+                return DynamicExecutionResult(
+                    'timeout',
+                    error=(
+                        f'{func_name} execution timed out after '
+                        f'{self.exec_timeout_s}s'
+                    ),
+                )
 
             try:
                 status, payload = conn.recv()
             except (BrokenPipeError, EOFError, OSError):
                 logger.debug(f'Executor: {func_name} worker stopped unexpectedly')
                 self._restart_dynamic_worker()
-                return None
+                return DynamicExecutionResult(
+                    'worker_error',
+                    error=f'{func_name} worker stopped unexpectedly',
+                )
 
         if status == 'ok':
-            return payload
+            return DynamicExecutionResult('ok', value=payload)
 
         logger.debug(f'Executor: {func_name} failure {payload}')
-        return None
+        return DynamicExecutionResult('runtime_error', error=str(payload))
 
     def _ensure_dynamic_worker(
         self

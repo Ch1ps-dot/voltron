@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-import time, select, socket, pickle, json, base64, hashlib, asyncio, ast
+import time, select, socket, pickle, json, base64, hashlib, asyncio, ast, traceback
 from typing import Callable, Tuple
 
 from voltron.configs import configs
@@ -9,7 +9,7 @@ from voltron.utils.logger import (
     format_event,
     logger_fuzz as logger,
 )
-from voltron.executor.mapper import Mapper
+from voltron.executor.mapper import Mapper, RuntimeComponentRepairError
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
 from voltron.synthesizer.observer import ResponseObserver
@@ -166,6 +166,9 @@ class Executor:
         )
 
         self.parser_func: Callable
+        self._parser_code = ''
+        self._parser_version = ''
+        self._last_known_good_parser: tuple[Callable, str, str] | None = None
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
         self.checker_sources: dict[str, str] = {}
@@ -190,6 +193,8 @@ class Executor:
         ] = {}
         self.component_evidence: dict[tuple[str, str, str], dict] = {}
         self._component_usage_lock = threading.Lock()
+        self._component_repair_lock = threading.Lock()
+        self._component_repair_pending: set[tuple[str, str, str]] = set()
         self._component_usage_counts: dict[str, dict[str, int]] = {
             'checker_status': {},
             'checker_scope': {},
@@ -1659,33 +1664,94 @@ class Executor:
         msg_type: str,
         show_fuzz_ui: bool,
     ) -> str:
-        resp_code = 'UNKOWN'
-        resp_byte: bytes = self.parser_func(buf)
-        unable_parse_request = getattr(self, 'unable_parse_request', None)
-        if unable_parse_request is None:
-            unable_parse_request = set()
-            self.unable_parse_request = unable_parse_request
-        try_times = 3
-        if resp_byte == b'' and msg_type not in unable_parse_request:
-            while try_times > 0:
-                try_times -= 1
-                resp_byte = self.parser_func(buf)
-                if resp_byte == b'':
-                    logger.debug(f'parse error:{buf}')
-                    self._update_parser(buf, show_fuzz_ui)
-                    logger.debug('Update Parser')
-                else:
-                    break
+        resp_byte = self._invoke_parser_with_repair(buf, show_fuzz_ui)
+        return resp_byte.decode(
+            'utf-8',
+            errors='backslashreplace',
+        )
 
-        if resp_byte == b'':
-            unable_parse_request.add(msg_type)
-            logger.debug('Parse Error')
-        else:
-            resp_code = resp_byte.decode(
-                'utf-8',
-                errors='backslashreplace',
+    def _invoke_parser_with_repair(
+        self,
+        response: bytes,
+        show_fuzz_ui: bool,
+    ) -> bytes:
+        try:
+            parsed = self.parser_func(response)
+            if not isinstance(parsed, bytes):
+                raise TypeError(
+                    'packet_parser must return bytes; '
+                    f'got {type(parsed).__name__}'
+                )
+            if not parsed:
+                raise ValueError(
+                    'packet_parser returned empty bytes for the runtime response'
+                )
+            self._last_known_good_parser = (
+                self.parser_func,
+                getattr(self, '_parser_code', ''),
+                getattr(self, '_parser_version', ''),
             )
-        return resp_code
+            return parsed
+        except Exception as exception:
+            error = (
+                f'{type(exception).__name__}: {exception}\n'
+                f'{traceback.format_exc()}'
+            )
+
+        if show_fuzz_ui:
+            self._set_ui_operation('Repairing parser from runtime failure')
+        try:
+            repair = self.mapper.repair_runtime_component(
+                component='parser',
+                component_type='__all__',
+                version=getattr(self, '_parser_version', 'unknown'),
+                source_code=getattr(self, '_parser_code', ''),
+                error=error,
+                runtime_input=response,
+            )
+            if repair is not None:
+                parser, _code = repair
+                self.mapper.cur_parser = parser
+                self.load_parser(parser)
+                replayed = self.parser_func(response)
+                if isinstance(replayed, bytes) and replayed:
+                    self._last_known_good_parser = (
+                        self.parser_func,
+                        self._parser_code,
+                        self._parser_version,
+                    )
+                    logger.debug('Executor: parser repair replay succeeded')
+                    return replayed
+                error = (
+                    'repaired packet_parser failed same-input replay: '
+                    f'{type(replayed).__name__} {replayed!r}'
+                )
+
+            fallback = getattr(self, '_last_known_good_parser', None)
+            if fallback is not None:
+                fallback_func, fallback_code, fallback_version = fallback
+                replayed = fallback_func(response)
+                if isinstance(replayed, bytes) and replayed:
+                    self.parser_func = fallback_func
+                    self._parser_code = fallback_code
+                    self._parser_version = fallback_version
+                    logger.warning(
+                        'Executor: rolled parser back to last-known-good %s',
+                        fallback_version,
+                    )
+                    return replayed
+        except Exception as repair_error:
+            error = (
+                f'{error}\nrepair_failure: '
+                f'{type(repair_error).__name__}: {repair_error}'
+            )
+        finally:
+            if show_fuzz_ui:
+                self._set_ui_operation('')
+
+        raise RuntimeComponentRepairError(
+            f'parser runtime repair exhausted: {error}'
+        )
 
     def _receive_initial_response(
         self,
@@ -1803,34 +1869,18 @@ class Executor:
                     if len(buf) == 0:
                         return 'RCLOSED', None
                     else:
-                        # recv response and parse it
-                        resp_code = None
-                        resp_byte: bytes = self.parser_func(buf)
-
-                        try_times = 3
-                        if resp_byte == b'':
-                            while try_times > 0:
-                                try_times -= 1
-                                resp_code = self.parser_func(buf)
-                                if resp_code == b'':
-                                    logger.debug(f'parse error:{buf}')
-                                    self._update_parser(
-                                        buf,
-                                        show_fuzz_ui,
-                                    )
-                                    logger.debug('Update Parser')
-                                else:
-                                    break
-                            
-                        if resp_byte == b'':
-                            logger.debug('Parse Error')
-                            resp_code = 'UNKOWN'
-                        else:
-                            resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
-
-                        return resp_code, buf
+                        return (
+                            self._parse_tcp_response(
+                                buf,
+                                msg_type,
+                                show_fuzz_ui,
+                            ),
+                            buf,
+                        )
                 else:
                     logger.debug('recv: no data')
+        except RuntimeComponentRepairError:
+            raise
         except Exception:
             logger.exception('Executor: receive failed')
         finally:
@@ -2198,9 +2248,16 @@ class Executor:
                 code = f.read()
                 exec(code, name_space)
                 obj = name_space[f'packet_parser']
+                if not callable(obj):
+                    raise TypeError('packet_parser is not callable')
                 self.parser_func = obj
+                self._parser_code = code
+                self._parser_version = p.name
         except Exception as e:
             logger.debug(f'Mapper: generated failure {e}')
+            raise RuntimeComponentRepairError(
+                f'parser load failed [{getattr(p, "name", "unknown")}]: {e}'
+            ) from e
 
     def load_checkers(
         self,
@@ -2341,6 +2398,90 @@ class Executor:
                         to_scope='exact',
                     ))
 
+    def _schedule_component_runtime_repair(
+        self,
+        component: str,
+        component_type: str,
+        source_code: str,
+        error: str,
+        runtime_input: bytes,
+    ) -> None:
+        """Repair optional response components without blocking fuzzing."""
+        producer = getattr(getattr(self, 'mapper', None), 'producer', None)
+        if not callable(getattr(producer, 'repair_runtime_component', None)):
+            return
+        if not hasattr(self, '_component_repair_lock'):
+            self._component_repair_lock = threading.Lock()
+            self._component_repair_pending = set()
+        source_sha = hashlib.sha256(source_code.encode('utf-8')).hexdigest()
+        key = (component, component_type, source_sha)
+        with self._component_repair_lock:
+            if key in self._component_repair_pending:
+                return
+            self._component_repair_pending.add(key)
+
+        def repair_in_background() -> None:
+            try:
+                if component == 'checker':
+                    equipped = self.mapper.equip_checkers()
+                else:
+                    equipped = self.mapper.equip_observers()
+                metadata = equipped.get(component_type)
+                version = getattr(metadata, 'name', 'unknown')
+                result = self.mapper.repair_runtime_component(
+                    component=component,
+                    component_type=component_type,
+                    version=version,
+                    source_code=source_code,
+                    error=error,
+                    runtime_input=runtime_input,
+                )
+                if result is None:
+                    return
+                if component == 'checker':
+                    self.mapper.checkers = self.mapper.producer.checkers
+                    self.load_checkers(self.mapper.equip_checkers())
+                else:
+                    self.mapper.observers = self.mapper.producer.observers
+                    self.load_observers(self.mapper.equip_observers())
+            except Exception:
+                logger.exception(
+                    'Executor: background %s repair failed [%s]',
+                    component,
+                    component_type,
+                )
+            finally:
+                with self._component_repair_lock:
+                    self._component_repair_pending.discard(key)
+
+        threading.Thread(
+            target=repair_in_background,
+            name=f'voltron-repair-{component}-{component_type}',
+            daemon=True,
+        ).start()
+
+    def _response_component_is_quarantined(
+        self,
+        component: str,
+        component_type: str,
+    ) -> bool:
+        equip_name = (
+            'equip_checkers' if component == 'checker' else 'equip_observers'
+        )
+        equip = getattr(self.mapper, equip_name, None)
+        check = getattr(self.mapper, '_component_quarantined', None)
+        if not callable(equip) or not callable(check):
+            return False
+        try:
+            metadata = equip().get(component_type)
+        except (AttributeError, TypeError):
+            return False
+        return metadata is not None and check(
+            component,
+            component_type,
+            getattr(metadata, 'name', 'unknown'),
+        )
+
     def observe_response_result(
         self,
         response_type: str,
@@ -2364,12 +2505,24 @@ class Executor:
         scope = self._component_scope(response_type, component_type)
         source = observer_sources.get(component_type) if component_type else None
         if source is not None and component_type is not None:
+            if self._response_component_is_quarantined(
+                'observer', component_type
+            ):
+                return ObservationResult(
+                    semantic_fingerprint=fallback,
+                    raw_fingerprint=fallback,
+                    scope='raw',
+                    component_type=component_type,
+                    provisional=True,
+                    error='observer version is quarantined',
+                )
             code, function_name = source
-            digest = self.mapper._run_dynamic_code(
+            execution = self.mapper._run_dynamic_code_result(
                 code,
                 function_name,
                 args=(response,),
             )
+            digest = execution.value if execution.status == 'ok' else None
             if self._valid_observer_digest(digest):
                 return ObservationResult(
                     semantic_fingerprint=digest,
@@ -2382,13 +2535,19 @@ class Executor:
                 'Executor: observer failed or returned invalid digest [%s]',
                 response_type,
             )
+            error = execution.error or (
+                'invalid_return: packet_observer must return lowercase SHA-256'
+            )
+            self._schedule_component_runtime_repair(
+                'observer', component_type, code, error, response
+            )
             return ObservationResult(
                 semantic_fingerprint=fallback,
                 raw_fingerprint=fallback,
                 scope='raw',
                 component_type=component_type,
                 provisional=True,
-                error='observer returned an invalid digest',
+                error=error,
             )
 
         observer = observer_funcs.get(component_type) if component_type else None
@@ -2593,15 +2752,35 @@ class Executor:
                 error='no checker available',
             )
 
+        if (
+            checker_source is not None
+            and component_type is not None
+            and self._response_component_is_quarantined(
+                'checker', component_type
+            )
+        ):
+            return CheckerEvaluation(
+                status='unchecked',
+                scope=self._component_scope(response_type, component_type),
+                component_type=component_type,
+                error='checker version is quarantined',
+            )
+
         try:
             if checker_source is not None:
-                is_valid = self.mapper._run_dynamic_code(
+                execution = self.mapper._run_dynamic_code_result(
                     checker_source,
                     'packet_checker',
                     args=(response,),
                 )
-                if is_valid is None:
-                    raise RuntimeError('checker execution failed or timed out')
+                is_valid = (
+                    execution.value if execution.status == 'ok' else None
+                )
+                if execution.status != 'ok':
+                    raise RuntimeError(
+                        execution.error
+                        or 'checker execution failed or timed out'
+                    )
             else:
                 is_valid = checker(response)
             if not isinstance(is_valid, bool):
@@ -2610,6 +2789,14 @@ class Executor:
             logger.debug(
                 f'Executor: checker failure [{response_type}] {e}'
             )
+            if checker_source is not None and component_type is not None:
+                self._schedule_component_runtime_repair(
+                    'checker',
+                    component_type,
+                    checker_source,
+                    f'{type(e).__name__}: {e}',
+                    response,
+                )
             return CheckerEvaluation(
                 status='unchecked',
                 scope=self._component_scope(response_type, component_type),
