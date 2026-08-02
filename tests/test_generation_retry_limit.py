@@ -6,6 +6,7 @@ from lxml import etree
 
 from voltron.configs import configs
 from voltron.synthesizer.generator import Generator
+from voltron.synthesizer.code_validation import RAW_SHA256_OBSERVER
 from voltron.synthesizer.synthesizer import AsyncProducer
 
 
@@ -23,10 +24,15 @@ def test_invalid_mutator_is_retried_three_times_then_skipped(tmp_path, monkeypat
 
     class FailingChater:
         def __init__(self):
-            self.calls = 0
+            self.generate_calls = 0
+            self.repair_calls = 0
 
         async def llm_mutator_evolve(self, **_kwargs):
-            self.calls += 1
+            self.generate_calls += 1
+            return "def mutate(:\n"
+
+        async def llm_code_repair(self, **_kwargs):
+            self.repair_calls += 1
             return "def mutate(:\n"
 
     chater = FailingChater()
@@ -54,7 +60,8 @@ def test_invalid_mutator_is_retried_three_times_then_skipped(tmp_path, monkeypat
     )
 
     assert result is None
-    assert chater.calls == 3
+    assert chater.generate_calls == 1
+    assert chater.repair_calls == 2
 
 
 def test_invalid_checker_and_observer_are_retried_three_times_then_skipped(
@@ -66,6 +73,7 @@ def test_invalid_checker_and_observer_are_retried_three_times_then_skipped(
         def __init__(self):
             self.checker_calls = 0
             self.observer_calls = 0
+            self.repair_calls = 0
 
         async def llm_checker_gen(self, **_kwargs):
             self.checker_calls += 1
@@ -73,6 +81,10 @@ def test_invalid_checker_and_observer_are_retried_three_times_then_skipped(
 
         async def llm_observer_gen(self, **_kwargs):
             self.observer_calls += 1
+            return "def packet_observer(:\n"
+
+        async def llm_code_repair(self, **_kwargs):
+            self.repair_calls += 1
             return "def packet_observer(:\n"
 
     chater = FailingChater()
@@ -94,9 +106,10 @@ def test_invalid_checker_and_observer_are_retried_three_times_then_skipped(
     )
 
     assert checker is None
-    assert observer is None
+    assert observer == ("OK", RAW_SHA256_OBSERVER)
     assert chater.checker_calls == 3
-    assert chater.observer_calls == 3
+    assert chater.observer_calls == 1
+    assert chater.repair_calls == 2
 
 
 def test_generator_evolution_retries_after_invalid_generated_code(

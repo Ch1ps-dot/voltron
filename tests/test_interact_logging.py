@@ -49,6 +49,22 @@ def test_interact_logs_matching_begin_and_end_boundaries(monkeypatch):
     assert f"interaction_id='{begin_id}'" in end
 
 
+def test_interact_records_pairs_at_the_executor_boundary(monkeypatch):
+    executor = make_executor()
+    executor.analyzer = SimpleNamespace(active_phase='model_learning', stage='')
+    observed = []
+    executor.pair_recorder = SimpleNamespace(
+        observe=lambda conversation, phase: observed.append((conversation, phase))
+    )
+    cons = Conversation()
+    cons.add_state('PING', '200')
+    cons.add_data(b'PING', b'200 OK')
+    monkeypatch.setattr(executor, '_interact_once', lambda *_args, **_kwargs: (True, cons))
+
+    assert executor.interact([('PING', b'PING')]) == (True, cons)
+    assert observed == [(cons, 'model_learning')]
+
+
 def test_interact_logs_end_boundary_when_execution_raises(monkeypatch):
     executor = make_executor()
     logger = RecordingLogger()
