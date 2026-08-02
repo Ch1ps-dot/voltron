@@ -149,6 +149,19 @@ class Fuzzer:
             'max_rounds_per_type',
             1,
         )
+        generated_code = configs_yaml.get('generated_code', {})
+        configs.generation_retry_limit = max(
+            1,
+            int(generated_code.get('retry_limit', 3)),
+        )
+        configs.generated_code_timeout_s = max(
+            0.1,
+            float(generated_code.get('timeout_seconds', 2.0)),
+        )
+        configs.generated_message_max_bytes = max(
+            1,
+            int(generated_code.get('max_message_bytes', 1024 * 1024)),
+        )
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name

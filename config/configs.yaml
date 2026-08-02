@@ -87,3 +87,8 @@ llm_compliance:
   api_key: none
   model: none
   async_sem: 8
+
+generated_code:
+  retry_limit: 3
+  timeout_seconds: 2.0
+  max_message_bytes: 1048576

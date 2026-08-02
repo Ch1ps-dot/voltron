@@ -7,7 +7,7 @@ from voltron.configs import configs
 from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from voltron.utils.logger import logger_fuzz as logger
 from typing import TypedDict
-import base64, json, random, time, threading, os, math
+import random, time, threading, os, math
 
 
 class StateStats(TypedDict):
@@ -54,7 +54,6 @@ class Berserker:
         self.useful_seq: list[list[tuple[str, bytes]]] = []
         self.max_seq_len = 0
         self.seen_req_res_pairs = self.seed_retention.seen_request_response_pairs
-        self._req_res_pair_next_id = 0
 
         self.mapper = mapper
         self.exe = exe
@@ -433,55 +432,6 @@ class Berserker:
         logger.debug(f'select mutators[{mode}]: {'/'.join([m[0] for m in ms])}')
         return ms
 
-    def save_request_response_pair(
-        self,
-        request_type: str,
-        response_type: str,
-        request: bytes,
-        response: bytes,
-    ) -> None:
-        """Save one newly observed request-response type relation."""
-        try:
-            target_folder = configs.results_path / 'request_response_pairs'
-            target_folder.mkdir(parents=True, exist_ok=True)
-
-            while True:
-                file_path = (
-                    target_folder
-                    / f'pair_{self._req_res_pair_next_id:06d}.json'
-                )
-                self._req_res_pair_next_id += 1
-                if not file_path.exists():
-                    break
-
-            data = {
-                'request_type': request_type,
-                'response_type': response_type,
-                'request_length': len(request),
-                'response_length': len(response),
-                'request': {
-                    'encoding': 'base64',
-                    'data': base64.b64encode(request).decode('ascii'),
-                },
-                'response': {
-                    'encoding': 'base64',
-                    'data': base64.b64encode(response).decode('ascii'),
-                },
-            }
-            with file_path.open('w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2)
-                f.write('\n')
-
-            logger.debug(
-                'Berserker: saved new request-response relation '
-                f'{request_type}/{response_type} to {file_path.name}'
-            )
-        except Exception as e:
-            logger.debug(
-                'Berserker: failed to save request-response relation '
-                f'{request_type}/{response_type}: {e}'
-            )
-    
     def analyze_cons(
         self,
         cons: Conversation,
@@ -500,16 +450,6 @@ class Berserker:
         self.max_unique_resp_num = (
             self.seed_retention.max_unique_response_count
         )
-
-        for request_type, response_type, request, response in (
-            novelty.new_request_response_pairs
-        ):
-            self.save_request_response_pair(
-                request_type,
-                response_type,
-                request,
-                response,
-            )
 
         for index, _response_type in novelty.new_responses:
             content = cons.content[index] if index < len(cons.content) else None

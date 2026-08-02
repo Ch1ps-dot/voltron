@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-import time, select, socket, pickle, json, base64, hashlib, asyncio
+import time, select, socket, pickle, json, base64, hashlib, asyncio, ast
 from typing import Callable, Tuple
 
 from voltron.configs import configs
@@ -15,6 +15,7 @@ from voltron.synthesizer.checker import Checker
 from voltron.synthesizer.observer import ResponseObserver
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
+from voltron.executor.pair_recorder import RequestResponsePairRecorder
 from voltron.executor.sut_monitor import (
     CRASHED,
     EXITED,
@@ -86,6 +87,15 @@ class Executor:
         self.host = configs.host
         self.port = configs.port
         self.trans_layer = configs.trans_layer
+        # Kamailio's SIP seeds advertise 127.0.0.1:5061 in Via/Contact.
+        # Bind the UDP client socket to that port so replies return to the
+        # executor instead of being sent to an unrelated ephemeral port.
+        self.local_port = (
+            5061
+            if self.trans_layer == 'udp'
+            and getattr(configs, 'target_name', '') == 'kamailio'
+            else None
+        )
         self.sut_deployment = getattr(configs, 'sut_deployment', 'local')
         self.sut_monitor = build_sut_monitor(configs)
         self.try_times_parser = 2
@@ -104,11 +114,13 @@ class Executor:
         self.unable_parse_request: set[str] = set()
         self._saved_seed_digests: set[str] = set()
         self._saved_seed_lock = threading.Lock()
+        self.pair_recorder = RequestResponsePairRecorder(configs.results_path)
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
         self.observer_funcs: dict[str, Callable[[bytes], str]] = {}
+        self.observer_sources: dict[str, tuple[str, str]] = {}
         if configs.fuzz_mode != 'replay':
             self.load_checkers(self.mapper.equip_checkers())
             self.load_observers(self.mapper.equip_observers())
@@ -332,7 +344,14 @@ class Executor:
                 poll_wait_ms=poll_wait_ms,
                 run_checker=run_checker,
             )
-            flag, _ = result
+            flag, conversation = result
+            pair_recorder = getattr(self, 'pair_recorder', None)
+            if flag and conversation is not None and pair_recorder is not None:
+                pair_recorder.observe(
+                    conversation,
+                    phase=getattr(self.analyzer, 'active_phase', None)
+                    or getattr(self.analyzer, 'stage', ''),
+                )
             if flag:
                 outcome = 'completed'
             elif self.stop_event.is_set():
@@ -1026,6 +1045,9 @@ class Executor:
                     sock = socket.create_connection((self.host, self.port))
                 elif (self.trans_layer == 'udp'):
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    if self.local_port is not None:
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                        sock.bind((self.host, self.local_port))
                 else:
                     return None
             except ConnectionRefusedError as e:
@@ -1655,18 +1677,27 @@ class Executor:
     ) -> None:
         """Load the latest generated semantic observer for each response type."""
         self.observer_funcs = {}
+        self.observer_sources = {}
         for msg_type, observer in observers.items():
-            namespace = {}
             try:
                 with open(self.mapper.o_path(observer), 'r', encoding='utf-8') as f:
-                    exec(f.read(), namespace)
-                observer_func: Callable = (
-                    namespace.get('packet_observer')
-                    or namespace.get('packet_hasher')
+                    code = f.read()
+                tree = ast.parse(code)
+                function_names = {
+                    node.name
+                    for node in tree.body
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                }
+                function_name = next(
+                    (
+                        name for name in ('packet_observer', 'packet_hasher')
+                        if name in function_names
+                    ),
+                    None,
                 )
-                if not callable(observer_func):
+                if function_name is None:
                     raise TypeError('packet_observer is missing or not callable')
-                self.observer_funcs[msg_type] = observer_func
+                self.observer_sources[msg_type] = (code, function_name)
             except Exception:
                 logger.exception(
                     f'Executor: observer load failure [{msg_type}]'
@@ -1679,6 +1710,25 @@ class Executor:
     ) -> str:
         """Return an IR-normalized digest, falling back to raw SHA-256."""
         fallback = hashlib.sha256(response).hexdigest()
+        observer_sources = getattr(self, 'observer_sources', {})
+        source = observer_sources.get(response_type)
+        if source is None:
+            source = observer_sources.get('__all__')
+        if source is not None:
+            code, function_name = source
+            digest = self.mapper._run_dynamic_code(
+                code,
+                function_name,
+                args=(response,),
+            )
+            if self._valid_observer_digest(digest):
+                return digest
+            logger.warning(
+                'Executor: observer failed or returned invalid digest [%s]',
+                response_type,
+            )
+            return fallback
+
         observer = self.observer_funcs.get(response_type)
         if observer is None:
             observer = self.observer_funcs.get('__all__')
@@ -1686,12 +1736,7 @@ class Executor:
             return fallback
         try:
             digest = observer(response)
-            if (
-                not isinstance(digest, str)
-                or len(digest) != 64
-                or digest != digest.lower()
-                or any(char not in '0123456789abcdef' for char in digest)
-            ):
+            if not self._valid_observer_digest(digest):
                 raise TypeError(
                     'packet_observer must return lowercase SHA-256'
                 )
@@ -1701,6 +1746,15 @@ class Executor:
                 f'Executor: observer failure [{response_type}]'
             )
             return fallback
+
+    @staticmethod
+    def _valid_observer_digest(digest: object) -> bool:
+        return (
+            isinstance(digest, str)
+            and len(digest) == 64
+            and digest == digest.lower()
+            and all(char in '0123456789abcdef' for char in digest)
+        )
 
     def observe_response_with_evolution(
         self,
@@ -1717,7 +1771,10 @@ class Executor:
         if not hasattr(self, 'observer_semantic_reviews'):
             self.observer_semantic_reviews = {}
         digest = self.observe_response(response_type, response)
-        if response_type not in self.observer_funcs:
+        if (
+            response_type not in self.observer_funcs
+            and response_type not in getattr(self, 'observer_sources', {})
+        ):
             return digest
 
         previous_samples = self._historical_response_samples(response_type)

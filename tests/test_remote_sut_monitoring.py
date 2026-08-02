@@ -76,6 +76,31 @@ def test_setup_socket_uses_configured_tcp_host(monkeypatch):
     assert calls[1] == ('setblocking', False)
 
 
+def test_setup_socket_binds_configured_udp_source_port(monkeypatch):
+    executor = Executor.__new__(Executor)
+    executor.trans_layer = 'udp'
+    executor.host = '127.0.0.1'
+    executor.port = 5060
+    executor.local_port = 5061
+    calls = []
+
+    class FakeSocket:
+        def setsockopt(self, *args):
+            calls.append(('setsockopt', *args))
+
+        def bind(self, endpoint):
+            calls.append(('bind', endpoint))
+
+        def setblocking(self, flag):
+            calls.append(('setblocking', flag))
+
+    monkeypatch.setattr(socket, 'socket', lambda *_args: FakeSocket())
+
+    assert executor.setup_socket() is not None
+    assert ('bind', ('127.0.0.1', 5061)) in calls
+    assert ('setblocking', False) in calls
+
+
 def test_remote_timeout_keeps_timeout_when_agent_reports_running():
     executor = make_remote_executor(SUTStatus(state=RUNNING))
     cons = Conversation()

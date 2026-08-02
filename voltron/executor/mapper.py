@@ -35,7 +35,11 @@ def _dynamic_code_worker(
         if item is None:
             break
 
-        code, func_name = item
+        if len(item) == 2:
+            code, func_name = item
+            args = ()
+        else:
+            code, func_name, args = item
         cache_key = (func_name, code)
         try:
             func = func_cache.get(cache_key)
@@ -45,7 +49,7 @@ def _dynamic_code_worker(
                 func = namespace[func_name]
                 func_cache[cache_key] = func
 
-            conn.send(('ok', func()))
+            conn.send(('ok', func(*args)))
         except Exception:
             conn.send(('error', traceback.format_exc()))
 
@@ -275,6 +279,7 @@ class Mapper:
         """
         ms = []
         for req in req_seq:
+            selected = False
             if req in self.mutators:
                 # get generator of according message type
                 m = self.select_mutator(req, select_mode)
@@ -293,14 +298,26 @@ class Mapper:
                     if msg is not None:
                         msg_type = m.msg_type
                         ms.append((msg_type, msg))
+                        selected = True
                     else:
                         logger.debug(f'Mapper: mutator failed {m.msg_type}/{m.name}')
                 except Exception:
                     logger.debug(asdict(m))
                     logger.debug(self.message_pool)
                     logger.exception('Mapper: mutator selection failed')
-            else:
-                logger.debug(f'Mapper: unexpected type {req}')
+            if not selected:
+                fallback = self.select_generators(
+                    [req],
+                    cache_mode=False,
+                    select_mode=select_mode,
+                )
+                if fallback:
+                    logger.debug(
+                        f'Mapper: using generator fallback for mutator {req}'
+                    )
+                    ms.extend(fallback)
+                else:
+                    logger.debug(f'Mapper: no mutator or generator for {req}')
         return ms
     
     def select_generator(
@@ -353,8 +370,9 @@ class Mapper:
     def _run_dynamic_code(
         self,
         code: str,
-        func_name: str
-    ) -> bytes | None:
+        func_name: str,
+        args: tuple = (),
+    ) -> object | None:
         with self._dynamic_lock:
             if not self._ensure_dynamic_worker():
                 logger.debug(f'Executor: {func_name} worker setup failed')
@@ -366,7 +384,7 @@ class Mapper:
                 return None
 
             try:
-                conn.send((code, func_name))
+                conn.send((code, func_name, args))
             except (BrokenPipeError, EOFError, OSError):
                 if not self._restart_dynamic_worker():
                     logger.debug(f'Executor: {func_name} worker restart failed')
@@ -376,7 +394,7 @@ class Mapper:
                 if conn is None:
                     logger.debug(f'Executor: {func_name} worker connection missing after restart')
                     return None
-                conn.send((code, func_name))
+                conn.send((code, func_name, args))
 
             if not conn.poll(self.exec_timeout_s):
                 logger.debug(f'Executor: {func_name} timeout after {self.exec_timeout_s}s')

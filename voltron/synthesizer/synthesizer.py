@@ -1,7 +1,7 @@
 from pathlib import Path
 from lxml import etree # type: ignore
 from tqdm import tqdm
-import json, asyncio, hashlib
+import json, asyncio, hashlib, threading, time
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
 from urllib.parse import quote
@@ -10,6 +10,10 @@ from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.synthesizer.checker import Checker
 from voltron.synthesizer.observer import ResponseObserver
+from voltron.synthesizer.code_validation import (
+    RAW_SHA256_OBSERVER,
+    validate_generated_code,
+)
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
@@ -77,6 +81,10 @@ class AsyncProducer:
             self.legacy_observer_path / 'hasher_info.json'
         )
         self.mutator_info_path = self.mutator_path / 'mutator_info.json'
+        self.generation_manifest_path = (
+            configs.results_path / 'generation_manifest.jsonl'
+        )
+        self._generation_manifest_lock = threading.Lock()
         
         for path in (
             self.generator_path,
@@ -105,6 +113,47 @@ class AsyncProducer:
         self.best_parser_info: dict = {}
         self._response_sections = None
         self._ir_evolution_rounds: dict[str, int] = {}
+
+    def _record_generation(
+        self,
+        component: str,
+        msg_type: str,
+        outcome: str,
+        attempt: int,
+        code: str | None = None,
+        error: str = '',
+    ) -> None:
+        record = {
+            'timestamp': time.time(),
+            'component': component,
+            'message_type': msg_type,
+            'outcome': outcome,
+            'attempt': attempt,
+            'code_sha256': (
+                hashlib.sha256(code.encode('utf-8')).hexdigest()
+                if code is not None
+                else None
+            ),
+            'error': error[:2000],
+        }
+        try:
+            manifest_lock = getattr(self, '_generation_manifest_lock', None)
+            if manifest_lock is None:
+                manifest_lock = threading.Lock()
+                self._generation_manifest_lock = manifest_lock
+            manifest_path = getattr(
+                self,
+                'generation_manifest_path',
+                configs.results_path / 'generation_manifest.jsonl',
+            )
+            with manifest_lock:
+                with manifest_path.open(
+                    'a', encoding='utf-8'
+                ) as stream:
+                    json.dump(record, stream, ensure_ascii=False)
+                    stream.write('\n')
+        except Exception:
+            logger.exception('Producer: failed to record generation manifest')
             
     def run(
         self
@@ -166,6 +215,7 @@ class AsyncProducer:
                 with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
                     mutator_info = json.load(f)
                     self.mutators_info_load(mutator_info)
+                    self._filter_invalid_cached_mutators()
                 logger.debug("Mutator: load mutator info")
             except Exception as e:
                 logger.debug(f'Mutator: load error {e}')
@@ -344,7 +394,10 @@ class AsyncProducer:
                 logger.debug("Producer: load observer info")
                 if (
                     configs.spec_knowledge
-                    and not self._observer_cache_matches_response_types()
+                    and (
+                        not self._observer_cache_matches_response_types()
+                        or not self._observer_cache_contracts_valid()
+                    )
                 ):
                     logger.debug(
                         'Producer: observer cache does not match response types; '
@@ -357,6 +410,78 @@ class AsyncProducer:
                     self.observer_gen()
         elif configs.spec_knowledge:
             self.observer_gen()
+
+    def _generated_code_timeout(self) -> float:
+        return max(0.1, getattr(configs, 'generated_code_timeout_s', 2.0))
+
+    def _generated_message_limit(self) -> int:
+        return max(
+            1,
+            getattr(configs, 'generated_message_max_bytes', 1024 * 1024),
+        )
+
+    def _observer_cache_contracts_valid(self) -> bool:
+        for response_type in self._response_types_from_primary_field():
+            versions = self.observers.get(response_type, [])
+            if not versions:
+                return False
+            observer = versions[-1]
+            path = Path(observer.path)
+            typed_path = (
+                self.observer_path
+                / quote(response_type, safe='._-')
+                / f'{observer.name}.py'
+            )
+            if typed_path.is_file():
+                path = typed_path
+            if not path.is_file():
+                return False
+            code = path.read_text(encoding='utf-8')
+            validation = validate_generated_code(
+                code,
+                'packet_observer',
+                'observer',
+                timeout_s=self._generated_code_timeout(),
+            )
+            if not validation.ok:
+                self._record_generation(
+                    'observer', response_type, 'cache_invalid', 0, code,
+                    validation.error,
+                )
+                return False
+            self._record_generation(
+                'observer', response_type, 'reused_cache', 0, code,
+            )
+        return True
+
+    def _filter_invalid_cached_mutators(self) -> None:
+        filtered: dict[str, list[Generator]] = {}
+        for msg_type, versions in self.mutators.items():
+            for mutator in reversed(versions):
+                path = self.mutator_path / msg_type / f'{mutator.name}.py'
+                if not path.is_file() and mutator.path:
+                    path = Path(mutator.path)
+                if not path.is_file():
+                    continue
+                code = path.read_text(encoding='utf-8')
+                validation = validate_generated_code(
+                    code,
+                    'mutate',
+                    'mutator',
+                    timeout_s=self._generated_code_timeout(),
+                    max_output_bytes=self._generated_message_limit(),
+                )
+                if validation.ok:
+                    filtered[msg_type] = [mutator]
+                    self._record_generation(
+                        'mutator', msg_type, 'reused_cache', 0, code,
+                    )
+                    break
+                self._record_generation(
+                    'mutator', msg_type, 'cache_invalid', 0, code,
+                    validation.error,
+                )
+        self.mutators = filtered
 
     async def _generator_gen_one(
         self,
@@ -664,24 +789,33 @@ class AsyncProducer:
         async with sem:
             retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
             failure_count = 0
+            failed_code: str | None = None
+            failure_error = ''
             while failure_count < retry_limit:
+                mutate_code: str | None = None
                 try:
-                    # generate input generator and save it
-                    logger.debug(self.poss_response)
-                    logger.debug(self.poss_response[msg_type])
-                    mutate_code = await self.chater.llm_mutator_evolve(
-                        code=old_code,
-                        pro_name=self.rfcp.pro_name,
-                        field_name=self.rfcp.req_fields[0],
-                        msg_type=msg_type,
-                        msg_ir=self._request_ir_info(msg_type),
-                        info=doc_info,
-                        poss_response='\n'.join(self.poss_response[msg_type]),
-                        trace=json.dumps(
-                            sorted(req_res.get(msg_type, set())),
-                            ensure_ascii=False,
-                        ),
-                    )
+                    if failed_code is None:
+                        mutate_code = await self.chater.llm_mutator_evolve(
+                            code=old_code,
+                            pro_name=self.rfcp.pro_name,
+                            field_name=self.rfcp.req_fields[0],
+                            msg_type=msg_type,
+                            msg_ir=self._request_ir_info(msg_type),
+                            info=doc_info,
+                            poss_response='\n'.join(
+                                self.poss_response.get(msg_type, [])
+                            ),
+                            trace=json.dumps(
+                                sorted(req_res.get(msg_type, set())),
+                                ensure_ascii=False,
+                            ),
+                        )
+                    else:
+                        mutate_code = await self.chater.llm_code_repair(
+                            code=failed_code,
+                            error=failure_error,
+                            function_name='mutate',
+                        )
                     
                     # berserker_code = await self.chater.llm_mutator_berserker(
                     #     code=old_code,
@@ -690,27 +824,49 @@ class AsyncProducer:
                     #     info=doc_info
                     # )
                     
-                    # test generated code
-                    name_space = {}
-                    exec(mutate_code, name_space)
-                    obj = name_space[f'mutate']
-                    msg: bytes | None = obj()
-                    if msg == None or msg == b'':
-                        raise Exception('mutate return empty')
-                    
+                    validation = validate_generated_code(
+                        mutate_code,
+                        'mutate',
+                        'mutator',
+                        timeout_s=self._generated_code_timeout(),
+                        max_output_bytes=self._generated_message_limit(),
+                    )
+                    if not validation.ok:
+                        raise ValueError(validation.error)
                     # exec(berserker_code, name_space)
                     # obj = name_space[f'berserker_{msg_type}']
                     # obj()
                     with analyzer.lock:
                         analyzer.finished += 1
+                    self._record_generation(
+                        'mutator',
+                        msg_type,
+                        'generated' if failure_count == 0 else 'repaired',
+                        failure_count + 1,
+                        mutate_code,
+                    )
                     return msg_type, mutate_code
-                except Exception:
+                except LLMDeadlineExceeded as error:
+                    failure_error = f'llm_transport_timeout: {error}'
+                    self._record_generation(
+                        'mutator', msg_type, 'fallback', failure_count + 1,
+                        mutate_code, failure_error,
+                    )
+                    break
+                except Exception as error:
+                    if mutate_code is not None:
+                        failed_code = mutate_code
+                    failure_error = f'{type(error).__name__}: {error}'
                     failure_count += 1
+                    self._record_generation(
+                        'mutator', msg_type, 'invalid', failure_count,
+                        mutate_code, failure_error,
+                    )
                     logger.exception('Producer: mutator generation failed')
             logger.error(
-                'Producer: giving up mutator generation for %s after %d attempts',
+                'Producer: falling back to the best generator for %s after %d attempts',
                 msg_type,
-                retry_limit,
+                failure_count,
             )
             return None
 
@@ -998,44 +1154,68 @@ class AsyncProducer:
         async with sem:
             retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
             failure_count = 0
+            failed_code: str | None = None
+            failure_error = ''
             while failure_count < retry_limit:
+                observer_code: str | None = None
                 try:
-                    observer_code = await self.chater.llm_observer_gen(
-                        pro_name=self.rfcp.pro_name,
-                        msg_ir=msg_ir,
-                        res_info=res_info,
-                        response_type=response_type,
-                    )
-                    compile(observer_code, '<observer_gen>', 'exec')
-                    namespace = {}
-                    exec(observer_code, namespace)
-                    observer_func = self._observer_callable(namespace)
-                    if not callable(observer_func):
-                        raise TypeError(
-                            'packet_observer is missing or not callable'
+                    if failed_code is None:
+                        observer_code = await self.chater.llm_observer_gen(
+                            pro_name=self.rfcp.pro_name,
+                            msg_ir=msg_ir,
+                            res_info=res_info,
+                            response_type=response_type,
                         )
-                    for probe in (b'', b'voltron-observer-probe'):
-                        digest = observer_func(probe)
-                        if not self._valid_digest(digest):
-                            raise TypeError(
-                                'packet_observer must return lowercase SHA-256'
-                            )
-                        if observer_func(probe) != digest:
-                            raise ValueError(
-                                'packet_observer must be deterministic'
-                            )
+                    else:
+                        observer_code = await self.chater.llm_code_repair(
+                            code=failed_code,
+                            error=failure_error,
+                            function_name='packet_observer',
+                        )
+                    validation = validate_generated_code(
+                        observer_code,
+                        'packet_observer',
+                        'observer',
+                        timeout_s=self._generated_code_timeout(),
+                    )
+                    if not validation.ok:
+                        raise ValueError(validation.error)
+                    self._record_generation(
+                        'observer',
+                        response_type,
+                        'generated' if failure_count == 0 else 'repaired',
+                        failure_count + 1,
+                        observer_code,
+                    )
                     return response_type, observer_code
-                except Exception:
+                except LLMDeadlineExceeded as error:
+                    failure_error = f'llm_transport_timeout: {error}'
+                    self._record_generation(
+                        'observer', response_type, 'invalid', failure_count + 1,
+                        observer_code, failure_error,
+                    )
+                    break
+                except Exception as error:
+                    if observer_code is not None:
+                        failed_code = observer_code
+                    failure_error = f'{type(error).__name__}: {error}'
                     failure_count += 1
+                    self._record_generation(
+                        'observer', response_type, 'invalid', failure_count,
+                        observer_code, failure_error,
+                    )
                     logger.exception(
                         f'Producer: invalid observer [{response_type}]'
                     )
-            logger.error(
-                'Producer: giving up observer generation for %s after %d attempts',
-                response_type,
-                retry_limit,
+            self._record_generation(
+                'observer', response_type, 'fallback_raw_sha256',
+                failure_count, RAW_SHA256_OBSERVER, failure_error,
             )
-            return None
+            logger.warning(
+                'Producer: using raw SHA-256 observer fallback for %s',
+                response_type,
+            )
+            return response_type, RAW_SHA256_OBSERVER
 
     async def _observer_gen_async(self) -> list[tuple[str, str] | None]:
         if not hasattr(self, 'res_ir'):
@@ -1226,37 +1406,64 @@ class AsyncProducer:
             }
             for sample in samples
         ], indent=2)
-        for _ in range(3):
+        failed_code: str | None = None
+        failure_error = ''
+        retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+        for failure_count in range(retry_limit):
+            code: str | None = None
             try:
-                code = await self.chater.llm_observer_evolve(
-                    pro_name=self.rfcp.pro_name,
-                    response_type=response_type,
-                    msg_ir=msg_ir,
-                    original_code=original_code,
-                    samples=sample_info,
+                if failed_code is None:
+                    code = await self.chater.llm_observer_evolve(
+                        pro_name=self.rfcp.pro_name,
+                        response_type=response_type,
+                        msg_ir=msg_ir,
+                        original_code=original_code,
+                        samples=sample_info,
+                    )
+                else:
+                    code = await self.chater.llm_code_repair(
+                        code=failed_code,
+                        error=failure_error,
+                        function_name='packet_observer',
+                    )
+                validation = validate_generated_code(
+                    code,
+                    'packet_observer',
+                    'observer',
+                    timeout_s=self._generated_code_timeout(),
+                    observer_samples=tuple(samples),
+                    require_equal_observations=True,
                 )
-                compile(code, '<observer_evolve>', 'exec')
-                namespace = {}
-                exec(code, namespace)
-                observer_func = self._observer_callable(namespace)
-                if not callable(observer_func):
-                    raise TypeError(
-                        'packet_observer is missing or not callable'
-                    )
-                digests = [observer_func(sample) for sample in samples]
-                if not all(self._valid_digest(digest) for digest in digests):
-                    raise TypeError(
-                        'packet_observer must return lowercase SHA-256'
-                    )
-                if len(set(digests)) != 1:
-                    raise ValueError(
-                        'evolved observer does not unify historical samples'
-                    )
+                if not validation.ok:
+                    raise ValueError(validation.error)
+                self._record_generation(
+                    'observer_evolution', response_type,
+                    'generated' if failure_count == 0 else 'repaired',
+                    failure_count + 1, code,
+                )
                 return code
-            except Exception:
+            except LLMDeadlineExceeded as error:
+                failure_error = f'llm_transport_timeout: {error}'
+                self._record_generation(
+                    'observer_evolution', response_type, 'invalid',
+                    failure_count + 1, code, failure_error,
+                )
+                break
+            except Exception as error:
+                if code is not None:
+                    failed_code = code
+                failure_error = f'{type(error).__name__}: {error}'
+                self._record_generation(
+                    'observer_evolution', response_type, 'invalid',
+                    failure_count + 1, code, failure_error,
+                )
                 logger.exception(
                     f'Producer: observer evolution failed [{response_type}]'
                 )
+        self._record_generation(
+            'observer_evolution', response_type, 'keep_previous',
+            retry_limit, original_code, failure_error,
+        )
         return None
 
     @staticmethod
