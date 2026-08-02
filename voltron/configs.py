@@ -24,6 +24,11 @@ class Config:
         self.generation_retry_limit: int = 3
         self.generated_code_timeout_s: float = 2.0
         self.generated_message_max_bytes: int = 1024 * 1024
+        # Response checkers/observers are generated on demand.  Only the
+        # protocol-wide fallback and explicitly configured high-value types
+        # are prepared before fuzzing starts.
+        self.response_component_lazy_generation: bool = True
+        self.response_component_prewarm_types: list[str] = []
         
         self.target_name: str
         self.trans_layer: str

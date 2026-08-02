@@ -1,7 +1,7 @@
 from pathlib import Path
 from lxml import etree # type: ignore
 from tqdm import tqdm
-import json, asyncio, hashlib, threading, time
+import json, asyncio, hashlib, threading, time, queue, re
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
 from urllib.parse import quote
@@ -46,6 +46,8 @@ class AsyncProducer:
         checkers: the generated response conformance checkers
         mutators: the generated mutators
     """
+
+    RESPONSE_COMPONENT_CONTRACT_VERSION = 'response-components-v1'
 
     def __init__(
             self,
@@ -113,6 +115,11 @@ class AsyncProducer:
         self.best_parser_info: dict = {}
         self._response_sections = None
         self._ir_evolution_rounds: dict[str, int] = {}
+        self._response_component_lock = threading.RLock()
+        self._response_component_pending: set[str] = set()
+        self._response_component_failures: set[str] = set()
+        self._response_component_queue: queue.Queue[str] = queue.Queue()
+        self._response_component_worker: threading.Thread | None = None
 
     def _record_generation(
         self,
@@ -360,25 +367,31 @@ class AsyncProducer:
                     logger.debug("Producer: load checker info")
                     if (
                         configs.spec_knowledge
-                        and not self._checker_cache_matches_response_types()
+                        and not self._checker_cache_matches_response_types(
+                            self._initial_response_component_types()
+                        )
                     ):
                         logger.debug(
                             'Producer: checker cache does not match response '
                             'types from the primary state field; regenerating'
                         )
-                        self.checker_gen()
+                        self.checker_gen(
+                            self._missing_checker_types(
+                                self._initial_response_component_types()
+                            )
+                        )
                 elif configs.spec_knowledge:
                     logger.debug(
                         "Producer: legacy checker cache detected; regenerating"
                     )
-                    self.checker_gen()
+                    self.checker_gen(self._initial_response_component_types())
                 else:
                     self.legacy_checkers_info_load(checker_info)
                     logger.debug("Producer: load legacy checker info")
             except Exception as e:
                 logger.debug(f'Producer: checker load error {e}')
         elif configs.spec_knowledge:
-            self.checker_gen()
+            self.checker_gen(self._initial_response_component_types())
 
     def _load_observers(self) -> None:
         """Load or synthesize response observers outside replay mode."""
@@ -395,7 +408,9 @@ class AsyncProducer:
                 if (
                     configs.spec_knowledge
                     and (
-                        not self._observer_cache_matches_response_types()
+                        not self._observer_cache_matches_response_types(
+                            self._initial_response_component_types()
+                        )
                         or not self._observer_cache_contracts_valid()
                     )
                 ):
@@ -403,13 +418,19 @@ class AsyncProducer:
                         'Producer: observer cache does not match response types; '
                         'regenerating'
                     )
-                    self.observer_gen()
+                    self.observer_gen(
+                        self._missing_observer_types(
+                            self._initial_response_component_types()
+                        )
+                    )
             except Exception:
                 logger.exception('Producer: observer load error')
                 if configs.spec_knowledge:
-                    self.observer_gen()
+                    self.observer_gen(
+                        self._initial_response_component_types()
+                    )
         elif configs.spec_knowledge:
-            self.observer_gen()
+            self.observer_gen(self._initial_response_component_types())
 
     def _generated_code_timeout(self) -> float:
         return max(0.1, getattr(configs, 'generated_code_timeout_s', 2.0))
@@ -421,10 +442,12 @@ class AsyncProducer:
         )
 
     def _observer_cache_contracts_valid(self) -> bool:
-        for response_type in self._response_types_from_primary_field():
+        invalid_types: list[str] = []
+        for response_type in list(self.observers):
             versions = self.observers.get(response_type, [])
             if not versions:
-                return False
+                invalid_types.append(response_type)
+                continue
             observer = versions[-1]
             path = Path(observer.path)
             typed_path = (
@@ -435,7 +458,8 @@ class AsyncProducer:
             if typed_path.is_file():
                 path = typed_path
             if not path.is_file():
-                return False
+                invalid_types.append(response_type)
+                continue
             code = path.read_text(encoding='utf-8')
             validation = validate_generated_code(
                 code,
@@ -448,11 +472,14 @@ class AsyncProducer:
                     'observer', response_type, 'cache_invalid', 0, code,
                     validation.error,
                 )
-                return False
+                invalid_types.append(response_type)
+                continue
             self._record_generation(
                 'observer', response_type, 'reused_cache', 0, code,
             )
-        return True
+        for response_type in invalid_types:
+            self.observers.pop(response_type, None)
+        return not invalid_types
 
     def _filter_invalid_cached_mutators(self) -> None:
         filtered: dict[str, list[Generator]] = {}
@@ -1048,6 +1075,7 @@ class AsyncProducer:
             retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
             failure_count = 0
             while failure_count < retry_limit:
+                checker_code: str | None = None
                 try:
                     checker_code = await self.chater.llm_checker_gen(
                         pro_name=self.rfcp.pro_name,
@@ -1056,20 +1084,26 @@ class AsyncProducer:
                         response_type=response_type,
                         type_rule=self._response_type_rule_info(response_type),
                     )
-                    compile(checker_code, '<string>', 'exec')
-                    namespace = {}
-                    exec(checker_code, namespace)
-                    checker_func = namespace.get('packet_checker')
-                    if not callable(checker_func):
-                        raise TypeError(
-                            'packet_checker is missing or not callable'
-                        )
-                    result = checker_func(b'')
-                    if not isinstance(result, bool):
-                        raise TypeError('packet_checker must return bool')
+                    validation = validate_generated_code(
+                        checker_code,
+                        'packet_checker',
+                        'checker',
+                        timeout_s=self._generated_code_timeout(),
+                    )
+                    if not validation.ok:
+                        raise ValueError(validation.error)
+                    self._record_generation(
+                        'checker', response_type, 'generated',
+                        failure_count + 1, checker_code,
+                    )
                     return response_type, checker_code
                 except Exception as e:
                     failure_count += 1
+                    self._record_generation(
+                        'checker', response_type, 'invalid', failure_count,
+                        checker_code,
+                        f'{type(e).__name__}: {e}',
+                    )
                     logger.debug(
                         f'[Checker Generation][{response_type}]: '
                         f'invalid checker {e}'
@@ -1082,7 +1116,8 @@ class AsyncProducer:
             return None
 
     async def _checker_gen_async(
-            self
+            self,
+            response_types: list[str] | None = None,
     ) -> list[tuple[str, str] | None]:
         if not hasattr(self, 'res_ir'):
             raise RuntimeError('Response IR is unavailable for checker generation')
@@ -1091,7 +1126,11 @@ class AsyncProducer:
         if not messages:
             raise RuntimeError('Response IR does not contain any messages')
 
-        response_types = self._response_types_from_primary_field()
+        response_types = (
+            response_types
+            if response_types is not None
+            else self._initial_response_component_types()
+        )
         res_info = self._primary_response_field_info()
         sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
@@ -1109,33 +1148,47 @@ class AsyncProducer:
         return await tqdm_asyncio.gather(*tasks, desc='checker')
 
     def checker_gen(
-            self
+            self,
+            response_types: list[str] | None = None,
     ) -> None:
-        """Generate one initial response checker for each response type."""
-        results = asyncio.run(self._checker_gen_async())
-        self.checkers = {}
+        """Generate and persist missing response checkers."""
+        response_types = list(dict.fromkeys(
+            response_types
+            if response_types is not None
+            else self._initial_response_component_types()
+        ))
+        if not response_types:
+            return
+        results = asyncio.run(self._checker_gen_async(response_types))
 
-        for result in results:
-            if result is None:
-                continue
-            msg_type, checker_code = result
-            msg_dir = self.checker_path / quote(msg_type, safe='._-')
-            msg_dir.mkdir(parents=True, exist_ok=True)
-            checker_path = msg_dir / 'id0.py'
-            with open(checker_path, 'w', encoding='utf-8') as f:
-                f.write(checker_code)
+        with self._response_components_lock():
+            for result in results:
+                if result is None:
+                    continue
+                msg_type, checker_code = result
+                if self.checkers.get(msg_type):
+                    continue
+                msg_dir = self.checker_path / quote(msg_type, safe='._-')
+                msg_dir.mkdir(parents=True, exist_ok=True)
+                checker_path = msg_dir / 'id0.py'
+                with open(checker_path, 'w', encoding='utf-8') as f:
+                    f.write(checker_code)
 
-            checker = Checker(
-                msg_type=msg_type,
-                evolved_from='init',
-                name='id0',
-                path=str(checker_path.resolve()),
-                state_field=self._primary_response_field_name()
-            )
-            self.checkers.setdefault(msg_type, []).append(checker)
+                checker = Checker(
+                    msg_type=msg_type,
+                    evolved_from='init',
+                    name='id0',
+                    path=str(checker_path.resolve()),
+                    state_field=self._primary_response_field_name(),
+                    contract_version=(
+                        self.RESPONSE_COMPONENT_CONTRACT_VERSION
+                    ),
+                    ir_sha256=self._response_component_ir_sha256(msg_type),
+                )
+                self.checkers.setdefault(msg_type, []).append(checker)
 
-        with open(self.checker_info_path, 'w', encoding='utf-8') as f:
-            json.dump(self.checker_info(), f)
+            with open(self.checker_info_path, 'w', encoding='utf-8') as f:
+                json.dump(self.checker_info(), f)
 
         logger.debug("[Producer]: finish checkers generation")
 
@@ -1217,13 +1270,20 @@ class AsyncProducer:
             )
             return response_type, RAW_SHA256_OBSERVER
 
-    async def _observer_gen_async(self) -> list[tuple[str, str] | None]:
+    async def _observer_gen_async(
+        self,
+        response_types: list[str] | None = None,
+    ) -> list[tuple[str, str] | None]:
         if not hasattr(self, 'res_ir'):
             raise RuntimeError('Response IR is unavailable for observer generation')
         messages = self.res_ir.findall('message')
         if not messages:
             raise RuntimeError('Response IR does not contain any messages')
-        response_types = self._response_types_from_primary_field()
+        response_types = (
+            response_types
+            if response_types is not None
+            else self._initial_response_component_types()
+        )
         res_info = self._primary_response_field_info()
         sem = asyncio.Semaphore(configs.async_sem_fuzz)
         tasks = [
@@ -1237,29 +1297,45 @@ class AsyncProducer:
         ]
         return await tqdm_asyncio.gather(*tasks, desc='observer')
 
-    def observer_gen(self) -> None:
-        """Generate one semantic response observer for each response type."""
-        results = asyncio.run(self._observer_gen_async())
-        self.observers = {}
-        for result in results:
-            if result is None:
-                continue
-            msg_type, observer_code = result
-            msg_dir = self.observer_path / quote(msg_type, safe='._-')
-            msg_dir.mkdir(parents=True, exist_ok=True)
-            observer_path = msg_dir / 'id0.py'
-            with observer_path.open('w', encoding='utf-8') as f:
-                f.write(observer_code)
-            observer = ResponseObserver(
-                msg_type=msg_type,
-                name='id0',
-                path=str(observer_path.resolve()),
-                state_field=self._primary_response_field_name(),
-                evolved_from='init',
-            )
-            self.observers.setdefault(msg_type, []).append(observer)
-        with self.observer_info_path.open('w', encoding='utf-8') as f:
-            json.dump(self.observer_info(), f, indent=2)
+    def observer_gen(
+        self,
+        response_types: list[str] | None = None,
+    ) -> None:
+        """Generate and persist missing semantic response observers."""
+        response_types = list(dict.fromkeys(
+            response_types
+            if response_types is not None
+            else self._initial_response_component_types()
+        ))
+        if not response_types:
+            return
+        results = asyncio.run(self._observer_gen_async(response_types))
+        with self._response_components_lock():
+            for result in results:
+                if result is None:
+                    continue
+                msg_type, observer_code = result
+                if self.observers.get(msg_type):
+                    continue
+                msg_dir = self.observer_path / quote(msg_type, safe='._-')
+                msg_dir.mkdir(parents=True, exist_ok=True)
+                observer_path = msg_dir / 'id0.py'
+                with observer_path.open('w', encoding='utf-8') as f:
+                    f.write(observer_code)
+                observer = ResponseObserver(
+                    msg_type=msg_type,
+                    name='id0',
+                    path=str(observer_path.resolve()),
+                    state_field=self._primary_response_field_name(),
+                    contract_version=(
+                        self.RESPONSE_COMPONENT_CONTRACT_VERSION
+                    ),
+                    ir_sha256=self._response_component_ir_sha256(msg_type),
+                    evolved_from='init',
+                )
+                self.observers.setdefault(msg_type, []).append(observer)
+            with self.observer_info_path.open('w', encoding='utf-8') as f:
+                json.dump(self.observer_info(), f, indent=2)
         logger.debug("[Producer]: finish observers generation")
 
     def evolve_observer(
@@ -1328,6 +1404,8 @@ class AsyncProducer:
             name=name,
             path=str(target_path.resolve()),
             state_field=current.state_field,
+            contract_version=current.contract_version,
+            ir_sha256=current.ir_sha256,
             evolved_from=current.name,
             sample_observations=[
                 hashlib.sha256(sample).hexdigest()
@@ -1598,6 +1676,8 @@ class AsyncProducer:
             name=name,
             path=str(target_path.resolve()),
             state_field=current.state_field,
+            contract_version=current.contract_version,
+            ir_sha256=current.ir_sha256,
             checked_res=list(dict.fromkeys(
                 [*current.checked_res, response_digest]
             )),
@@ -1650,6 +1730,197 @@ class AsyncProducer:
                     f'Producer: checker evolution failed [{response_type}]'
                 )
         return None
+
+    def _response_components_lock(self) -> threading.RLock:
+        lock = getattr(self, '_response_component_lock', None)
+        if lock is None:
+            lock = threading.RLock()
+            self._response_component_lock = lock
+        return lock
+
+    @staticmethod
+    def response_family(response_type: str) -> str | None:
+        """Return a stable protocol response-family key when one is evident."""
+        match = re.search(r'(?<!\d)([1-5])\d{2}(?!\d)', response_type)
+        if match is None:
+            return None
+        return f'{match.group(1)}xx'
+
+    def response_component_candidates(
+        self,
+        response_type: str,
+    ) -> list[str]:
+        """Return exact, family, then protocol-wide component keys."""
+        candidates = [response_type]
+        family = self.response_family(response_type)
+        if family is not None and family != response_type:
+            candidates.append(family)
+        candidates.append('__all__')
+        return list(dict.fromkeys(candidates))
+
+    def _initial_response_component_types(self) -> list[str]:
+        """Select the bounded set prepared before network fuzzing starts."""
+        if not getattr(configs, 'response_component_lazy_generation', True):
+            return self._response_types_from_primary_field()
+        configured = getattr(
+            configs,
+            'response_component_prewarm_types',
+            [],
+        )
+        known = set(self._response_types_from_primary_field())
+        prewarm = [
+            str(item).strip()
+            for item in configured
+            if str(item).strip() in known
+        ]
+        return list(dict.fromkeys(['__all__', *prewarm]))
+
+    def _missing_checker_types(self, response_types: list[str]) -> list[str]:
+        state_field = self._primary_response_field_name()
+        missing = []
+        for item in response_types:
+            versions = self.checkers.get(item, [])
+            if versions and self._response_component_metadata_current(
+                versions[-1], item, state_field
+            ):
+                continue
+            self.checkers.pop(item, None)
+            missing.append(item)
+        return missing
+
+    def _missing_observer_types(self, response_types: list[str]) -> list[str]:
+        state_field = self._primary_response_field_name()
+        missing = []
+        for item in response_types:
+            versions = self.observers.get(item, [])
+            if versions and self._response_component_metadata_current(
+                versions[-1], item, state_field
+            ):
+                continue
+            self.observers.pop(item, None)
+            missing.append(item)
+        return missing
+
+    def _response_component_ir_sha256(self, response_type: str) -> str:
+        messages = self.res_ir.findall('message')
+        selected = self._checker_ir_for_response_type(response_type, messages)
+        digest = hashlib.sha256()
+        digest.update(etree.tostring(selected, encoding='utf-8'))
+        digest.update(b'\0')
+        digest.update(
+            self._primary_response_field_info().encode('utf-8')
+        )
+        digest.update(b'\0')
+        digest.update(
+            self._response_type_rule_info(response_type).encode('utf-8')
+        )
+        return digest.hexdigest()
+
+    def _response_component_metadata_current(
+        self,
+        component: Checker | ResponseObserver,
+        response_type: str,
+        state_field: str | None = None,
+    ) -> bool:
+        return (
+            component.state_field == (
+                state_field or self._primary_response_field_name()
+            )
+            and component.contract_version == (
+                self.RESPONSE_COMPONENT_CONTRACT_VERSION
+            )
+            and component.ir_sha256 == self._response_component_ir_sha256(
+                response_type
+            )
+        )
+
+    def request_response_components(self, response_type: str) -> None:
+        """Queue missing exact/family components without blocking fuzzing."""
+        if response_type.upper() in {
+            'UNKNOWN', 'UNKOWN', 'TIMEOUT', 'CRASH', 'CLOSED', 'RCLOSED',
+            'POLLERR',
+        }:
+            return
+        if (
+            not getattr(configs, 'spec_knowledge', True)
+            or not getattr(configs, 'response_component_lazy_generation', True)
+        ):
+            return
+        keys = self.response_component_candidates(response_type)[:-1]
+        with self._response_components_lock():
+            if not hasattr(self, '_response_component_pending'):
+                self._response_component_pending = set()
+            if not hasattr(self, '_response_component_failures'):
+                self._response_component_failures = set()
+            if not hasattr(self, '_response_component_queue'):
+                self._response_component_queue = queue.Queue()
+            for key in keys:
+                checker_missing = bool(self._missing_checker_types([key]))
+                observer_missing = bool(self._missing_observer_types([key]))
+                if (
+                    not checker_missing
+                    and not observer_missing
+                ) or key in self._response_component_pending or key in (
+                    self._response_component_failures
+                ):
+                    continue
+                self._response_component_pending.add(key)
+                self._response_component_queue.put(key)
+            worker = getattr(self, '_response_component_worker', None)
+            if self._response_component_pending and (
+                worker is None or not worker.is_alive()
+            ):
+                self._response_component_worker = threading.Thread(
+                    target=self._response_component_worker_main,
+                    name='voltron-response-components',
+                    daemon=True,
+                )
+                self._response_component_worker.start()
+
+    def _response_component_worker_main(self) -> None:
+        """Generate queued components serially to keep cache writes coherent."""
+        while True:
+            failed = False
+            try:
+                response_type = self._response_component_queue.get_nowait()
+            except queue.Empty:
+                return
+            try:
+                if not self.checkers.get(response_type):
+                    self.checker_gen([response_type])
+                if not self.observers.get(response_type):
+                    self.observer_gen([response_type])
+                if (
+                    not self.checkers.get(response_type)
+                    or not self.observers.get(response_type)
+                ):
+                    failed = True
+                    self._record_generation(
+                        'response_components', response_type,
+                        'quarantined', 0,
+                        error='checker or observer generation unavailable',
+                    )
+            except Exception:
+                failed = True
+                logger.exception(
+                    'Producer: on-demand response component generation failed '
+                    '[%s]',
+                    response_type,
+                )
+            finally:
+                with self._response_components_lock():
+                    if failed:
+                        self._response_component_failures.add(response_type)
+                    self._response_component_pending.discard(response_type)
+                self._response_component_queue.task_done()
+
+    def wait_for_response_components(self, timeout: float | None = None) -> bool:
+        """Testing/shutdown hook; normal fuzzing never waits for generation."""
+        worker = getattr(self, '_response_component_worker', None)
+        if worker is None:
+            return True
+        worker.join(timeout)
+        return not worker.is_alive()
 
     def _response_types_from_primary_field(
         self
@@ -1951,26 +2222,45 @@ class AsyncProducer:
         return ''.join(char.lower() for char in field_name if char.isalnum())
 
     def _checker_cache_matches_response_types(
-        self
+        self,
+        expected_types: list[str] | None = None,
     ) -> bool:
-        expected_types = set(self._response_types_from_primary_field())
-        if set(self.checkers) != expected_types:
+        expected = set(
+            expected_types
+            if expected_types is not None
+            else self._initial_response_component_types()
+        )
+        if not expected.issubset(self.checkers):
             return False
         state_field = self._primary_response_field_name()
         return all(
             checkers
-            and checkers[-1].state_field == state_field
-            for checkers in self.checkers.values()
+            and self._response_component_metadata_current(
+                checkers[-1], msg_type, state_field
+            )
+            for msg_type, checkers in self.checkers.items()
+            if msg_type in expected
         )
 
-    def _observer_cache_matches_response_types(self) -> bool:
-        expected_types = set(self._response_types_from_primary_field())
-        if set(self.observers) != expected_types:
+    def _observer_cache_matches_response_types(
+        self,
+        expected_types: list[str] | None = None,
+    ) -> bool:
+        expected = set(
+            expected_types
+            if expected_types is not None
+            else self._initial_response_component_types()
+        )
+        if not expected.issubset(self.observers):
             return False
         state_field = self._primary_response_field_name()
         return all(
-            observers and observers[-1].state_field == state_field
-            for observers in self.observers.values()
+            observers
+            and self._response_component_metadata_current(
+                observers[-1], msg_type, state_field
+            )
+            for msg_type, observers in self.observers.items()
+            if msg_type in expected
         )
         
     async def _parser_evo_one(

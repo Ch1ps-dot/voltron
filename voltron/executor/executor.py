@@ -25,6 +25,7 @@ from voltron.executor.sut_monitor import (
     build_sut_monitor,
 )
 import math, statistics, threading, sys, os, signal, re
+from dataclasses import dataclass, asdict
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
@@ -59,6 +60,24 @@ RUNTIME_EXCEPTION_PATTERNS = (
     re.compile(r'(?:uncaught exception|uncaught \w*error)', re.IGNORECASE),
     re.compile(r'PHP Fatal error:', re.IGNORECASE),
 )
+
+
+@dataclass(frozen=True)
+class CheckerEvaluation:
+    status: str
+    scope: str
+    component_type: str | None
+    error: str = ''
+
+
+@dataclass(frozen=True)
+class ObservationResult:
+    semantic_fingerprint: str
+    raw_fingerprint: str
+    scope: str
+    component_type: str | None
+    provisional: bool
+    error: str = ''
 
 class Executor:
     """Executor for interacting with the SUT, sending requests and receiving responses, and recording the conversation.
@@ -119,6 +138,7 @@ class Executor:
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
+        self.checker_sources: dict[str, str] = {}
         self.observer_funcs: dict[str, Callable[[bytes], str]] = {}
         self.observer_sources: dict[str, tuple[str, str]] = {}
         if configs.fuzz_mode != 'replay':
@@ -138,6 +158,15 @@ class Executor:
         self.observer_semantic_reviews: dict[
             tuple[str, str, str], bool
         ] = {}
+        self.component_evidence: dict[tuple[str, str, str], dict] = {}
+        self._component_usage_lock = threading.Lock()
+        self._component_usage_counts: dict[str, dict[str, int]] = {
+            'checker_status': {},
+            'checker_scope': {},
+            'observer_scope': {},
+        }
+        self._component_observed_types: set[str] = set()
+        self._component_provisional_count = 0
         self._invalid_response_lock = threading.Lock()
         self.stop_event = stop_event
             
@@ -347,11 +376,22 @@ class Executor:
             flag, conversation = result
             pair_recorder = getattr(self, 'pair_recorder', None)
             if flag and conversation is not None and pair_recorder is not None:
-                pair_recorder.observe(
-                    conversation,
-                    phase=getattr(self.analyzer, 'active_phase', None)
-                    or getattr(self.analyzer, 'stage', ''),
+                phase = (
+                    getattr(self.analyzer, 'active_phase', None)
+                    or getattr(self.analyzer, 'stage', '')
                 )
+                if isinstance(pair_recorder, RequestResponsePairRecorder):
+                    pair_recorder.observe(
+                        conversation,
+                        phase=phase,
+                        component_evidence=getattr(
+                            self,
+                            'component_evidence',
+                            {},
+                        ),
+                    )
+                else:
+                    pair_recorder.observe(conversation, phase=phase)
             if flag:
                 outcome = 'completed'
             elif self.stop_event.is_set():
@@ -1657,15 +1697,19 @@ class Executor:
     ) -> None:
         """Load the latest generated checker for each response type."""
         self.checker_funcs = {}
+        self.checker_sources = {}
         for msg_type, checker in checkers.items():
-            namespace = {}
             try:
                 with open(self.mapper.c_path(checker), 'r', encoding='utf-8') as f:
-                    exec(f.read(), namespace)
-                checker_func: Callable = namespace.get('packet_checker')
-                if not callable(checker_func):
+                    code = f.read()
+                tree = ast.parse(code)
+                if not any(
+                    isinstance(node, ast.FunctionDef)
+                    and node.name == 'packet_checker'
+                    for node in tree.body
+                ):
                     raise TypeError('packet_checker is missing or not callable')
-                self.checker_funcs[msg_type] = checker_func
+                self.checker_sources[msg_type] = code
             except Exception as e:
                 logger.debug(
                     f'Executor: checker load failure [{msg_type}] {e}'
@@ -1708,13 +1752,107 @@ class Executor:
         response_type: str,
         response: bytes
     ) -> str:
-        """Return an IR-normalized digest, falling back to raw SHA-256."""
+        """Return the selected semantic digest for compatibility callers."""
+        return self.observe_response_result(
+            response_type,
+            response,
+        ).semantic_fingerprint
+
+    @staticmethod
+    def _response_component_candidates(response_type: str) -> list[str]:
+        candidates = [response_type]
+        family_match = re.search(
+            r'(?<!\d)([1-5])\d{2}(?!\d)',
+            response_type,
+        )
+        if family_match is not None:
+            candidates.append(f'{family_match.group(1)}xx')
+        candidates.append('__all__')
+        return list(dict.fromkeys(candidates))
+
+    @staticmethod
+    def _component_scope(
+        response_type: str,
+        component_type: str | None,
+    ) -> str:
+        if component_type is None:
+            return 'raw'
+        if component_type == response_type:
+            return 'exact'
+        if component_type == '__all__':
+            return 'generic'
+        return 'family'
+
+    def _request_and_refresh_response_components(
+        self,
+        response_type: str,
+    ) -> None:
+        producer = getattr(getattr(self, 'mapper', None), 'producer', None)
+        if producer is None:
+            return
+        request = getattr(producer, 'request_response_components', None)
+        if not callable(request):
+            return
+        request(response_type)
+
+        # A previous background request may have completed since the last
+        # response.  Reload only when metadata now contains an unloaded key.
+        equip_checkers = getattr(self.mapper, 'equip_checkers', None)
+        if callable(equip_checkers):
+            equipped = equip_checkers()
+            loaded_checkers = set(getattr(self, 'checker_sources', {})) | set(
+                getattr(self, 'checker_funcs', {})
+            )
+            if set(equipped) != loaded_checkers:
+                self.load_checkers(equipped)
+        equip_observers = getattr(self.mapper, 'equip_observers', None)
+        if callable(equip_observers):
+            equipped = equip_observers()
+            loaded = set(getattr(self, 'observer_sources', {})) | set(
+                getattr(self, 'observer_funcs', {})
+            )
+            newly_available = set(equipped) - loaded
+            if set(equipped) != loaded:
+                self.load_observers(equipped)
+                if response_type in newly_available and hasattr(
+                    self,
+                    'checked_request_response_pairs',
+                ):
+                    # Preserve raw fingerprints in persisted evidence while
+                    # rebuilding in-memory semantic indexes for the newly
+                    # available exact observer.
+                    self._rebuild_observation_indexes(response_type)
+                    self._reobserve_persisted_invalid_responses(response_type)
+                    logger.debug(format_event(
+                        'observer.promoted',
+                        response_type=response_type,
+                        from_scope='provisional',
+                        to_scope='exact',
+                    ))
+
+    def observe_response_result(
+        self,
+        response_type: str,
+        response: bytes,
+    ) -> ObservationResult:
+        """Observe with exact/family/generic selection and explicit fallback."""
         fallback = hashlib.sha256(response).hexdigest()
+        self._request_and_refresh_response_components(response_type)
         observer_sources = getattr(self, 'observer_sources', {})
-        source = observer_sources.get(response_type)
-        if source is None:
-            source = observer_sources.get('__all__')
-        if source is not None:
+        observer_funcs = getattr(self, 'observer_funcs', {})
+        component_type = next(
+            (
+                candidate
+                for candidate in self._response_component_candidates(
+                    response_type
+                )
+                if candidate in observer_sources or candidate in observer_funcs
+            ),
+            None,
+        )
+        scope = self._component_scope(response_type, component_type)
+        source = observer_sources.get(component_type) if component_type else None
+        if source is not None and component_type is not None:
             code, function_name = source
             digest = self.mapper._run_dynamic_code(
                 code,
@@ -1722,30 +1860,61 @@ class Executor:
                 args=(response,),
             )
             if self._valid_observer_digest(digest):
-                return digest
+                return ObservationResult(
+                    semantic_fingerprint=digest,
+                    raw_fingerprint=fallback,
+                    scope=scope,
+                    component_type=component_type,
+                    provisional=scope != 'exact',
+                )
             logger.warning(
                 'Executor: observer failed or returned invalid digest [%s]',
                 response_type,
             )
-            return fallback
+            return ObservationResult(
+                semantic_fingerprint=fallback,
+                raw_fingerprint=fallback,
+                scope='raw',
+                component_type=component_type,
+                provisional=True,
+                error='observer returned an invalid digest',
+            )
 
-        observer = self.observer_funcs.get(response_type)
+        observer = observer_funcs.get(component_type) if component_type else None
         if observer is None:
-            observer = self.observer_funcs.get('__all__')
-        if observer is None:
-            return fallback
+            return ObservationResult(
+                semantic_fingerprint=fallback,
+                raw_fingerprint=fallback,
+                scope='raw',
+                component_type=None,
+                provisional=True,
+                error='no observer available',
+            )
         try:
             digest = observer(response)
             if not self._valid_observer_digest(digest):
                 raise TypeError(
                     'packet_observer must return lowercase SHA-256'
                 )
-            return digest
-        except Exception:
+            return ObservationResult(
+                semantic_fingerprint=digest,
+                raw_fingerprint=fallback,
+                scope=scope,
+                component_type=component_type,
+                provisional=scope != 'exact',
+            )
+        except Exception as error:
             logger.exception(
                 f'Executor: observer failure [{response_type}]'
             )
-            return fallback
+            return ObservationResult(
+                semantic_fingerprint=fallback,
+                raw_fingerprint=fallback,
+                scope='raw',
+                component_type=component_type,
+                provisional=True,
+                error=f'{type(error).__name__}: {error}',
+            )
 
     @staticmethod
     def _valid_observer_digest(digest: object) -> bool:
@@ -1874,28 +2043,76 @@ class Executor:
         response_type: str,
         response: bytes
     ) -> bool:
-        """Validate a response with the checker selected by parser output."""
-        checker = self.checker_funcs.get(response_type)
-        if checker is None:
-            checker = self.checker_funcs.get('__all__')
-        if checker is None:
+        """Compatibility boolean: only a confirmed rejection is False."""
+        evaluation = self.evaluate_response(response_type, response)
+        self.last_checker_evaluation = evaluation
+        return evaluation.status != 'non_compliant'
+
+    def evaluate_response(
+        self,
+        response_type: str,
+        response: bytes,
+    ) -> CheckerEvaluation:
+        """Return a four-state checker result with component provenance."""
+        self._request_and_refresh_response_components(response_type)
+        checker_funcs = getattr(self, 'checker_funcs', {})
+        checker_sources = getattr(self, 'checker_sources', {})
+        component_type = next(
+            (
+                candidate
+                for candidate in self._response_component_candidates(
+                    response_type
+                )
+                if candidate in checker_funcs or candidate in checker_sources
+            ),
+            None,
+        )
+        checker = checker_funcs.get(component_type) if component_type else None
+        checker_source = (
+            checker_sources.get(component_type) if component_type else None
+        )
+        if checker is None and checker_source is None:
             logger.debug(
                 f'Executor: no checker for response type {response_type}'
             )
-            return True
+            return CheckerEvaluation(
+                status='unchecked',
+                scope='none',
+                component_type=None,
+                error='no checker available',
+            )
 
         try:
-            is_valid = checker(response)
+            if checker_source is not None:
+                is_valid = self.mapper._run_dynamic_code(
+                    checker_source,
+                    'packet_checker',
+                    args=(response,),
+                )
+                if is_valid is None:
+                    raise RuntimeError('checker execution failed or timed out')
+            else:
+                is_valid = checker(response)
             if not isinstance(is_valid, bool):
                 raise TypeError('packet_checker must return bool')
         except Exception as e:
             logger.debug(
                 f'Executor: checker failure [{response_type}] {e}'
             )
-            is_valid = False
+            return CheckerEvaluation(
+                status='unchecked',
+                scope=self._component_scope(response_type, component_type),
+                component_type=component_type,
+                error=f'{type(e).__name__}: {e}',
+            )
 
         if is_valid:
-            return True
+            scope = self._component_scope(response_type, component_type)
+            return CheckerEvaluation(
+                status='compliant' if scope == 'exact' else 'uncertain',
+                scope=scope,
+                component_type=component_type,
+            )
 
         logger.debug(format_event(
             'checker.reject',
@@ -1903,7 +2120,11 @@ class Executor:
             length=len(response),
             response=response,
         ))
-        return False
+        return CheckerEvaluation(
+            status='non_compliant',
+            scope=self._component_scope(response_type, component_type),
+            component_type=component_type,
+        )
 
     def check_response_during_fuzzing(
         self,
@@ -1920,6 +2141,8 @@ class Executor:
             response_type,
             response,
         )
+        observation = self.observe_response_result(response_type, response)
+        response_observation = observation.semantic_fingerprint
         raw_digest = hashlib.sha256(response).hexdigest()
         dedup_key = (
             request_type,
@@ -1940,7 +2163,115 @@ class Executor:
                 (request_type, response_type, raw_digest)
             ] = response
 
-        return self.check_response(response_type, response)
+        is_valid = self.check_response(response_type, response)
+        evaluation = getattr(self, 'last_checker_evaluation', None)
+        if not isinstance(evaluation, CheckerEvaluation):
+            evaluation = CheckerEvaluation(
+                status='compliant' if is_valid else 'non_compliant',
+                scope='exact',
+                component_type=response_type,
+            )
+        if not hasattr(self, 'component_evidence'):
+            self.component_evidence = {}
+        self.component_evidence[
+            (request_type, response_type, raw_digest)
+        ] = {
+            'checker': asdict(evaluation),
+            'observer': asdict(observation),
+        }
+        self._record_response_component_usage(
+            request_type,
+            response_type,
+            evaluation,
+            observation,
+        )
+        logger.debug(format_event(
+            'response.components',
+            request_type=request_type,
+            response_type=response_type,
+            checker_status=evaluation.status,
+            checker_scope=evaluation.scope,
+            checker_component=evaluation.component_type or '',
+            observer_scope=observation.scope,
+            observer_component=observation.component_type or '',
+            observer_provisional=observation.provisional,
+            raw_fingerprint=observation.raw_fingerprint,
+            semantic_fingerprint=observation.semantic_fingerprint,
+        ))
+        return is_valid
+
+    def _record_response_component_usage(
+        self,
+        request_type: str,
+        response_type: str,
+        evaluation: CheckerEvaluation,
+        observation: ObservationResult,
+    ) -> None:
+        """Persist auditable component decisions and an incremental summary."""
+        results_path = getattr(configs, 'results_path', None)
+        if not isinstance(results_path, Path) or not results_path.is_dir():
+            return
+        if not hasattr(self, '_component_usage_lock'):
+            self._component_usage_lock = threading.Lock()
+        with self._component_usage_lock:
+            record = {
+                'timestamp': time.time(),
+                'request_type': request_type,
+                'response_type': response_type,
+                'checker': asdict(evaluation),
+                'observer': asdict(observation),
+            }
+            try:
+                with (
+                    results_path / 'response_component_usage.jsonl'
+                ).open('a', encoding='utf-8') as stream:
+                    json.dump(record, stream, ensure_ascii=False)
+                    stream.write('\n')
+
+                if not hasattr(self, '_component_usage_counts'):
+                    self._component_usage_counts = {
+                        'checker_status': {},
+                        'checker_scope': {},
+                        'observer_scope': {},
+                    }
+                    self._component_observed_types = set()
+                    self._component_provisional_count = 0
+                dimensions = (
+                    ('checker_status', evaluation.status),
+                    ('checker_scope', evaluation.scope),
+                    ('observer_scope', observation.scope),
+                )
+                for dimension, value in dimensions:
+                    counts = self._component_usage_counts[dimension]
+                    counts[value] = counts.get(value, 0) + 1
+                self._component_observed_types.add(response_type)
+                if observation.provisional:
+                    self._component_provisional_count += 1
+
+                summary = {
+                    'observed_response_types': sorted(
+                        self._component_observed_types
+                    ),
+                    'observed_response_type_count': len(
+                        self._component_observed_types
+                    ),
+                    **self._component_usage_counts,
+                    'observer_provisional_count': (
+                        self._component_provisional_count
+                    ),
+                }
+                summary_path = (
+                    results_path / 'response_component_summary.json'
+                )
+                temporary_path = summary_path.with_suffix('.json.tmp')
+                with temporary_path.open('w', encoding='utf-8') as stream:
+                    json.dump(summary, stream, indent=2, ensure_ascii=False)
+                    stream.write('\n')
+                temporary_path.replace(summary_path)
+            except Exception:
+                logger.exception(
+                    'Executor: failed to persist response component usage'
+                )
 
     def handle_nonconforming_response(
         self,

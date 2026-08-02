@@ -61,3 +61,30 @@ def test_observer_runtime_is_isolated_and_falls_back_on_timeout():
         ).hexdigest()
     finally:
         mapper.close()
+
+
+def test_checker_runtime_is_isolated_and_becomes_unchecked_on_timeout():
+    mapper = Mapper.__new__(Mapper)
+    mapper.producer = None
+    mapper.exec_timeout_s = 0.1
+    mapper._dynamic_ctx = mp.get_context('spawn')
+    mapper._dynamic_conn = None
+    mapper._dynamic_proc = None
+    mapper._dynamic_lock = threading.Lock()
+    executor = Executor.__new__(Executor)
+    executor.mapper = mapper
+    executor.checker_funcs = {}
+    executor.checker_sources = {
+        '200': (
+            'def packet_checker(response):\n'
+            '    while True:\n'
+            '        pass\n'
+        )
+    }
+    try:
+        result = executor.evaluate_response('200', b'200 OK\r\n')
+        assert result.status == 'unchecked'
+        assert result.scope == 'exact'
+        assert 'timed out' in result.error
+    finally:
+        mapper.close()

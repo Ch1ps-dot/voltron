@@ -10,4 +10,6 @@ class Checker:
     name: str
     path: str
     state_field: str = ''
+    contract_version: str = ''
+    ir_sha256: str = ''
     checked_res: list[str] = field(default_factory=list)

@@ -162,6 +162,21 @@ class Fuzzer:
             1,
             int(generated_code.get('max_message_bytes', 1024 * 1024)),
         )
+        response_components = configs_yaml.get('response_components', {})
+        lazy_generation = response_components.get('lazy_generation', True)
+        if not isinstance(lazy_generation, bool):
+            raise TypeError(
+                'response_components.lazy_generation must be a boolean'
+            )
+        configs.response_component_lazy_generation = lazy_generation
+        prewarm_types = response_components.get('prewarm_types', [])
+        if not isinstance(prewarm_types, list):
+            raise TypeError('response_components.prewarm_types must be a list')
+        configs.response_component_prewarm_types = [
+            str(item).strip()
+            for item in prewarm_types
+            if str(item).strip()
+        ]
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name

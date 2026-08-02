@@ -25,6 +25,7 @@ class RequestResponsePairRecorder:
         self,
         conversation: Conversation,
         phase: str = '',
+        component_evidence: dict[tuple[str, str, str], dict] | None = None,
     ) -> int:
         """Record eligible relations and return the number of new pair files."""
         saved = 0
@@ -51,6 +52,13 @@ class RequestResponsePairRecorder:
                 request=request,
                 response=response,
                 phase=phase,
+                component_evidence=(
+                    component_evidence or {}
+                ).get((
+                    request_type,
+                    response_type,
+                    hashlib.sha256(response).hexdigest(),
+                )),
             ):
                 saved += 1
         return saved
@@ -62,6 +70,7 @@ class RequestResponsePairRecorder:
         request: bytes,
         response: bytes,
         phase: str,
+        component_evidence: dict | None = None,
     ) -> bool:
         relation = (request_type, response_type)
         with self._lock:
@@ -98,6 +107,24 @@ class RequestResponsePairRecorder:
                 },
                 'phase': phase or 'unknown',
                 'conversation_digest': digest.hexdigest(),
+                'runtime_components': component_evidence or {
+                    'checker': {
+                        'status': 'unchecked',
+                        'scope': 'none',
+                        'component_type': None,
+                        'error': 'checker was not enabled for this exchange',
+                    },
+                    'observer': {
+                        'semantic_fingerprint': hashlib.sha256(
+                            response
+                        ).hexdigest(),
+                        'raw_fingerprint': hashlib.sha256(response).hexdigest(),
+                        'scope': 'raw',
+                        'component_type': None,
+                        'provisional': True,
+                        'error': 'observer evidence was not recorded',
+                    },
+                },
             }
             temporary_path = file_path.with_name(
                 f'.{file_path.name}.{os.getpid()}.{threading.get_ident()}.tmp'

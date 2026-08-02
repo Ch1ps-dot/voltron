@@ -111,6 +111,22 @@ def _validation_worker(
                 raise ValueError(
                     'evolved observer does not unify historical samples'
                 )
+        elif contract == 'checker':
+            try:
+                signature.bind(b'probe')
+            except TypeError as error:
+                raise TypeError(f'wrong checker signature: {error}') from error
+            for probe in (b'', b'voltron-checker-probe', b'\x00\xff', None):
+                first = function(probe)
+                second = function(probe)
+                if not isinstance(first, bool):
+                    raise TypeError(
+                        'invalid_return_type: checker must return bool'
+                    )
+                if first != second:
+                    raise ValueError(
+                        'nondeterministic: checker changed for identical input'
+                    )
         elif contract == 'mutator':
             try:
                 signature.bind()
