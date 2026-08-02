@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import threading
 
@@ -74,3 +75,39 @@ def test_uses_next_available_file_id(tmp_path):
 
     assert recorder.observe(conversation, phase='fuzzing') == 1
     assert (target / 'pair_000001.json').is_file()
+
+
+def test_persists_runtime_component_provenance(tmp_path):
+    recorder = RequestResponsePairRecorder(tmp_path)
+    conversation = Conversation()
+    add_exchange(conversation, 'PING', '200', b'PING', b'200 OK')
+    raw_hash = hashlib.sha256(b'200 OK').hexdigest()
+    runtime_components = {
+        'checker': {
+            'status': 'compliant',
+            'scope': 'exact',
+            'component_type': '200',
+            'error': '',
+        },
+        'observer': {
+            'semantic_fingerprint': 'a' * 64,
+            'raw_fingerprint': raw_hash,
+            'scope': 'exact',
+            'component_type': '200',
+            'provisional': False,
+            'error': '',
+        },
+    }
+
+    assert recorder.observe(
+        conversation,
+        phase='fuzzing',
+        component_evidence={
+            ('PING', '200', raw_hash): runtime_components,
+        },
+    ) == 1
+
+    record = json.loads(next(
+        (tmp_path / 'request_response_pairs').glob('pair_*.json')
+    ).read_text(encoding='utf-8'))
+    assert record['runtime_components'] == runtime_components

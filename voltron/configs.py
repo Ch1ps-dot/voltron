@@ -8,6 +8,11 @@ class Config:
         self.info_path: Path
         self.run_script: Path
         self.setup_script: Path
+        self.readiness_script: Path | None = None
+        self.readiness_adapter: str = ''
+        self.setup_timeout_s: float = 30.0
+        self.readiness_timeout_s: float = 5.0
+        self.port_release_timeout_s: float = 3.0
         self.models_path: Path
         self.doc_paths: list[Path] = []
         self.pmp_path: Path
@@ -24,6 +29,11 @@ class Config:
         self.generation_retry_limit: int = 3
         self.generated_code_timeout_s: float = 2.0
         self.generated_message_max_bytes: int = 1024 * 1024
+        # Response checkers/observers are generated on demand.  Only the
+        # protocol-wide fallback and explicitly configured high-value types
+        # are prepared before fuzzing starts.
+        self.response_component_lazy_generation: bool = True
+        self.response_component_prewarm_types: list[str] = []
         
         self.target_name: str
         self.trans_layer: str

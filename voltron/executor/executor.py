@@ -25,6 +25,7 @@ from voltron.executor.sut_monitor import (
     build_sut_monitor,
 )
 import math, statistics, threading, sys, os, signal, re
+from dataclasses import dataclass, asdict
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
@@ -60,6 +61,35 @@ RUNTIME_EXCEPTION_PATTERNS = (
     re.compile(r'PHP Fatal error:', re.IGNORECASE),
 )
 
+
+@dataclass(frozen=True)
+class CheckerEvaluation:
+    status: str
+    scope: str
+    component_type: str | None
+    error: str = ''
+
+
+@dataclass(frozen=True)
+class ObservationResult:
+    semantic_fingerprint: str
+    raw_fingerprint: str
+    scope: str
+    component_type: str | None
+    provisional: bool
+    error: str = ''
+
+
+@dataclass(frozen=True)
+class LifecycleCommandResult:
+    stage: str
+    success: bool
+    returncode: int | None
+    duration_s: float
+    stdout: str = ''
+    stderr: str = ''
+    error: str = ''
+
 class Executor:
     """Executor for interacting with the SUT, sending requests and receiving responses, and recording the conversation.
     
@@ -83,6 +113,23 @@ class Executor:
         # some attributes for sut
         self.run_script: Path = configs.run_script
         self.setup_script: Path = configs.setup_script
+        self.readiness_script: Path | None = getattr(
+            configs,
+            'readiness_script',
+            None,
+        )
+        self.readiness_adapter = getattr(configs, 'readiness_adapter', '')
+        self.setup_timeout_s = getattr(configs, 'setup_timeout_s', 30.0)
+        self.readiness_timeout_s = getattr(
+            configs,
+            'readiness_timeout_s',
+            5.0,
+        )
+        self.port_release_timeout_s = getattr(
+            configs,
+            'port_release_timeout_s',
+            3.0,
+        )
         self.cmdline: list[str] = cmdline
         self.host = configs.host
         self.port = configs.port
@@ -114,11 +161,14 @@ class Executor:
         self.unable_parse_request: set[str] = set()
         self._saved_seed_digests: set[str] = set()
         self._saved_seed_lock = threading.Lock()
-        self.pair_recorder = RequestResponsePairRecorder(configs.results_path)
+        self.pair_recorder = RequestResponsePairRecorder(
+            getattr(configs, 'results_path', configs.base_path)
+        )
 
         self.parser_func: Callable
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
+        self.checker_sources: dict[str, str] = {}
         self.observer_funcs: dict[str, Callable[[bytes], str]] = {}
         self.observer_sources: dict[str, tuple[str, str]] = {}
         if configs.fuzz_mode != 'replay':
@@ -138,7 +188,27 @@ class Executor:
         self.observer_semantic_reviews: dict[
             tuple[str, str, str], bool
         ] = {}
+        self.component_evidence: dict[tuple[str, str, str], dict] = {}
+        self._component_usage_lock = threading.Lock()
+        self._component_usage_counts: dict[str, dict[str, int]] = {
+            'checker_status': {},
+            'checker_scope': {},
+            'observer_scope': {},
+        }
+        self._component_observed_types: set[str] = set()
+        self._component_provisional_count = 0
         self._invalid_response_lock = threading.Lock()
+        self._environment_condition = threading.Condition(threading.RLock())
+        self._lifecycle_record_lock = threading.Lock()
+        self.environment_state = 'not_started'
+        self.environment_result: LifecycleCommandResult | None = None
+        self.last_readiness_result: LifecycleCommandResult | None = None
+        self._interaction_index = 0
+        self._active_interaction_proc: subprocess.Popen | None = None
+        self._active_interaction_socket: socket.socket | None = None
+        self._active_interaction_remote = False
+        self._active_interaction_lock = threading.RLock()
+        self._prefetched_initial_response: bytes | None = None
         self.stop_event = stop_event
             
     def cov_setup(
@@ -178,23 +248,185 @@ class Executor:
             logger.debug(f'[SUT Setup Failure]: {e}')
             return None
 
-    def setup_exe(
-            self
-    ) -> subprocess.Popen | None:
-        if (self.setup_script.is_file() and configs.fuzz_mode != 'replay'):
+    def _environment_sync(self) -> threading.Condition:
+        condition = getattr(self, '_environment_condition', None)
+        if condition is None:
+            condition = threading.Condition(threading.RLock())
+            self._environment_condition = condition
+        if not hasattr(self, 'environment_state'):
+            self.environment_state = 'not_started'
+            self.environment_result = None
+        return condition
+
+    def _record_lifecycle_event(self, record: dict) -> None:
+        results_path = getattr(configs, 'results_path', None)
+        if not isinstance(results_path, Path) or not results_path.is_dir():
+            return
+        lock = getattr(self, '_lifecycle_record_lock', None)
+        if lock is None:
+            lock = threading.Lock()
+            self._lifecycle_record_lock = lock
+        payload = {'timestamp': time.time(), **record}
+        try:
+            with lock:
+                with (
+                    results_path / 'executor_lifecycle.jsonl'
+                ).open('a', encoding='utf-8') as stream:
+                    json.dump(payload, stream, ensure_ascii=False)
+                    stream.write('\n')
+        except Exception:
+            logger.exception('Executor: failed to persist lifecycle event')
+
+    @staticmethod
+    def _bounded_output(value: str | bytes | None, limit: int = 16000) -> str:
+        if value is None:
+            return ''
+        if isinstance(value, bytes):
+            value = value.decode('utf-8', errors='backslashreplace')
+        return value[-limit:]
+
+    def _run_lifecycle_script(
+        self,
+        script: Path,
+        args: list[str],
+        timeout_s: float,
+        stage: str,
+        env: dict[str, str] | None = None,
+    ) -> LifecycleCommandResult:
+        started = time.perf_counter()
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                [str(script), *args],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                start_new_session=True,
+                env=env,
+            )
             try:
-                proc = subprocess.Popen(
-                    [self.setup_script],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True
+                stdout, stderr = proc.communicate(timeout=timeout_s)
+            except subprocess.TimeoutExpired:
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGTERM,
+                    timeout=1,
                 )
-                return proc
-            except Exception as e:
-                logger.debug(f'[SUT clean Failure]: {e}')
-                return None
+                stdout, stderr = proc.communicate()
+                return LifecycleCommandResult(
+                    stage=(
+                        f'{stage[:-7]}-timeout'
+                        if stage.endswith('-failed')
+                        else f'{stage}-timeout'
+                    ),
+                    success=False,
+                    returncode=proc.returncode,
+                    duration_s=time.perf_counter() - started,
+                    stdout=self._bounded_output(stdout),
+                    stderr=self._bounded_output(stderr),
+                    error=f'exceeded {timeout_s:.2f}s timeout',
+                )
+            return LifecycleCommandResult(
+                stage=stage,
+                success=proc.returncode == 0,
+                returncode=proc.returncode,
+                duration_s=time.perf_counter() - started,
+                stdout=self._bounded_output(stdout),
+                stderr=self._bounded_output(stderr),
+                error=(
+                    ''
+                    if proc.returncode == 0
+                    else f'exited with status {proc.returncode}'
+                ),
+            )
+        except Exception as error:
+            if proc is not None:
+                self._terminate_process_group(
+                    proc,
+                    signal.SIGKILL,
+                    timeout=1,
+                )
+            return LifecycleCommandResult(
+                stage=stage,
+                success=False,
+                returncode=getattr(proc, 'returncode', None),
+                duration_s=time.perf_counter() - started,
+                error=f'{type(error).__name__}: {error}',
+            )
+
+    def initialize_environment(self) -> bool:
+        """Run the local setup hook exactly once for this Executor."""
+        condition = self._environment_sync()
+        with condition:
+            while self.environment_state == 'running':
+                condition.wait()
+            if self.environment_state == 'succeeded':
+                return True
+            if self.environment_state == 'failed':
+                return False
+            self.environment_state = 'running'
+
+        remote = self._is_remote_deployment()
+        setup_script = getattr(self, 'setup_script', Path())
+        should_skip = (
+            remote
+            or getattr(configs, 'fuzz_mode', '') == 'replay'
+            or not setup_script.is_file()
+        )
+        if should_skip:
+            result = LifecycleCommandResult(
+                stage='environment-setup-skipped',
+                success=True,
+                returncode=None,
+                duration_s=0.0,
+            )
         else:
-            return None
+            result = self._run_lifecycle_script(
+                setup_script,
+                [],
+                getattr(self, 'setup_timeout_s', 30.0),
+                'environment-setup-failed',
+            )
+            if result.success:
+                result = LifecycleCommandResult(
+                    stage='environment-setup-complete',
+                    success=True,
+                    returncode=result.returncode,
+                    duration_s=result.duration_s,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                )
+
+        with condition:
+            self.environment_result = result
+            self.environment_state = (
+                'succeeded' if result.success else 'failed'
+            )
+            condition.notify_all()
+
+        logger.debug(format_event(
+            'environment.initialize',
+            stage=result.stage,
+            success=result.success,
+            script=str(setup_script),
+            returncode=result.returncode,
+            duration_s=round(result.duration_s, 3),
+            stdout=result.stdout,
+            stderr=result.stderr,
+            error=result.error,
+        ))
+        self._record_lifecycle_event({
+            'event': 'environment.initialize',
+            'script': str(setup_script),
+            'result': asdict(result),
+        })
+        if not result.success:
+            self.stop_event.set()
+        return result.success
+
+    def setup_exe(self) -> bool:
+        """Compatibility alias for the synchronous one-time initialization."""
+        return self.initialize_environment()
 
     def run_exe(
         self
@@ -239,6 +471,350 @@ class Executor:
             )
             return None
 
+    def _wait_for_port_release(self, port: int) -> bool:
+        deadline = time.monotonic() + getattr(
+            self,
+            'port_release_timeout_s',
+            3.0,
+        )
+        while time.monotonic() < deadline:
+            _, listeners_found = self._find_listener_pids(port)
+            if not listeners_found:
+                return True
+            if self.stop_event.wait(0.05):
+                return False
+        _, listeners_found = self._find_listener_pids(port)
+        return not listeners_found
+
+    def start_sut_for_interaction(
+        self,
+    ) -> tuple[bool, subprocess.Popen | None]:
+        """Start only the per-interaction SUT process."""
+        if self.stop_event.is_set():
+            return False, None
+        if self._is_remote_deployment():
+            self._monitor().start()
+            return True, None
+
+        self.kill_listeners(self.port)
+        if not self._wait_for_port_release(self.port):
+            self._log_sut_start_failure(
+                None,
+                stage='sut-cleanup-failed',
+                detail='target port remained occupied after listener cleanup',
+            )
+            self.stop_event.set()
+            return False, None
+
+        grace_s = max(0.01, min(0.5, self.setup_time_s))
+        proc = None
+        for attempt in range(1, 101):
+            proc = self.run_exe()
+            if proc is None:
+                self._log_sut_start_failure(
+                    None,
+                    stage='sut-launch-failed',
+                    attempt=attempt,
+                    detail='run_exe returned no process',
+                )
+                self.stop_event.set()
+                return False, None
+            if self.stop_event.wait(grace_s):
+                self._terminate_process_group(proc, signal.SIGTERM, timeout=1)
+                return False, None
+            if proc.poll() is None:
+                return True, proc
+            self._log_sut_start_failure(
+                proc,
+                stage='sut-exited-immediately',
+                attempt=attempt,
+                detail=f'process exited within {grace_s:.2f}s',
+            )
+            if attempt < 100:
+                self._wait_for_port_release(self.port)
+
+        self.stop_event.set()
+        return False, proc
+
+    def _wait_for_socket_readiness(
+        self,
+        proc: subprocess.Popen | None,
+    ) -> socket.socket | None:
+        remote = self._is_remote_deployment()
+        # Preserve the historical 100-attempt socket-readiness window for
+        # subjects without a protocol hook.  The separate readiness timeout
+        # only bounds the optional protocol probe.
+        timeout_s = max(self.setup_time_s, 100 * self.setup_time_s)
+        deadline = time.monotonic() + timeout_s
+        attempt = 0
+        while attempt == 0 or time.monotonic() < deadline:
+            attempt += 1
+            if self.stop_event.wait(self.setup_time_s):
+                return None
+            sock = self.setup_socket()
+            if sock is not None:
+                return sock
+            if remote:
+                status = self._monitor().status()
+                if status.state in {EXITED, CRASHED}:
+                    self._log_sut_start_failure(
+                        proc,
+                        stage='remote-readiness-check',
+                        attempt=attempt,
+                        detail=self._remote_status_summary(),
+                    )
+                    return None
+            elif proc is None or proc.poll() is not None:
+                self._log_sut_start_failure(
+                    proc,
+                    stage='sut-exited-before-socket-ready',
+                    attempt=attempt,
+                    detail='process exited before target port accepted a connection',
+                )
+                return None
+
+        self._log_sut_start_failure(
+            proc,
+            stage='socket-readiness-timeout',
+            attempt=attempt,
+            detail=f'service did not become reachable within {timeout_s:.2f}s',
+        )
+        return None
+
+    @staticmethod
+    def _ftp_reply_complete(buffer: bytes) -> bool:
+        lines = buffer.splitlines(keepends=True)
+        if not lines or not lines[0].endswith((b'\n', b'\r')):
+            return False
+        first = lines[0]
+        if len(first) < 4 or not first[:3].isdigit():
+            return True
+        if first[3:4] != b'-':
+            return True
+        terminator = first[:3] + b' '
+        return any(
+            line.startswith(terminator) and line.endswith((b'\n', b'\r'))
+            for line in lines[1:]
+        )
+
+    def _read_ftp_banner_from_active_socket(
+        self,
+        sock: socket.socket,
+        timeout_s: float,
+    ) -> bytes:
+        """Read one FTP greeting without opening or modifying the session."""
+        if sock is None or sock.fileno() < 0:
+            raise ConnectionError('active fuzz socket is unavailable')
+
+        deadline = time.monotonic() + timeout_s
+        buffer = b''
+        poller = select.poll()
+        poller.register(
+            sock,
+            select.POLLIN | select.POLLERR | select.POLLHUP,
+        )
+        try:
+            while time.monotonic() < deadline:
+                if self.stop_event.is_set():
+                    raise InterruptedError('fuzzing stopped during FTP readiness')
+                remaining_ms = max(
+                    1,
+                    int((deadline - time.monotonic()) * 1000),
+                )
+                events = poller.poll(remaining_ms)
+                if not events:
+                    continue
+                _fd, event = events[0]
+                if event & select.POLLIN:
+                    try:
+                        chunk = sock.recv(4096)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        raise ConnectionError(
+                            'FTP connection closed before a complete banner'
+                        )
+                    buffer += chunk
+                    if len(buffer) > 65536:
+                        raise ValueError('FTP banner exceeds 65536 bytes')
+                    if self._ftp_reply_complete(buffer):
+                        break
+                elif event & (select.POLLERR | select.POLLHUP):
+                    raise ConnectionError(
+                        'FTP socket failed before a complete banner'
+                    )
+        finally:
+            poller.unregister(sock)
+
+        if not self._ftp_reply_complete(buffer):
+            raise TimeoutError(
+                f'FTP banner was not complete within {timeout_s:.2f}s'
+            )
+        if (
+            not buffer.startswith(b'220')
+            or len(buffer) < 4
+            or buffer[3:4] not in {b' ', b'-'}
+        ):
+            raise ValueError(f'invalid FTP banner {buffer!r}')
+        return buffer
+
+    def _publish_subject_readiness(
+        self,
+        result: LifecycleCommandResult,
+        source: str,
+    ) -> bool:
+        self.last_readiness_result = result
+        logger.debug(format_event(
+            'sut.readiness',
+            stage=result.stage,
+            success=result.success,
+            source=source,
+            returncode=result.returncode,
+            duration_s=round(result.duration_s, 3),
+            stdout=result.stdout,
+            stderr=result.stderr,
+            error=result.error,
+        ))
+        self._record_lifecycle_event({
+            'event': 'sut.readiness',
+            'source': source,
+            'host': str(self.host),
+            'port': self.port,
+            'result': asdict(result),
+        })
+        return result.success
+
+    def run_subject_readiness(
+        self,
+        sock: socket.socket | None = None,
+    ) -> bool:
+        """Run a configured protocol readiness check.
+
+        Script hooks use an independent connection.  The ProFTPD adapter is a
+        deliberate exception: ``-X`` serves one session and exits, so its FTP
+        greeting is consumed from and cached for the active fuzz connection.
+        """
+        adapter_value = getattr(self, 'readiness_adapter', '')
+        adapter = (
+            adapter_value.strip()
+            if isinstance(adapter_value, str)
+            else ''
+        )
+        timeout_s = getattr(self, 'readiness_timeout_s', 5.0)
+        if adapter:
+            started = time.perf_counter()
+            try:
+                if adapter != 'ftp_banner_active_socket':
+                    raise ValueError(f'unknown readiness adapter {adapter!r}')
+                banner = self._read_ftp_banner_from_active_socket(
+                    sock,
+                    timeout_s,
+                )
+                self._prefetched_initial_response = banner
+                result = LifecycleCommandResult(
+                    stage='protocol-readiness-complete',
+                    success=True,
+                    returncode=None,
+                    duration_s=time.perf_counter() - started,
+                    stdout=self._bounded_output(
+                        'FTP banner ready: '
+                        + banner.rstrip().decode(
+                            'latin-1',
+                            errors='replace',
+                        )
+                    ),
+                )
+            except Exception as error:
+                result = LifecycleCommandResult(
+                    stage=(
+                        'protocol-readiness-timeout'
+                        if isinstance(error, TimeoutError)
+                        else 'protocol-readiness-failed'
+                    ),
+                    success=False,
+                    returncode=None,
+                    duration_s=time.perf_counter() - started,
+                    error=f'{type(error).__name__}: {error}',
+                )
+            return self._publish_subject_readiness(result, adapter)
+
+        script = getattr(self, 'readiness_script', None)
+        if script is None or not script.is_file():
+            result = LifecycleCommandResult(
+                stage='protocol-readiness-skipped',
+                success=True,
+                returncode=None,
+                duration_s=0.0,
+            )
+            return self._publish_subject_readiness(result, 'none')
+
+        environment = os.environ.copy()
+        environment.update({
+            'VOLTRON_READINESS_HOST': str(self.host),
+            'VOLTRON_READINESS_PORT': str(self.port),
+            'VOLTRON_READINESS_TIMEOUT': str(timeout_s),
+        })
+        result = self._run_lifecycle_script(
+            script,
+            [str(self.host), str(self.port), str(timeout_s)],
+            timeout_s,
+            'protocol-readiness-failed',
+            env=environment,
+        )
+        if result.success:
+            result = LifecycleCommandResult(
+                stage='protocol-readiness-complete',
+                success=True,
+                returncode=result.returncode,
+                duration_s=result.duration_s,
+                stdout=result.stdout,
+                stderr=result.stderr,
+            )
+        return self._publish_subject_readiness(result, str(script))
+
+    def _active_lifecycle_lock(self) -> threading.RLock:
+        lock = getattr(self, '_active_interaction_lock', None)
+        if lock is None:
+            lock = threading.RLock()
+            self._active_interaction_lock = lock
+        return lock
+
+    def _track_active_interaction(
+        self,
+        proc: subprocess.Popen | None,
+        sock: socket.socket | None,
+        remote: bool,
+    ) -> None:
+        with self._active_lifecycle_lock():
+            self._active_interaction_proc = proc
+            self._active_interaction_socket = sock
+            self._active_interaction_remote = remote
+
+    def stop_sut_for_interaction(
+        self,
+        close_signal: signal.Signals = signal.SIGTERM,
+        timeout: float = 3.0,
+    ) -> None:
+        """Stop only the active interaction socket and target process."""
+        with self._active_lifecycle_lock():
+            sock = getattr(self, '_active_interaction_socket', None)
+            proc = getattr(self, '_active_interaction_proc', None)
+            remote = getattr(self, '_active_interaction_remote', False)
+            self._active_interaction_socket = None
+            self._active_interaction_proc = None
+            self._active_interaction_remote = False
+            self._prefetched_initial_response = None
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                logger.exception('Executor: interaction socket close failed')
+        if remote:
+            self._monitor().stop()
+        else:
+            self._terminate_process_group(proc, close_signal, timeout=timeout)
+        analyzer.sut_proc = None
+
     def _log_sut_start_failure(
         self,
         proc: subprocess.Popen | None,
@@ -250,15 +826,18 @@ class Executor:
         fields = [
             'Executor: SUT startup failure',
             f'stage={stage}',
-            f'script={self.run_script}',
+            f'script={getattr(self, "run_script", "<remote>")}',
             f'transport={self.trans_layer}',
             f'endpoint={getattr(self, "host", "localhost")}:{self.port}',
+            f'interaction={getattr(self, "_interaction_index", 0)}',
         ]
         if attempt is not None:
             fields.append(f'attempt={attempt}')
         if detail:
             fields.append(f'detail={detail}')
 
+        process_stdout = ''
+        process_stderr = ''
         if proc is None:
             fields.append('process=not-created')
         else:
@@ -270,13 +849,75 @@ class Executor:
                 else f'returncode={return_code}'
             )
             if return_code is not None:
-                stdout, stderr = self._read_process_output(proc)
-                if stdout:
-                    fields.append(f'stdout={stdout.strip()!r}')
-                if stderr:
-                    fields.append(f'stderr={stderr.strip()!r}')
-                if not stdout and not stderr:
+                process_stdout, process_stderr = self._read_process_output(proc)
+                if process_stdout:
+                    fields.append(f'stdout={process_stdout.strip()!r}')
+                if process_stderr:
+                    fields.append(f'stderr={process_stderr.strip()!r}')
+                if not process_stdout and not process_stderr:
                     fields.append('output=<empty>')
+
+        listener_pids: set[int] = set()
+        listener_found: bool | None = None
+        try:
+            listener_pids, listener_found = self._find_listener_pids(
+                self.port
+            )
+            fields.append(f'port_listening={listener_found}')
+            fields.append(
+                'listener_pids='
+                + (
+                    ','.join(str(pid) for pid in sorted(listener_pids))
+                    if listener_pids
+                    else ('hidden' if listener_found else 'none')
+                )
+            )
+        except Exception as error:
+            fields.append(
+                f'listener_diagnostic={type(error).__name__}: {error}'
+            )
+
+        readiness = getattr(self, 'last_readiness_result', None)
+        if readiness is not None:
+            fields.extend((
+                f'readiness_stage={readiness.stage}',
+                f'readiness_returncode={readiness.returncode}',
+                f'readiness_stdout={readiness.stdout!r}',
+                f'readiness_stderr={readiness.stderr!r}',
+                f'readiness_error={readiness.error!r}',
+            ))
+        environment = getattr(self, 'environment_result', None)
+        if environment is not None:
+            fields.extend((
+                f'environment_stage={environment.stage}',
+                f'environment_returncode={environment.returncode}',
+                f'environment_stdout={environment.stdout!r}',
+                f'environment_stderr={environment.stderr!r}',
+                f'environment_error={environment.error!r}',
+            ))
+
+        self._record_lifecycle_event({
+            'event': 'sut.start_failure',
+            'stage': stage,
+            'interaction': getattr(self, '_interaction_index', 0),
+            'attempt': attempt,
+            'detail': detail,
+            'script': str(getattr(self, 'run_script', '<remote>')),
+            'host': str(getattr(self, 'host', 'localhost')),
+            'port': self.port,
+            'port_listening': listener_found,
+            'listener_pids': sorted(listener_pids),
+            'pid': getattr(proc, 'pid', None),
+            'returncode': (
+                proc.poll() if proc is not None else None
+            ),
+            'stdout': self._bounded_output(process_stdout),
+            'stderr': self._bounded_output(process_stderr),
+            'readiness': asdict(readiness) if readiness is not None else None,
+            'environment': (
+                asdict(environment) if environment is not None else None
+            ),
+        })
 
         logger.debug('; '.join(fields))
 
@@ -347,11 +988,22 @@ class Executor:
             flag, conversation = result
             pair_recorder = getattr(self, 'pair_recorder', None)
             if flag and conversation is not None and pair_recorder is not None:
-                pair_recorder.observe(
-                    conversation,
-                    phase=getattr(self.analyzer, 'active_phase', None)
-                    or getattr(self.analyzer, 'stage', ''),
+                phase = (
+                    getattr(self.analyzer, 'active_phase', None)
+                    or getattr(self.analyzer, 'stage', '')
                 )
+                if isinstance(pair_recorder, RequestResponsePairRecorder):
+                    pair_recorder.observe(
+                        conversation,
+                        phase=phase,
+                        component_evidence=getattr(
+                            self,
+                            'component_evidence',
+                            {},
+                        ),
+                    )
+                else:
+                    pair_recorder.observe(conversation, phase=phase)
             if flag:
                 outcome = 'completed'
             elif self.stop_event.is_set():
@@ -368,6 +1020,7 @@ class Executor:
             )
             raise
         finally:
+            self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
             conversation = result[1] if result is not None else None
             logger.debug(format_boundary(
                 'interact.end',
@@ -409,154 +1062,43 @@ class Executor:
         remote_deployment = self._is_remote_deployment()
         if self.stop_event.is_set():
             return False, None
-        clean = None
-        proc = None
-        if remote_deployment:
-            self._monitor().start()
-        else:
-            self.kill_listeners(self.port)
-            if self.stop_event.is_set():
-                return False, None
-            clean = self.setup_exe()
-            if self.stop_event.is_set():
-                if clean is not None:
-                    self._terminate_process_group(
-                        clean,
-                        signal.SIGKILL,
-                        timeout=1,
-                    )
-                return False, None
-            proc = self.run_exe()
-        
-        
-        # if proc is None:
-        #     logger.debug(f'Executor: SUT Setup Failure')
-        #     return False, None
-        
-        # if proc.poll() is not None: 
-        #     logger.debug(f'Executor: SUT Setup Failure: {proc.returncode}')
-        #     return False, None
-        
-        # avoid unexceptional crash of target
-        if not remote_deployment:
-            for attempt in range(1, 101):
-                if self.stop_event.is_set():
-                    self._terminate_process_group(
-                        proc,
-                        signal.SIGTERM,
-                        timeout=1,
-                    )
-                    return False, None
-                if proc is not None and proc.poll() is not None:
-                    self._log_sut_start_failure(
-                        proc,
-                        stage='process-exited-before-ready-check',
-                        attempt=attempt,
-                    )
-                    if self.stop_event.wait(self.setup_time_s):
-                        return False, None
-                    proc = self.run_exe()
-                else:
-                    break
+        if not self.initialize_environment():
+            return False, None
+        if not hasattr(self, '_interaction_index'):
+            self._interaction_index = 0
+        self._interaction_index += 1
+        self._prefetched_initial_response = None
 
-            if proc is None:
-                self._log_sut_start_failure(
-                    proc,
-                    stage='process-launch-retries',
-                    detail='run_exe returned no process',
-                )
-                raise Exception('Execute: process close')
-            if proc.poll() is not None:
-                self._log_sut_start_failure(
-                    proc,
-                    stage='process-launch-retries',
-                    detail='process still exited after launch retries',
-                )
-                raise Exception('Execute: process close')
-        
-        # wait for server setup
-        sock = None
-        for attempt in range(1, 101):
-            if self.stop_event.wait(self.setup_time_s):
-                if not remote_deployment:
-                    self._terminate_process_group(
-                        proc,
-                        signal.SIGTERM,
-                        timeout=1,
-                    )
-                return False, None
-            sock = self.setup_socket()
-            if sock == None:
-                if remote_deployment:
-                    status = self._monitor().status()
-                    logger.debug(
-                        'Executor: remote SUT not ready; '
-                        f'attempt={attempt}; state={status.state}; '
-                        f'process_running={status.process_running}; '
-                        f'port_listening={status.port_listening}'
-                    )
-                    if status.state in {EXITED, CRASHED}:
-                        self._log_sut_start_failure(
-                            proc,
-                            stage='remote-readiness-check',
-                            attempt=attempt,
-                            detail=self._remote_status_summary(),
-                        )
-                        raise Exception('Execute: remote process close')
-                elif proc != None and proc.poll() is not None:
-                    self._log_sut_start_failure(
-                        proc,
-                        stage='socket-readiness-check',
-                        attempt=attempt,
-                        detail='process exited before socket became ready',
-                    )
-                    if self.stop_event.is_set():
-                        return False, None
-                    proc = self.run_exe()
-                    if self.stop_event.is_set():
-                        self._terminate_process_group(
-                            proc,
-                            signal.SIGTERM,
-                            timeout=1,
-                        )
-                        return False, None
-                    self.kill_listeners(self.port)
-                continue
-            else:
-                break
-            
-        if not remote_deployment and proc is None:
-            self._log_sut_start_failure(
-                proc,
-                stage='socket-readiness-check',
-                detail='restart returned no process',
-            )
-            raise Exception('Executor: process close')
-        if not remote_deployment and proc.poll() is not None:
-            self._log_sut_start_failure(
-                proc,
-                stage='socket-readiness-check',
-                detail='process exited after socket readiness attempts',
-            )
-            raise Exception('Execute: process close')
-            
-        if sock == None:
-            self._log_sut_start_failure(
-                proc,
-                stage='socket-readiness-timeout',
-                attempt=100,
-                detail=(
-                    f'service did not become reachable within '
-                    f'{100 * self.setup_time_s:.2f}s'
-                    + (
-                        f'; {self._remote_status_summary()}'
-                        if remote_deployment
-                        else ''
-                    )
-                ),
-            )
+        started, proc = self.start_sut_for_interaction()
+        if not started:
+            return False, None
+        self._track_active_interaction(proc, None, remote_deployment)
+
+        sock = self._wait_for_socket_readiness(proc)
+        if sock is None:
+            self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
             self.stop_event.set()
-            sys.exit(0)
+            return False, None
+        self._track_active_interaction(proc, sock, remote_deployment)
+
+        if not self.run_subject_readiness(sock):
+            self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
+            if not remote_deployment:
+                self._log_sut_start_failure(
+                    proc,
+                    stage=(
+                        self.last_readiness_result.stage
+                        if self.last_readiness_result is not None
+                        else 'protocol-readiness-failed'
+                    ),
+                    detail=(
+                        self.last_readiness_result.error
+                        if self.last_readiness_result is not None
+                        else 'protocol readiness hook failed'
+                    ),
+                )
+            self.stop_event.set()
+            return False, None
         
         
         logger.debug(">>>Executor: interact start")
@@ -564,21 +1106,13 @@ class Executor:
         cons: Conversation = Conversation()
         
         # maybe recv initialize message
-        resp_code, resp_data = self.net_recv(
+        resp_code, resp_data = self._receive_initial_response(
             sock=sock,
             poll_timeout_ms=100,
             show_fuzz_ui=run_checker,
         )
         if self.stop_event.is_set():
-            sock.close()
-            if remote_deployment:
-                self._monitor().stop()
-            else:
-                self._terminate_process_group(
-                    proc,
-                    signal.SIGTERM,
-                    timeout=1,
-                )
+            self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
             return False, None
         last_recv = '-'
         if(resp_code and resp_data):
@@ -626,6 +1160,7 @@ class Executor:
             
             # send message and parse response
             if msg == None:
+                self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
                 return False, None
             
             flag, req_data = self.net_send(msg, sock)
@@ -762,12 +1297,6 @@ class Executor:
         with self.analyzer.lock:
             self.analyzer.path_num = self.analyzer.path_num + 1
 
-        # close socket
-        try:
-            sock.close()
-        except Exception as e:
-            logger.debug(f'socket close error: {e}')
-        
         self._handle_crash_if_detected(
             cons,
             proc,
@@ -782,11 +1311,7 @@ class Executor:
             if getattr(configs, 'fuzz_mode', '') == 'replay'
             else signal.SIGTERM
         )
-        if remote_deployment:
-            self._monitor().stop()
-        else:
-            self._terminate_process_group(proc, close_signal, timeout=3)
-        analyzer.sut_proc = None
+        self.stop_sut_for_interaction(close_signal, timeout=3)
         
         # ensure sub-subprocess die
         # if proc.poll is None:
@@ -803,11 +1328,6 @@ class Executor:
         #             logger.debug(f'target process: {e}')
         #             break
         
-        # kill clean script
-        if clean != None and not remote_deployment:
-            self._terminate_process_group(clean, signal.SIGKILL, timeout=1)
-                
-
         # self.post_exe()
         logger.debug("<<<Executor: interact done")
         return True, cons
@@ -1133,6 +1653,59 @@ class Executor:
 
         return False, None
     
+    def _parse_tcp_response(
+        self,
+        buf: bytes,
+        msg_type: str,
+        show_fuzz_ui: bool,
+    ) -> str:
+        resp_code = 'UNKOWN'
+        resp_byte: bytes = self.parser_func(buf)
+        unable_parse_request = getattr(self, 'unable_parse_request', None)
+        if unable_parse_request is None:
+            unable_parse_request = set()
+            self.unable_parse_request = unable_parse_request
+        try_times = 3
+        if resp_byte == b'' and msg_type not in unable_parse_request:
+            while try_times > 0:
+                try_times -= 1
+                resp_byte = self.parser_func(buf)
+                if resp_byte == b'':
+                    logger.debug(f'parse error:{buf}')
+                    self._update_parser(buf, show_fuzz_ui)
+                    logger.debug('Update Parser')
+                else:
+                    break
+
+        if resp_byte == b'':
+            unable_parse_request.add(msg_type)
+            logger.debug('Parse Error')
+        else:
+            resp_code = resp_byte.decode(
+                'utf-8',
+                errors='backslashreplace',
+            )
+        return resp_code
+
+    def _receive_initial_response(
+        self,
+        sock: socket.socket,
+        poll_timeout_ms: int,
+        show_fuzz_ui: bool,
+    ) -> Tuple[str | None, bytes | None]:
+        prefetched = getattr(self, '_prefetched_initial_response', None)
+        self._prefetched_initial_response = None
+        if prefetched is None:
+            return self.net_recv(
+                sock=sock,
+                poll_timeout_ms=poll_timeout_ms,
+                show_fuzz_ui=show_fuzz_ui,
+            )
+        return (
+            self._parse_tcp_response(prefetched, '-', show_fuzz_ui),
+            prefetched,
+        )
+
     def net_recv(
             self, 
             sock: socket.socket,
@@ -1200,36 +1773,14 @@ class Executor:
                     if len(buf) == 0:
                         return 'RCLOSED', None
                     else:
-                        # recv response and parse it
-                        resp_code = 'UNKOWN'
-                        resp_byte: bytes = self.parser_func(buf)
-                        try_times = 3
-                        if resp_byte == b'' and msg_type not in self.unable_parse_request:
-                            while try_times > 0:
-                                try_times -= 1
-                                resp_byte = self.parser_func(buf)
-                                if resp_byte == b'':
-                                    logger.debug(f'parse error:{buf}')
-                                    self._update_parser(
-                                        buf,
-                                        show_fuzz_ui,
-                                    )
-                                    logger.debug('Update Parser')
-                                else:
-                                    break
-                            
-                        if resp_byte == b'':
-                            self.unable_parse_request.add(msg_type)
-                            logger.debug('Parse Error')
-                        else:
-                            resp_code = resp_byte.decode("utf-8", errors="backslashreplace")
-                        # update some analysis data
-                        
-                            # self.analyzer.last_parser = self.mapper.cur_parser
-                            # if self.analyzer.last_generator != None and self.analyzer.last_generator.cur_res != None:
-                            #     self.analyzer.last_generator.cur_res.append(resp_code)
-                        
-                        return resp_code, buf
+                        return (
+                            self._parse_tcp_response(
+                                buf,
+                                msg_type,
+                                show_fuzz_ui,
+                            ),
+                            buf,
+                        )
                 
             elif (self.trans_layer == 'udp'):
                 events = poller.poll(100) # poll timeout will influence the performance, need to adjust
@@ -1657,15 +2208,19 @@ class Executor:
     ) -> None:
         """Load the latest generated checker for each response type."""
         self.checker_funcs = {}
+        self.checker_sources = {}
         for msg_type, checker in checkers.items():
-            namespace = {}
             try:
                 with open(self.mapper.c_path(checker), 'r', encoding='utf-8') as f:
-                    exec(f.read(), namespace)
-                checker_func: Callable = namespace.get('packet_checker')
-                if not callable(checker_func):
+                    code = f.read()
+                tree = ast.parse(code)
+                if not any(
+                    isinstance(node, ast.FunctionDef)
+                    and node.name == 'packet_checker'
+                    for node in tree.body
+                ):
                     raise TypeError('packet_checker is missing or not callable')
-                self.checker_funcs[msg_type] = checker_func
+                self.checker_sources[msg_type] = code
             except Exception as e:
                 logger.debug(
                     f'Executor: checker load failure [{msg_type}] {e}'
@@ -1708,13 +2263,107 @@ class Executor:
         response_type: str,
         response: bytes
     ) -> str:
-        """Return an IR-normalized digest, falling back to raw SHA-256."""
+        """Return the selected semantic digest for compatibility callers."""
+        return self.observe_response_result(
+            response_type,
+            response,
+        ).semantic_fingerprint
+
+    @staticmethod
+    def _response_component_candidates(response_type: str) -> list[str]:
+        candidates = [response_type]
+        family_match = re.search(
+            r'(?<!\d)([1-5])\d{2}(?!\d)',
+            response_type,
+        )
+        if family_match is not None:
+            candidates.append(f'{family_match.group(1)}xx')
+        candidates.append('__all__')
+        return list(dict.fromkeys(candidates))
+
+    @staticmethod
+    def _component_scope(
+        response_type: str,
+        component_type: str | None,
+    ) -> str:
+        if component_type is None:
+            return 'raw'
+        if component_type == response_type:
+            return 'exact'
+        if component_type == '__all__':
+            return 'generic'
+        return 'family'
+
+    def _request_and_refresh_response_components(
+        self,
+        response_type: str,
+    ) -> None:
+        producer = getattr(getattr(self, 'mapper', None), 'producer', None)
+        if producer is None:
+            return
+        request = getattr(producer, 'request_response_components', None)
+        if not callable(request):
+            return
+        request(response_type)
+
+        # A previous background request may have completed since the last
+        # response.  Reload only when metadata now contains an unloaded key.
+        equip_checkers = getattr(self.mapper, 'equip_checkers', None)
+        if callable(equip_checkers):
+            equipped = equip_checkers()
+            loaded_checkers = set(getattr(self, 'checker_sources', {})) | set(
+                getattr(self, 'checker_funcs', {})
+            )
+            if set(equipped) != loaded_checkers:
+                self.load_checkers(equipped)
+        equip_observers = getattr(self.mapper, 'equip_observers', None)
+        if callable(equip_observers):
+            equipped = equip_observers()
+            loaded = set(getattr(self, 'observer_sources', {})) | set(
+                getattr(self, 'observer_funcs', {})
+            )
+            newly_available = set(equipped) - loaded
+            if set(equipped) != loaded:
+                self.load_observers(equipped)
+                if response_type in newly_available and hasattr(
+                    self,
+                    'checked_request_response_pairs',
+                ):
+                    # Preserve raw fingerprints in persisted evidence while
+                    # rebuilding in-memory semantic indexes for the newly
+                    # available exact observer.
+                    self._rebuild_observation_indexes(response_type)
+                    self._reobserve_persisted_invalid_responses(response_type)
+                    logger.debug(format_event(
+                        'observer.promoted',
+                        response_type=response_type,
+                        from_scope='provisional',
+                        to_scope='exact',
+                    ))
+
+    def observe_response_result(
+        self,
+        response_type: str,
+        response: bytes,
+    ) -> ObservationResult:
+        """Observe with exact/family/generic selection and explicit fallback."""
         fallback = hashlib.sha256(response).hexdigest()
+        self._request_and_refresh_response_components(response_type)
         observer_sources = getattr(self, 'observer_sources', {})
-        source = observer_sources.get(response_type)
-        if source is None:
-            source = observer_sources.get('__all__')
-        if source is not None:
+        observer_funcs = getattr(self, 'observer_funcs', {})
+        component_type = next(
+            (
+                candidate
+                for candidate in self._response_component_candidates(
+                    response_type
+                )
+                if candidate in observer_sources or candidate in observer_funcs
+            ),
+            None,
+        )
+        scope = self._component_scope(response_type, component_type)
+        source = observer_sources.get(component_type) if component_type else None
+        if source is not None and component_type is not None:
             code, function_name = source
             digest = self.mapper._run_dynamic_code(
                 code,
@@ -1722,30 +2371,61 @@ class Executor:
                 args=(response,),
             )
             if self._valid_observer_digest(digest):
-                return digest
+                return ObservationResult(
+                    semantic_fingerprint=digest,
+                    raw_fingerprint=fallback,
+                    scope=scope,
+                    component_type=component_type,
+                    provisional=scope != 'exact',
+                )
             logger.warning(
                 'Executor: observer failed or returned invalid digest [%s]',
                 response_type,
             )
-            return fallback
+            return ObservationResult(
+                semantic_fingerprint=fallback,
+                raw_fingerprint=fallback,
+                scope='raw',
+                component_type=component_type,
+                provisional=True,
+                error='observer returned an invalid digest',
+            )
 
-        observer = self.observer_funcs.get(response_type)
+        observer = observer_funcs.get(component_type) if component_type else None
         if observer is None:
-            observer = self.observer_funcs.get('__all__')
-        if observer is None:
-            return fallback
+            return ObservationResult(
+                semantic_fingerprint=fallback,
+                raw_fingerprint=fallback,
+                scope='raw',
+                component_type=None,
+                provisional=True,
+                error='no observer available',
+            )
         try:
             digest = observer(response)
             if not self._valid_observer_digest(digest):
                 raise TypeError(
                     'packet_observer must return lowercase SHA-256'
                 )
-            return digest
-        except Exception:
+            return ObservationResult(
+                semantic_fingerprint=digest,
+                raw_fingerprint=fallback,
+                scope=scope,
+                component_type=component_type,
+                provisional=scope != 'exact',
+            )
+        except Exception as error:
             logger.exception(
                 f'Executor: observer failure [{response_type}]'
             )
-            return fallback
+            return ObservationResult(
+                semantic_fingerprint=fallback,
+                raw_fingerprint=fallback,
+                scope='raw',
+                component_type=component_type,
+                provisional=True,
+                error=f'{type(error).__name__}: {error}',
+            )
 
     @staticmethod
     def _valid_observer_digest(digest: object) -> bool:
@@ -1874,28 +2554,76 @@ class Executor:
         response_type: str,
         response: bytes
     ) -> bool:
-        """Validate a response with the checker selected by parser output."""
-        checker = self.checker_funcs.get(response_type)
-        if checker is None:
-            checker = self.checker_funcs.get('__all__')
-        if checker is None:
+        """Compatibility boolean: only a confirmed rejection is False."""
+        evaluation = self.evaluate_response(response_type, response)
+        self.last_checker_evaluation = evaluation
+        return evaluation.status != 'non_compliant'
+
+    def evaluate_response(
+        self,
+        response_type: str,
+        response: bytes,
+    ) -> CheckerEvaluation:
+        """Return a four-state checker result with component provenance."""
+        self._request_and_refresh_response_components(response_type)
+        checker_funcs = getattr(self, 'checker_funcs', {})
+        checker_sources = getattr(self, 'checker_sources', {})
+        component_type = next(
+            (
+                candidate
+                for candidate in self._response_component_candidates(
+                    response_type
+                )
+                if candidate in checker_funcs or candidate in checker_sources
+            ),
+            None,
+        )
+        checker = checker_funcs.get(component_type) if component_type else None
+        checker_source = (
+            checker_sources.get(component_type) if component_type else None
+        )
+        if checker is None and checker_source is None:
             logger.debug(
                 f'Executor: no checker for response type {response_type}'
             )
-            return True
+            return CheckerEvaluation(
+                status='unchecked',
+                scope='none',
+                component_type=None,
+                error='no checker available',
+            )
 
         try:
-            is_valid = checker(response)
+            if checker_source is not None:
+                is_valid = self.mapper._run_dynamic_code(
+                    checker_source,
+                    'packet_checker',
+                    args=(response,),
+                )
+                if is_valid is None:
+                    raise RuntimeError('checker execution failed or timed out')
+            else:
+                is_valid = checker(response)
             if not isinstance(is_valid, bool):
                 raise TypeError('packet_checker must return bool')
         except Exception as e:
             logger.debug(
                 f'Executor: checker failure [{response_type}] {e}'
             )
-            is_valid = False
+            return CheckerEvaluation(
+                status='unchecked',
+                scope=self._component_scope(response_type, component_type),
+                component_type=component_type,
+                error=f'{type(e).__name__}: {e}',
+            )
 
         if is_valid:
-            return True
+            scope = self._component_scope(response_type, component_type)
+            return CheckerEvaluation(
+                status='compliant' if scope == 'exact' else 'uncertain',
+                scope=scope,
+                component_type=component_type,
+            )
 
         logger.debug(format_event(
             'checker.reject',
@@ -1903,7 +2631,11 @@ class Executor:
             length=len(response),
             response=response,
         ))
-        return False
+        return CheckerEvaluation(
+            status='non_compliant',
+            scope=self._component_scope(response_type, component_type),
+            component_type=component_type,
+        )
 
     def check_response_during_fuzzing(
         self,
@@ -1920,6 +2652,8 @@ class Executor:
             response_type,
             response,
         )
+        observation = self.observe_response_result(response_type, response)
+        response_observation = observation.semantic_fingerprint
         raw_digest = hashlib.sha256(response).hexdigest()
         dedup_key = (
             request_type,
@@ -1940,7 +2674,115 @@ class Executor:
                 (request_type, response_type, raw_digest)
             ] = response
 
-        return self.check_response(response_type, response)
+        is_valid = self.check_response(response_type, response)
+        evaluation = getattr(self, 'last_checker_evaluation', None)
+        if not isinstance(evaluation, CheckerEvaluation):
+            evaluation = CheckerEvaluation(
+                status='compliant' if is_valid else 'non_compliant',
+                scope='exact',
+                component_type=response_type,
+            )
+        if not hasattr(self, 'component_evidence'):
+            self.component_evidence = {}
+        self.component_evidence[
+            (request_type, response_type, raw_digest)
+        ] = {
+            'checker': asdict(evaluation),
+            'observer': asdict(observation),
+        }
+        self._record_response_component_usage(
+            request_type,
+            response_type,
+            evaluation,
+            observation,
+        )
+        logger.debug(format_event(
+            'response.components',
+            request_type=request_type,
+            response_type=response_type,
+            checker_status=evaluation.status,
+            checker_scope=evaluation.scope,
+            checker_component=evaluation.component_type or '',
+            observer_scope=observation.scope,
+            observer_component=observation.component_type or '',
+            observer_provisional=observation.provisional,
+            raw_fingerprint=observation.raw_fingerprint,
+            semantic_fingerprint=observation.semantic_fingerprint,
+        ))
+        return is_valid
+
+    def _record_response_component_usage(
+        self,
+        request_type: str,
+        response_type: str,
+        evaluation: CheckerEvaluation,
+        observation: ObservationResult,
+    ) -> None:
+        """Persist auditable component decisions and an incremental summary."""
+        results_path = getattr(configs, 'results_path', None)
+        if not isinstance(results_path, Path) or not results_path.is_dir():
+            return
+        if not hasattr(self, '_component_usage_lock'):
+            self._component_usage_lock = threading.Lock()
+        with self._component_usage_lock:
+            record = {
+                'timestamp': time.time(),
+                'request_type': request_type,
+                'response_type': response_type,
+                'checker': asdict(evaluation),
+                'observer': asdict(observation),
+            }
+            try:
+                with (
+                    results_path / 'response_component_usage.jsonl'
+                ).open('a', encoding='utf-8') as stream:
+                    json.dump(record, stream, ensure_ascii=False)
+                    stream.write('\n')
+
+                if not hasattr(self, '_component_usage_counts'):
+                    self._component_usage_counts = {
+                        'checker_status': {},
+                        'checker_scope': {},
+                        'observer_scope': {},
+                    }
+                    self._component_observed_types = set()
+                    self._component_provisional_count = 0
+                dimensions = (
+                    ('checker_status', evaluation.status),
+                    ('checker_scope', evaluation.scope),
+                    ('observer_scope', observation.scope),
+                )
+                for dimension, value in dimensions:
+                    counts = self._component_usage_counts[dimension]
+                    counts[value] = counts.get(value, 0) + 1
+                self._component_observed_types.add(response_type)
+                if observation.provisional:
+                    self._component_provisional_count += 1
+
+                summary = {
+                    'observed_response_types': sorted(
+                        self._component_observed_types
+                    ),
+                    'observed_response_type_count': len(
+                        self._component_observed_types
+                    ),
+                    **self._component_usage_counts,
+                    'observer_provisional_count': (
+                        self._component_provisional_count
+                    ),
+                }
+                summary_path = (
+                    results_path / 'response_component_summary.json'
+                )
+                temporary_path = summary_path.with_suffix('.json.tmp')
+                with temporary_path.open('w', encoding='utf-8') as stream:
+                    json.dump(summary, stream, indent=2, ensure_ascii=False)
+                    stream.write('\n')
+                temporary_path.replace(summary_path)
+            except Exception:
+                logger.exception(
+                    'Executor: failed to persist response component usage'
+                )
 
     def handle_nonconforming_response(
         self,

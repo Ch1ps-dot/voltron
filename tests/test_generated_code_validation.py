@@ -44,6 +44,31 @@ def test_mutator_validation_isolates_timeout_and_output_contract():
     assert 'output_too_large:' in oversized.error
 
 
+def test_checker_validation_isolates_timeout_and_requires_boolean():
+    timeout = validate_generated_code(
+        'def packet_checker(response):\n    while True:\n        pass\n',
+        'packet_checker',
+        'checker',
+        timeout_s=0.2,
+    )
+    wrong_type = validate_generated_code(
+        'def packet_checker(response):\n    return "yes"\n',
+        'packet_checker',
+        'checker',
+        timeout_s=1,
+    )
+    valid = validate_generated_code(
+        'def packet_checker(response):\n    return isinstance(response, bytes)\n',
+        'packet_checker',
+        'checker',
+        timeout_s=1,
+    )
+
+    assert timeout.error.startswith('execution_timeout:')
+    assert 'checker must return bool' in wrong_type.error
+    assert valid.ok
+
+
 def test_observer_evolution_validation_requires_samples_to_converge():
     distinct = '''import hashlib
 def packet_observer(response: bytes) -> str:

@@ -98,10 +98,49 @@ class Fuzzer:
             'local',
         )
         configs.monitor = configs_yaml[self.target_name].get('monitor', {})
+        executor_config = configs_yaml.get('executor', {})
+        target_config = configs_yaml[self.target_name]
+        configs.setup_timeout_s = max(
+            0.1,
+            float(target_config.get(
+                'setup_timeout_seconds',
+                executor_config.get('setup_timeout_seconds', 30.0),
+            )),
+        )
+        configs.readiness_timeout_s = max(
+            0.1,
+            float(target_config.get(
+                'readiness_timeout_seconds',
+                executor_config.get('readiness_timeout_seconds', 5.0),
+            )),
+        )
+        configs.port_release_timeout_s = max(
+            0.1,
+            float(target_config.get(
+                'port_release_timeout_seconds',
+                executor_config.get('port_release_timeout_seconds', 3.0),
+            )),
+        )
 
         # some file path 
         configs.run_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'run.sh'
         configs.setup_script = configs.base_path / 'config' / 'subjects' / configs.target_name / 'setup.sh'
+        readiness_script = target_config.get('readiness_script')
+        configs.readiness_script = (
+            configs.base_path
+            / 'config'
+            / 'subjects'
+            / configs.target_name
+            / readiness_script
+            if isinstance(readiness_script, str) and readiness_script.strip()
+            else None
+        )
+        readiness_adapter = target_config.get('readiness_adapter', '')
+        configs.readiness_adapter = (
+            readiness_adapter.strip()
+            if isinstance(readiness_adapter, str)
+            else ''
+        )
         configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
         configs.info_path = configs.base_path / 'config' / 'subjects' / configs.target_name / 'info.md'
         for rfc in configs.rfc_name:
@@ -162,6 +201,21 @@ class Fuzzer:
             1,
             int(generated_code.get('max_message_bytes', 1024 * 1024)),
         )
+        response_components = configs_yaml.get('response_components', {})
+        lazy_generation = response_components.get('lazy_generation', True)
+        if not isinstance(lazy_generation, bool):
+            raise TypeError(
+                'response_components.lazy_generation must be a boolean'
+            )
+        configs.response_component_lazy_generation = lazy_generation
+        prewarm_types = response_components.get('prewarm_types', [])
+        if not isinstance(prewarm_types, list):
+            raise TypeError('response_components.prewarm_types must be a list')
+        configs.response_component_prewarm_types = [
+            str(item).strip()
+            for item in prewarm_types
+            if str(item).strip()
+        ]
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name
