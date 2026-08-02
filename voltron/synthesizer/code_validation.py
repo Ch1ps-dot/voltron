@@ -32,7 +32,7 @@ def _static_validation(code: str, function_name: str) -> ValidationResult:
     try:
         tree = ast.parse(code)
     except SyntaxError as error:
-        return ValidationResult(False, f'syntax_error: {error}')
+        return ValidationResult(False, f'SyntaxError: syntax_error: {error}')
 
     functions = [
         node
@@ -72,6 +72,8 @@ def _validation_worker(
     max_output_bytes: int,
     observer_samples: tuple[bytes, ...],
     require_equal_observations: bool,
+    runtime_samples: tuple[bytes, ...],
+    require_nonempty_samples: bool,
 ) -> None:
     try:
         namespace: dict = {}
@@ -116,7 +118,10 @@ def _validation_worker(
                 signature.bind(b'probe')
             except TypeError as error:
                 raise TypeError(f'wrong checker signature: {error}') from error
-            for probe in (b'', b'voltron-checker-probe', b'\x00\xff', None):
+            for probe in (
+                b'', b'voltron-checker-probe', b'\x00\xff', None,
+                *runtime_samples,
+            ):
                 first = function(probe)
                 second = function(probe)
                 if not isinstance(first, bool):
@@ -142,6 +147,43 @@ def _validation_worker(
                     raise ValueError(
                         f'output_too_large: {len(result)} > {max_output_bytes}'
                     )
+        elif contract == 'generator':
+            try:
+                signature.bind()
+            except TypeError as error:
+                raise TypeError(f'wrong generator signature: {error}') from error
+            for _ in range(3):
+                result = function()
+                if not isinstance(result, bytes):
+                    raise TypeError('invalid_return_type: generator must return bytes')
+                if not result:
+                    raise ValueError('empty_result: generator returned empty bytes')
+                if len(result) > max_output_bytes:
+                    raise ValueError(
+                        f'output_too_large: {len(result)} > {max_output_bytes}'
+                    )
+        elif contract == 'parser':
+            try:
+                signature.bind(b'probe')
+            except TypeError as error:
+                raise TypeError(f'wrong parser signature: {error}') from error
+            base_probes = (b'', b'voltron-parser-probe', b'\x00\xff')
+            for index, probe in enumerate((*base_probes, *runtime_samples)):
+                result = function(probe)
+                if not isinstance(result, bytes):
+                    raise TypeError('invalid_return_type: parser must return bytes')
+                if len(result) > max_output_bytes:
+                    raise ValueError(
+                        f'output_too_large: {len(result)} > {max_output_bytes}'
+                    )
+                if (
+                    require_nonempty_samples
+                    and index >= len(base_probes)
+                    and not result
+                ):
+                    raise ValueError(
+                        'empty_result: parser could not classify runtime sample'
+                    )
         else:
             raise ValueError(f'unknown validation contract: {contract}')
         connection.send((True, ''))
@@ -159,6 +201,8 @@ def validate_generated_code(
     max_output_bytes: int = 1024 * 1024,
     observer_samples: tuple[bytes, ...] = (),
     require_equal_observations: bool = False,
+    runtime_samples: tuple[bytes, ...] = (),
+    require_nonempty_samples: bool = False,
 ) -> ValidationResult:
     """Validate generated code without executing it in the caller process."""
     static_result = _static_validation(code, function_name)
@@ -177,6 +221,8 @@ def validate_generated_code(
             max_output_bytes,
             observer_samples,
             require_equal_observations,
+            runtime_samples,
+            require_nonempty_samples,
         ),
         daemon=True,
     )

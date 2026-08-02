@@ -1,5 +1,5 @@
 from pathlib import Path
-import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, subprocess
+import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, subprocess, json
 
 from voltron.executor.conversation import Conversation
 
@@ -29,6 +29,10 @@ from voltron.learner.mlstar import (
     ModelLearningStopped,
 )
 from voltron.learner.automata import MealyMachine
+
+
+class NoCoverageInputError(RuntimeError):
+    """Coverage replay cannot proceed because no valid testcase exists."""
 
 def exit_handler():
     for thread in threading.enumerate():
@@ -294,6 +298,14 @@ class Fuzzer:
 
         try:
             self._install_signal_handlers()
+            worker_failure: list[tuple[BaseException, str]] = []
+
+            def run_fuzz_worker() -> None:
+                try:
+                    fuzz_loop(self.stop_event)
+                except BaseException as error:
+                    worker_failure.append((error, traceback.format_exc()))
+                    self.stop_event.set()
             
             # start fuzzing and set up ui
             t_ui = threading.Thread(
@@ -303,8 +315,7 @@ class Fuzzer:
                 daemon=True,
             )
             t_fuzz = threading.Thread(
-                target=fuzz_loop,
-                args=(self.stop_event,),
+                target=run_fuzz_worker,
                 name='voltron-fuzz',
                 daemon=True,
             )
@@ -315,12 +326,19 @@ class Fuzzer:
 
             t_fuzz.join()
             t_ui.join()
+            if worker_failure:
+                error, worker_traceback = worker_failure[0]
+                raise RuntimeError(
+                    'voltron-fuzz worker failed:\n'
+                    f'{worker_traceback}'
+                ) from error
             
         except KeyboardInterrupt:
             logger.debug('Fuzzer: interrupted')
         except Exception:
             logger.exception('Fuzzer: fuzzing failed')
             self.stop_event.set()
+            raise
         finally:
             self.cleanup()
         logger.debug('Fuzzer: finish fuzzing')
@@ -344,6 +362,14 @@ class Fuzzer:
 
         try:
             self._install_signal_handlers()
+            worker_failure: list[tuple[BaseException, str]] = []
+
+            def run_replay_worker() -> None:
+                try:
+                    self.replay_process(res_dir, cov_folder)
+                except BaseException as error:
+                    worker_failure.append((error, traceback.format_exc()))
+                    self.stop_event.set()
             
             # start fuzzing and set up ui
             t_ui = threading.Thread(
@@ -353,8 +379,7 @@ class Fuzzer:
                 daemon=True,
             )
             t_fuzz = threading.Thread(
-                target=self.replay_process,
-                args=(res_dir, cov_folder,),
+                target=run_replay_worker,
                 name='voltron-replay',
                 daemon=True,
             )
@@ -365,12 +390,19 @@ class Fuzzer:
 
             t_fuzz.join()
             t_ui.join()
+            if worker_failure:
+                error, worker_traceback = worker_failure[0]
+                raise RuntimeError(
+                    'voltron-replay worker failed:\n'
+                    f'{worker_traceback}'
+                ) from error
             
         except KeyboardInterrupt:
             logger.debug('Replay: interrupted')
         except Exception:
             logger.exception('Fuzzer: replay failed')
             self.stop_event.set()
+            raise
         finally:
             self.cleanup()
         logger.debug('Fuzzer: finish replay')
@@ -445,6 +477,7 @@ class Fuzzer:
         except Exception:
             logger.exception('Fuzzer: state fuzzing failed')
             stop_event.set()
+            raise
             
     def model_learning(
         self,
@@ -582,7 +615,7 @@ class Fuzzer:
             except Exception:
                 logger.exception('Fuzzer: model learning failed')
                 stop_event.set()
-                sys.exit(1)
+                raise RuntimeError('model learning failed')
             if (configs.time_limit_s < time.time() - analyzer.start_time):
                 logger.debug('Fuzzer: timeout')
                 stop_event.set()
@@ -640,6 +673,7 @@ class Fuzzer:
                     fuzz_phase_status = 'failed'
                     logger.exception('Fuzzer: berserker fuzzing failed')
                     stop_event.set()
+                    raise
 
                 if (configs.time_limit_s < time.time() - analyzer.start_time):
                     logger.debug('Fuzzer: timeout')
@@ -695,6 +729,20 @@ class Fuzzer:
                     logger.exception(
                         f'Fuzzer: skip invalid replay testcase {item}'
                     )
+
+            if file_count == 0:
+                status_path = res_dir / 'coverage_replay_status.json'
+                status_path.write_text(
+                    json.dumps({
+                        'status': 'NO_COVERAGE_INPUT',
+                        'valid_testcase_count': 0,
+                        'input_directory': str(in_dir),
+                    }, indent=2),
+                    encoding='utf-8',
+                )
+                raise NoCoverageInputError(
+                    f'no valid replay testcase found under {in_dir}'
+                )
             
             analyzer.set_progress('berserker', 'replay', file_count)
             self.exe.cov_setup(cov_folder, cov_file)
@@ -717,6 +765,9 @@ class Fuzzer:
 
                 if flag:
                     self.exe.cov_collect(cov_folder, cov_file, file_list[i])
+        except NoCoverageInputError:
+            logger.error('Fuzzer: coverage replay has no valid input')
+            raise
         except Exception:
             logger.exception('Fuzzer: replay processing failed')
         finally:

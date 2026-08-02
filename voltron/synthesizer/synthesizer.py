@@ -173,6 +173,7 @@ class AsyncProducer:
                 with open(self.generator_info_path, 'r', encoding='utf-8') as f:
                     generator_info = json.load(f)
                     self.generators_info_load(generator_info)
+                self._filter_invalid_cached_generators()
                 logger.debug("Producer: load generator")
             except Exception as e:
                 logger.debug(f'Producer: generator load error {e}')
@@ -194,7 +195,10 @@ class AsyncProducer:
                 logger.debug("Producer: load parser info")
                 if (
                     configs.spec_knowledge
-                    and not self._parser_cache_matches_primary_field()
+                    and (
+                        not self._parser_cache_matches_primary_field()
+                        or not self._parser_cache_contract_valid()
+                    )
                 ):
                     logger.debug(
                         'Producer: parser cache does not match the primary '
@@ -510,6 +514,39 @@ class AsyncProducer:
                 )
         self.mutators = filtered
 
+    def _filter_invalid_cached_generators(self) -> None:
+        filtered: dict[str, list[Generator]] = {}
+        for msg_type, versions in self.generators.items():
+            for generator in versions:
+                path = self.generator_path / msg_type / f'{generator.name}.py'
+                if not path.is_file() and generator.path:
+                    path = Path(generator.path)
+                if not path.is_file():
+                    continue
+                code = path.read_text(encoding='utf-8')
+                validation = validate_generated_code(
+                    code,
+                    'generate',
+                    'generator',
+                    timeout_s=self._generated_code_timeout(),
+                    max_output_bytes=self._generated_message_limit(),
+                )
+                if validation.ok:
+                    filtered.setdefault(msg_type, []).append(generator)
+                    self._record_generation(
+                        'generator', msg_type, 'reused_cache', 0, code,
+                    )
+                    continue
+                self._record_generation(
+                    'generator', msg_type, 'cache_invalid', 0, code,
+                    validation.error,
+                )
+            if msg_type not in filtered and versions:
+                # Keep the latest source available for runtime repair.  It is
+                # quarantined before any failing output can be sent.
+                filtered[msg_type] = [versions[-1]]
+        self.generators = filtered
+
     async def _generator_gen_one(
         self,
         msg,
@@ -524,7 +561,8 @@ class AsyncProducer:
             failure_count = 0
             failed_code: str | None = None
             failure_error = ''
-            while(True):
+            retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+            while failure_count < retry_limit:
                 input_code: str | None = None
                 try:
                     if failed_code is None:
@@ -543,12 +581,20 @@ class AsyncProducer:
                             function_name='generate',
                         )
                     
-                    # test generated code
-                    name_space = {}
-                    exec(input_code, name_space)
-                    obj = name_space[f'generate']
-                    obj()
-                    
+                    validation = validate_generated_code(
+                        input_code,
+                        'generate',
+                        'generator',
+                        timeout_s=self._generated_code_timeout(),
+                        max_output_bytes=self._generated_message_limit(),
+                    )
+                    if not validation.ok:
+                        raise ValueError(validation.error)
+                    self._record_generation(
+                        'generator', msg_type,
+                        'generated' if failure_count == 0 else 'repaired',
+                        failure_count + 1, input_code,
+                    )
                     return msg_type, input_code
                 except LLMDeadlineExceeded:
                     raise
@@ -556,7 +602,16 @@ class AsyncProducer:
                     if input_code is not None:
                         failed_code = input_code
                     failure_error = f'{type(e).__name__}: {e}'
+                    failure_count += 1
+                    self._record_generation(
+                        'generator', msg_type, 'invalid', failure_count,
+                        input_code, failure_error,
+                    )
                     logger.debug(f'Producer :generate error {str(e)}')
+            raise RuntimeError(
+                f'generator generation failed for {msg_type} after '
+                f'{retry_limit} attempts: {failure_error}'
+            )
 
     async def _generator_gen_async(
         self
@@ -690,16 +745,22 @@ class AsyncProducer:
                             function_name='generate',
                         )
                     
-                    # test generated code
-                    name_space = {}
-                    exec(input_code, name_space)
-                    obj = name_space[f'generate']
-                    obj()
-                    msg: bytes | None = obj()
-                    if msg == None or msg == b'':
-                        raise Exception('mutate return empty')
+                    validation = validate_generated_code(
+                        input_code,
+                        'generate',
+                        'generator',
+                        timeout_s=self._generated_code_timeout(),
+                        max_output_bytes=self._generated_message_limit(),
+                    )
+                    if not validation.ok:
+                        raise ValueError(validation.error)
                     with analyzer.lock:
                         analyzer.finished += 1
+                    self._record_generation(
+                        'generator_evolution', msg_type,
+                        'generated' if failure_count == 0 else 'repaired',
+                        failure_count + 1, input_code,
+                    )
                     return msg_type, input_code
                 except LLMDeadlineExceeded:
                     raise
@@ -708,6 +769,10 @@ class AsyncProducer:
                         failed_code = input_code
                     failure_error = f'{type(e).__name__}: {e}'
                     failure_count += 1
+                    self._record_generation(
+                        'generator_evolution', msg_type, 'invalid',
+                        failure_count, input_code, failure_error,
+                    )
                     if failure_count >= getattr(
                         configs,
                         'ir_evolution_failure_threshold',
@@ -1012,7 +1077,9 @@ class AsyncProducer:
         type_rules = self._response_type_rules_info()
         failed_code: str | None = None
         failure_error = ''
-        while(True):
+        retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+        failure_count = 0
+        while failure_count < retry_limit:
             pkt_parser_code: str | None = None
             try:
                 if failed_code is None:
@@ -1027,7 +1094,19 @@ class AsyncProducer:
                         error=failure_error,
                         function_name='packet_parser',
                     )
-                compile(pkt_parser_code, '<string>', 'exec')
+                validation = validate_generated_code(
+                    pkt_parser_code,
+                    'packet_parser',
+                    'parser',
+                    timeout_s=self._generated_code_timeout(),
+                )
+                if not validation.ok:
+                    raise ValueError(validation.error)
+                self._record_generation(
+                    'parser', '__all__',
+                    'generated' if failure_count == 0 else 'repaired',
+                    failure_count + 1, pkt_parser_code,
+                )
                 return pkt_parser_code
             except LLMDeadlineExceeded:
                 raise
@@ -1035,7 +1114,16 @@ class AsyncProducer:
                 if pkt_parser_code is not None:
                     failed_code = pkt_parser_code
                 failure_error = f'{type(e).__name__}: {e}'
-                logger.debug(f'[Parser Generation]: syntax error {e}')
+                failure_count += 1
+                self._record_generation(
+                    'parser', '__all__', 'invalid', failure_count,
+                    pkt_parser_code, failure_error,
+                )
+                logger.debug(f'[Parser Generation]: invalid parser {e}')
+        raise RuntimeError(
+            f'parser generation failed after {retry_limit} attempts: '
+            f'{failure_error}'
+        )
                 
     def parser_gen(
             self
@@ -2284,7 +2372,9 @@ class AsyncProducer:
                 
         failed_code: str | None = None
         failure_error = ''
-        while(True):
+        retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+        failure_count = 0
+        while failure_count < retry_limit:
             pkt_parser_code: str | None = None
             try:
                 if failed_code is None:
@@ -2305,7 +2395,21 @@ class AsyncProducer:
                 # test generated code
                 with analyzer.lock:
                     analyzer.finished += 1
-                compile(pkt_parser_code, '<string>', 'exec')
+                validation = validate_generated_code(
+                    pkt_parser_code,
+                    'packet_parser',
+                    'parser',
+                    timeout_s=self._generated_code_timeout(),
+                    runtime_samples=(message,),
+                    require_nonempty_samples=True,
+                )
+                if not validation.ok:
+                    raise ValueError(validation.error)
+                self._record_generation(
+                    'parser_evolution', '__all__',
+                    'generated' if failure_count == 0 else 'repaired',
+                    failure_count + 1, pkt_parser_code,
+                )
                 return pkt_parser_code
             except LLMDeadlineExceeded:
                 raise
@@ -2313,7 +2417,16 @@ class AsyncProducer:
                 if pkt_parser_code is not None:
                     failed_code = pkt_parser_code
                 failure_error = f'{type(e).__name__}: {e}'
+                failure_count += 1
+                self._record_generation(
+                    'parser_evolution', '__all__', 'invalid',
+                    failure_count, pkt_parser_code, failure_error,
+                )
                 logger.debug(f'Producer: generate error {e}')
+        raise RuntimeError(
+            f'parser evolution failed after {retry_limit} attempts: '
+            f'{failure_error}'
+        )
 
     def _primary_response_field_info(
         self
@@ -2393,6 +2506,250 @@ class AsyncProducer:
         return self.parsers[-1].state_field == (
             self._primary_response_field_name()
         )
+
+    def _parser_cache_contract_valid(self) -> bool:
+        if not self.parsers:
+            return False
+        parser = self.parsers[-1]
+        path = self.parser_path / f'{parser.name}.py'
+        if not path.is_file():
+            return False
+        code = path.read_text(encoding='utf-8')
+        validation = validate_generated_code(
+            code,
+            'packet_parser',
+            'parser',
+            timeout_s=self._generated_code_timeout(),
+        )
+        self._record_generation(
+            'parser', '__all__',
+            'reused_cache' if validation.ok else 'cache_invalid',
+            0, code, validation.error,
+        )
+        return validation.ok
+
+    @staticmethod
+    def _atomic_write_text(path: Path, content: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(
+            f'.{path.name}.{threading.get_ident()}.{time.time_ns()}.tmp'
+        )
+        temporary.write_text(content, encoding='utf-8')
+        temporary.replace(path)
+
+    def _atomic_write_json(self, path: Path, content: object) -> None:
+        self._atomic_write_text(
+            path,
+            json.dumps(content, ensure_ascii=False),
+        )
+
+    def _publish_runtime_component(
+        self,
+        component: str,
+        component_type: str,
+        code: str,
+    ) -> object:
+        """Atomically publish a contract-validated replacement version."""
+        lock = getattr(self, '_runtime_component_lock', None)
+        if lock is None:
+            lock = threading.RLock()
+            self._runtime_component_lock = lock
+        with lock:
+            state_field = self._primary_response_field_name()
+            if component == 'parser':
+                old_name = self.parsers[-1].name if self.parsers else 'init'
+                name = f'id{len(self.parsers)}'
+                path = self.parser_path / f'{name}.py'
+                self._atomic_write_text(path, code)
+                metadata = Parser(
+                    evolved_from=old_name,
+                    name=name,
+                    state_field=state_field,
+                )
+                self.parsers.append(metadata)
+                self._atomic_write_json(
+                    self.parser_info_path,
+                    self.parser_info(),
+                )
+                return metadata
+
+            if component in {'generator', 'mutator'}:
+                collection = (
+                    self.generators
+                    if component == 'generator'
+                    else self.mutators
+                )
+                root = (
+                    self.generator_path
+                    if component == 'generator'
+                    else self.mutator_path
+                )
+                versions = collection.setdefault(component_type, [])
+                old_name = versions[-1].name if versions else 'init'
+                name = f'id{len(versions)}'
+                path = root / component_type / f'{name}.py'
+                self._atomic_write_text(path, code)
+                metadata = Generator(
+                    msg_type=component_type,
+                    evolved_from=old_name,
+                    name=name,
+                    path=str(path.resolve()),
+                )
+                versions.append(metadata)
+                info_path = (
+                    self.generator_info_path
+                    if component == 'generator'
+                    else self.mutator_info_path
+                )
+                info = (
+                    self.generator_info()
+                    if component == 'generator'
+                    else self.mutator_info()
+                )
+                self._atomic_write_json(info_path, info)
+                return metadata
+
+            if component == 'checker':
+                versions = self.checkers.setdefault(component_type, [])
+                old_name = versions[-1].name if versions else 'init'
+                name = f'id{len(versions)}'
+                path = (
+                    self.checker_path
+                    / quote(component_type, safe='._-')
+                    / f'{name}.py'
+                )
+                self._atomic_write_text(path, code)
+                metadata = Checker(
+                    msg_type=component_type,
+                    evolved_from=old_name,
+                    name=name,
+                    path=str(path.resolve()),
+                    state_field=state_field,
+                    contract_version=self.RESPONSE_COMPONENT_CONTRACT_VERSION,
+                    ir_sha256=self._response_component_ir_sha256(
+                        component_type
+                    ),
+                )
+                versions.append(metadata)
+                self._atomic_write_json(
+                    self.checker_info_path,
+                    self.checker_info(),
+                )
+                return metadata
+
+            if component == 'observer':
+                versions = self.observers.setdefault(component_type, [])
+                old_name = versions[-1].name if versions else 'init'
+                name = f'id{len(versions)}'
+                path = (
+                    self.observer_path
+                    / quote(component_type, safe='._-')
+                    / f'{name}.py'
+                )
+                self._atomic_write_text(path, code)
+                metadata = ResponseObserver(
+                    msg_type=component_type,
+                    evolved_from=old_name,
+                    name=name,
+                    path=str(path.resolve()),
+                    state_field=state_field,
+                    contract_version=self.RESPONSE_COMPONENT_CONTRACT_VERSION,
+                    ir_sha256=self._response_component_ir_sha256(
+                        component_type
+                    ),
+                )
+                versions.append(metadata)
+                self._atomic_write_json(
+                    self.observer_info_path,
+                    self.observer_info(),
+                )
+                return metadata
+
+        raise ValueError(f'unsupported runtime component: {component}')
+
+    async def _repair_runtime_component_async(
+        self,
+        component: str,
+        component_type: str,
+        source_code: str,
+        error: str,
+        runtime_input: bytes | None,
+    ) -> tuple[object, str] | None:
+        function_name = {
+            'parser': 'packet_parser',
+            'generator': 'generate',
+            'mutator': 'mutate',
+            'checker': 'packet_checker',
+            'observer': 'packet_observer',
+        }[component]
+        failed_code = source_code
+        failure_error = error
+        retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
+        for attempt in range(1, retry_limit + 1):
+            candidate: str | None = None
+            try:
+                candidate = await self.chater.llm_code_repair(
+                    code=failed_code,
+                    error=failure_error,
+                    function_name=function_name,
+                )
+                runtime_samples = (
+                    (runtime_input,) if runtime_input is not None else ()
+                )
+                validation = validate_generated_code(
+                    candidate,
+                    function_name,
+                    component,
+                    timeout_s=self._generated_code_timeout(),
+                    max_output_bytes=self._generated_message_limit(),
+                    observer_samples=runtime_samples,
+                    runtime_samples=runtime_samples,
+                    require_nonempty_samples=(component == 'parser'),
+                )
+                if not validation.ok:
+                    raise ValueError(validation.error)
+                metadata = self._publish_runtime_component(
+                    component,
+                    component_type,
+                    candidate,
+                )
+                self._record_generation(
+                    f'{component}_runtime_repair', component_type,
+                    'published', attempt, candidate,
+                )
+                self._last_runtime_repair_attempts = attempt
+                return metadata, candidate
+            except LLMDeadlineExceeded:
+                raise
+            except Exception as repair_error:
+                if candidate is not None:
+                    failed_code = candidate
+                failure_error = (
+                    f'{type(repair_error).__name__}: {repair_error}'
+                )
+                self._record_generation(
+                    f'{component}_runtime_repair', component_type,
+                    'invalid', attempt, candidate, failure_error,
+                )
+        self._last_runtime_repair_attempts = retry_limit
+        return None
+
+    def repair_runtime_component(
+        self,
+        component: str,
+        component_type: str,
+        source_code: str,
+        error: str,
+        runtime_input: bytes | None = None,
+    ) -> tuple[object, str] | None:
+        """Repair, validate, and publish code after a runtime contract failure."""
+        return asyncio.run(self._repair_runtime_component_async(
+            component,
+            component_type,
+            source_code,
+            error,
+            runtime_input,
+        ))
 
     def parser_evo(
         self,
