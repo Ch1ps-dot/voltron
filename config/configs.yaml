@@ -13,6 +13,7 @@ forked-daapd:
   rfc_name: ["daap","rfc7230","rfc7231","rfc7232","rfc7233","rfc7234","rfc7235", "daap"]
   trans_layer: tcp
   server: parent
+  readiness_script: ready.sh
 
 bftpd:
   protocol: ftp
@@ -37,6 +38,7 @@ proftpd:
   rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
   trans_layer: tcp
   server: parent
+  readiness_adapter: ftp_banner_active_socket
 
 exim:
   protocol: smtp
@@ -69,6 +71,11 @@ lighttpd:
   rfc_name: ["rfc9110","rfc7540","rfc2616","rfc1945"]
   trans_layer: tcp
   server: child
+
+executor:
+  setup_timeout_seconds: 30.0
+  readiness_timeout_seconds: 5.0
+  port_release_timeout_seconds: 3.0
 
 llm_doc:
   base_url: https://vip.yinli.one/v1
