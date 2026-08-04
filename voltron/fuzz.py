@@ -271,6 +271,82 @@ class Fuzzer:
        
         print('Executor: equipment setup')
 
+    def _request_stop(self, reason: str) -> None:
+        """Set a classified stop reason and signal this fuzzer's event."""
+        request_stop = getattr(analyzer, 'request_stop', None)
+        if callable(request_stop):
+            request_stop(reason, self.stop_event)
+        else:
+            self.stop_event.set()
+
+    def _finalize_run_status(self) -> int:
+        """Persist an authoritative run result and return its process code."""
+        now = time.time()
+        planned = float(getattr(self, 'time_limit_s', 0) or 0)
+        started = getattr(analyzer, 'start_time', now)
+        actual = max(0.0, now - started)
+        reason = getattr(analyzer, 'stop_reason', None)
+        if reason is None and planned > 0 and actual >= planned:
+            reason = 'deadline'
+            analyzer.stop_reason = reason
+
+        phase_metrics = getattr(analyzer, 'phase_metrics', {})
+        fuzz_phase = phase_metrics.get('fuzzing', {})
+        if reason == 'deadline':
+            if fuzz_phase.get('status') == 'deadline_reached':
+                run_status = 'completed'
+                exit_code = 0
+            else:
+                run_status = 'deadline_before_fuzzing'
+                exit_code = 2
+        elif reason in {
+            'failure',
+            'model_learning_failure',
+            'sut_failure',
+            'coverage_failure',
+        }:
+            run_status = 'failed'
+            exit_code = 1
+        elif reason in {'external_interrupt', 'cancelled'}:
+            run_status = 'interrupted'
+            exit_code = 130
+        elif reason is None:
+            run_status = 'incomplete'
+            exit_code = 2
+            reason = 'unknown'
+            analyzer.stop_reason = reason
+        else:
+            run_status = 'incomplete'
+            exit_code = 2
+
+        analyzer.run_status = run_status
+        analyzer.planned_duration_s = planned
+        analyzer.actual_duration_s = actual
+        status = {
+            'run_status': run_status,
+            'stop_reason': reason,
+            'planned_duration_s': planned,
+            'actual_duration_s': actual,
+            'exit_code': exit_code,
+            'target': getattr(self, 'target_name', ''),
+            'algorithm': getattr(analyzer, 'strategy', ''),
+            'phases': {
+                name: metric.get('status')
+                for name, metric in phase_metrics.items()
+            },
+        }
+        try:
+            target = configs.results_path / 'run_status.json'
+            temporary = target.with_suffix('.json.tmp')
+            temporary.write_text(
+                json.dumps(status, indent=2, ensure_ascii=False) + '\n',
+                encoding='utf-8',
+            )
+            temporary.replace(target)
+        except Exception:
+            logger.exception('Fuzzer: failed to write run status')
+        return exit_code
+
     def fuzz(
         self,
         algo: str,
@@ -295,7 +371,11 @@ class Fuzzer:
             analyzer.strategy = algo
             start_time = time.time()
             analyzer.start_time = start_time
+            analyzer.run_status = 'running'
+            analyzer.planned_duration_s = self.time_limit_s
 
+        exit_code = 2
+        run_error: BaseException | None = None
         try:
             self._install_signal_handlers()
             worker_failure: list[tuple[BaseException, str]] = []
@@ -305,7 +385,7 @@ class Fuzzer:
                     fuzz_loop(self.stop_event)
                 except BaseException as error:
                     worker_failure.append((error, traceback.format_exc()))
-                    self.stop_event.set()
+                    self._request_stop('failure')
             
             # start fuzzing and set up ui
             t_ui = threading.Thread(
@@ -335,13 +415,18 @@ class Fuzzer:
             
         except KeyboardInterrupt:
             logger.debug('Fuzzer: interrupted')
-        except Exception:
+            self._request_stop('external_interrupt')
+        except BaseException as error:
             logger.exception('Fuzzer: fuzzing failed')
-            self.stop_event.set()
-            raise
+            self._request_stop('failure')
+            run_error = error
         finally:
+            exit_code = self._finalize_run_status()
             self.cleanup()
         logger.debug('Fuzzer: finish fuzzing')
+        if run_error is not None:
+            raise run_error
+        return exit_code
             
     def replay(
         self,
@@ -460,7 +545,7 @@ class Fuzzer:
                     raise
                 finally:
                     if stop_event.is_set() and model_phase_status == 'completed':
-                        model_phase_status = 'stopped'
+                        model_phase_status = analyzer.phase_stop_status()
                     analyzer.end_phase('model_learning', model_phase_status)
             else:
                 analyzer.record_skipped_phase('model_learning')
@@ -472,11 +557,9 @@ class Fuzzer:
                 return
             self.berserker_fuzz(hypothesis, stop_event)
                 
-            self.stop_event.set()
-                
         except Exception:
             logger.exception('Fuzzer: state fuzzing failed')
-            stop_event.set()
+            self._request_stop('failure')
             raise
             
     def model_learning(
@@ -608,17 +691,22 @@ class Fuzzer:
                         self.producer.generator_evo(h)
                     continue
 
-            except (LLMDeadlineExceeded, ModelLearningStopped):
+            except LLMDeadlineExceeded:
                 logger.debug('Fuzzer: model learning stopped')
-                stop_event.set()
+                self._request_stop('deadline')
                 break
-            except Exception:
+            except ModelLearningStopped:
+                logger.debug('Fuzzer: model learning stopped')
+                if getattr(analyzer, 'stop_reason', None) is None:
+                    self._request_stop('model_learning_failure')
+                break
+            except Exception as error:
                 logger.exception('Fuzzer: model learning failed')
-                stop_event.set()
-                raise RuntimeError('model learning failed')
+                self._request_stop('model_learning_failure')
+                raise RuntimeError('model learning failed') from error
             if (configs.time_limit_s < time.time() - analyzer.start_time):
                 logger.debug('Fuzzer: timeout')
-                stop_event.set()
+                self._request_stop('deadline')
                 
         return h_lsit[-1] if h_lsit else None
     
@@ -672,19 +760,19 @@ class Fuzzer:
                 except Exception:
                     fuzz_phase_status = 'failed'
                     logger.exception('Fuzzer: berserker fuzzing failed')
-                    stop_event.set()
+                    self._request_stop('failure')
                     raise
 
                 if (configs.time_limit_s < time.time() - analyzer.start_time):
                     logger.debug('Fuzzer: timeout')
-                    stop_event.set()
+                    self._request_stop('deadline')
                     analyzer.collect_results()
         finally:
             analyzer.finalize_generator_metrics(
                 phase_iteration=analyzer.iter,
             )
             if stop_event.is_set() and fuzz_phase_status == 'completed':
-                fuzz_phase_status = 'stopped'
+                fuzz_phase_status = analyzer.phase_stop_status()
             analyzer.end_phase('fuzzing', fuzz_phase_status)
                 
     def replay_process(
@@ -780,7 +868,7 @@ class Fuzzer:
     ):
         # Handle normal exit of fuzzer Ctrl+C
         logger.debug(f'Fuzzer: caught signal {signal_num}, stopping')
-        self.stop_event.set()
+        self._request_stop('external_interrupt')
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         self._terminate_active_sut(signal.SIGTERM, timeout=0.5)
         raise KeyboardInterrupt

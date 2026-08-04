@@ -43,7 +43,10 @@ class ObTable:
         self.stop_event = stop_event
 
     def _stop_learning(self, reason: str) -> None:
-        self.stop_event.set()
+        if analyzer.stop_reason is None:
+            analyzer.request_stop('model_learning_failure', self.stop_event)
+        else:
+            self.stop_event.set()
         raise ModelLearningStopped(reason)
         
     def table_init(self):
@@ -72,7 +75,7 @@ class ObTable:
                     
                     if (configs.time_limit_s < time.time() - analyzer.start_time):
                         logger.debug('Fuzzer: timeout')
-                        self.stop_event.set()
+                        analyzer.request_stop('deadline', self.stop_event)
                     if self.stop_event.is_set():
                         self._stop_learning('model learning stopped')
                         
@@ -124,7 +127,7 @@ class ObTable:
                     iter_si += 1
                     if (configs.time_limit_s < time.time() - analyzer.start_time):
                         logger.debug('Fuzzer: timeout')
-                        self.stop_event.set()
+                        analyzer.request_stop('deadline', self.stop_event)
                         
                     if self.stop_event.is_set():
                         self._stop_learning('model learning stopped')
@@ -315,15 +318,17 @@ class MealyLstar:
         self,
         id: str
     ):
+        hypothesis = None
         try:
             self.table.make_close()
             self.table.make_consistent()
-            h = self.table.build_hypothesis(id)
+            hypothesis = self.table.build_hypothesis(id)
         except ModelLearningStopped:
             raise
         except Exception:
             logger.exception('LM: learning failed')
-        return h
+            raise
+        return hypothesis
 
     def berserker_run(
         self,
@@ -333,6 +338,7 @@ class MealyLstar:
         
         id: name of hypothesis
         """
+        hypothesis = None
         try:
             # extend mutated alphabet
             additional_symbol = []
@@ -347,9 +353,10 @@ class MealyLstar:
             self.table.table_init()
             self.table.make_close()
             self.table.make_consistent()
-            h = self.table.build_hypothesis(id)
+            hypothesis = self.table.build_hypothesis(id)
         except ModelLearningStopped:
             raise
         except Exception:
             logger.exception('LM: learning with existing table failed')
-        return h
+            raise
+        return hypothesis

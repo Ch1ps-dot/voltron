@@ -99,10 +99,12 @@ def main(
         state_learning=state_learning,
         guided_scheduling=guided_scheduling,
     )
-    fuzzer.fuzz(
+    exit_code = fuzzer.fuzz(
         algo=algorithm,
         time_limit_min=time
     )
+    if exit_code:
+        raise click.exceptions.Exit(exit_code)
 
 if __name__ == '__main__':
     main()

@@ -76,6 +76,12 @@ class Analyzer:
         self.iter = 0 # fuzzer generation iteration
         
         self.stop_event: threading.Event
+        # A stop event alone cannot distinguish a deadline, cancellation, or
+        # an internal failure.  Keep that reason alongside the event.
+        self.stop_reason: str | None = None
+        self.run_status: str = 'not_started'
+        self.planned_duration_s: float | None = None
+        self.actual_duration_s: float | None = None
         
         self.sut_proc: subprocess.Popen | None = None
         self._metric_series_path: Path | None = None
@@ -96,6 +102,10 @@ class Analyzer:
             self._generator_metrics_finalized = False
             self.lifetime_res_types_cnt = {}
             self.lifetime_resp_trans_cnt = {}
+            self.stop_reason = None
+            self.run_status = 'not_started'
+            self.planned_duration_s = None
+            self.actual_duration_s = None
             try:
                 csv_path = configs.results_path / 'phase_metrics.csv'
                 csv_path.unlink(missing_ok=True)
@@ -111,6 +121,38 @@ class Analyzer:
                 generator_csv_path.unlink(missing_ok=True)
             except Exception:
                 logger.exception('Analyzer: reset phase metrics failure')
+
+    def request_stop(
+            self,
+            reason: str,
+            event: threading.Event | None = None,
+    ) -> None:
+        """Set the stop reason once, then signal the shared stop event."""
+        with self.lock:
+            if self.stop_reason is None:
+                self.stop_reason = reason
+            stop_event = event or getattr(self, 'stop_event', None)
+        if stop_event is not None:
+            stop_event.set()
+
+    def phase_stop_status(
+            self,
+            default: str = 'stopped',
+    ) -> str:
+        """Map a run stop reason to an unambiguous phase status."""
+        reason = self.stop_reason
+        if reason == 'deadline':
+            return 'deadline_reached'
+        if reason in {'external_interrupt', 'cancelled'}:
+            return 'interrupted'
+        if reason in {
+            'failure',
+            'model_learning_failure',
+            'sut_failure',
+            'coverage_failure',
+        }:
+            return 'failed'
+        return default
 
     def _new_phase_metric(
             self,
@@ -550,6 +592,16 @@ class Analyzer:
             with status_file.open(mode='w', encoding='utf-8') as f:
                 f.write(f'{"start_time":<15}: {self.start_time}\n')
                 f.write(f'{"running_time":<15}: {self.seconds_to_hms(time.time() - self.start_time)}\n')
+                f.write(f'{"stop_reason":<15}: {self.stop_reason or "unknown"}\n')
+                f.write(f'{"run_status":<15}: {self.run_status}\n')
+                f.write(
+                    f'{"planned_duration_s":<21}: '
+                    f'{self.planned_duration_s if self.planned_duration_s is not None else ""}\n'
+                )
+                f.write(
+                    f'{"actual_duration_s":<21}: '
+                    f'{self.actual_duration_s if self.actual_duration_s is not None else ""}\n'
+                )
                 f.write(f'{"target_name":<15}: {self.target_name}\n')
                 f.write(f'{"protocol_name":<15}: {self.pro_name}\n')
                 f.write(f'{"exec_path_num":<15}: {self.path_num}\n')
