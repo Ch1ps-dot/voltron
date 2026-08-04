@@ -215,6 +215,14 @@ class Executor:
         self._active_interaction_lock = threading.RLock()
         self._prefetched_initial_response: bytes | None = None
         self.stop_event = stop_event
+
+    def _request_stop(self, reason: str) -> None:
+        runtime_analyzer = getattr(self, 'analyzer', analyzer)
+        request_stop = getattr(runtime_analyzer, 'request_stop', None)
+        if callable(request_stop):
+            request_stop(reason, self.stop_event)
+        else:
+            self.stop_event.set()
             
     def cov_setup(
         self,
@@ -426,7 +434,7 @@ class Executor:
             'result': asdict(result),
         })
         if not result.success:
-            self.stop_event.set()
+            self._request_stop('sut_failure')
         return result.success
 
     def setup_exe(self) -> bool:
@@ -508,7 +516,7 @@ class Executor:
                 stage='sut-cleanup-failed',
                 detail='target port remained occupied after listener cleanup',
             )
-            self.stop_event.set()
+            self._request_stop('sut_failure')
             return False, None
 
         grace_s = max(0.01, min(0.5, self.setup_time_s))
@@ -522,7 +530,7 @@ class Executor:
                     attempt=attempt,
                     detail='run_exe returned no process',
                 )
-                self.stop_event.set()
+                self._request_stop('sut_failure')
                 return False, None
             if self.stop_event.wait(grace_s):
                 self._terminate_process_group(proc, signal.SIGTERM, timeout=1)
@@ -538,7 +546,7 @@ class Executor:
             if attempt < 100:
                 self._wait_for_port_release(self.port)
 
-        self.stop_event.set()
+        self._request_stop('sut_failure')
         return False, proc
 
     def _wait_for_socket_readiness(
@@ -1082,7 +1090,7 @@ class Executor:
         sock = self._wait_for_socket_readiness(proc)
         if sock is None:
             self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
-            self.stop_event.set()
+            self._request_stop('sut_failure')
             return False, None
         self._track_active_interaction(proc, sock, remote_deployment)
 
@@ -1102,7 +1110,7 @@ class Executor:
                         else 'protocol readiness hook failed'
                     ),
                 )
-            self.stop_event.set()
+            self._request_stop('sut_failure')
             return False, None
         
         

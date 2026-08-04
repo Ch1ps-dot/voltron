@@ -47,9 +47,13 @@ class AsyncChater:
 
     @staticmethod
     def _stop_for_deadline() -> None:
-        stop_event = getattr(analyzer, 'stop_event', None)
-        if stop_event is not None:
-            stop_event.set()
+        request_stop = getattr(analyzer, 'request_stop', None)
+        if callable(request_stop):
+            request_stop('deadline')
+        else:
+            stop_event = getattr(analyzer, 'stop_event', None)
+            if stop_event is not None:
+                stop_event.set()
         logger.debug('LLM: fuzzing deadline reached; cancelling request')
 
     async def chat_llm(
