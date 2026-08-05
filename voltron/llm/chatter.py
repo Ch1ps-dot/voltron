@@ -217,7 +217,10 @@ class AsyncChater:
             prompt=pmp,
             usage = "ir_repair"
         )
-        return self.code_extract(ans)
+        # IR repair responses are XML, not Python source.  Keeping an XML
+        # markdown fence here causes the RFC parser to retry the same invalid
+        # payload forever because ``etree.fromstring`` receives the fence.
+        return self.xml_extract(ans)
 
     async def llm_ir_evolve(
             self,
