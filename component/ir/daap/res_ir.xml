@@ -1,128 +1,15 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <ir>
   <message name="DAAPResponse">
-    <!-- DAAP response message: an HTTP response with status line, headers, and a DMAP binary body. The body is a top-level DMAP container (dmap.serverinforesponse, code 'msrv') that contains a sequence of DMAP subchunks. Note that the HTTP header section is not explicitly modeled here; the focus is on the DMAP payload structure. -->
+    <!-- DAAP response body. The HTTP response entity is a single DMAP tagged chunk; all multi-byte values are big-endian. HTTP headers and gzip encoding are outside this message definition. -->
 
-    <!-- DMAP top-level chunk header -->
-    <field name="ContentCode" type="constant" length="4B" value="0x6d737276"/>
-    <!-- ASCII code 'msrv' for dmap.serverinforesponse; identifies the root container -->
+    <field name="ContentCode" type="variable" length="4B" value="4-byte OSType code: 'msrv', 'mccr', 'mlog', 'mupd', 'avdb', ..."/>
+    <!-- Top-level content code identifying the response container. Examples: 'msrv' = server info response, 'mccr' = content codes response, 'mlog' = login response, 'mupd' = update response. -->
 
     <field name="ContentLength" type="variable" length="4B" value="0..4294967295"/>
-    <!-- Length in bytes of the data section (excluding this 8-byte header). For the top-level chunk, this value may be incorrect; actual length is the total body size minus 8 bytes. -->
+    <!-- Big-endian unsigned length of the Data field only; it does not include the ContentCode and ContentLength header bytes. Some servers send an incorrect top-level length, so robust decoders may need to derive the top-level Data size from the HTTP body length minus 8. -->
 
-    <!-- Start of DMAP data section (subchunks) -->
-
-    <!-- 1. dmap.status (mstt) -->
-    <field name="mstt_ContentCode" type="constant" length="4B" value="0x6d737474"/>
-    <!-- DMAP content code for 'mstt' (dmap.status) -->
-
-    <field name="mstt_Length" type="constant" length="4B" value="4"/>
-    <!-- Length of the data (4 bytes) -->
-
-    <field name="mstt_Data" type="variable" length="4B" value="0..4294967295"/>
-    <!-- Response status code (uint32). Typical value is 200. -->
-
-    <!-- 2. dmap.protocolversion (mpro) -->
-    <field name="mpro_ContentCode" type="constant" length="4B" value="0x6d70726f"/>
-    <!-- DMAP content code for 'mpro' (dmap.protocolversion) -->
-
-    <field name="mpro_Length" type="constant" length="4B" value="4"/>
-    <!-- Length of the data (4 bytes) -->
-
-    <field name="mpro_Data" type="variable" length="4B" value="0..4294967295"/>
-    <!-- DMAP protocol version as a version type (2 bytes major, 1 byte minor, 1 byte patch). For 1.0.0, data = 0x00010000. -->
-
-    <!-- 3. daap.protocolversion (apro) -->
-    <field name="apro_ContentCode" type="constant" length="4B" value="0x6170726f"/>
-    <!-- DMAP content code for 'apro' (daap.protocolversion) -->
-
-    <field name="apro_Length" type="constant" length="4B" value="4"/>
-    <!-- Length of the data (4 bytes) -->
-
-    <field name="apro_Data" type="variable" length="4B" value="0..4294967295"/>
-    <!-- DAAP protocol version (same format as mpro). For 1.0.0, data = 0x00010000. -->
-
-    <!-- 4. dmap.itemname (minm) -->
-    <field name="minm_ContentCode" type="constant" length="4B" value="0x6d696e6d"/>
-    <!-- DMAP content code for 'minm' (dmap.itemname) -->
-
-    <field name="minm_Length" type="variable" length="4B" value="0..4294967295"/>
-    <!-- Length of the string data in bytes -->
-
-    <field name="minm_Data" type="variable" length="undefined" value="UTF-8 string"/>
-    <!-- Server name as a UTF-8 string. Length determined by minm_Length field. -->
-
-    <!-- 5. dmap.loginrequired (mslr) – optional; if present, indicates login is required -->
-    <field name="mslr_ContentCode" type="constant" length="4B" value="0x6d736c72"/>
-    <!-- DMAP content code for 'mslr' (dmap.loginrequired) -->
-
-    <field name="mslr_Length" type="constant" length="4B" value="1"/>
-    <!-- Length of data (1 byte) -->
-
-    <field name="mslr_Data" type="variable" length="1B" value="0 or 1"/>
-    <!-- Boolean; 0 = login not required, 1 = login required. If absent, default false. -->
-
-    <!-- 6. dmap.timeoutinterval (mstm) -->
-    <field name="mstm_ContentCode" type="constant" length="4B" value="0x6d73746d"/>
-    <!-- DMAP content code for 'mstm' (dmap.timeoutinterval) -->
-
-    <field name="mstm_Length" type="constant" length="4B" value="4"/>
-    <!-- Length of data (4 bytes) -->
-
-    <field name="mstm_Data" type="variable" length="4B" value="0..4294967295"/>
-    <!-- Timeout interval in seconds (uint32). Common value 1800. -->
-
-    <!-- 7. dmap.supportsautologout (msal) -->
-    <field name="msal_ContentCode" type="constant" length="4B" value="0x6d73616c"/>
-    <!-- DMAP content code for 'msal' (dmap.supportsautologout) -->
-
-    <field name="msal_Length" type="constant" length="4B" value="1"/>
-    <!-- Length of data (1 byte) -->
-
-    <field name="msal_Data" type="variable" length="1B" value="0 or 1"/>
-    <!-- Boolean; 0 = not supported, 1 = supported. -->
-
-    <!-- 8. dmap.supportsupdate (msup) -->
-    <field name="msup_ContentCode" type="constant" length="4B" value="0x6d737570"/>
-    <!-- DMAP content code for 'msup' (dmap.supportsupdate) -->
-
-    <field name="msup_Length" type="constant" length="4B" value="1"/>
-    <field name="msup_Data" type="variable" length="1B" value="0 or 1"/>
-
-    <!-- 9. dmap.supportspersistentids (mspi) -->
-    <field name="mspi_ContentCode" type="constant" length="4B" value="0x6d737069"/>
-    <field name="mspi_Length" type="constant" length="4B" value="1"/>
-    <field name="mspi_Data" type="variable" length="1B" value="0 or 1"/>
-
-    <!-- 10. dmap.supportsextensions (msex) -->
-    <field name="msex_ContentCode" type="constant" length="4B" value="0x6d736578"/>
-    <field name="msex_Length" type="constant" length="4B" value="1"/>
-    <field name="msex_Data" type="variable" length="1B" value="0 or 1"/>
-
-    <!-- 11. dmap.supportsbrowse (msbr) -->
-    <field name="msbr_ContentCode" type="constant" length="4B" value="0x6d736272"/>
-    <field name="msbr_Length" type="constant" length="4B" value="1"/>
-    <field name="msbr_Data" type="variable" length="1B" value="0 or 1"/>
-
-    <!-- 12. dmap.supportsquery (msqy) -->
-    <field name="msqy_ContentCode" type="constant" length="4B" value="0x6d737179"/>
-    <field name="msqy_Length" type="constant" length="4B" value="1"/>
-    <field name="msqy_Data" type="variable" length="1B" value="0 or 1"/>
-
-    <!-- 13. dmap.supportsindex (msix) -->
-    <field name="msix_ContentCode" type="constant" length="4B" value="0x6d736978"/>
-    <field name="msix_Length" type="constant" length="4B" value="1"/>
-    <field name="msix_Data" type="variable" length="1B" value="0 or 1"/>
-
-    <!-- 14. dmap.supportsresolve (msrs) -->
-    <field name="msrs_ContentCode" type="constant" length="4B" value="0x6d737273"/>
-    <field name="msrs_Length" type="constant" length="4B" value="1"/>
-    <field name="msrs_Data" type="variable" length="1B" value="0 or 1"/>
-
-    <!-- 15. dmap.databasescount (msdc) -->
-    <field name="msdc_ContentCode" type="constant" length="4B" value="0x6d736463"/>
-    <field name="msdc_Length" type="constant" length="4B" value="4"/>
-    <field name="msdc_Data" type="variable" length="4B" value="0..4294967295"/>
-    <!-- Number of databases on the server (uint32). -->
+    <field name="Data" type="variable" length="undefined" value="Sequence of zero or more nested chunks, each using the same [ContentCode(4B) + ContentLength(4B) + Data] layout"/>
+    <!-- The payload consists of child tagged chunks. For a server info response (ContentCode = 'msrv'), the child chunk sequence is: 'mstt', 'mpro', 'apro', 'minm', 'mslr', 'mstm', 'msal', 'msup', 'mspi', 'msex', 'msbr', 'msqy', 'msix', 'msrs', 'msdc'. For a content codes response (ContentCode = 'mccr'), it contains 'mstt' followed by one or more 'mdcl' dictionaries. The Data length is normally the value of ContentLength; however, the top-level ContentLength is known to be unreliable, so use total HTTP body length minus 8 when parsing the top-level chunk. -->
 </message>
 </ir>

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from voltron.configs import configs
+from voltron.llm.chatter import AsyncChater
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.rfcparser.setciontree import SectionTree
 
@@ -62,6 +63,134 @@ def test_document_annotation_falls_back_after_bounded_attempts():
 
     assert len(calls) == parser.ANNOTATION_MAX_ATTEMPTS
     assert node.content_type == "none"
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "expected"),
+    [
+        (
+            "4.6 /databases",
+            "Returns a list of databases.",
+            "request",
+        ),
+        (
+            "5.2 Sample Response",
+            "HTTP/1.1 200 OK\nContent-Length: 122",
+            "response",
+        ),
+    ],
+)
+def test_document_annotation_uses_safe_local_fallback(
+    name,
+    content,
+    expected,
+):
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.rfc_name = ["daap"]
+    parser.pro_name = "daap"
+
+    class FailingChater:
+        async def llm_doc_parse(self, **kwargs):
+            raise RuntimeError("provider unavailable")
+
+    parser.chater = FailingChater()
+    tree = make_tree("daap", content)
+    from voltron.rfcparser.setciontree import SectionNode
+
+    node = SectionNode(1, 0, len(content), name)
+    tree.leafs = [node]
+
+    asyncio.run(parser._spe_parse_one(node, asyncio.Semaphore(1), tree))
+
+    assert node.content_type == expected
+
+
+def test_ir_repair_extracts_xml_fence():
+    chater = AsyncChater.__new__(AsyncChater)
+
+    class Prompts:
+        from string import Template
+        _tem_ir_repair = Template("$ir $error")
+
+    chater.pmp = Prompts()
+
+    async def fake_chat_llm(**kwargs):
+        return "```xml\n<message name=\"/databases\"/>\n```"
+
+    chater.chat_llm = fake_chat_llm
+    repaired = asyncio.run(
+        chater.llm_ir_repair("<broken>", "XMLSyntaxError")
+    )
+
+    assert repaired.strip() == '<message name="/databases"/>'
+
+
+def test_message_ir_generation_repairs_xml_once():
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.pro_name = "daap"
+    parser.IR_REPAIR_MAX_ATTEMPTS = 3
+    parser._message_ir_context = lambda *_: "DAAP request documentation"
+
+    class Chater:
+        async def llm_ir_generation(self, **kwargs):
+            return "<message>"
+
+        async def llm_ir_repair(self, **kwargs):
+            return '<message name="/databases"/>'
+
+    parser.chater = Chater()
+
+    message = asyncio.run(
+        parser._msg_model_gen_one(
+            "/databases", asyncio.Semaphore(1), "req"
+        )
+    )
+
+    assert message.tag == "message"
+    assert message.get("name") == "/databases"
+
+
+def test_message_ir_generation_has_bounded_failure():
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.pro_name = "daap"
+    parser.IR_REPAIR_MAX_ATTEMPTS = 2
+    parser._message_ir_context = lambda *_: "DAAP request documentation"
+
+    class Chater:
+        async def llm_ir_generation(self, **kwargs):
+            return "<message>"
+
+        async def llm_ir_repair(self, **kwargs):
+            return "still not XML"
+
+    parser.chater = Chater()
+
+    with pytest.raises(RuntimeError, match="failed after 2 attempts"):
+        asyncio.run(
+            parser._msg_model_gen_one(
+                "/databases", asyncio.Semaphore(1), "req"
+            )
+        )
+
+
+def test_message_ir_generation_times_out():
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.pro_name = "daap"
+    parser.ANNOTATION_TIMEOUT_S = 0.01
+    parser._message_ir_context = lambda *_: "DAAP request documentation"
+
+    class Chater:
+        async def llm_ir_generation(self, **kwargs):
+            await asyncio.sleep(1)
+
+    parser.chater = Chater()
+
+    with pytest.raises(RuntimeError, match="generation timed out"):
+        asyncio.run(
+            parser._msg_model_gen_one(
+                "/databases", asyncio.Semaphore(1), "req"
+            )
+        )
 
 
 def test_damaged_sectiontree_cache_is_regenerated(tmp_path, monkeypatch):

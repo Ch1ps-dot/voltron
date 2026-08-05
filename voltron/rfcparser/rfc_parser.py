@@ -25,6 +25,7 @@ class AsyncRFCParser:
     """
     ANNOTATION_MAX_ATTEMPTS = 3
     ANNOTATION_TIMEOUT_S = 30.0
+    IR_REPAIR_MAX_ATTEMPTS = 3
 
     def __init__(
             self, 
@@ -392,10 +393,10 @@ class AsyncRFCParser:
         #     node.content_type = doc_type
 
     async def _spe_parse_one(
-        self,
-        node: SectionNode,
-        sem: asyncio.Semaphore,
-        st: SectionTree
+            self,
+            node: SectionNode,
+            sem: asyncio.Semaphore,
+            st: SectionTree
     ):
         async with sem:
             doc = st.fetch_node_content(node)
@@ -430,11 +431,49 @@ class AsyncRFCParser:
                         f'[{node.name}]: {error}'
                     )
 
-            node.content_type = 'none'
+            fallback = self._document_annotation_fallback(node, doc)
+            node.content_type = fallback or 'none'
+            if fallback:
+                logger.warning(
+                    'RFCParser: document annotation exhausted; using '
+                    f'local {fallback} fallback [{st.name}] [{node.name}]'
+                )
+                return
             logger.warning(
                 'RFCParser: document annotation exhausted; using none '
                 f'[{st.name}] [{node.name}]'
             )
+
+    @staticmethod
+    def _document_annotation_fallback(
+            node: SectionNode,
+            document: str,
+    ) -> str | None:
+        """Classify unambiguous wire-format sections without an LLM.
+
+        The fallback deliberately recognizes only two forms: a numbered
+        section whose title is an absolute URI (a request endpoint), and a
+        section explicitly called "Sample Response" that contains an HTTP
+        status line.  It is used only after all LLM annotation attempts fail,
+        so normal model annotations remain authoritative.
+        """
+        title = str(getattr(node, 'name', '')).strip()
+        content = str(document or '')
+
+        if re.match(r'^\d+(?:\.\d+)*\s+/\S+', title):
+            return 'request'
+
+        if (
+            re.search(r'\bsample\s+response\b', title, re.IGNORECASE)
+            and re.search(
+                r'^\s*(?:HTTP/\d(?:\.\d)?\s+\d{3}\b|\d{3}\b)',
+                content,
+                re.MULTILINE,
+            )
+        ):
+            return 'response'
+
+        return None
 
     async def _req_field(
             self,
@@ -662,27 +701,57 @@ class AsyncRFCParser:
             field_type: str
     ):
         rfc_doc = self._message_ir_context(msg_type, field_type)
-        async with sem:    
-            msg_ir = await self.chater.llm_ir_generation(
-                            pro_name=self.pro_name,
-                            message_name=msg_type,
-                            rfc_doc=rfc_doc
+        async with sem:
+            try:
+                msg_ir = await asyncio.wait_for(
+                    self.chater.llm_ir_generation(
+                        pro_name=self.pro_name,
+                        message_name=msg_type,
+                        rfc_doc=rfc_doc,
+                    ),
+                    timeout=self.ANNOTATION_TIMEOUT_S,
+                )
+            except asyncio.TimeoutError as error:
+                raise RuntimeError(
+                    'RFCParser: message IR generation timed out '
+                    f'[{field_type}] [{msg_type}] after '
+                    f'{self.ANNOTATION_TIMEOUT_S}s'
+                ) from error
+            last_error = 'empty IR response'
+            for attempt in range(1, self.IR_REPAIR_MAX_ATTEMPTS + 1):
+                if msg_ir is None or not str(msg_ir).strip():
+                    last_error = 'empty IR response'
+                else:
+                    try:
+                        return etree.fromstring(msg_ir)
+                    except Exception as error:
+                        last_error = str(error)
+                        logger.debug(
+                            'RFCParser: bad XML format '
+                            f'[{msg_type}] attempt '
+                            f'{attempt}/{self.IR_REPAIR_MAX_ATTEMPTS}: '
+                            f'{error}'
                         )
-            while(True):
-                if msg_ir == None:
-                    logger.debug('RFCParser: empty IR')
-                    raise Exception
+
+                if attempt == self.IR_REPAIR_MAX_ATTEMPTS:
+                    break
                 try:
-                    ir_xml = etree.fromstring(msg_ir)
-                    return ir_xml
-                except Exception as e:
-                    logger.debug(f'RFCParser: [bad xml format] {msg_type} err: {e}')
-                    fix_ir = await self.chater.llm_ir_repair(
-                                ir=msg_ir,
-                                error=str(e)
-                            )
-                    if (fix_ir != None):
-                        msg_ir = fix_ir
+                    msg_ir = await asyncio.wait_for(
+                        self.chater.llm_ir_repair(
+                            ir=str(msg_ir or ''),
+                            error=last_error,
+                        ),
+                        timeout=self.ANNOTATION_TIMEOUT_S,
+                    )
+                except Exception as error:
+                    last_error = str(error)
+                    msg_ir = None
+
+            raise RuntimeError(
+                'RFCParser: message IR generation failed after '
+                f'{self.IR_REPAIR_MAX_ATTEMPTS} attempts '
+                f'[{field_type}] [{msg_type}]: {last_error}'
+            )
 
     def _message_ir_context(
             self,
