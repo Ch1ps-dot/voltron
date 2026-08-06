@@ -1,5 +1,8 @@
 import asyncio
+import json
 from types import SimpleNamespace
+
+import pytest
 
 from voltron.analyzer.analyzer import analyzer
 from lxml import etree
@@ -12,6 +15,101 @@ from voltron.synthesizer.synthesizer import AsyncProducer
 
 def _set_retry_limit(monkeypatch) -> None:
     monkeypatch.setattr(configs, "generation_retry_limit", 3, raising=False)
+
+
+def test_initial_generator_failure_isolated_to_its_request_type(
+    tmp_path,
+    monkeypatch,
+):
+    _set_retry_limit(monkeypatch)
+    monkeypatch.setattr(configs, "async_sem_fuzz", 2, raising=False)
+    info_path = tmp_path / "info.md"
+    info_path.write_text("target info", encoding="utf-8")
+
+    class MixedChater:
+        async def llm_generator_gen(self, *, msg_type, **_kwargs):
+            if msg_type == "GOOD":
+                return "def generate():\n    return b'PING\\r\\n'\n"
+            return "def generate(:\n"
+
+        async def llm_code_repair(self, **_kwargs):
+            return "def generate(:\n"
+
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.chater = MixedChater()
+    producer.rfcp = SimpleNamespace(
+        pro_name="example",
+        req_fields=["method"],
+        req_types={"GOOD", "BAD"},
+        req_dep_map={"GOOD": {}, "BAD": {"GOOD": {"kind": "after"}}},
+        poss_res={"GOOD": ["OK"], "BAD": ["ERR"]},
+    )
+    producer.req_ir = etree.fromstring(
+        b"<ir><message name='GOOD'/><message name='BAD'/></ir>"
+    )
+    producer.generator_path = tmp_path / "generators"
+    producer.generator_path.mkdir()
+    producer.generator_info_path = producer.generator_path / "generator_info.json"
+    producer.info_path = info_path
+    producer.req_types = {"GOOD", "BAD"}
+    producer.req_dep = dict(producer.rfcp.req_dep_map)
+    producer.poss_response = dict(producer.rfcp.poss_res)
+    producer.generators = {}
+    producer._record_generation = lambda *_args, **_kwargs: None
+    producer._generated_code_timeout = lambda: 1
+    producer._generated_message_limit = lambda: 4096
+    producer._request_type_rule_info = lambda _msg_type: "rule"
+
+    producer.generator_gen()
+
+    assert set(producer.generators) == {"GOOD"}
+    assert producer.req_types == {"GOOD"}
+    assert producer.req_dep == {"GOOD": {}}
+    assert producer.poss_response == {"GOOD": ["OK"]}
+    assert (producer.generator_path / "GOOD" / "id0.py").is_file()
+    assert not (producer.generator_path / "BAD" / "id0.py").exists()
+    assert set(json.loads(producer.generator_info_path.read_text())) == {"GOOD"}
+
+
+def test_initial_generator_all_failures_remain_fatal(tmp_path, monkeypatch):
+    _set_retry_limit(monkeypatch)
+    monkeypatch.setattr(configs, "async_sem_fuzz", 1, raising=False)
+    info_path = tmp_path / "info.md"
+    info_path.write_text("target info", encoding="utf-8")
+
+    class FailingChater:
+        async def llm_generator_gen(self, **_kwargs):
+            return "def generate(:\n"
+
+        async def llm_code_repair(self, **_kwargs):
+            return "def generate(:\n"
+
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.chater = FailingChater()
+    producer.rfcp = SimpleNamespace(
+        pro_name="example",
+        req_fields=["method"],
+        req_types={"BAD"},
+        req_dep_map={"BAD": {}},
+        poss_res={"BAD": []},
+    )
+    producer.req_ir = etree.fromstring(b"<ir><message name='BAD'/></ir>")
+    producer.generator_path = tmp_path / "generators"
+    producer.generator_path.mkdir()
+    producer.generator_info_path = producer.generator_path / "generator_info.json"
+    producer.info_path = info_path
+    producer.req_types = {"BAD"}
+    producer.req_dep = {"BAD": {}}
+    producer.poss_response = {"BAD": []}
+    producer.generators = {}
+    producer._record_generation = lambda *_args, **_kwargs: None
+    producer._generated_code_timeout = lambda: 1
+    producer._generated_message_limit = lambda: 4096
+    producer._request_type_rule_info = lambda _msg_type: "rule"
+
+    with pytest.raises(RuntimeError, match="no usable request types"):
+        producer.generator_gen()
+    assert not producer.generator_info_path.exists()
 
 
 def test_invalid_mutator_is_retried_three_times_then_skipped(tmp_path, monkeypatch):

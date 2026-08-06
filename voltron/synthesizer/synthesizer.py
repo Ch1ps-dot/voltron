@@ -617,36 +617,117 @@ class AsyncProducer:
         self
     ):
         sem = asyncio.Semaphore(configs.async_sem_fuzz)
-        tasks = [
-            self._generator_gen_one(msg, sem)
-            for msg in self.req_ir.findall("message") 
-        ]
-        results = await tqdm_asyncio.gather(*tasks, desc='generator')
-        return results
+        messages = list(self.req_ir.findall("message"))
+
+        async def generate_one(
+            message,
+        ) -> tuple[str, tuple[str, str] | Exception]:
+            msg_type = str(message.get('name') or '')
+            try:
+                return msg_type, await self._generator_gen_one(message, sem)
+            except Exception as error:
+                return msg_type, error
+
+        tasks = [generate_one(message) for message in messages]
+
+        generated: list[tuple[str, str]] = []
+        failed: dict[str, str] = {}
+        deadline_error: LLMDeadlineExceeded | None = None
+        for task in tqdm_asyncio.as_completed(
+            tasks,
+            total=len(tasks),
+            desc='generator',
+        ):
+            msg_type, result = await task
+            if isinstance(result, LLMDeadlineExceeded):
+                deadline_error = result
+                failed[msg_type] = str(result)
+            elif isinstance(result, Exception):
+                failed[msg_type] = f'{type(result).__name__}: {result}'
+            else:
+                self._save_initial_generator(*result)
+                generated.append(result)
+
+        if deadline_error is not None:
+            raise deadline_error
+        return generated, failed
+
+    def _save_initial_generator(
+        self,
+        msg_type: str,
+        input_code: str,
+    ) -> None:
+        """Persist each validated initial generator as soon as it succeeds."""
+        msg_dir = self.generator_path / msg_type
+        msg_dir.mkdir(parents=True, exist_ok=True)
+        init_gen_path = msg_dir / 'id0.py'
+        init_gen_path.write_text(input_code, encoding='utf-8')
+        info = {
+            'msg_type': msg_type,
+            'evolved_from': 'init',
+            'name': 'id0',
+            'path': str(init_gen_path.resolve()),
+        }
+        self.generators.setdefault(msg_type, [])
+        self.generators[msg_type].append(Generator(**info))
+
+    def _restrict_to_available_generators(
+        self,
+    ) -> None:
+        """Remove unavailable initial request types from downstream inputs."""
+        available = {
+            msg_type for msg_type, versions in self.generators.items()
+            if versions
+        }
+        self.req_types = set(available)
+        self.req_dep = {
+            msg_type: {
+                dependency: relation
+                for dependency, relation in dependencies.items()
+                if dependency in available
+            }
+            for msg_type, dependencies in self.req_dep.items()
+            if msg_type in available
+        }
+        self.poss_response = {
+            msg_type: responses
+            for msg_type, responses in self.poss_response.items()
+            if msg_type in available
+        }
+        self.rfcp.req_types = set(available)
+        self.rfcp.req_dep_map = self.req_dep
+        self.rfcp.poss_res = self.poss_response
 
     def generator_gen(
         self
     ) -> None:
         """Generate and save init input generator
         """
-        
-        results = asyncio.run(self._generator_gen_async())
-        for msg_type, input_code in results:
-            msg_dir = self.generator_path / f'{msg_type}'
-            if not msg_dir.is_dir():
-                msg_dir.mkdir()
-            
-            init_gen_path = msg_dir / 'id0.py'
-            with open(init_gen_path, 'w', encoding='utf-8') as f:
-                f.write(input_code)
-                info: dict = {'msg_type': msg_type, 'evolved_from': 'init', 'name': 'id0', 'path': str(init_gen_path.resolve())}
-                self.generators.setdefault(msg_type, [])
-                self.generators[msg_type].append(Generator(**info))
-            
+
+        _, failures = asyncio.run(self._generator_gen_async())
+
+        if not self.generators:
+            failure_summary = '; '.join(
+                f'{msg_type}: {error}'
+                for msg_type, error in sorted(failures.items())
+            )
+            raise RuntimeError(
+                'initial generator generation produced no usable request '
+                f'types: {failure_summary or "no request messages"}'
+            )
+
+        self._restrict_to_available_generators()
         with open(self.generator_info_path, 'w', encoding='utf-8') as f:
             json.dump(self.generator_info(), f)
-            
-        logger.debug("[Producer]: finish generator generation")
+
+        if failures:
+            logger.warning(
+                'Producer: initial generator generation degraded; '
+                f'usable={len(self.generators)} failed={len(failures)} '
+                f'types={", ".join(sorted(failures))}'
+            )
+        else:
+            logger.debug("[Producer]: finish generator generation")
         
     async def _generator_evo_one(
         self,
