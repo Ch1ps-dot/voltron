@@ -546,6 +546,14 @@ class Executor:
                 attempt=attempt,
                 detail=f'process exited within {grace_s:.2f}s',
             )
+            # The launcher may exit after leaving a daemon or helper in its
+            # process group.  Clean the group before retrying so the orphan
+            # cannot keep the target port occupied.
+            self._terminate_process_group(
+                proc,
+                signal.SIGTERM,
+                timeout=1,
+            )
             if attempt < 100:
                 self._wait_for_port_release(self.port)
 
@@ -1357,25 +1365,84 @@ class Executor:
         """Terminate a SUT process tree that was started with start_new_session."""
         if proc is None:
             return
+
+        # ``start_new_session=True`` makes the child PID the process-group ID.
+        # Keep using that stable ID even when the launcher has already exited:
+        # wrappers and daemonizing targets may leave descendants alive in the
+        # group after ``proc.poll()`` starts returning a status.
+        pgid = getattr(proc, '_voltron_process_group', proc.pid)
+        if pgid <= 1 or pgid == os.getpgrp():
+            logger.debug(
+                'refusing to terminate unsafe SUT process group: '
+                f'pgid={pgid}; pid={proc.pid}'
+            )
+            return
+
+        def group_exists() -> bool:
+            # Reap the launcher as soon as it exits.  An unreaped process is a
+            # zombie and still makes killpg(..., 0) report the group as
+            # present, which would otherwise force every clean shutdown to
+            # wait for the timeout and take the SIGKILL path.  Reaping the
+            # leader is safe because ``pgid`` remains valid for any surviving
+            # descendants in the same group.
+            try:
+                proc.poll()
+            except Exception:
+                pass
+            try:
+                os.killpg(pgid, 0)
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                return True
+            return True
+
+        if not group_exists():
+            try:
+                proc.wait(timeout=0)
+            except Exception:
+                pass
+            return
+
         try:
-            if proc.poll() is None:
-                os.killpg(proc.pid, sig)
-                returncode = proc.wait(timeout=timeout)
-                logger.debug(f'close process group [returncode: {returncode} pid: {proc.pid}]')
-                return
-        except subprocess.TimeoutExpired:
-            logger.debug(f'process group did not stop after {sig.name}: {proc.pid}')
+            os.killpg(pgid, sig)
         except ProcessLookupError:
-            logger.debug(f'process group already closed: {proc.pid}')
+            logger.debug(f'process group already closed: {pgid}')
             return
         except Exception as err:
             logger.debug(f'process group close err: {err}')
 
+        deadline = time.monotonic() + max(0, timeout)
+        while group_exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+
+        if not group_exists():
+            try:
+                returncode = proc.wait(timeout=0)
+            except Exception:
+                returncode = proc.poll()
+            logger.debug(
+                'close process group '
+                f'[returncode: {returncode} pid: {proc.pid} pgid: {pgid}]'
+            )
+            return
+
+        logger.debug(f'process group did not stop after {sig.name}: {pgid}')
         try:
-            if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGKILL)
-                returncode = proc.wait(timeout=1)
-                logger.debug(f'killed process group [returncode: {returncode} pid: {proc.pid}]')
+            os.killpg(pgid, signal.SIGKILL)
+            kill_deadline = time.monotonic() + 1
+            while group_exists() and time.monotonic() < kill_deadline:
+                time.sleep(0.02)
+            try:
+                returncode = proc.wait(timeout=0)
+            except Exception:
+                returncode = proc.poll()
+            logger.debug(
+                'killed process group '
+                f'[returncode: {returncode} pid: {proc.pid} pgid: {pgid}]'
+            )
+        except ProcessLookupError:
+            logger.debug(f'process group already closed: {pgid}')
         except Exception as err:
             logger.debug(f'process group kill err: {err}')
     

@@ -127,6 +127,88 @@ def test_executor_does_not_restart_sut_when_stop_arrives_during_retry(
     assert len(run_calls) == 1
 
 
+def test_terminate_process_group_cleans_descendants_after_leader_exit(
+    monkeypatch,
+):
+    class ExitedProcess:
+        pid = 4321
+
+        @staticmethod
+        def poll():
+            return 0
+
+        @staticmethod
+        def wait(timeout=None):
+            return 0
+
+    executor = Executor.__new__(Executor)
+    process_group_exists = True
+    signals = []
+
+    def fake_killpg(pgid, sig):
+        nonlocal process_group_exists
+        assert pgid == 4321
+        if sig == 0:
+            if not process_group_exists:
+                raise ProcessLookupError
+            return
+        signals.append(sig)
+        process_group_exists = False
+
+    monkeypatch.setattr("voltron.executor.executor.os.getpgrp", lambda: 9999)
+    monkeypatch.setattr("voltron.executor.executor.os.killpg", fake_killpg)
+
+    executor._terminate_process_group(
+        ExitedProcess(),
+        signal.SIGTERM,
+        timeout=0.1,
+    )
+
+    assert signals == [signal.SIGTERM]
+
+
+def test_terminate_process_group_reaps_leader_without_sigkill_timeout(
+    monkeypatch,
+):
+    terminated = False
+    leader_reaped = False
+    signals = []
+
+    class Process:
+        pid = 5432
+
+        @staticmethod
+        def poll():
+            nonlocal leader_reaped
+            if not terminated:
+                return None
+            leader_reaped = True
+            return 0
+
+        @staticmethod
+        def wait(timeout=None):
+            return 0
+
+    def fake_killpg(pgid, sig):
+        nonlocal terminated
+        assert pgid == 5432
+        if sig == 0:
+            if leader_reaped:
+                raise ProcessLookupError
+            return
+        signals.append(sig)
+        terminated = True
+
+    executor = Executor.__new__(Executor)
+    monkeypatch.setattr("voltron.executor.executor.os.getpgrp", lambda: 9999)
+    monkeypatch.setattr("voltron.executor.executor.os.killpg", fake_killpg)
+
+    executor._terminate_process_group(Process(), signal.SIGTERM, timeout=1)
+
+    assert leader_reaped is True
+    assert signals == [signal.SIGTERM]
+
+
 def test_fuzzer_registers_interrupt_support_before_module_initialization(
     monkeypatch,
 ):
