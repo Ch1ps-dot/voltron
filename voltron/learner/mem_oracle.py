@@ -6,6 +6,10 @@ from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from voltron.utils.logger import logger_fuzz as logger
 from voltron.configs import configs
 import pprint
+from voltron.learner.partial_guidance import (
+    ModelLearningThreshold,
+    PartialTraceRecorder,
+)
 
 class MembershipOracle:
     """Membership Oracle for querying the SUT with sequences of requests and obtaining the corresponding responses.
@@ -20,11 +24,15 @@ class MembershipOracle:
         mapper: Mapper,
         executor: Executor,
         seed_retention: SeedRetentionPolicy | None = None,
+        trace_recorder: PartialTraceRecorder | None = None,
+        threshold_tracker: ModelLearningThreshold | None = None,
     ) -> None:
         self.mapper = mapper
         self.executor = executor
         self.alphabet = list(mapper.request_types)
         self.seed_retention = seed_retention or SeedRetentionPolicy()
+        self.trace_recorder = trace_recorder
+        self.threshold_tracker = threshold_tracker
     
     def query(
         self, 
@@ -51,6 +59,13 @@ class MembershipOracle:
                 )
                 if novelty.interesting:
                     self.executor.save_cons(cons)
+                if self.trace_recorder is not None:
+                    pair_grew = self.trace_recorder.observe(cons)
+                    if self.threshold_tracker is not None:
+                        self.threshold_tracker.observe(
+                            self.trace_recorder,
+                            pair_grew,
+                        )
                 logger.debug(f'sent seq -> {cons.req_seq}')
                 logger.debug(f'recv seq <- {cons.res_seq}')
                 return cons.res_seq

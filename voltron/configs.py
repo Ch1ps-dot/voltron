@@ -39,6 +39,9 @@ class Config:
         # are prepared before fuzzing starts.
         self.response_component_lazy_generation: bool = True
         self.response_component_prewarm_types: list[str] = []
+        # Stop model learning after input/output-scaled MQ stagnation and
+        # preserve replayable traces for partial fuzz guidance.
+        self.partial_guidance_enabled: bool = True
         
         self.target_name: str
         self.trans_layer: str

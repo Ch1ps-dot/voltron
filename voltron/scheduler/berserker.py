@@ -5,6 +5,7 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.learner.automata import MealyMachine
 from voltron.configs import configs
 from voltron.scheduler.seed_retention import SeedRetentionPolicy
+from voltron.learner.partial_guidance import PartialStateGraph
 from voltron.utils.logger import logger_fuzz as logger
 from typing import TypedDict
 import random, time, threading, os, math
@@ -45,6 +46,7 @@ class Berserker:
         exe: Executor,
         machine: MealyMachine | None,
         use_guidance: bool = True,
+        partial_guidance: PartialStateGraph | None = None,
     ) -> None:
         self.seed_retention = SeedRetentionPolicy()
         self.unique_resp = self.seed_retention.unique_responses
@@ -52,6 +54,18 @@ class Berserker:
         self.unique_resp_trans: set[str] = set()
         self.useful_msg: list[tuple[str, bytes]] = []
         self.useful_seq: list[list[tuple[str, bytes]]] = []
+        self.partial_guidance = partial_guidance if use_guidance else None
+        self.partial_seed_sequences: list[list[tuple[str, bytes]]] = (
+            self.partial_guidance.seed_sequences()
+            if self.partial_guidance is not None
+            else []
+        )
+        # Reuse partial traces through the existing interesting-seed path as
+        # well as the explicit prefix path below.  They remain ordinary fuzz
+        # seeds, never inferred machine states.
+        self.useful_seq.extend(self.partial_seed_sequences)
+        self.selected_partial_prefix = False
+        self.partial_prefix_attempts = 0
         self.max_seq_len = 0
         self.seen_req_res_pairs = self.seed_retention.seen_request_response_pairs
 
@@ -272,6 +286,15 @@ class Berserker:
         """
         self.selected_base_state = None
         self.selected_base_state_mode = ''
+        self.selected_partial_prefix = False
+        if self.partial_seed_sequences:
+            # Prefer concrete MQ prefixes often enough to preserve useful
+            # learning evidence, while leaving the rest of the scheduler's
+            # random/dependency behavior intact.
+            if self.rand.random() < 0.5:
+                self.selected_partial_prefix = True
+                self.partial_prefix_attempts += 1
+                return list(self.rand.choice(self.partial_seed_sequences))
         mode = ''
         if len(self.useful_seq) == 0:
             mode = 'random'
@@ -510,7 +533,10 @@ class Berserker:
             
             method = (
                 'cat'
-                if self.selected_base_state is not None
+                if (
+                    self.selected_base_state is not None
+                    or self.selected_partial_prefix
+                )
                 else self.rand.choice(self.methods)
             )
             if (method == 'cat'):

@@ -27,8 +27,14 @@ from voltron.learner.mlstar import (
     EquOracle,
     ObTable,
     ModelLearningStopped,
+    ModelLearningThresholdReached,
 )
 from voltron.learner.automata import MealyMachine
+from voltron.learner.partial_guidance import (
+    ModelLearningThreshold,
+    PartialStateGraph,
+    PartialTraceRecorder,
+)
 
 
 class NoCoverageInputError(RuntimeError):
@@ -230,6 +236,16 @@ class Fuzzer:
             for item in prewarm_types
             if str(item).strip()
         ]
+        learning_config = configs_yaml.get('model_learning', {})
+        partial_guidance_enabled = learning_config.get(
+            'partial_guidance_enabled',
+            True,
+        )
+        if not isinstance(partial_guidance_enabled, bool):
+            raise TypeError(
+                'model_learning.partial_guidance_enabled must be a boolean'
+            )
+        configs.partial_guidance_enabled = partial_guidance_enabled
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name
@@ -519,6 +535,7 @@ class Fuzzer:
                 configs.models_path.mkdir()
             
             hypothesis: MealyMachine | None = None
+            self.partial_guidance: PartialStateGraph | None = None
             begin_time = time.time()
             if self.state_learning:
                 analyzer.begin_phase('model_learning')
@@ -531,10 +548,22 @@ class Fuzzer:
                 model_phase_status = 'completed'
                 try:
                     model_learning_seed_retention = SeedRetentionPolicy()
+                    trace_recorder = PartialTraceRecorder()
+                    request_types = getattr(self.mapper, 'request_types', set())
+                    threshold_tracker = (
+                        ModelLearningThreshold(request_types)
+                        if (
+                            getattr(configs, 'partial_guidance_enabled', True)
+                            and request_types
+                        )
+                        else None
+                    )
                     mq = MembershipOracle(
                         mapper=self.mapper,
                         executor=self.exe,
                         seed_retention=model_learning_seed_retention,
+                        trace_recorder=trace_recorder,
+                        threshold_tracker=threshold_tracker,
                     )
                     eq = EquOracle(
                         mapper=self.mapper,
@@ -548,6 +577,8 @@ class Fuzzer:
 
                     if hypothesis is None:
                         hypothesis = self.model_learning(mq, eq, stop_event)
+                        if self.partial_guidance is not None:
+                            model_phase_status = 'threshold_drained_partial'
                     else:
                         self.mapper.message_pool = hypothesis.map
                 except BaseException:
@@ -565,7 +596,11 @@ class Fuzzer:
             if stop_event.is_set():
                 logger.debug('Fuzzer: model learning stopped at timeout')
                 return
-            self.berserker_fuzz(hypothesis, stop_event)
+            self.berserker_fuzz(
+                hypothesis,
+                stop_event,
+                partial_guidance=getattr(self, 'partial_guidance', None),
+            )
                 
         except Exception:
             logger.exception('Fuzzer: state fuzzing failed')
@@ -701,6 +736,18 @@ class Fuzzer:
                         self.producer.generator_evo(h)
                     continue
 
+            except ModelLearningThresholdReached as reached:
+                self.partial_guidance = self._save_partial_guidance(
+                    mq,
+                    reached.table,
+                    reason='threshold_drained_partial',
+                )
+                logger.debug(
+                    'Fuzzer: model learning threshold reached; '
+                    'using %d partial traces for fuzz guidance',
+                    len(self.partial_guidance.traces),
+                )
+                break
             except LLMDeadlineExceeded:
                 logger.debug('Fuzzer: model learning stopped')
                 self._request_stop('deadline')
@@ -719,11 +766,56 @@ class Fuzzer:
                 self._request_stop('deadline')
                 
         return h_lsit[-1] if h_lsit else None
+
+    def _partial_guidance_fingerprint(self) -> dict[str, object]:
+        """Bind partial traces to the components that produced their bytes."""
+        parser = getattr(self.mapper, 'cur_parser', None)
+        generators = getattr(self.mapper, 'generators', {})
+        return {
+            'target': getattr(
+                self,
+                'target_name',
+                getattr(configs, 'target_name', ''),
+            ),
+            'protocol': getattr(configs, 'pro_name', ''),
+            'endpoint': f'{getattr(configs, "host", "")}:{getattr(configs, "port", "")}',
+            'parser': getattr(parser, 'name', str(parser) if parser else ''),
+            'generators': {
+                str(symbol): getattr(generator, 'name', str(generator))
+                for symbol, generator in sorted(generators.items())
+            },
+        }
+
+    def _save_partial_guidance(
+        self,
+        mq,
+        table: ObTable,
+        reason: str,
+    ) -> PartialStateGraph:
+        recorder = getattr(mq, 'trace_recorder', None)
+        if recorder is None:
+            raise RuntimeError('partial guidance requires an MQ trace recorder')
+        table_snapshot = (
+            copy.deepcopy(table.S),
+            copy.deepcopy(table.E),
+            copy.deepcopy(table.T),
+        )
+        graph = recorder.snapshot(
+            self._partial_guidance_fingerprint(),
+            table_snapshot,
+            reason,
+        )
+        for folder in (configs.models_path, configs.results_path):
+            folder.mkdir(parents=True, exist_ok=True)
+            with (folder / 'partial_guidance.pkl').open('wb') as stream:
+                pickle.dump(graph, stream)
+        return graph
     
     def berserker_fuzz(
         self,
         hypothesis: MealyMachine | None,
-        stop_event
+        stop_event,
+        partial_guidance: PartialStateGraph | None = None,
     ):
         """--- berserker fuzzing ---"""
         with analyzer.lock:   
@@ -744,6 +836,9 @@ class Fuzzer:
             self.exe,
             hypothesis,
             use_guidance=self.guided_scheduling,
+            partial_guidance=(
+                partial_guidance if self.guided_scheduling else None
+            ),
         )
 
         analyzer.begin_phase('fuzzing')

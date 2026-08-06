@@ -13,6 +13,14 @@ class ModelLearningStopped(RuntimeError):
     """Signal that model learning stopped before producing a hypothesis."""
 
 
+class ModelLearningThresholdReached(RuntimeError):
+    """A drained observation table should be retained as partial evidence."""
+
+    def __init__(self, table: 'ObTable') -> None:
+        super().__init__('model learning no-growth threshold reached')
+        self.table = table
+
+
 class ObTable:
     """Oberservation Table for LM* algorithm, which is used to learn the Mealy machine model of the SUT.
 
@@ -41,6 +49,14 @@ class ObTable:
         self.mq = mq
         self.eq = eq
         self.stop_event = stop_event
+        self.threshold_tracker = getattr(mq, 'threshold_tracker', None)
+
+    @property
+    def threshold_reached(self) -> bool:
+        return bool(
+            self.threshold_tracker is not None
+            and getattr(self.threshold_tracker, 'reached', False)
+        )
 
     def _stop_learning(self, reason: str) -> None:
         if analyzer.stop_reason is None:
@@ -214,6 +230,11 @@ class ObTable:
         logger.debug('Ob: make close')
         while True:
             if self.stop_event.is_set(): return
+            # The current _fill_table invocation has already drained all
+            # entries for the frozen S/E snapshot.  Do not add another prefix
+            # once the no-growth gate is reached.
+            if self.threshold_reached:
+                return
             closed, s, a = self.is_closed()
             sa = s + (a,) if s and a else None
             if closed or sa == None or ( s != None and len(s) > 1 and self.T[s[:-1]][s[-1:]] in self.abnormal_syembol):
@@ -224,6 +245,8 @@ class ObTable:
             with analyzer.lock:
                 analyzer.state += 1
             self._fill_table()
+            if self.threshold_reached:
+                return
 
     def is_consistent(self):
         """Check consistent of table
@@ -245,6 +268,8 @@ class ObTable:
         while True:
             if self.stop_event.is_set():
                 self._stop_learning('model learning stopped')
+            if self.threshold_reached:
+                return
             ok, data = self.is_consistent()
             if ok or data == None:
                 return
@@ -320,8 +345,14 @@ class MealyLstar:
     ):
         hypothesis = None
         try:
+            if getattr(self.table, 'threshold_reached', False):
+                raise ModelLearningThresholdReached(self.table)
             self.table.make_close()
+            if getattr(self.table, 'threshold_reached', False):
+                raise ModelLearningThresholdReached(self.table)
             self.table.make_consistent()
+            if getattr(self.table, 'threshold_reached', False):
+                raise ModelLearningThresholdReached(self.table)
             hypothesis = self.table.build_hypothesis(id)
         except ModelLearningStopped:
             raise
