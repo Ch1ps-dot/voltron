@@ -56,6 +56,31 @@ class AsyncChater:
                 stop_event.set()
         logger.debug('LLM: fuzzing deadline reached; cancelling request')
 
+    @staticmethod
+    def _compact_context(value: object, limit: int | None = None) -> str:
+        """Keep both ends of variable prompt context within a fixed budget.
+
+        Prompt templates contain the instructions and are never truncated.
+        Keeping the beginning and end of RFC/IR/code context preserves its
+        identifier/definition and trailing constraints while preventing one
+        large context from dominating a component-generation request.
+        """
+        text = '' if value is None else str(value)
+        max_chars = (
+            getattr(configs, 'prompt_context_max_chars', 12_000)
+            if limit is None
+            else limit
+        )
+        max_chars = max(512, int(max_chars))
+        if len(text) <= max_chars:
+            return text
+
+        marker = '\n\n[... Voltron context truncated ...]\n\n'
+        retained = max_chars - len(marker)
+        head_chars = max(1, retained * 2 // 3)
+        tail_chars = max(1, retained - head_chars)
+        return f'{text[:head_chars]}{marker}{text[-tail_chars:]}'
+
     async def chat_llm(
             self, 
             prompt: str,
@@ -184,7 +209,11 @@ class AsyncChater:
             error_msg: str = ""
     ) -> str | None:
         tmp = self.pmp._tem_doc_analyze
-        pmp = tmp.substitute(rfc_num = rfc_num, pro_name = pro_name, rfc_doc = rfc_doc)
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            rfc_doc=self._compact_context(rfc_doc),
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "doc_parse"
@@ -198,7 +227,11 @@ class AsyncChater:
         rfc_doc: str
     ):
         tmp = self.pmp._tem_ir_generation
-        pmp = tmp.substitute(pro_name=pro_name, message_name=message_name, rfc_doc=rfc_doc)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            message_name=message_name,
+            rfc_doc=self._compact_context(rfc_doc),
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "ir_generation"
@@ -211,7 +244,10 @@ class AsyncChater:
             error: str
     ):
         tmp = self.pmp._tem_ir_repair
-        pmp = tmp.substitute(ir=ir, error=error)
+        pmp = tmp.substitute(
+            ir=self._compact_context(ir),
+            error=self._compact_context(error),
+        )
         # logger.debug(pmp)
         ans = await self.chat_llm(
             prompt=pmp,
@@ -237,10 +273,10 @@ class AsyncChater:
             pro_name=pro_name,
             direction=direction,
             msg_type=msg_type,
-            current_ir=current_ir,
-            type_rule=type_rule,
-            section_context=section_context,
-            feedback=feedback,
+            current_ir=self._compact_context(current_ir),
+            type_rule=self._compact_context(type_rule),
+            section_context=self._compact_context(section_context),
+            feedback=self._compact_context(feedback),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -271,9 +307,9 @@ class AsyncChater:
             pro_name=pro_name,
             field_name=field_name,
             msg_type=msg_type,
-            msg_ir=msg_ir,
-            info=info,
-            type_rule=type_rule,
+            msg_ir=self._compact_context(msg_ir),
+            info=self._compact_context(info),
+            type_rule=self._compact_context(type_rule),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -291,8 +327,8 @@ class AsyncChater:
         """Repair generated Python code using its local validation error."""
         tmp = self.pmp._tem_code_repair
         pmp = tmp.substitute(
-            code=code,
-            error=error,
+            code=self._compact_context(code),
+            error=self._compact_context(error),
             function_name=function_name,
         )
         ans = await self.chat_llm(
@@ -331,11 +367,11 @@ class AsyncChater:
             pro_name=pro_name,
             field_name=field_name,
             msg_type=msg_type,
-            code=code,
-            msg_ir=msg_ir,
-            info=info,
-            trace=trace,
-            related_code=related_code,
+            code=self._compact_context(code),
+            msg_ir=self._compact_context(msg_ir),
+            info=self._compact_context(info),
+            trace=self._compact_context(trace),
+            related_code=self._compact_context(related_code),
         )
         # logger.debug(pmp)
         ans = await self.chat_llm(
@@ -367,9 +403,9 @@ class AsyncChater:
             message = message[:99]
         pmp = tmp.substitute(
             pro_name=pro_name,
-            res_info=res_info,
-            type_rules=type_rules,
-            original_code=old_code,
+            res_info=self._compact_context(res_info),
+            type_rules=self._compact_context(type_rules),
+            original_code=self._compact_context(old_code),
             message=message,
         )
         ans = await self.chat_llm(
@@ -410,11 +446,11 @@ class AsyncChater:
             pro_name=pro_name,
             field_name=field_name,
             msg_type=msg_type,
-            code=code,
-            msg_ir=msg_ir,
-            info=info,
-            poss_response=poss_response,
-            trace=trace,
+            code=self._compact_context(code),
+            msg_ir=self._compact_context(msg_ir),
+            info=self._compact_context(info),
+            poss_response=self._compact_context(poss_response),
+            trace=self._compact_context(trace),
         )
         # logger.debug(pmp)
         ans = await self.chat_llm(
@@ -442,8 +478,8 @@ class AsyncChater:
         tmp = self.pmp._tem_gen_parser
         pmp = tmp.substitute(
             pro_name=pro_name,
-            res_info=res_info,
-            type_rules=type_rules,
+            res_info=self._compact_context(res_info),
+            type_rules=self._compact_context(type_rules),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -464,10 +500,10 @@ class AsyncChater:
         tmp = self.pmp._tem_gen_checker
         pmp = tmp.substitute(
             pro_name=pro_name,
-            msg_ir=msg_ir,
-            res_info=res_info,
+            msg_ir=self._compact_context(msg_ir),
+            res_info=self._compact_context(res_info),
             response_type=response_type,
-            type_rule=type_rule,
+            type_rule=self._compact_context(type_rule),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -487,8 +523,8 @@ class AsyncChater:
         tmp = self.pmp._tem_gen_observer
         pmp = tmp.substitute(
             pro_name=pro_name,
-            msg_ir=msg_ir,
-            res_info=res_info,
+            msg_ir=self._compact_context(msg_ir),
+            res_info=self._compact_context(res_info),
             response_type=response_type,
         )
         ans = await self.chat_llm(
@@ -510,9 +546,9 @@ class AsyncChater:
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
-            msg_ir=msg_ir,
-            original_code=original_code,
-            samples=samples,
+            msg_ir=self._compact_context(msg_ir),
+            original_code=self._compact_context(original_code),
+            samples=self._compact_context(samples),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -533,7 +569,7 @@ class AsyncChater:
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
-            msg_ir=msg_ir,
+            msg_ir=self._compact_context(msg_ir),
             old_response=repr(old_response),
             new_response=repr(new_response),
         )
@@ -556,10 +592,10 @@ class AsyncChater:
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
-            original_code=original_code,
+            original_code=self._compact_context(original_code),
             response_repr=repr(response),
             response_hex=response.hex(' '),
-            review_summary=review_summary
+            review_summary=self._compact_context(review_summary)
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -574,7 +610,11 @@ class AsyncChater:
             rfc_doc: str
     ) -> tuple[str, str]:
         tmp = self.pmp._tem_req_query
-        pmp = tmp.substitute(rfc_num=rfc_num, pro_name=pro_name, rfc_doc=rfc_doc)
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            rfc_doc=self._compact_context(rfc_doc),
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "req_query"
@@ -589,7 +629,11 @@ class AsyncChater:
             rfc_doc: str
     ) -> tuple[str, str]:
         tmp = self.pmp._tem_res_query
-        pmp = tmp.substitute(rfc_num=rfc_num, pro_name=pro_name, rfc_doc=rfc_doc)
+        pmp = tmp.substitute(
+            rfc_num=rfc_num,
+            pro_name=pro_name,
+            rfc_doc=self._compact_context(rfc_doc),
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "res_query"
@@ -608,8 +652,8 @@ class AsyncChater:
         pmp = tmp.substitute(
             rfc_num=rfc_num,
             pro_name=pro_name,
-            field_info=field_info,
-            rfc_doc=rfc_doc,
+            field_info=self._compact_context(field_info),
+            rfc_doc=self._compact_context(rfc_doc),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -628,8 +672,8 @@ class AsyncChater:
         pmp = tmp.substitute(
             rfc_num=rfc_num,
             pro_name=pro_name,
-            field_info=field_info,
-            rfc_doc=rfc_doc,
+            field_info=self._compact_context(field_info),
+            rfc_doc=self._compact_context(rfc_doc),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -651,11 +695,11 @@ class AsyncChater:
         pmp = tmp.substitute(
             rfc_num=rfc_num,
             pro_name=pro_name,
-            request_types=request_types,
-            response_types=response_types,
+            request_types=self._compact_context(request_types),
+            response_types=self._compact_context(response_types),
             content_type=content_type,
             section_name=section_name,
-            section_content=section_content,
+            section_content=self._compact_context(section_content),
         )
         ans = await self.chat_llm(
             prompt=pmp,
@@ -671,7 +715,12 @@ class AsyncChater:
             info: str = ""
     ) -> str:
         tmp = self.pmp._tem_possible_response
-        pmp = tmp.substitute(pro_name=pro_name, current_request=current_request, response_types=response_types, info=info)
+        pmp = tmp.substitute(
+            pro_name=pro_name,
+            current_request=current_request,
+            response_types=self._compact_context(response_types),
+            info=self._compact_context(info),
+        )
         ans = await self.chat_llm(
             prompt=pmp,
             usage = "possible_res"

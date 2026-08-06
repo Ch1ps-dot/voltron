@@ -5,6 +5,7 @@ from string import Template
 from types import SimpleNamespace
 
 from voltron.llm.chatter import AsyncChater
+from voltron.configs import configs
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.synthesizer import AsyncProducer
 
@@ -150,3 +151,40 @@ def test_code_repair_prompt_includes_failed_code_and_validation_error():
     assert "def generate(:" in captured["prompt"]
     assert "SyntaxError: invalid syntax" in captured["prompt"]
     assert "function named `generate`" in captured["prompt"]
+
+
+def test_code_repair_compacts_large_variable_context(monkeypatch):
+    prompt_path = (
+        Path(__file__).resolve().parents[1]
+        / "skills"
+        / "builder"
+        / "code_repair.md"
+    )
+    chater = AsyncChater.__new__(AsyncChater)
+    chater.pmp = SimpleNamespace(
+        _tem_code_repair=Template(prompt_path.read_text(encoding="utf-8"))
+    )
+    captured = {}
+
+    async def fake_chat_llm(prompt, usage):
+        captured["prompt"] = prompt
+        captured["usage"] = usage
+        return "def generate():\n    return b'PING\\r\\n'\n"
+
+    monkeypatch.setattr(configs, "prompt_context_max_chars", 512)
+    chater.chat_llm = fake_chat_llm
+    code = "CODE-START\n" + ("x" * 2_000) + "\nCODE-END"
+    error = "ERROR-START\n" + ("y" * 2_000) + "\nERROR-END"
+
+    asyncio.run(
+        chater.llm_code_repair(
+            code=code,
+            error=error,
+            function_name="generate",
+        )
+    )
+
+    assert captured["usage"] == "code_repair"
+    assert captured["prompt"].count("[... Voltron context truncated ...]") == 2
+    for boundary in ("CODE-START", "CODE-END", "ERROR-START", "ERROR-END"):
+        assert boundary in captured["prompt"]

@@ -47,6 +47,24 @@ import click
     show_default=True,
     help="Enable state/dependency-guided scheduling and feedback-based energy.",
 )
+@click.option(
+    "--compliance-analysis/--no-compliance-analysis",
+    default=True,
+    show_default=True,
+    help=(
+        "Review checker rejections with the compliance LLM and evolve "
+        "false-positive checkers."
+    ),
+)
+@click.option(
+    "--observer/--no-observer",
+    default=True,
+    show_default=True,
+    help=(
+        "Enable generated semantic response observers and their runtime "
+        "evolution."
+    ),
+)
 def main(
     sut: str, 
     algorithm: str, 
@@ -58,6 +76,8 @@ def main(
     spec_knowledge: bool,
     state_learning: bool,
     guided_scheduling: bool,
+    compliance_analysis: bool,
+    observer: bool,
 ):
     if rfc_parser and generate_ir:
         raise click.UsageError(
@@ -98,6 +118,8 @@ def main(
         spec_knowledge=spec_knowledge,
         state_learning=state_learning,
         guided_scheduling=guided_scheduling,
+        compliance_analysis=compliance_analysis,
+        observer_enabled=observer,
     )
     exit_code = fuzzer.fuzz(
         algo=algorithm,

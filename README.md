@@ -327,6 +327,30 @@ for that round in `mutated_types`.
 
 ## Compliance Analysis
 
+During fuzzing, checker rejections are reviewed with the compliance LLM by
+default.  Disable those in-run LLM reviews (and the associated checker repair)
+while retaining normal fuzzing and pair collection with:
+
+```bash
+uv run cli.py -s lighttpd -t 60 --no-compliance-analysis
+```
+
+`analyze_compliance.py` remains a separate post-processing command and is not
+affected by this switch.
+
+Semantic observers are also enabled by default.  Disable generated observers,
+their background generation, and observer evolution while using raw response
+hashes for deduplication with:
+
+```bash
+uv run cli.py -s lighttpd -t 60 --no-observer
+```
+
+Checker and in-run compliance work are deduplicated by parsed response code:
+after a code has been checked once, later responses with that code do not
+invoke observers, checkers, or the compliance LLM.  Raw request/response pairs
+remain available for offline analysis.
+
 `analyze_compliance.py` analyzes saved request-response pairs for possible
 protocol non-compliance bugs. For each pair, it retrieves relevant protocol
 requirements from the cached RFC SectionTrees, combines them with the captured

@@ -179,11 +179,12 @@ class Executor:
         self.observer_sources: dict[str, tuple[str, str]] = {}
         if configs.fuzz_mode != 'replay':
             self.load_checkers(self.mapper.equip_checkers())
-            self.load_observers(self.mapper.equip_observers())
-        self.checked_request_response_pairs: set[
-            tuple[str, str, str]
-        ] = set()
-        self.reviewed_invalid_responses: set[tuple[str, str, str]] = set()
+            if getattr(configs, 'observer_enabled', True):
+                self.load_observers(self.mapper.equip_observers())
+        # Checker/compliance work is budgeted once per parsed response code.
+        # Raw request/response pairs are recorded independently.
+        self.checked_request_response_pairs: set[str] = set()
+        self.reviewed_invalid_responses: set[str] = set()
         self.checked_response_samples: dict[
             tuple[str, str, str], bytes
         ] = {}
@@ -2420,7 +2421,10 @@ class Executor:
             if set(equipped) != loaded_checkers:
                 self.load_checkers(equipped)
         equip_observers = getattr(self.mapper, 'equip_observers', None)
-        if callable(equip_observers):
+        if (
+            getattr(configs, 'observer_enabled', True)
+            and callable(equip_observers)
+        ):
             equipped = equip_observers()
             loaded = set(getattr(self, 'observer_sources', {})) | set(
                 getattr(self, 'observer_funcs', {})
@@ -2536,6 +2540,15 @@ class Executor:
         """Observe with exact/family/generic selection and explicit fallback."""
         fallback = hashlib.sha256(response).hexdigest()
         self._request_and_refresh_response_components(response_type)
+        if not getattr(configs, 'observer_enabled', True):
+            return ObservationResult(
+                semantic_fingerprint=fallback,
+                raw_fingerprint=fallback,
+                scope='raw',
+                component_type=None,
+                provisional=False,
+                error='observer disabled',
+            )
         observer_sources = getattr(self, 'observer_sources', {})
         observer_funcs = getattr(self, 'observer_funcs', {})
         component_type = next(
@@ -2647,6 +2660,8 @@ class Executor:
         response: bytes
     ) -> str:
         """Evolve an observer only for semantically equivalent divergence."""
+        if not getattr(configs, 'observer_enabled', True):
+            return hashlib.sha256(response).hexdigest()
         if not hasattr(self, 'checked_response_samples'):
             self.checked_response_samples = {}
         if not hasattr(self, 'reviewed_response_samples'):
@@ -2881,6 +2896,20 @@ class Executor:
         if not enabled:
             return True
 
+        # Response-code deduplication happens before any observer/checker work
+        # so repeated responses do not consume component or compliance budget.
+        dedup_key = response_type
+        with self._invalid_response_lock:
+            if dedup_key in self.checked_request_response_pairs:
+                logger.debug(format_event(
+                    'checker.deduplicated',
+                    request_type=request_type,
+                    response_type=response_type,
+                    deduplication='response_code',
+                ))
+                return True
+            self.checked_request_response_pairs.add(dedup_key)
+
         response_observation = self.observe_response_with_evolution(
             response_type,
             response,
@@ -2888,21 +2917,7 @@ class Executor:
         observation = self.observe_response_result(response_type, response)
         response_observation = observation.semantic_fingerprint
         raw_digest = hashlib.sha256(response).hexdigest()
-        dedup_key = (
-            request_type,
-            response_type,
-            response_observation,
-        )
         with self._invalid_response_lock:
-            if dedup_key in self.checked_request_response_pairs:
-                logger.debug(format_event(
-                    'checker.deduplicated',
-                    request_type=request_type,
-                    response_type=response_type,
-                    response_observation=dedup_key[2],
-                ))
-                return True
-            self.checked_request_response_pairs.add(dedup_key)
             self.checked_response_samples[
                 (request_type, response_type, raw_digest)
             ] = response
@@ -3023,6 +3038,12 @@ class Executor:
         response_type: str
     ) -> None:
         """Review one unique checker rejection and act on the LLM verdict."""
+        if not getattr(configs, 'compliance_analysis', True):
+            logger.debug(
+                'Executor: compliance analysis disabled; checker rejection '
+                f'not reviewed [{response_type}]'
+            )
+            return
         if not cons.content or not cons.req_seq:
             logger.debug(
                 'Executor: cannot review response without conversation data'
@@ -3034,13 +3055,12 @@ class Executor:
         if not response:
             return
 
-        response_observation = self.observe_response(response_type, response)
-        dedup_key = (request_type, response_type, response_observation)
+        dedup_key = response_type
         with self._invalid_response_lock:
             if dedup_key in self.reviewed_invalid_responses:
                 logger.debug(
                     'Executor: duplicate non-conforming response skipped '
-                    f'[{request_type}/{response_type}] {response_observation}'
+                    f'[{request_type}/{response_type}] by response code'
                 )
                 return
             self.reviewed_invalid_responses.add(dedup_key)
@@ -3316,34 +3336,21 @@ class Executor:
         self,
         response_type: str
     ) -> None:
-        self.checked_request_response_pairs = {
-            key
-            for key in self.checked_request_response_pairs
-            if key[1] != response_type
-        }
-        self.reviewed_invalid_responses = {
-            key
-            for key in self.reviewed_invalid_responses
-            if key[1] != response_type
-        }
-        for (request_type, saved_type, _), response in (
-            self.checked_response_samples.items()
+        # Observation changes no longer alter response-code deduplication.
+        # Preserve the fact that this code was already checked/reviewed if a
+        # historical sample exists, while leaving other response codes intact.
+        if any(
+            saved_type == response_type
+            for (_, saved_type, _), _response
+            in self.checked_response_samples.items()
         ):
-            if saved_type == response_type:
-                self.checked_request_response_pairs.add((
-                    request_type,
-                    saved_type,
-                    self.observe_response(saved_type, response),
-                ))
-        for (request_type, saved_type, _), response in (
-            self.reviewed_response_samples.items()
+            self.checked_request_response_pairs.add(response_type)
+        if any(
+            saved_type == response_type
+            for (_, saved_type, _), _response
+            in self.reviewed_response_samples.items()
         ):
-            if saved_type == response_type:
-                self.reviewed_invalid_responses.add((
-                    request_type,
-                    saved_type,
-                    self.observe_response(saved_type, response),
-                ))
+            self.reviewed_invalid_responses.add(response_type)
 
     def _reobserve_persisted_invalid_responses(
         self,

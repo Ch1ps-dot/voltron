@@ -214,6 +214,8 @@ class Mapper:
         }
 
     def equip_observers(self) -> dict[str, ResponseObserver]:
+        if not getattr(configs, 'observer_enabled', True):
+            return {}
         return {
             msg_type: observers[-1]
             for msg_type, observers in self.observers.items()

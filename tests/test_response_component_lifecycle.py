@@ -131,6 +131,39 @@ def test_on_demand_generation_is_deduplicated_and_nonblocking():
     assert calls.count(("observer", ("4xx",))) == 1
 
 
+def test_on_demand_generation_skips_observers_when_disabled():
+    producer = make_producer()
+    calls = []
+
+    def checker_gen(response_types):
+        calls.append(("checker", tuple(response_types)))
+        for response_type in response_types:
+            producer.checkers[response_type] = [SimpleNamespace(
+                state_field="Status-Code",
+                contract_version=producer.RESPONSE_COMPONENT_CONTRACT_VERSION,
+                ir_sha256=f"ir:{response_type}",
+            )]
+
+    producer.checker_gen = checker_gen
+    producer.observer_gen = lambda _response_types: calls.append(("observer",))
+    old_spec = configs.spec_knowledge
+    old_lazy = configs.response_component_lazy_generation
+    old_enabled = configs.observer_enabled
+    try:
+        configs.spec_knowledge = True
+        configs.response_component_lazy_generation = True
+        configs.observer_enabled = False
+        producer.request_response_components("404")
+        assert producer.wait_for_response_components(timeout=2)
+    finally:
+        configs.spec_knowledge = old_spec
+        configs.response_component_lazy_generation = old_lazy
+        configs.observer_enabled = old_enabled
+
+    assert calls == [("checker", ("404",)), ("checker", ("4xx",))]
+    assert producer.observers == {}
+
+
 def make_executor() -> Executor:
     executor = Executor.__new__(Executor)
     executor.mapper = SimpleNamespace(producer=None)

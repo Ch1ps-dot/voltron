@@ -102,6 +102,35 @@ def test_confirmed_violation_is_saved_once():
     assert executor.analyzer.current_operation == ""
 
 
+def test_compliance_analysis_can_be_disabled(monkeypatch):
+    executor, producer = make_executor("non_compliant")
+    saved = []
+    executor.save_invalid_response = lambda *args, **kwargs: saved.append(True)
+    monkeypatch.setattr(configs, "compliance_analysis", False)
+
+    executor.handle_nonconforming_response(make_conversation(), "200")
+
+    assert producer.review_calls == 0
+    assert producer.evolve_calls == 0
+    assert saved == []
+
+
+def test_observer_can_be_disabled_without_executing_cached_observer(
+    monkeypatch,
+):
+    executor, _ = make_executor("uncertain")
+    calls = []
+    executor.observer_funcs = {"200": lambda _response: calls.append(True)}
+    monkeypatch.setattr(configs, "observer_enabled", False)
+
+    observed = executor.observe_response_result("200", b"200 OK\r\n")
+
+    assert calls == []
+    assert observed.scope == "raw"
+    assert observed.provisional is False
+    assert observed.error == "observer disabled"
+
+
 def test_persisted_invalid_response_is_deduplicated_across_executors(tmp_path):
     configs.results_path = tmp_path
     first_executor, _ = make_executor("non_compliant")
@@ -214,7 +243,7 @@ def test_compliant_false_positive_evolves_and_hot_reloads_checker():
     assert executor.analyzer.current_operation == ""
 
 
-def test_same_response_for_different_request_types_is_reviewed_separately():
+def test_same_response_code_is_reviewed_once_across_request_types():
     executor, producer = make_executor("uncertain")
 
     executor.handle_nonconforming_response(
@@ -226,7 +255,7 @@ def test_same_response_for_different_request_types_is_reviewed_separately():
         "200",
     )
 
-    assert producer.review_calls == 2
+    assert producer.review_calls == 1
 
 
 def test_checker_is_skipped_outside_fuzzing():
@@ -298,7 +327,7 @@ def test_duplicate_request_response_pair_is_skipped_before_checker():
     assert calls == [("200", b"invalid")]
 
 
-def test_different_request_bytes_with_same_types_and_response_are_deduplicated():
+def test_response_code_deduplicates_across_request_types_and_bytes():
     executor = Executor.__new__(Executor)
     executor.checked_request_response_pairs = set()
     executor._invalid_response_lock = threading.Lock()
@@ -316,16 +345,16 @@ def test_different_request_bytes_with_same_types_and_response_are_deduplicated()
         enabled=True,
     )
     executor.check_response_during_fuzzing(
-        "USER",
+        "PASS",
         "331",
-        b"331 password\r\n",
+        b"331 password changed\r\n",
         enabled=True,
     )
 
     assert len(calls) == 1
 
 
-def test_semantic_observer_deduplicates_dynamic_response_fields():
+def test_response_code_deduplicates_before_observer_execution():
     executor = Executor.__new__(Executor)
     executor.checked_request_response_pairs = set()
     executor._invalid_response_lock = threading.Lock()
@@ -429,13 +458,13 @@ def test_observer_evolution_reobservees_memory_and_persisted_results(
         enabled=True,
     ) is True
 
-    assert producer.evolve_calls == 1
+    assert producer.evolve_calls == 0
     assert checker_calls == [first]
-    assert executor.checked_request_response_pairs == {
-        ("CONNECT", "405", "d" * 64)
-    }
+    assert executor.checked_request_response_pairs == {"405"}
     updated = json.loads(record_path.read_text(encoding="utf-8"))
-    assert updated["response_observation"] == "d" * 64
+    assert updated["response_observation"] == __import__("hashlib").sha256(
+        first
+    ).hexdigest()
 
 
 def test_observer_does_not_evolve_for_semantically_different_responses():

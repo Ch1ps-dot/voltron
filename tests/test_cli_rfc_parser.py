@@ -49,6 +49,48 @@ def test_fuzzing_mode_still_requires_time():
     assert 'Missing option "-t" / "--time" for fuzzing mode.' in result.output
 
 
+def test_compliance_analysis_option_is_forwarded_to_fuzzer(monkeypatch):
+    captured = {}
+
+    class FakeFuzzer:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def fuzz(self, **_kwargs):
+            return 0
+
+    monkeypatch.setattr(cli_module, "Fuzzer", FakeFuzzer)
+
+    result = CliRunner().invoke(
+        cli_module.main,
+        ["--sut", "lightftp", "--time", "1", "--no-compliance-analysis"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["compliance_analysis"] is False
+
+
+def test_observer_option_is_forwarded_to_fuzzer(monkeypatch):
+    captured = {}
+
+    class FakeFuzzer:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def fuzz(self, **_kwargs):
+            return 0
+
+    monkeypatch.setattr(cli_module, "Fuzzer", FakeFuzzer)
+
+    result = CliRunner().invoke(
+        cli_module.main,
+        ["--sut", "lightftp", "--time", "1", "--no-observer"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["observer_enabled"] is False
+
+
 def test_generate_ir_option_does_not_start_fuzzer(tmp_path, monkeypatch):
     output_path = tmp_path / "component" / "ir" / "ftp"
     calls = []

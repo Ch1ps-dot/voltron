@@ -53,6 +53,8 @@ class Fuzzer:
             spec_knowledge: bool = True,
             state_learning: bool = True,
             guided_scheduling: bool = True,
+            compliance_analysis: bool = True,
+            observer_enabled: bool = True,
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
@@ -61,6 +63,8 @@ class Fuzzer:
         self.spec_knowledge = spec_knowledge
         self.state_learning = state_learning
         self.guided_scheduling = guided_scheduling
+        self.compliance_analysis = compliance_analysis
+        self.observer_enabled = observer_enabled
         self._cleanup_lock = threading.RLock()
         self._cleanup_done = False
         self._previous_sigint_handler = None
@@ -182,6 +186,8 @@ class Fuzzer:
         configs.spec_knowledge = self.spec_knowledge
         configs.state_learning = self.state_learning
         configs.guided_scheduling = self.guided_scheduling
+        configs.compliance_analysis = self.compliance_analysis
+        configs.observer_enabled = self.observer_enabled
         ir_evolution = configs_yaml.get('ir_evolution', {})
         configs.ir_evolution_enabled = ir_evolution.get('enabled', True)
         configs.ir_evolution_failure_threshold = ir_evolution.get(
@@ -204,6 +210,10 @@ class Fuzzer:
         configs.generated_message_max_bytes = max(
             1,
             int(generated_code.get('max_message_bytes', 1024 * 1024)),
+        )
+        configs.prompt_context_max_chars = max(
+            512,
+            int(generated_code.get('prompt_context_max_chars', 12_000)),
         )
         response_components = configs_yaml.get('response_components', {})
         lazy_generation = response_components.get('lazy_generation', True)

@@ -23,12 +23,17 @@ class Config:
         self.spec_knowledge: bool = True
         self.state_learning: bool = True
         self.guided_scheduling: bool = True
+        self.compliance_analysis: bool = True
+        self.observer_enabled: bool = True
         self.ir_evolution_enabled: bool = True
         self.ir_evolution_failure_threshold: int = 3
         self.ir_evolution_max_rounds_per_type: int = 1
         self.generation_retry_limit: int = 3
         self.generated_code_timeout_s: float = 2.0
         self.generated_message_max_bytes: int = 1024 * 1024
+        # Bound variable RFC/IR/code context inserted into LLM prompts.  The
+        # prompt template and its instructions are preserved in full.
+        self.prompt_context_max_chars: int = 12_000
         # Response checkers/observers are generated on demand.  Only the
         # protocol-wide fallback and explicitly configured high-value types
         # are prepared before fuzzing starts.

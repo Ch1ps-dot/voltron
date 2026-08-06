@@ -218,7 +218,8 @@ class AsyncProducer:
 
         if configs.fuzz_mode != 'replay':
             self._load_checkers()
-            self._load_observers()
+            if getattr(configs, 'observer_enabled', True):
+                self._load_observers()
 
         # load existed parser info or generate init mutator
         if (self.mutator_info_path.is_file()):
@@ -1471,6 +1472,9 @@ class AsyncProducer:
         response_types: list[str] | None = None,
     ) -> None:
         """Generate and persist missing semantic response observers."""
+        if not getattr(configs, 'observer_enabled', True):
+            logger.debug('Producer: observer generation disabled')
+            return
         response_types = list(dict.fromkeys(
             response_types
             if response_types is not None
@@ -1513,6 +1517,9 @@ class AsyncProducer:
         samples: list[bytes]
     ) -> ResponseObserver | None:
         """Evolve a response observer so same-type historical samples converge."""
+        if not getattr(configs, 'observer_enabled', True):
+            logger.debug('Producer: observer evolution disabled')
+            return None
         versions = self.observers.get(response_type)
         if not versions:
             logger.debug(
@@ -2025,7 +2032,11 @@ class AsyncProducer:
                 self._response_component_queue = queue.Queue()
             for key in keys:
                 checker_missing = bool(self._missing_checker_types([key]))
-                observer_missing = bool(self._missing_observer_types([key]))
+                observer_missing = (
+                    bool(self._missing_observer_types([key]))
+                    if getattr(configs, 'observer_enabled', True)
+                    else False
+                )
                 if (
                     not checker_missing
                     and not observer_missing
@@ -2057,17 +2068,23 @@ class AsyncProducer:
             try:
                 if not self.checkers.get(response_type):
                     self.checker_gen([response_type])
-                if not self.observers.get(response_type):
+                if (
+                    getattr(configs, 'observer_enabled', True)
+                    and not self.observers.get(response_type)
+                ):
                     self.observer_gen([response_type])
                 if (
                     not self.checkers.get(response_type)
-                    or not self.observers.get(response_type)
+                    or (
+                        getattr(configs, 'observer_enabled', True)
+                        and not self.observers.get(response_type)
+                    )
                 ):
                     failed = True
                     self._record_generation(
                         'response_components', response_type,
                         'quarantined', 0,
-                        error='checker or observer generation unavailable',
+                        error='required response component generation unavailable',
                     )
             except Exception:
                 failed = True
