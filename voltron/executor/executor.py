@@ -29,6 +29,7 @@ from dataclasses import dataclass, asdict
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
+PARSER_UNKNOWN_RESPONSE = b'UNKNOWN'
 ASAN_CRASH_MARKERS = (
     'ERROR: AddressSanitizer',
     'AddressSanitizer:',
@@ -169,6 +170,8 @@ class Executor:
         self._parser_code = ''
         self._parser_version = ''
         self._last_known_good_parser: tuple[Callable, str, str] | None = None
+        self.parser_degraded = False
+        self.parser_fallback_count = 0
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
         self.checker_sources: dict[str, str] = {}
@@ -1705,6 +1708,8 @@ class Executor:
                 f'{type(exception).__name__}: {exception}\n'
                 f'{traceback.format_exc()}'
             )
+            failed_code = getattr(self, '_parser_code', '')
+            failed_version = getattr(self, '_parser_version', 'unknown')
 
         if show_fuzz_ui:
             self._set_ui_operation('Repairing parser from runtime failure')
@@ -1738,16 +1743,20 @@ class Executor:
             fallback = getattr(self, '_last_known_good_parser', None)
             if fallback is not None:
                 fallback_func, fallback_code, fallback_version = fallback
-                replayed = fallback_func(response)
-                if isinstance(replayed, bytes) and replayed:
-                    self.parser_func = fallback_func
-                    self._parser_code = fallback_code
-                    self._parser_version = fallback_version
-                    logger.warning(
-                        'Executor: rolled parser back to last-known-good %s',
-                        fallback_version,
-                    )
-                    return replayed
+                if (
+                    fallback_version != failed_version
+                    or fallback_code != failed_code
+                ):
+                    replayed = fallback_func(response)
+                    if isinstance(replayed, bytes) and replayed:
+                        self.parser_func = fallback_func
+                        self._parser_code = fallback_code
+                        self._parser_version = fallback_version
+                        logger.warning(
+                            'Executor: rolled parser back to last-known-good %s',
+                            fallback_version,
+                        )
+                        return replayed
         except Exception as repair_error:
             error = (
                 f'{error}\nrepair_failure: '
@@ -1756,6 +1765,35 @@ class Executor:
         finally:
             if show_fuzz_ui:
                 self._set_ui_operation('')
+
+        if response:
+            self.parser_degraded = True
+            self.parser_fallback_count = (
+                getattr(self, 'parser_fallback_count', 0) + 1
+            )
+            logger.warning(
+                'Executor: parser repair exhausted; using UNKNOWN fallback '
+                '[version=%s input_sha256=%s]',
+                failed_version,
+                hashlib.sha256(response).hexdigest(),
+            )
+            append_record = getattr(
+                self.mapper, '_append_runtime_record', None
+            )
+            if callable(append_record):
+                append_record(
+                    'component_parser_fallbacks.jsonl',
+                    {
+                        'timestamp': time.time(),
+                        'component': 'parser',
+                        'failed_version': failed_version,
+                        'input_sha256': hashlib.sha256(response).hexdigest(),
+                        'input_length': len(response),
+                        'fallback_response': PARSER_UNKNOWN_RESPONSE.decode(),
+                        'error': error[:12000],
+                    },
+                )
+            return PARSER_UNKNOWN_RESPONSE
 
         raise RuntimeComponentRepairError(
             f'parser runtime repair exhausted: {error}'

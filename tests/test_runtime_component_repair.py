@@ -80,6 +80,44 @@ def test_parser_runtime_failure_repairs_and_replays_same_response():
     assert executor._parser_version == "id1"
 
 
+def test_parser_runtime_failure_degrades_to_unknown_after_repair_exhaustion():
+    response = b"\xff\xfebinary-response"
+    repairs = []
+
+    class FakeMapper:
+        cur_parser = SimpleNamespace(name="id0")
+
+        def repair_runtime_component(self, **kwargs):
+            repairs.append(kwargs)
+            return None
+
+    executor = Executor.__new__(Executor)
+    executor.mapper = FakeMapper()
+    executor.parser_func = lambda _response: b""
+    executor._parser_code = "def packet_parser(_response): return b''\n"
+    executor._parser_version = "id0"
+    executor._last_known_good_parser = None
+    executor.parser_degraded = False
+    executor.parser_fallback_count = 0
+
+    assert executor._parse_tcp_response(response, "-", False) == "UNKNOWN"
+    assert len(repairs) == 1
+    assert repairs[0]["runtime_input"] == response
+    assert executor.parser_degraded is True
+    assert executor.parser_fallback_count == 1
+
+
+def test_parser_validation_rejects_empty_nonempty_probe():
+    result = validate_generated_code(
+        "def packet_parser(_response):\n    return b''\n",
+        "packet_parser",
+        "parser",
+    )
+
+    assert result.ok is False
+    assert "non-empty validation sample" in result.error
+
+
 def test_runtime_repair_is_deduplicated_and_records_artifacts(
     tmp_path,
     monkeypatch,
