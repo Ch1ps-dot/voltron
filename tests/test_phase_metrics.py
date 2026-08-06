@@ -158,6 +158,50 @@ def test_lifetime_response_metrics_survive_phase_resets():
     assert metric.lifetime_resp_trans_num() == 2
 
 
+def test_state_snapshots_are_written_only_for_new_response_graph_items(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
+    monkeypatch.setattr("voltron.analyzer.analyzer.time.time", lambda: 125.5)
+    metric = Analyzer()
+    metric.target_name = "demo"
+    metric.start_time = 100.0
+
+    metric.res_types_update("220")
+    metric.resp_trans_update("-/220")
+    metric.res_types_update("220")
+    metric.resp_trans_update("-/220")
+
+    rows = read_phase_rows(tmp_path / "states.csv")
+    assert len(rows) == 12
+    assert {row["event"] for row in rows} == {
+        "new_response_type",
+        "new_response_transition",
+    }
+    assert {row["event_value"] for row in rows} == {"220", "-/220"}
+    assert {row["event_timestamp"] for row in rows} == {"125.500000"}
+    assert {row["elapsed_seconds"] for row in rows} == {"25.500000"}
+    assert {row["time"] for row in rows} == {"0"}
+
+    first_snapshot = rows[:6]
+    second_snapshot = rows[6:]
+    assert {row["data_type"] for row in first_snapshot} == {
+        "nodes",
+        "edges",
+        "lifetime_response_events",
+        "lifetime_response_types",
+        "lifetime_response_transition_events",
+        "lifetime_response_transitions",
+    }
+    assert {
+        row["data"] for row in first_snapshot if row["data_type"] == "nodes"
+    } == {"1"}
+    assert {
+        row["data"] for row in second_snapshot if row["data_type"] == "edges"
+    } == {"1"}
+
+
 def test_generator_checkpoints_record_cumulative_values_and_deltas(
     tmp_path,
     monkeypatch,

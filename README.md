@@ -313,6 +313,12 @@ The same values are displayed in the runtime UI and written to `fuzzer_status`.
 outcomes such as timeout, closed connection, poll error, and crash retain their
 existing dedicated counters and are not treated as parsed response types.
 
+`states.csv` is event-driven: Voltron appends a six-metric snapshot only when
+it first discovers a response type or a response transition.  The legacy
+`time` field remains elapsed whole minutes for compatibility; `event`,
+`event_value`, `event_timestamp`, and `elapsed_seconds` identify the exact
+discovery that produced each snapshot.
+
 `generator_iteration_metrics.csv` records whole-process response checkpoints
 around generator changes. It contains model-learning and fuzzing baselines, one
 row immediately before each actual generator evolution or mutation, and one

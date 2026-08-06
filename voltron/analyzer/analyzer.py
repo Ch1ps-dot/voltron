@@ -84,8 +84,7 @@ class Analyzer:
         self.actual_duration_s: float | None = None
         
         self.sut_proc: subprocess.Popen | None = None
-        self._metric_series_path: Path | None = None
-        self._metric_series_last_minute: int | None = None
+        self._state_snapshot_path: Path | None = None
 
     def reset_phase_metrics(
             self
@@ -100,6 +99,7 @@ class Analyzer:
             self._last_generator_checkpoint = None
             self._last_generator_operation_id = None
             self._generator_metrics_finalized = False
+            self._state_snapshot_path = None
             self.lifetime_res_types_cnt = {}
             self.lifetime_resp_trans_cnt = {}
             self.stop_reason = None
@@ -667,76 +667,90 @@ class Analyzer:
     def collect_metric_series(
             self
     ):
-        series_file = configs.results_path / 'states.csv'
-        try:
-            if self._metric_series_path != series_file:
-                self._metric_series_path = series_file
-                self._metric_series_last_minute = None
+        """Retained for callers that collect results at shutdown.
 
-            elapsed_minute = int((time.time() - self.start_time) // 60)
-            start_minute = 0
-            if self._metric_series_last_minute is not None:
-                start_minute = self._metric_series_last_minute + 1
+        State metrics are written immediately when a newly discovered response
+        type or response transition changes the state graph.  Writing the
+        final counters once for every elapsed minute would fabricate a time
+        series, so shutdown does not append synthetic backfilled samples.
+        """
+        return
 
-            if start_minute > elapsed_minute:
-                return
+    def _record_state_snapshot(
+            self,
+            event: str,
+            event_value: str,
+    ) -> None:
+        """Append one timestamped state-graph snapshot for a new discovery."""
+        results_path = getattr(configs, 'results_path', None)
+        start_time = getattr(self, 'start_time', None)
+        if (
+            not isinstance(results_path, Path)
+            or not results_path.is_dir()
+            or not isinstance(start_time, (int, float))
+        ):
+            return
 
-            write_header = not series_file.is_file() or series_file.stat().st_size == 0
-            with series_file.open(mode='a', encoding='utf-8', newline='') as f:
-                writer = csv.DictWriter(
-                    f,
-                    fieldnames=['subject', 'fuzzer', 'data_type', 'time', 'data']
-                )
-                if write_header:
-                    writer.writeheader()
-
-                for minute in range(start_minute, elapsed_minute + 1):
-                    writer.writerow({
-                        'subject': self.target_name,
-                        'fuzzer': 'voltron',
-                        'data_type': 'nodes',
-                        'time': minute,
-                        'data': self.res_types_num()
-                    })
-                    writer.writerow({
-                        'subject': self.target_name,
-                        'fuzzer': 'voltron',
-                        'data_type': 'edges',
-                        'time': minute,
-                        'data': self.resp_trans_num()
-                    })
-                    writer.writerow({
-                        'subject': self.target_name,
-                        'fuzzer': 'voltron',
-                        'data_type': 'lifetime_response_events',
-                        'time': minute,
-                        'data': self.lifetime_res_events_num()
-                    })
-                    writer.writerow({
-                        'subject': self.target_name,
-                        'fuzzer': 'voltron',
-                        'data_type': 'lifetime_response_types',
-                        'time': minute,
-                        'data': self.lifetime_res_types_num()
-                    })
-                    writer.writerow({
-                        'subject': self.target_name,
-                        'fuzzer': 'voltron',
-                        'data_type': 'lifetime_response_transition_events',
-                        'time': minute,
-                        'data': self.lifetime_resp_trans_events_num()
-                    })
-                    writer.writerow({
-                        'subject': self.target_name,
-                        'fuzzer': 'voltron',
-                        'data_type': 'lifetime_response_transitions',
-                        'time': minute,
-                        'data': self.lifetime_resp_trans_num()
-                    })
-
-            self._metric_series_last_minute = elapsed_minute
-        except Exception:
-            logger.exception('Analyzer: collect metric series failure')
+        with self.lock:
+            timestamp = time.time()
+            elapsed_seconds = max(0.0, timestamp - start_time)
+            series_file = results_path / 'states.csv'
+            write_header = (
+                self._state_snapshot_path != series_file
+                or not series_file.is_file()
+                or series_file.stat().st_size == 0
+            )
+            fieldnames = [
+                'subject',
+                'fuzzer',
+                'data_type',
+                'time',
+                'data',
+                'event',
+                'event_value',
+                'event_timestamp',
+                'elapsed_seconds',
+            ]
+            values = (
+                ('nodes', self.res_types_num()),
+                ('edges', self.resp_trans_num()),
+                ('lifetime_response_events', self.lifetime_res_events_num()),
+                ('lifetime_response_types', self.lifetime_res_types_num()),
+                (
+                    'lifetime_response_transition_events',
+                    self.lifetime_resp_trans_events_num(),
+                ),
+                (
+                    'lifetime_response_transitions',
+                    self.lifetime_resp_trans_num(),
+                ),
+            )
+            try:
+                with series_file.open(
+                    mode='a', encoding='utf-8', newline=''
+                ) as stream:
+                    writer = csv.DictWriter(stream, fieldnames=fieldnames)
+                    if write_header:
+                        writer.writeheader()
+                    for data_type, data in values:
+                        writer.writerow({
+                            'subject': getattr(self, 'target_name', ''),
+                            'fuzzer': 'voltron',
+                            # Keep the historical minute-based field for
+                            # existing result consumers.  Exact ordering is
+                            # available through the new elapsed/timestamp
+                            # columns.
+                            'time': int(elapsed_seconds // 60),
+                            'data_type': data_type,
+                            'data': data,
+                            'event': event,
+                            'event_value': event_value,
+                            'event_timestamp': f'{timestamp:.6f}',
+                            'elapsed_seconds': f'{elapsed_seconds:.6f}',
+                        })
+                self._state_snapshot_path = series_file
+            except Exception:
+                logger.exception('Analyzer: write state snapshot failure')
 
     def req_types_update(
             self,
@@ -751,6 +765,7 @@ class Analyzer:
             self,
             res_code: str
     ):
+        is_new_lifetime_type = res_code not in self.lifetime_res_types_cnt
         if res_code in self.res_types_cnt.keys():
             self.res_types_cnt[res_code] +=  1
         else:
@@ -766,11 +781,14 @@ class Analyzer:
             self.lifetime_res_types_cnt[res_code] += 1
         else:
             self.lifetime_res_types_cnt[res_code] = 1
+        if is_new_lifetime_type:
+            self._record_state_snapshot('new_response_type', res_code)
 
     def resp_trans_update(
             self,
             trans: str
     ):
+        is_new_lifetime_transition = trans not in self.lifetime_resp_trans_cnt
         if trans in self.resp_trans_cnt.keys():
             self.resp_trans_cnt[trans] += 1
         else:
@@ -786,6 +804,8 @@ class Analyzer:
             self.lifetime_resp_trans_cnt[trans] += 1
         else:
             self.lifetime_resp_trans_cnt[trans] = 1
+        if is_new_lifetime_transition:
+            self._record_state_snapshot('new_response_transition', trans)
 
     
     def req_types_num(
