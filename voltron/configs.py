@@ -42,6 +42,11 @@ class Config:
         # Stop model learning after input/output-scaled MQ stagnation and
         # preserve replayable traces for partial fuzz guidance.
         self.partial_guidance_enabled: bool = True
+        # A threshold ends one observation-table attempt, not the whole
+        # learning phase.  Regenerate components and start this many fresh
+        # learning attempts before falling back to partial guidance.
+        self.threshold_relearn_limit: int = 3
+        self.bootstrap_partial_evolution: bool = True
         
         self.target_name: str
         self.trans_layer: str

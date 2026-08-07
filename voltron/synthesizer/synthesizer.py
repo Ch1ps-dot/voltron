@@ -734,15 +734,18 @@ class AsyncProducer:
         self,
         msg_type: str,
         doc_info:str,
-        machine: MealyMachine,
-        sem
+        machine: MealyMachine | None,
+        sem,
+        trace_hints: set[str] | None = None,
     ):
         """Generate and save evolved input generator for one message type
         
         Attribute:
             msg_type: the message type of generator to be evolved
             doc_info: the document information to be used for generator evolution
-            machine: the current MealyMachine which provides the state transition information for generator evolution
+            machine: an optional complete model providing state transitions
+            trace_hints: concrete partial-learning evidence used before the
+                first complete model exists
         """
         generator_versions = self.generators.get(msg_type, [])
         if not generator_versions:
@@ -769,10 +772,13 @@ class AsyncProducer:
             
         # extract state trace of request pair which has dependency and the code of related generators 
         code_dep: list[str] = []
-        trace_list: set[str] = set()
+        trace_list: set[str] = set(trace_hints or set())
         if msg_type in self.req_dep.keys():
             for last_req, relation in self.req_dep[msg_type].items():
-                trace_list.add(machine.get_relation(last_req, msg_type))
+                if machine is not None:
+                    trace_list.add(
+                        machine.get_relation(last_req, msg_type)
+                    )
                 dependency_generators = self.generators.get(last_req, [])
                 if not dependency_generators:
                     logger.debug(
@@ -816,7 +822,7 @@ class AsyncProducer:
                             field_name=self.rfcp.req_fields[0],
                             msg_type=msg_type,
                             msg_ir=self._request_ir_info(msg_type),
-                            trace= '\n'.join(trace_list),
+                            trace='\n'.join(sorted(trace_list)),
                             info=doc_info,
                             related_code='\n'.join(code_dep)
                         )
@@ -879,20 +885,62 @@ class AsyncProducer:
     async def _generator_evo_async(
         self,
         doc_info: str,
-        machine: MealyMachine
+        machine: MealyMachine | None,
+        msg_types: set[str] | None = None,
+        trace_hints: dict[str, set[str]] | None = None,
     ):
         sem = asyncio.Semaphore(configs.async_sem_fuzz)
+        selected_types = msg_types if msg_types is not None else self.req_types
+        hints = trace_hints or {}
         tasks = [
-            self._generator_evo_one(msg_type=msg_type, doc_info=doc_info, machine=machine, sem=sem)
-            for msg_type in self.req_types
+            self._generator_evo_one(
+                msg_type=msg_type,
+                doc_info=doc_info,
+                machine=machine,
+                sem=sem,
+                trace_hints=hints.get(msg_type),
+            )
+            for msg_type in selected_types
         ]
         results = await asyncio.gather(*tasks)
         return results
 
+    def _save_evolved_generators(self, results) -> list[str]:
+        """Publish locally validated generator evolution results."""
+        evolved_types: list[str] = []
+        for result in results:
+            if result is None:
+                continue
+            msg_type, input_code = result
+            msg_dir = self.generator_path / f'{msg_type}'
+            if not msg_dir.is_dir():
+                msg_dir.mkdir()
+
+            cur_id = len(self.generators[msg_type])
+            gen_path = msg_dir / f'id{cur_id}.py'
+            with open(gen_path, 'w', encoding='utf-8') as f:
+                f.write(input_code)
+
+            old_name = self.generators[msg_type][-1].name
+            new_name = f'id{cur_id}'
+            info: dict = {
+                'msg_type': msg_type,
+                'evolved_from': old_name,
+                'name': new_name,
+                'path': str(gen_path.resolve()),
+            }
+            self.generators.setdefault(msg_type, [])
+            self.generators[msg_type].append(Generator(**info))
+            evolved_types.append(msg_type)
+
+        with open(self.generator_info_path, 'w', encoding='utf-8') as f:
+            json.dump(self.generator_info(), f)
+        return evolved_types
+
     def generator_evo(
             self,
             machine: MealyMachine
-    ) -> None:
+    ) -> list[str]:
         """Evolve and save input generator
         
         Attribute:
@@ -908,34 +956,70 @@ class AsyncProducer:
         
         # produce new generator
         results = asyncio.run(self._generator_evo_async(doc_info, machine))
-        for result in results:
-            if result is None:
-                continue
-            msg_type, input_code = result
-            msg_dir = self.generator_path / f'{msg_type}'
-            if not msg_dir.is_dir():
-                msg_dir.mkdir()
-            
-            # save generator
-            cur_id = len(self.generators[msg_type])
-            gen_path = msg_dir / f'id{cur_id}.py'
-            with open(gen_path, 'w', encoding='utf-8') as f:
-                f.write(input_code)
-                # construct and save information for new generator
-                
-                old_name = self.generators[msg_type][-1].name
-                new_name = f'id{cur_id}'
-                info: dict = {'msg_type': msg_type, 'evolved_from': old_name, 'name': new_name, 'path': str(gen_path.resolve())}
-                self.generators.setdefault(msg_type, [])
-                self.generators[msg_type].append(Generator(**info))
-                
-        # save the information of new generator to file   
-        with open(self.generator_info_path, 'w', encoding='utf-8') as f:
-            json.dump(self.generator_info(), f)
+        evolved_types = self._save_evolved_generators(results)
         
         with analyzer.lock:
             analyzer.clean_progress()
         logger.debug("[Producer]: finish generator generation")
+        return evolved_types
+
+    @staticmethod
+    def _partial_trace_hints(partial) -> dict[str, set[str]]:
+        """Summarize replayed observations without inventing model states."""
+        hints: dict[str, set[str]] = {}
+        for trace in partial.traces:
+            symbols = list(trace.symbols)
+            responses = list(trace.responses)
+            path = ' -> '.join(symbols)
+            output = ' -> '.join(responses)
+            summary = f'observed request path: {path}; responses: {output}'
+            for symbol in symbols:
+                hints.setdefault(symbol, set()).add(summary)
+        return hints
+
+    def generator_evo_from_partial(self, partial) -> list[str]:
+        """Bootstrap generator evolution from concrete partial MQ evidence.
+
+        This path deliberately passes no fabricated Mealy machine.  It evolves
+        only request types with no response pair or a single observed response
+        class; well-covered types remain on their current validated version.
+        """
+        response_counts: dict[str, set[str]] = {
+            msg_type: set() for msg_type in self.req_types
+        }
+        for msg_type, response in partial.request_response_pairs:
+            response_counts.setdefault(msg_type, set()).add(response)
+        sparse_types = {
+            msg_type
+            for msg_type in self.req_types
+            if len(response_counts.get(msg_type, set())) <= 1
+        }
+        if not sparse_types:
+            # Stagnation may still reflect missing request dependencies rather
+            # than per-symbol response variety.  Keep bootstrap capable of
+            # making progress by evolving every validated baseline once.
+            sparse_types = set(self.req_types)
+
+        with analyzer.lock:
+            analyzer.set_progress('evolve', 'evolve', len(sparse_types))
+
+        with open(self.info_path, 'r', encoding='utf-8') as f:
+            doc_info = f.read()
+        results = asyncio.run(
+            self._generator_evo_async(
+                doc_info,
+                machine=None,
+                msg_types=sparse_types,
+                trace_hints=self._partial_trace_hints(partial),
+            )
+        )
+        evolved_types = self._save_evolved_generators(results)
+        with analyzer.lock:
+            analyzer.clean_progress()
+        logger.debug(
+            '[Producer]: finish partial bootstrap generator evolution'
+        )
+        return evolved_types
                 
     async def _generator_mutate_one(
         self,

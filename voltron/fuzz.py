@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, subprocess, json
 
 from voltron.executor.conversation import Conversation
@@ -246,6 +247,19 @@ class Fuzzer:
                 'model_learning.partial_guidance_enabled must be a boolean'
             )
         configs.partial_guidance_enabled = partial_guidance_enabled
+        configs.threshold_relearn_limit = max(
+            0,
+            int(learning_config.get('threshold_relearn_limit', 3)),
+        )
+        bootstrap_partial_evolution = learning_config.get(
+            'bootstrap_partial_evolution',
+            True,
+        )
+        if not isinstance(bootstrap_partial_evolution, bool):
+            raise TypeError(
+                'model_learning.bootstrap_partial_evolution must be a boolean'
+            )
+        configs.bootstrap_partial_evolution = bootstrap_partial_evolution
         
         analyzer.pro_name = configs.pro_name
         analyzer.target_name = configs.target_name
@@ -547,38 +561,18 @@ class Fuzzer:
                 )
                 model_phase_status = 'completed'
                 try:
-                    model_learning_seed_retention = SeedRetentionPolicy()
-                    trace_recorder = PartialTraceRecorder()
-                    request_types = getattr(self.mapper, 'request_types', set())
-                    threshold_tracker = (
-                        ModelLearningThreshold(request_types)
-                        if (
-                            getattr(configs, 'partial_guidance_enabled', True)
-                            and request_types
-                        )
-                        else None
-                    )
-                    mq = MembershipOracle(
-                        mapper=self.mapper,
-                        executor=self.exe,
-                        seed_retention=model_learning_seed_retention,
-                        trace_recorder=trace_recorder,
-                        threshold_tracker=threshold_tracker,
-                    )
-                    eq = EquOracle(
-                        mapper=self.mapper,
-                        executor=self.exe,
-                        seed_retention=model_learning_seed_retention,
-                    )
                     h_path = configs.models_path / 'evolved_hypothesis.pkl'
                     if h_path.is_file():
                         with open(h_path, 'rb') as f:
                             hypothesis = pickle.load(f)
 
                     if hypothesis is None:
-                        hypothesis = self.model_learning(mq, eq, stop_event)
-                        if self.partial_guidance is not None:
-                            model_phase_status = 'threshold_drained_partial'
+                        hypothesis = self.model_learning(None, None, stop_event)
+                        model_phase_status = getattr(
+                            self,
+                            'learning_outcome',
+                            'completed',
+                        )
                     else:
                         self.mapper.message_pool = hypothesis.map
                 except BaseException:
@@ -607,41 +601,177 @@ class Fuzzer:
             self._request_stop('failure')
             raise
             
+    def _create_learning_oracles(self):
+        """Create fresh per-iteration state-learning state.
+
+        A component evolution changes the concrete messages produced for the
+        alphabet.  Reusing an observation table, threshold counter, or cached
+        MQ bytes after that change would mix evidence from different component
+        versions, so every learning iteration owns new oracle state.
+        """
+        seed_retention = SeedRetentionPolicy()
+        trace_recorder = PartialTraceRecorder()
+        request_types = getattr(self.mapper, 'request_types', set())
+        threshold_tracker = (
+            ModelLearningThreshold(request_types)
+            if (
+                getattr(configs, 'partial_guidance_enabled', True)
+                and request_types
+            )
+            else None
+        )
+        mq = MembershipOracle(
+            mapper=self.mapper,
+            executor=self.exe,
+            seed_retention=seed_retention,
+            trace_recorder=trace_recorder,
+            threshold_tracker=threshold_tracker,
+        )
+        eq = EquOracle(
+            mapper=self.mapper,
+            executor=self.exe,
+            seed_retention=seed_retention,
+        )
+        return mq, eq
+
+    def _next_learning_oracles(self, mq, eq):
+        """Return clean oracle state, retaining lightweight test compatibility."""
+        factory = getattr(self, '_learning_oracle_factory', None)
+        if callable(factory):
+            return factory()
+        if hasattr(self, 'exe'):
+            return self._create_learning_oracles()
+        # Objects built with ``Fuzzer.__new__`` in unit tests do not have a
+        # live Executor.  Production Fuzzer instances always take the branch
+        # above; reusing the injected doubles keeps those tests focused on
+        # hypothesis selection rather than oracle construction.
+        return mq, eq
+
+    @staticmethod
+    def _partial_iteration_record(partial: PartialStateGraph):
+        """Adapt partial evidence to the existing iteration CSV contract."""
+        table = partial.table_snapshot or (set(), set(), {})
+        return SimpleNamespace(
+            table=table,
+            states=set(),
+            alphabet=set(partial.executed_symbols),
+            delta={},
+            output={},
+        )
+
+    def _evolve_after_learning_threshold(
+        self,
+        best_hypothesis: MealyMachine | None,
+        partial: PartialStateGraph,
+    ) -> list[str]:
+        """Produce new generators before retrying a thresholded iteration."""
+        if not self.spec_knowledge:
+            raise RuntimeError(
+                'model-learning threshold cannot evolve components when '
+                'specification knowledge is disabled'
+            )
+        if best_hypothesis is not None:
+            result = self.producer.generator_evo(best_hypothesis)
+        else:
+            if not getattr(configs, 'bootstrap_partial_evolution', True):
+                raise RuntimeError(
+                    'model-learning threshold reached before a complete '
+                    'hypothesis and bootstrap partial evolution is disabled'
+                )
+            evolve_partial = getattr(
+                self.producer,
+                'generator_evo_from_partial',
+                None,
+            )
+            if not callable(evolve_partial):
+                raise RuntimeError(
+                    'producer does not support bootstrap partial evolution'
+                )
+            result = evolve_partial(partial)
+        if not result:
+            raise RuntimeError(
+                'model-learning threshold evolution produced no usable '
+                'generator versions'
+            )
+        return list(result)
+
+    def _activate_captured_equipment(self, generators, parser) -> None:
+        """Select the component versions that produced the chosen model."""
+        mapper_generators = getattr(self.mapper, 'generators', None)
+        if isinstance(mapper_generators, dict):
+            mapper_generators.clear()
+            mapper_generators.update(
+                {
+                    msg_type: [generator]
+                    for msg_type, generator in generators.items()
+                }
+            )
+            self.producer.generators = mapper_generators
+        if hasattr(self.mapper, 'message_pool'):
+            self.mapper.message_pool.clear()
+        self.mapper.cur_parser = parser
+
+    def _finalize_best_hypothesis(
+        self,
+        hypothesis: MealyMachine,
+        generators,
+        parser,
+        h_path: Path,
+    ) -> None:
+        """Persist and activate a model together with its exact equipment."""
+        if parser is None:
+            raise RuntimeError('No parser was captured for the best model')
+        with open(h_path, 'wb') as f:
+            pickle.dump(hypothesis, f)
+        self.producer.save_best_equipment(
+            model_id=str(hypothesis.id),
+            generators=generators,
+            parser=parser,
+        )
+        self._activate_captured_equipment(generators, parser)
+        hypothesis.graph('evolved')
+
     def model_learning(
         self,
-        mq,
-        eq,
-        stop_event
+        mq=None,
+        eq=None,
+        stop_event=None,
     ) -> MealyMachine | None:
-        """--- model learning ---"""
+        """Run learning iterations, regenerating components after stagnation."""
+        stop_event = stop_event or self.stop_event
+        if mq is None or eq is None:
+            mq, eq = self._create_learning_oracles()
+
         h_lsit: list[MealyMachine] = []
         best_generators = {}
         best_parser = None
         h_path = configs.models_path / 'evolved_hypothesis.pkl'
         try_limit = 3
+        threshold_relearn_count = 0
+        self.learning_outcome = 'completed'
+
         while not stop_event.is_set():
             try:
                 cur_id = str(analyzer.iter)
                 with analyzer.lock:
                     analyzer.iter += 1
                     analyzer.reset_automata_cnt()
-                next_id = str(analyzer.iter)
 
-                # run model learning
                 iteration_start = time.time()
                 with analyzer.lock:
                     analyzer.stage = 'model learning'
                 ml = MealyLstar(mq, eq, self.stop_event)
                 h = ml.run(cur_id)
                 iteration_duration = time.time() - iteration_start
-                
-                # save and evaluate the automata
+                # A completed hypothesis breaks a consecutive threshold
+                # streak.  Future stagnation gets its own bounded recovery
+                # window and is still bounded by the normal H-quality limit.
+                threshold_relearn_count = 0
+
                 self.mapper.register_mapper(h)
                 h.res_types = analyzer.cur_res_types_cnt
                 h.res_trans_types = analyzer.cur_resp_trans_cnt
 
-                # select a better generator to evolve
-                # the more states transitions the better the generator
                 iteration_status = 'initial'
                 with analyzer.lock:
                     analyzer.stage = 'fuzzer evolve'
@@ -669,29 +799,22 @@ class Fuzzer:
                             iteration_status=iteration_status,
                         )
                         self.producer.generator_evo(h)
+                    mq, eq = self._next_learning_oracles(mq, eq)
                     continue
+
                 last_trans_num = len(h_lsit[-1].res_trans_types.keys())
                 cur_trans_num = len(h.res_trans_types.keys())
-                
                 if last_trans_num >= cur_trans_num:
-                    # self.producer.generator_evo(h_lsit[-1], next_id)
                     try_limit -= 1
                     if try_limit <= 0:
                         iteration_status = 'accepted_final'
                         best_hypothesis = h_lsit[-1]
-                        with open(h_path, 'wb') as f:
-                            pickle.dump(best_hypothesis, f)
-                        if best_parser is None:
-                            raise RuntimeError(
-                                'No parser was captured for the best model'
-                            )
-                        self.producer.save_best_equipment(
-                            model_id=str(best_hypothesis.id),
-                            generators=best_generators,
-                            parser=best_parser,
+                        self._finalize_best_hypothesis(
+                            best_hypothesis,
+                            best_generators,
+                            best_parser,
+                            h_path,
                         )
-                        best_hypothesis.graph('evolved')
-                        logger.debug('ml: save evolved model')
                         analyzer.record_model_learning_iteration(
                             iteration=int(cur_id),
                             hypothesis=best_hypothesis,
@@ -708,46 +831,117 @@ class Fuzzer:
                         status=iteration_status,
                         try_limit=try_limit,
                     )
-                
-                elif last_trans_num < cur_trans_num:
-                    iteration_status = 'improved'
-                    h_lsit.append(h)
-                    best_generators, best_parser = (
-                        self.producer.capture_current_equipment(
-                            self.mapper.cur_parser
-                        )
-                    )
-                    analyzer.record_model_learning_iteration(
-                        iteration=int(cur_id),
-                        hypothesis=h,
-                        duration_s=iteration_duration,
-                        status=iteration_status,
-                        try_limit=try_limit,
-                    )
-                    if self.spec_knowledge:
-                        analyzer.record_generator_checkpoint(
-                            phase='model_learning',
-                            checkpoint_type='before_generator_evolve',
-                            phase_iteration=int(cur_id),
-                            operation_id=f'evolve-{cur_id}',
-                            model_id=str(h.id),
-                            iteration_status=iteration_status,
-                        )
-                        self.producer.generator_evo(h)
+                    mq, eq = self._next_learning_oracles(mq, eq)
                     continue
 
+                iteration_status = 'improved'
+                h_lsit.append(h)
+                best_generators, best_parser = (
+                    self.producer.capture_current_equipment(
+                        self.mapper.cur_parser
+                    )
+                )
+                analyzer.record_model_learning_iteration(
+                    iteration=int(cur_id),
+                    hypothesis=h,
+                    duration_s=iteration_duration,
+                    status=iteration_status,
+                    try_limit=try_limit,
+                )
+                if self.spec_knowledge:
+                    analyzer.record_generator_checkpoint(
+                        phase='model_learning',
+                        checkpoint_type='before_generator_evolve',
+                        phase_iteration=int(cur_id),
+                        operation_id=f'evolve-{cur_id}',
+                        model_id=str(h.id),
+                        iteration_status=iteration_status,
+                    )
+                    self.producer.generator_evo(h)
+                mq, eq = self._next_learning_oracles(mq, eq)
+                continue
+
             except ModelLearningThresholdReached as reached:
+                iteration_duration = time.time() - iteration_start
                 self.partial_guidance = self._save_partial_guidance(
                     mq,
                     reached.table,
                     reason='threshold_drained_partial',
+                    iteration=int(cur_id),
                 )
-                logger.debug(
-                    'Fuzzer: model learning threshold reached; '
-                    'using %d partial traces for fuzz guidance',
-                    len(self.partial_guidance.traces),
+                threshold_relearn_count += 1
+                remaining = max(
+                    0,
+                    getattr(configs, 'threshold_relearn_limit', 3)
+                    - threshold_relearn_count,
                 )
-                break
+                analyzer.record_model_learning_iteration(
+                    iteration=int(cur_id),
+                    hypothesis=self._partial_iteration_record(
+                        self.partial_guidance
+                    ),
+                    duration_s=iteration_duration,
+                    status='threshold_drained',
+                    try_limit=remaining,
+                )
+                if threshold_relearn_count > getattr(
+                    configs, 'threshold_relearn_limit', 3
+                ):
+                    if h_lsit:
+                        self._finalize_best_hypothesis(
+                            h_lsit[-1],
+                            best_generators,
+                            best_parser,
+                            h_path,
+                        )
+                        # The latest partial was produced by evolved component
+                        # versions, while the complete H is restored with its
+                        # captured equipment.  Do not mix those fingerprints.
+                        self.partial_guidance = None
+                        self.learning_outcome = (
+                            'complete_h_after_threshold_retries'
+                        )
+                    else:
+                        self.learning_outcome = (
+                            'partial_after_retry_exhausted'
+                        )
+                    logger.debug(
+                        'Fuzzer: model learning threshold retries exhausted; '
+                        'outcome=%s',
+                        self.learning_outcome,
+                    )
+                    break
+
+                if not self.spec_knowledge:
+                    self.learning_outcome = 'partial_without_component_evolution'
+                    logger.debug(
+                        'Fuzzer: retaining partial guidance because component '
+                        'evolution is disabled'
+                    )
+                    break
+
+                best_hypothesis = h_lsit[-1] if h_lsit else None
+                with analyzer.lock:
+                    analyzer.stage = 'fuzzer evolve'
+                evolved_types = self._evolve_after_learning_threshold(
+                    best_hypothesis,
+                    self.partial_guidance,
+                )
+                analyzer.record_generator_checkpoint(
+                    phase='model_learning',
+                    checkpoint_type='threshold_relearn_evolve',
+                    phase_iteration=int(cur_id),
+                    operation_id=f'threshold-evolve-{cur_id}',
+                    model_id=(str(best_hypothesis.id) if best_hypothesis else ''),
+                    iteration_status=(
+                        'complete_h_relearn'
+                        if best_hypothesis is not None
+                        else 'bootstrap_partial_evolution'
+                    ),
+                    mutated_types=evolved_types,
+                )
+                mq, eq = self._next_learning_oracles(mq, eq)
+                continue
             except LLMDeadlineExceeded:
                 logger.debug('Fuzzer: model learning stopped')
                 self._request_stop('deadline')
@@ -761,16 +955,29 @@ class Fuzzer:
                 logger.exception('Fuzzer: model learning failed')
                 self._request_stop('model_learning_failure')
                 raise RuntimeError('model learning failed') from error
-            if (configs.time_limit_s < time.time() - analyzer.start_time):
+
+            if configs.time_limit_s < time.time() - analyzer.start_time:
                 logger.debug('Fuzzer: timeout')
                 self._request_stop('deadline')
-                
+
         return h_lsit[-1] if h_lsit else None
 
     def _partial_guidance_fingerprint(self) -> dict[str, object]:
         """Bind partial traces to the components that produced their bytes."""
         parser = getattr(self.mapper, 'cur_parser', None)
         generators = getattr(self.mapper, 'generators', {})
+        generator_versions = {}
+        for symbol, versions in sorted(generators.items()):
+            if isinstance(versions, (list, tuple)):
+                generator = versions[-1] if versions else None
+            else:
+                generator = versions
+            if generator is not None:
+                generator_versions[str(symbol)] = getattr(
+                    generator,
+                    'name',
+                    str(generator),
+                )
         return {
             'target': getattr(
                 self,
@@ -780,10 +987,7 @@ class Fuzzer:
             'protocol': getattr(configs, 'pro_name', ''),
             'endpoint': f'{getattr(configs, "host", "")}:{getattr(configs, "port", "")}',
             'parser': getattr(parser, 'name', str(parser) if parser else ''),
-            'generators': {
-                str(symbol): getattr(generator, 'name', str(generator))
-                for symbol, generator in sorted(generators.items())
-            },
+            'generators': generator_versions,
         }
 
     def _save_partial_guidance(
@@ -791,6 +995,7 @@ class Fuzzer:
         mq,
         table: ObTable,
         reason: str,
+        iteration: int | None = None,
     ) -> PartialStateGraph:
         recorder = getattr(mq, 'trace_recorder', None)
         if recorder is None:
@@ -809,6 +1014,13 @@ class Fuzzer:
             folder.mkdir(parents=True, exist_ok=True)
             with (folder / 'partial_guidance.pkl').open('wb') as stream:
                 pickle.dump(graph, stream)
+            if iteration is not None:
+                history = folder / 'partial_guidance'
+                history.mkdir(parents=True, exist_ok=True)
+                with (history / f'iteration_{iteration}.pkl').open(
+                    'wb'
+                ) as stream:
+                    pickle.dump(graph, stream)
         return graph
     
     def berserker_fuzz(
