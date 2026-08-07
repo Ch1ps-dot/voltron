@@ -1,5 +1,6 @@
 # Local target and LLM credentials
 fuzz_logs
+voltronbench/
 __pycache__/
 # Python 编译缓存文件
 __pycache__/

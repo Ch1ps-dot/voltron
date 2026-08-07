@@ -5,15 +5,19 @@ lightftp:
   rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
   trans_layer: tcp
   server: parent
+  parser_validation_samples:
+    - "220 Voltron FTP ready\r\n"
 
 forked-daapd:
   protocol: daap
   host: 127.0.0.1
   port: 3689
-  rfc_name: ["daap","rfc7230","rfc7231","rfc7232","rfc7233","rfc7234","rfc7235", "daap"]
+  rfc_name: ["daap"]
   trans_layer: tcp
   server: parent
   readiness_script: ready.sh
+  parser_validation_samples:
+    - hex: "485454502f312e3120323030204f4b0d0a436f6e74656e742d4c656e6774683a2032300d0a0d0a6d7372760000000c6d73747400000004000000c8"
 
 bftpd:
   protocol: ftp
@@ -22,6 +26,8 @@ bftpd:
   rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
   trans_layer: tcp
   server: parent
+  parser_validation_samples:
+    - "220 Voltron FTP ready\r\n"
 
 pureftpd:
   protocol: ftp
@@ -30,6 +36,8 @@ pureftpd:
   rfc_name: ["rfc959","rfc2428","rfc3659","rfc2389","rfc2228"]
   trans_layer: tcp
   server: parent
+  parser_validation_samples:
+    - "220 Voltron FTP ready\r\n"
 
 proftpd:
   protocol: ftp
@@ -39,6 +47,8 @@ proftpd:
   trans_layer: tcp
   server: parent
   readiness_adapter: ftp_banner_active_socket
+  parser_validation_samples:
+    - "220 Voltron FTP ready\r\n"
 
 exim:
   protocol: smtp
@@ -47,6 +57,8 @@ exim:
   rfc_name: ["rfc5321"]
   trans_layer: tcp
   server: parent
+  parser_validation_samples:
+    - "220 voltron.example ESMTP ready\r\n"
 
 kamailio:
   protocol: sip
@@ -55,6 +67,8 @@ kamailio:
   rfc_name: ["rfc3262", "rfc3261",  "rfc3311", "rfc3428", "rfc3515", "rfc3903", "rfc6086", "rfc6665"]
   trans_layer: udp
   server: parent
+  parser_validation_samples:
+    - "SIP/2.0 200 OK\r\nContent-Length: 0\r\n\r\n"
 
 live555:
   protocol: rtsp
@@ -63,6 +77,8 @@ live555:
   rfc_name: ["rfc7826"]
   trans_layer: tcp
   server: parent
+  parser_validation_samples:
+    - "RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 0\r\n\r\n"
 
 lighttpd:
   protocol: http
@@ -71,6 +87,8 @@ lighttpd:
   rfc_name: ["rfc9110","rfc7540","rfc2616","rfc1945"]
   trans_layer: tcp
   server: child
+  parser_validation_samples:
+    - "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
 
 executor:
   setup_timeout_seconds: 30.0
@@ -78,8 +96,8 @@ executor:
   port_release_timeout_seconds: 3.0
 
 llm_doc:
-  base_url: https://vip.yinli.one/v1
-  api_key: sk-lwBsE0yn0ECGWJBBnjLQl71T1yNAar48cmQYbB6i9KGjyeTN
+  base_url: https://api.deepseek.com
+  api_key: sk-cec1037f00164961ad06e0eb4950383b
   model: deepseek-v4-flash
   async_sem: 8
 

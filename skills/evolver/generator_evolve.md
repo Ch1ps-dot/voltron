@@ -1,120 +1,29 @@
-You are a developer of a **protocol fuzzer** and an expert in **protocol state transition analysis and test case generation**.
+TASK
+Repair and evolve a request generator to reach additional legal protocol states.
 
-Your task is to **analyze the root causes of restricted protocol state transitions** based on provided code and server response traces, then repair and regenerate a Python message generator that can trigger more diverse and legal server-side state transitions.
-
----
-
-## **Input**
-
-You will be given:
-
-### **Protocol name**: 
-   $pro_name
-   
-### **field name**
-   {$field_name}
-
-### **Field value** 
-   {$msg_type}
-
-### **Message syntax specification in protoIR format**:
-
-   $msg_ir
-
-### **Previous Generated Program**:
-   - This program may contain incorrect field values, invalid ordering, missing constraints, or violations of server expectations that restrict state transitions.
-
-   $code
-   
-### **SUT (Server Under Test) Information**:
-- Includes client/server configuration, supported state machines, and protocol compliance rules
-
+INPUT
+PROTOCOL: $pro_name
+TYPE_FIELD: $field_name
+REQUEST_TYPE: $msg_type
+IR_FIELD_TABLE_JSON:
+$msg_ir
+BASE_SHA256: $base_sha256
+NUMBERED_BASE_GENERATOR:
+$code
+SUT_CONTEXT:
 $info
-
-### **Observed trace of request and server response**
-- Each trace element reflects a semantic state transition (format: (RequestType / ResponseCode) → (NextRequestType / NextResponseCode))
-- Example: (AAA / 888) → (BBB / 666) (AAA request triggers 888 response, followed by BBB request triggering 666 response)
-
+OBSERVED_TRANSITIONS:
 $trace
+RELATED_GENERATORS:
+$related_code
 
-### **Generated program of semantic related request message**:
-   
-   $related_code
-   
----
+CONTRACT
+Return `generate() -> bytes` with no parameters.
+- Diagnose and fix invalid order/values/encoding/framing, missing fields, length/payload errors, or unsatisfied state preconditions evidenced by the inputs.
+- Preserve IR structure and SUT compatibility; use related generators only for supported cross-message/state dependencies.
+- Vary valid under-tested fields/optional elements toward unobserved legal transitions; output exactly one `$msg_type` message per call.
+- Do not invent protocol rules. Self-contained Python built-ins only; no networking; never return non-bytes.
 
-## **Your Task**
-
-### 1. Root Cause Analysis for Error Response
-- **Analyze code defects**: Identify issues in the previous program (e.g., invalid field values, incorrect field ordering, missing mandatory fields, mismatched length/payload, non-compliant encodings) that caused error response of server.
-- **Analyze protoIR constraints**: Use the supplied message IR to verify field order, constant fields, variable fields, length dependencies, required fields, legal values, encodings, and framing.
-- **Analyze response trace patterns**: 
-  - Map observed state transitions to protocol specification and SUT constraints
-  - Identify untriggered legal state transitions (gaps between expected and observed behavior)
-  - Determine why the server remained in the same state, entered an error state, or rejected transitions (e.g., invalid field semantics, missing preconditions, state machine violations)
-- **Identify semantic dependencies**: Extract cross-message/cross-field semantic relationships from traces and related code that are critical for valid state transitions.
-
-### 2. Infer Opportunities for New State Transitions
-- Based on root cause analysis, reason about:
-  - Which field constraints (value ranges, formats, dependencies) can be adjusted to unlock new state transitions
-  - Which valid but under-tested field values/optional elements can trigger alternative server responses
-  - Which state-compatible message variations (within protocol specs) can reach unobserved server states
-- Prioritize message variations that:
-  - Are strictly protocol-valid and SUT-compatible
-  - Target unobserved state transitions 
-
-### 3. Repair and Enhance Message Generation Logic
-- Fix all code defects identified in root cause analysis (e.g., correct field ordering, adjust values to legal ranges, add missing mandatory fields, align length/payload)
-- Ensure the repaired generator follows the supplied protoIR message structure exactly unless the SUT information explicitly requires a compatible variant.
-- Ensure generated messages comply with SUT's state machine rules and preconditions for new transitions
-- If prompt-provided information is strongly related to protocol state (such as state preconditions, transition constraints, required context, or state-dependent semantic hints), the generated result must strictly satisfy those requirements
-- Maintain compatibility with the current server state (where applicable) while exploring new transition paths
-
-### 4. Generate a State Transition-Oriented Message Generator
-- Produce a Python function that constructs **protocol-valid, state-transition-aware instance** of the $msg_type message:
-  - All fields are instantiated with valid values that can trigger diverse state transitions
-  - Ensures compatibility with SUT's expected behavior while maximizing transition diversity
-  - The output of generator only contains only one target type of message.
-
----
-
-## **Code Constraints**
-
-* Use **Python only**
-* Use **only built-in libraries** (`random`, `string`, `struct`, etc.)
-* No third-party packages
-* No input parameters
-* Output must be a **bytes object** (total length compliant with SUT's transmission limits)
-* Do NOT include networking code
-* The function must generate **valid, server-acceptable messages** that can trigger new state transitions
-
----
-
-## **Function Prototype (Must Match Exactly)**
-
-```python
-def generate():
-   """Generate one $msg_type message for the $pro_name protocol.
-   - Input: none
-   - Output: bytes
-   - Purpose: Trigger diverse, previously unobserved server-side state transitions
-   - Compliance: Strictly follows protocol specs and SUT requirements
-   """
-
-   message = b''
-
-   # Repaired message construction logic with state transition optimization
-   # Includes valid variations of key fields to unlock new state transitions
-
-   return message
-```
-
----
-
-## **Output Constraints**
-
-* Only output the completed Python function code
-* Do NOT include explanations, markdown, or comments outside the function
-* The function must be directly executable
-* The function takes no arguments
-* The generated message must be protocol-valid, SUT-compatible, and designed to trigger new state transitions
+OUTPUT
+JSON only: {"base_sha256":"$base_sha256","edits":[{"start_line":1,"end_line":1,"replacement":"changed source lines"}]}.
+Line ranges are one-based, inclusive, non-overlapping, and refer to NUMBERED_BASE_GENERATOR. Return only changed ranges, never the full program. Replacement must contain exact Python including indentation and escaped newlines.

@@ -1,44 +1,34 @@
-You are an expert in protocol specification analysis and protoIR repair.
+TASK
+Repair an IR whose model-learning feedback indicates an incomplete or inaccurate message definition.
 
-The fuzzer is in the model learning phase. It has observed repeated generator
-or parser failures that may be caused by an incomplete or inaccurate protoIR
-message description.
-
-## Input
-
-- Protocol name: $pro_name
-- Message direction: $direction
-- Target message type: $msg_type
-- Current protoIR:
-
-```xml
+INPUT
+PROTOCOL: $pro_name
+DIRECTION: $direction
+MESSAGE_TYPE: $msg_type
+BASE_SHA256: $base_sha256
+CURRENT_IR_FIELD_TABLE_JSON:
 $current_ir
-```
-
-- Type rule:
-
+TYPE_RULE:
 $type_rule
-
-- Relevant specification sections:
-
+SPEC_CONTEXT:
 $section_context
-
-- Feedback from model learning:
-
+LEARNING_FEEDBACK:
 $feedback
 
-## Task
+CONTRACT
+- Change the IR only where feedback plus spec/type-rule evidence supports it.
+- May correct order, constants, lengths, encoding, delimiters, optional/conditional/repeated fields, or payload boundaries.
+- Preserve correct fields/comments and message intent. Do not invent unsupported constraints.
 
-Repair the protoIR only when the feedback and specification context indicate
-that the current IR is incomplete or inconsistent with the protocol. The repair
-may adjust field order, constants, lengths, encodings, delimiters, optional or
-conditional fields, repeated fields, or payload boundaries.
-
-## Constraints
-
-- Preserve all correct fields and comments.
-- Do not invent fields or constraints unsupported by the specification context,
-  type rule, or concrete feedback.
-- Keep the target message type semantic intent unchanged.
-- Return one valid, well-formed XML fragment or document.
-- Do not include Markdown fences, explanations, or prose.
+OUTPUT
+JSON only: {"base_sha256":"$base_sha256","ops":[]}.
+Use only these operations:
+- update_message: message, set, remove
+- insert_message: index, value={attributes,note,fields:[{attributes,note}]}
+- delete_message or move_message: message, and index for move
+- set_message_note: message, note
+- update_field: message, field, set, remove
+- insert_field: message, index, attributes, optional note
+- delete_field or move_field: message, field, and index for move
+- set_field_note: message, field, note
+Indexes are zero-based final field/message positions. Emit only necessary operations; never repeat the full XML or field table.

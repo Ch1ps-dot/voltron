@@ -78,6 +78,49 @@ def test_parser_generation_does_not_retry_after_llm_deadline():
         asyncio.run(producer._parser_gen_async())
 
 
+def test_berserker_fuzz_uses_energy_2000(monkeypatch):
+    stop_event = threading.Event()
+    energies = []
+
+    class RecordingBerserker:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def run(self, energy):
+            energies.append(energy)
+            stop_event.set()
+            return []
+
+    fuzzer = Fuzzer.__new__(Fuzzer)
+    fuzzer.mapper = SimpleNamespace()
+    fuzzer.exe = object()
+    fuzzer.guided_scheduling = False
+    fuzzer.spec_knowledge = False
+
+    monkeypatch.setattr(fuzz_module, "Berserker", RecordingBerserker)
+    monkeypatch.setattr(configs, "time_limit_s", 3600, raising=False)
+    monkeypatch.setattr(analyzer, "start_time", time.time(), raising=False)
+    monkeypatch.setattr(analyzer, "cur_res_types_cnt", {}, raising=False)
+    monkeypatch.setattr(analyzer, "begin_phase", lambda *_args: None)
+    monkeypatch.setattr(analyzer, "end_phase", lambda *_args: None)
+    monkeypatch.setattr(analyzer, "collect_results", lambda: None)
+    monkeypatch.setattr(analyzer, "reset_automata_cnt", lambda: None)
+    monkeypatch.setattr(
+        analyzer,
+        "record_generator_checkpoint",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "finalize_generator_metrics",
+        lambda **_kwargs: None,
+    )
+
+    fuzzer.berserker_fuzz(None, stop_event)
+
+    assert energies == [2000]
+
+
 def test_state_fuzz_does_not_start_berserker_after_model_timeout(
     tmp_path,
     monkeypatch,

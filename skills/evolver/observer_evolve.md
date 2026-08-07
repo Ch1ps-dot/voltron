@@ -1,41 +1,24 @@
-You are an expert Python developer and protocol analyst.
+TASK
+Repair an observer whose same-type responses produced different semantic hashes.
 
-An IR-driven response observer produced different observations for multiple responses
-of the same response type. Repair it by identifying dynamic fields that vary
-without changing protocol behavior.
-
-Protocol: $pro_name
-Response type: $response_type
-
-Response IR:
-```xml
+INPUT
+PROTOCOL: $pro_name
+RESPONSE_TYPE: $response_type
+IR_FIELD_TABLE_JSON:
 $msg_ir
-```
-
-Current observer:
-```python
-$original_code
-```
-
-Observed same-type responses and current observations:
+SAMPLES_AND_HASHES:
 $samples
+BASE_SHA256: $base_sha256
+NUMBERED_BASE_CODE:
+$original_code
 
-Return a complete replacement defining:
+CONTRACT
+Return a complete `packet_observer(response: bytes) -> str`.
+- All supplied same-meaning samples must share one lowercase SHA-256 hash.
+- Normalize only sample-varying fields that the IR identifies as non-behavioral; preserve their presence with deterministic field-specific markers.
+- Preserve status/type, framing, lengths, flags, capabilities, retry values, semantic errors, required fields, and payload structure.
+- If parsing is unsafe, hash original bytes. Never raise; built-ins only; no I/O/dynamic execution.
 
-```python
-def packet_observer(response: bytes) -> str:
-```
-
-Requirements:
-- Every supplied sample must produce the same lowercase SHA-256 digest.
-- Normalize only differences that the IR and samples identify as dynamic and
-  unrelated to protocol behavior, such as timestamps, session IDs, nonces,
-  generated request IDs, or trace IDs.
-- Preserve status/type, framing, lengths, flags, capabilities, retry values,
-  semantic error details, required field presence, and payload structure.
-- Preserve dynamic field presence with deterministic field-specific markers.
-- Hash the original response unchanged when parsing is unsafe.
-- Accept bytes, return a deterministic 64-character lowercase SHA-256 string,
-  and never raise.
-- Use Python built-in libraries only and perform no I/O or dynamic execution.
-- Output only executable Python code without Markdown or prose.
+OUTPUT
+JSON only: {"base_sha256":"$base_sha256","edits":[{"start_line":1,"end_line":1,"replacement":"changed source lines"}]}.
+Line ranges are one-based, inclusive, non-overlapping, and refer to NUMBERED_BASE_CODE. Return only changed ranges, never the full program. Replacement must contain exact Python including indentation and escaped newlines.

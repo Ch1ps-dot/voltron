@@ -1,14 +1,28 @@
 from pathlib import Path
 from openai import AsyncOpenAI, OpenAIError
+import ast
+import json
 import time, re
 from re import Match
 from string import Template
 import asyncio
+from xml.etree import ElementTree
 
 from voltron.llm.prompt import Prompter
+from voltron.llm.incremental import (
+    IncrementalOutputError,
+    apply_ir_delta,
+    apply_source_delta,
+    content_sha256,
+    numbered_source_context,
+    parse_json_artifact,
+)
 from voltron.utils.logger import format_event, logger_llm as logger
 from voltron.configs import configs
 from voltron.analyzer.analyzer import analyzer
+
+
+SYSTEM_PROMPT = "Follow the task contract. Return only the requested artifact."
 
 
 class LLMDeadlineExceeded(RuntimeError):
@@ -81,6 +95,253 @@ class AsyncChater:
         tail_chars = max(1, retained - head_chars)
         return f'{text[:head_chars]}{marker}{text[-tail_chars:]}'
 
+    @staticmethod
+    def _xml_ir_to_field_table(
+        value: object,
+        message_name: str | None = None,
+    ) -> str:
+        """Convert protoIR XML into a compact, loss-aware field table.
+
+        Field attributes become shared columns and each field becomes one row.
+        Semantic XML comments are retained as short ``note`` values.  Invalid
+        or unsupported XML is returned unchanged so repair prompts can still
+        receive the malformed source text that they need to fix.
+        """
+        source = '' if value is None else str(value)
+        try:
+            parser = ElementTree.XMLParser(
+                target=ElementTree.TreeBuilder(insert_comments=True)
+            )
+            root = ElementTree.fromstring(source, parser=parser)
+        except (ElementTree.ParseError, TypeError, ValueError):
+            return source
+
+        if root.tag == 'message':
+            message_elements = [root]
+        elif root.tag == 'ir':
+            message_elements = list(root.findall('.//message'))
+        else:
+            return source
+        if not message_elements:
+            return source
+        if message_name:
+            matching = [
+                message
+                for message in message_elements
+                if message.attrib.get('name') == message_name
+            ]
+            if matching:
+                message_elements = matching
+
+        preferred_columns = ['name', 'type', 'length', 'value']
+        extra_columns: set[str] = set()
+        has_notes = False
+        parsed_messages: list[dict[str, object]] = []
+
+        for message in message_elements:
+            message_note: list[str] = []
+            fields: list[dict[str, str]] = []
+            last_field: dict[str, str] | None = None
+            for child in message:
+                if child.tag is ElementTree.Comment:
+                    note = ' '.join((child.text or '').split())
+                    if not note:
+                        continue
+                    has_notes = True
+                    if last_field is None:
+                        message_note.append(note)
+                    else:
+                        previous = last_field.get('note')
+                        last_field['note'] = (
+                            f'{previous} {note}' if previous else note
+                        )
+                    continue
+                if child.tag != 'field':
+                    continue
+                last_field = dict(child.attrib)
+                fields.append(last_field)
+                has_notes = has_notes or 'note' in child.attrib
+                extra_columns.update(
+                    key
+                    for key in child.attrib
+                    if key not in preferred_columns and key != 'note'
+                )
+
+            record: dict[str, object] = {
+                'name': message.attrib.get('name', ''),
+                '_fields': fields,
+            }
+            extra_message_attrs = {
+                key: val for key, val in message.attrib.items() if key != 'name'
+            }
+            if extra_message_attrs:
+                record['attributes'] = extra_message_attrs
+            if message_note:
+                record['note'] = ' '.join(message_note)
+            parsed_messages.append(record)
+
+        columns = preferred_columns + sorted(extra_columns)
+        if has_notes:
+            columns.append('note')
+        messages: list[dict[str, object]] = []
+        for parsed in parsed_messages:
+            fields = parsed.pop('_fields')
+            parsed['fields'] = [
+                [field.get(column) for column in columns]
+                for field in fields
+            ]
+            messages.append(parsed)
+
+        table: dict[str, object] = {
+            'columns': columns,
+            'messages': messages,
+        }
+        if root.tag == 'ir' and root.attrib:
+            table['ir_attributes'] = dict(root.attrib)
+        return json.dumps(
+            table,
+            ensure_ascii=False,
+            separators=(',', ':'),
+        )
+
+    @classmethod
+    def _fit_ir_table(
+        cls,
+        table: dict[str, object],
+        max_chars: int,
+    ) -> str:
+        """Fit a field table without cutting JSON in the middle of a row."""
+        marker = '[... truncated ...]'
+
+        def shorten(item, limit=512):
+            if isinstance(item, str) and len(item) > limit:
+                retained = max(2, limit - len(marker))
+                head = retained * 2 // 3
+                return f'{item[:head]}{marker}{item[-(retained - head):]}'
+            if isinstance(item, list):
+                return [shorten(value, limit) for value in item]
+            if isinstance(item, dict):
+                return {
+                    key: shorten(value, limit) for key, value in item.items()
+                }
+            return item
+
+        def encode(item):
+            return json.dumps(
+                item,
+                ensure_ascii=False,
+                separators=(',', ':'),
+            )
+
+        table = shorten(table)
+        encoded = encode(table)
+        if len(encoded) <= max_chars:
+            return encoded
+
+        source_messages = table.get('messages', [])
+        if not isinstance(source_messages, list):
+            return cls._compact_context(encoded, max_chars)
+
+        base = {key: value for key, value in table.items() if key != 'messages'}
+        selected: list[tuple[int, dict[str, object]]] = []
+        order: list[int] = []
+        left, right = 0, len(source_messages) - 1
+        while left <= right:
+            order.append(left)
+            if right != left:
+                order.append(right)
+            left += 1
+            right -= 1
+
+        def fit_fields(message: dict[str, object]) -> dict[str, object]:
+            fields = message.get('fields', [])
+            if not isinstance(fields, list):
+                return message
+            trimmed = {key: value for key, value in message.items() if key != 'fields'}
+            kept: list[tuple[int, object]] = []
+            field_order: list[int] = []
+            left_field, right_field = 0, len(fields) - 1
+            while left_field <= right_field:
+                field_order.append(left_field)
+                if right_field != left_field:
+                    field_order.append(right_field)
+                left_field += 1
+                right_field -= 1
+            for index in field_order:
+                for field in (fields[index], shorten(fields[index], 128)):
+                    candidate = sorted(kept + [(index, field)])
+                    candidate_message = {
+                        **trimmed,
+                        'fields': [item for _, item in candidate],
+                        'omitted_fields': len(fields) - len(candidate),
+                    }
+                    candidate_table = {
+                        **base,
+                        'messages': [candidate_message],
+                        'omitted_messages': max(0, len(source_messages) - 1),
+                    }
+                    if len(encode(candidate_table)) <= max_chars:
+                        kept = candidate
+                        break
+            return {
+                **trimmed,
+                'fields': [field for _, field in sorted(kept)],
+                'omitted_fields': len(fields) - len(kept),
+            }
+
+        for index in order:
+            message = source_messages[index]
+            if not isinstance(message, dict):
+                continue
+            fitted = fit_fields(message)
+            candidate = sorted(selected + [(index, fitted)])
+            candidate_table = {
+                **base,
+                'messages': [message for _, message in candidate],
+                'omitted_messages': len(source_messages) - len(candidate),
+            }
+            if len(encode(candidate_table)) <= max_chars:
+                selected = candidate
+
+        result = {
+            **base,
+            'messages': [message for _, message in sorted(selected)],
+            'omitted_messages': len(source_messages) - len(selected),
+        }
+        return encode(result)
+
+    @classmethod
+    def _compact_ir_context(
+        cls,
+        value: object,
+        message_name: str | None = None,
+    ) -> str:
+        source = '' if value is None else str(value)
+        compact = cls._xml_ir_to_field_table(source, message_name)
+        if compact == source:
+            return cls._compact_context(source)
+        max_chars = max(
+            512,
+            int(getattr(configs, 'prompt_context_max_chars', 12_000)),
+        )
+        if len(compact) <= max_chars:
+            return compact
+        return cls._fit_ir_table(json.loads(compact), max_chars)
+
+    @staticmethod
+    def _source_delta_context(source: str) -> tuple[str, str]:
+        limit = max(
+            512,
+            int(getattr(configs, 'prompt_context_max_chars', 12_000)),
+        )
+        return content_sha256(source), numbered_source_context(source, limit)
+
+    @staticmethod
+    def _apply_python_delta(source: str, response: str | None) -> str:
+        evolved = apply_source_delta(source, parse_json_artifact(response))
+        ast.parse(evolved)
+        return evolved
+
     async def chat_llm(
             self, 
             prompt: str,
@@ -111,7 +372,7 @@ class AsyncChater:
                 request = self.clt.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are a protocol analyzer."},
+                        {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": prompt}
                     ]
                 )
@@ -169,6 +430,9 @@ class AsyncChater:
                             if completion.usage is not None
                             else 0
                         ),
+                        usage=usage,
+                        model=self.model,
+                        tokens_reported=completion.usage is not None,
                     )
                 break
             except asyncio.TimeoutError as exc:
@@ -245,7 +509,7 @@ class AsyncChater:
     ):
         tmp = self.pmp._tem_ir_repair
         pmp = tmp.substitute(
-            ir=self._compact_context(ir),
+            ir=self._compact_ir_context(ir),
             error=self._compact_context(error),
         )
         # logger.debug(pmp)
@@ -269,11 +533,13 @@ class AsyncChater:
             feedback: str
     ) -> str:
         tmp = self.pmp._tem_ir_evolve
+        base_sha256 = content_sha256(current_ir)
         pmp = tmp.substitute(
             pro_name=pro_name,
             direction=direction,
             msg_type=msg_type,
-            current_ir=self._compact_context(current_ir),
+            base_sha256=base_sha256,
+            current_ir=self._compact_ir_context(current_ir, msg_type),
             type_rule=self._compact_context(type_rule),
             section_context=self._compact_context(section_context),
             feedback=self._compact_context(feedback),
@@ -282,7 +548,11 @@ class AsyncChater:
             prompt=pmp,
             usage="ir_evolve"
         )
-        return self.xml_extract(ans)
+        try:
+            return apply_ir_delta(current_ir, parse_json_artifact(ans))
+        except IncrementalOutputError as error:
+            logger.debug('LLM: invalid IR delta: %s', error)
+            return ''
 
     async def llm_generator_gen(
             self,
@@ -307,7 +577,7 @@ class AsyncChater:
             pro_name=pro_name,
             field_name=field_name,
             msg_type=msg_type,
-            msg_ir=self._compact_context(msg_ir),
+            msg_ir=self._compact_ir_context(msg_ir, msg_type),
             info=self._compact_context(info),
             type_rule=self._compact_context(type_rule),
         )
@@ -362,13 +632,15 @@ class AsyncChater:
             generated generator
         """
         tmp = self.pmp._tem_generator_evolve
+        base_sha256, numbered_code = self._source_delta_context(code)
 
         pmp = tmp.substitute(
             pro_name=pro_name,
             field_name=field_name,
             msg_type=msg_type,
-            code=self._compact_context(code),
-            msg_ir=self._compact_context(msg_ir),
+            code=numbered_code,
+            base_sha256=base_sha256,
+            msg_ir=self._compact_ir_context(msg_ir, msg_type),
             info=self._compact_context(info),
             trace=self._compact_context(trace),
             related_code=self._compact_context(related_code),
@@ -379,7 +651,7 @@ class AsyncChater:
             usage = "generator_evolve"
         )
 
-        return self.code_extract(ans)
+        return self._apply_python_delta(code, ans)
     
     async def llm_parser_evolve(
             self,
@@ -401,11 +673,13 @@ class AsyncChater:
         tmp = self.pmp._tem_parser_evolve
         if len(message) > 100:
             message = message[:99]
+        base_sha256, numbered_code = self._source_delta_context(old_code)
         pmp = tmp.substitute(
             pro_name=pro_name,
             res_info=self._compact_context(res_info),
             type_rules=self._compact_context(type_rules),
-            original_code=self._compact_context(old_code),
+            original_code=numbered_code,
+            base_sha256=base_sha256,
             message=message,
         )
         ans = await self.chat_llm(
@@ -413,7 +687,7 @@ class AsyncChater:
             usage = "parser_evolve"
         )
 
-        return self.code_extract(ans)
+        return self._apply_python_delta(old_code, ans)
     
     async def llm_mutator_evolve(
             self,
@@ -441,13 +715,15 @@ class AsyncChater:
             generated mutator
         """
         tmp = self.pmp._tem_mutator_evolve
+        base_sha256, numbered_code = self._source_delta_context(code)
         
         pmp = tmp.substitute(
             pro_name=pro_name,
             field_name=field_name,
             msg_type=msg_type,
-            code=self._compact_context(code),
-            msg_ir=self._compact_context(msg_ir),
+            code=numbered_code,
+            base_sha256=base_sha256,
+            msg_ir=self._compact_ir_context(msg_ir, msg_type),
             info=self._compact_context(info),
             poss_response=self._compact_context(poss_response),
             trace=self._compact_context(trace),
@@ -458,7 +734,7 @@ class AsyncChater:
             usage = "mutator_evolve"
         )
 
-        return self.code_extract(ans)
+        return self._apply_python_delta(code, ans)
         
     async def llm_parser_gen(
             self,
@@ -500,7 +776,7 @@ class AsyncChater:
         tmp = self.pmp._tem_gen_checker
         pmp = tmp.substitute(
             pro_name=pro_name,
-            msg_ir=self._compact_context(msg_ir),
+            msg_ir=self._compact_ir_context(msg_ir, response_type),
             res_info=self._compact_context(res_info),
             response_type=response_type,
             type_rule=self._compact_context(type_rule),
@@ -523,7 +799,7 @@ class AsyncChater:
         tmp = self.pmp._tem_gen_observer
         pmp = tmp.substitute(
             pro_name=pro_name,
-            msg_ir=self._compact_context(msg_ir),
+            msg_ir=self._compact_ir_context(msg_ir, response_type),
             res_info=self._compact_context(res_info),
             response_type=response_type,
         )
@@ -543,18 +819,20 @@ class AsyncChater:
     ) -> str:
         """Evolve a observer using same-type responses with different observations."""
         tmp = self.pmp._tem_observer_evolve
+        base_sha256, numbered_code = self._source_delta_context(original_code)
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
-            msg_ir=self._compact_context(msg_ir),
-            original_code=self._compact_context(original_code),
+            msg_ir=self._compact_ir_context(msg_ir, response_type),
+            original_code=numbered_code,
+            base_sha256=base_sha256,
             samples=self._compact_context(samples),
         )
         ans = await self.chat_llm(
             prompt=pmp,
             usage="observer_evolve",
         )
-        return self.code_extract(ans)
+        return self._apply_python_delta(original_code, ans)
 
     async def llm_observer_semantic_compare(
             self,
@@ -569,7 +847,7 @@ class AsyncChater:
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
-            msg_ir=self._compact_context(msg_ir),
+            msg_ir=self._compact_ir_context(msg_ir, response_type),
             old_response=repr(old_response),
             new_response=repr(new_response),
         )
@@ -589,10 +867,12 @@ class AsyncChater:
     ) -> str:
         """Relax a checker after RFC review confirms a false positive."""
         tmp = self.pmp._tem_checker_evolve
+        base_sha256, numbered_code = self._source_delta_context(original_code)
         pmp = tmp.substitute(
             pro_name=pro_name,
             response_type=response_type,
-            original_code=self._compact_context(original_code),
+            original_code=numbered_code,
+            base_sha256=base_sha256,
             response_repr=repr(response),
             response_hex=response.hex(' '),
             review_summary=self._compact_context(review_summary)
@@ -601,7 +881,7 @@ class AsyncChater:
             prompt=pmp,
             usage="checker_evolve"
         )
-        return self.code_extract(ans)
+        return self._apply_python_delta(original_code, ans)
     
     async def llm_request_query(
             self,

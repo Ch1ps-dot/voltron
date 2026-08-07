@@ -88,12 +88,18 @@ def retrieve_response_sections(
 
 def _display_bytes(data: bytes, limit: int = 4096) -> dict[str, Any]:
     sample = data[:limit]
+    try:
+        content = sample.decode("utf-8")
+    except UnicodeDecodeError:
+        encoding = "base64"
+        content = base64.b64encode(sample).decode("ascii")
+    else:
+        encoding = "utf-8"
     return {
         "length": len(data),
         "truncated": len(sample) < len(data),
-        "text": sample.decode("utf-8", errors="backslashreplace"),
-        "hex": sample.hex(" "),
-        "base64": base64.b64encode(sample).decode("ascii"),
+        "encoding": encoding,
+        "data": content,
     }
 
 
@@ -106,16 +112,14 @@ def build_compliance_prompt(
     retrieved: list[tuple[SectionRecord, float]],
     max_section_chars: int = 6000,
 ) -> str:
-    context = []
-    for number, (section, score) in enumerate(retrieved, start=1):
-        context.append(
-            f"[SPEC {number}]\n"
-            f"RFC: {section.rfc}\n"
-            f"Section: {section.section}\n"
-            f"Annotation: {section.content_type}\n"
-            f"BM25 score: {score:.4f}\n"
-            f"Content:\n{section.content[:max_section_chars]}"
-        )
+    context = [
+        {
+            "rfc": section.rfc,
+            "section": section.section,
+            "content": section.content[:max_section_chars],
+        }
+        for section, _score in retrieved
+    ]
 
     exchange = {
         "request_type": request_type,
@@ -124,18 +128,18 @@ def build_compliance_prompt(
         "response": _display_bytes(response),
     }
     return (
-        "Determine whether this response violates the protocol specification. "
-        "The local checker rejected it, but that rejection may be a checker "
-        "false positive.\n\n"
-        f"Protocol: {protocol}\n"
-        f"Captured exchange:\n{json.dumps(exchange, indent=2)}\n\n"
-        f"Retrieved response-structure sections:\n{'\n\n'.join(context)}\n\n"
-        "Use non_compliant only when the retrieved specification contains a "
-        "normative wire-format, semantic, or sequencing constraint that the "
-        "response violates. Use compliant when the response is permitted and "
-        "the local checker is too strict. Use uncertain when the supplied "
-        "sections are insufficient. Return only one JSON object matching:\n"
-        f"{json.dumps(ANALYSIS_SCHEMA, indent=2)}"
+        "TASK\nJudge whether a checker-rejected response violates the protocol "
+        "or is a checker false positive.\n\n"
+        "INPUT\n"
+        f"PROTOCOL: {protocol}\n"
+        f"EXCHANGE_JSON: {json.dumps(exchange, separators=(',', ':'))}\n"
+        f"SPEC_CONTEXT_JSON: {json.dumps(context, separators=(',', ':'))}\n\n"
+        "RULES\nUse non_compliant only for a normative wire-format, semantic, "
+        "or sequencing rule contradicted by the response. Use compliant when "
+        "permitted and the checker is too strict; uncertain when evidence is "
+        "insufficient. Do not invent requirements.\n\n"
+        "OUTPUT\nJSON only matching: "
+        f"{json.dumps(ANALYSIS_SCHEMA, separators=(',', ':'))}"
     )
 
 

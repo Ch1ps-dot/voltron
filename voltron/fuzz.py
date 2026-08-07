@@ -1154,7 +1154,7 @@ class Fuzzer:
                 try:
                     # init new learning process with previous model and run fuzzer
 
-                    req_res = berserker.run(500)
+                    req_res = berserker.run(2000)
                     if self.spec_knowledge:
                         self.producer.generator_mutate(
                             req_res,

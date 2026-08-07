@@ -324,6 +324,25 @@ def display_bytes(data: bytes, limit: int | None = 4096) -> dict[str, Any]:
     }
 
 
+def prompt_bytes(data: bytes, limit: int = 4096) -> dict[str, Any]:
+    """Represent wire data once for a model prompt, without text/hex/base64 duplication."""
+    sample = data[:limit]
+    try:
+        text = sample.decode("utf-8")
+    except UnicodeDecodeError:
+        encoding = "base64"
+        encoded = base64.b64encode(sample).decode("ascii")
+    else:
+        encoding = "utf-8"
+        encoded = text
+    return {
+        "length": len(data),
+        "truncated": len(sample) < len(data),
+        "encoding": encoding,
+        "data": encoded,
+    }
+
+
 def build_prompt(
     target: dict[str, Any],
     pair: PairRecord,
@@ -333,44 +352,36 @@ def build_prompt(
     if max_section_chars <= 0:
         raise ValueError("max_section_chars must be greater than zero")
 
-    context_parts = []
-    for number, (section, score) in enumerate(retrieved, start=1):
-        content = section.content[:max_section_chars]
-        context_parts.append(
-            f"[SPEC {number}]\n"
-            f"RFC: {section.rfc}\n"
-            f"Section: {section.section}\n"
-            f"Annotation: {section.content_type}\n"
-            f"BM25 score: {score:.4f}\n"
-            f"Content:\n{content}"
-        )
+    context = [
+        {
+            "rfc": section.rfc,
+            "section": section.section,
+            "content": section.content[:max_section_chars],
+        }
+        for section, _score in retrieved
+    ]
 
     exchange = {
         "request_type": pair.request_type,
         "response_type": pair.response_type,
-        "request": display_bytes(pair.request),
-        "response": display_bytes(pair.response),
+        "request": prompt_bytes(pair.request),
+        "response": prompt_bytes(pair.response),
     }
     return (
-        "You are analyzing a captured network protocol request-response pair "
-        "for a possible standards non-compliance bug.\n\n"
-        f"Target: {target['target_name']}\n"
-        f"Protocol: {target['protocol']}\n"
-        f"Configured specifications: {target['rfc_names']}\n\n"
-        "Captured exchange:\n"
-        f"{json.dumps(exchange, indent=2, ensure_ascii=False)}\n\n"
-        "Retrieved specification context:\n"
-        f"{'\n\n'.join(context_parts)}\n\n"
-        "Determine whether the response violates a normative protocol "
-        "requirement for this request. Distinguish an actual wire-format, "
-        "semantic, sequencing, or required-response violation from behavior "
-        "that is implementation-defined, optional, or unsupported by the "
-        "retrieved evidence. If the exchange lacks state/history needed for "
-        "a reliable conclusion, use verdict 'uncertain'. Do not claim a "
-        "violation without identifying supporting RFC text and the conflicting "
-        "observed bytes.\n\n"
-        "Return only one JSON object matching this shape:\n"
-        f"{json.dumps(ANALYSIS_SCHEMA, indent=2)}"
+        "TASK\nJudge whether the captured response violates a normative "
+        "wire-format, semantic, sequencing, or required-response rule.\n\n"
+        "INPUT\n"
+        f"TARGET: {target['target_name']}\n"
+        f"PROTOCOL: {target['protocol']}\n"
+        f"SPEC_NAMES: {json.dumps(target['rfc_names'], separators=(',', ':'))}\n"
+        f"EXCHANGE_JSON: {json.dumps(exchange, ensure_ascii=False, separators=(',', ':'))}\n"
+        f"SPEC_CONTEXT_JSON: {json.dumps(context, ensure_ascii=False, separators=(',', ':'))}\n\n"
+        "RULES\nUse non_compliant only with quoted/spec-located normative "
+        "evidence conflicting with observed bytes. Treat optional or "
+        "implementation-defined behavior as compliant; use uncertain when "
+        "state/history/evidence is insufficient. Do not invent causes.\n\n"
+        "OUTPUT\nJSON only matching: "
+        f"{json.dumps(ANALYSIS_SCHEMA, separators=(',', ':'))}"
     )
 
 
@@ -433,8 +444,8 @@ def build_vulnerability_report_prompt(
     exchange = {
         "request_type": pair.request_type,
         "response_type": pair.response_type,
-        "request": display_bytes(pair.request, limit=8192),
-        "response": display_bytes(pair.response, limit=8192),
+        "request": prompt_bytes(pair.request, limit=8192),
+        "response": prompt_bytes(pair.response, limit=8192),
     }
     report_context = {
         "target": target["target_name"],
@@ -445,20 +456,15 @@ def build_vulnerability_report_prompt(
         "captured_exchange": exchange,
     }
     return (
-        "You are a security engineer writing a vulnerability report for a "
-        "protocol standards non-compliance bug.\n\n"
-        "Use the provided compliance analysis, retrieved RFC evidence, and "
-        "captured request/response messages. Do not invent unsupported root "
-        "causes. If impact is uncertain, say so explicitly.\n\n"
-        "Write a concise Markdown report with these sections:\n"
-        "1. Summary\n"
-        "2. Affected Target and Protocol\n"
-        "3. Non-Compliance Evidence\n"
-        "4. Triggering Request and Observed Response\n"
-        "5. Reproduction Notes\n"
-        "6. Security Impact Hypothesis\n"
-        "7. Confidence and Open Questions\n\n"
-        f"Evidence JSON:\n{json.dumps(report_context, indent=2, ensure_ascii=False)}"
+        "TASK\nWrite a concise protocol non-compliance vulnerability report.\n\n"
+        "INPUT\nEVIDENCE_JSON: "
+        f"{json.dumps(report_context, ensure_ascii=False, separators=(',', ':'))}\n\n"
+        "CONTRACT\nUse only supplied analysis, RFC evidence, and exchanges; "
+        "state uncertain impact/root cause explicitly. Include Summary, "
+        "Affected Target and Protocol, Non-Compliance Evidence, Triggering "
+        "Exchange, Reproduction Notes, Security Impact Hypothesis, and "
+        "Confidence/Open Questions.\n\n"
+        "OUTPUT\nMarkdown report only."
     )
 
 

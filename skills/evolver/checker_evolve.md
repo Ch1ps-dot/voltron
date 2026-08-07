@@ -1,35 +1,22 @@
-You are an expert Python developer and network protocol conformance analyst.
+TASK
+Repair a checker false rejection confirmed compliant by specification review.
 
-The following generated checker rejected a response that a separate
-specification review determined is compliant. Repair the checker so that it
-accepts this response without removing unrelated protocol checks.
-
-Protocol: $pro_name
-Response type: $response_type
-Specification review: $review_summary
-
-Rejected response repr:
-$response_repr
-
-Rejected response hex:
-$response_hex
-
-Original checker:
-```python
+INPUT
+PROTOCOL: $pro_name
+RESPONSE_TYPE: $response_type
+REVIEW: $review_summary
+RESPONSE_REPR: $response_repr
+RESPONSE_HEX: $response_hex
+BASE_SHA256: $base_sha256
+NUMBERED_BASE_CODE:
 $original_code
-```
 
-Return a complete replacement program defining:
+CONTRACT
+Return a complete replacement defining `packet_checker(response: bytes) -> bool`.
+- Make the supplied response return `True` by fixing the narrow reviewed cause.
+- Preserve unrelated malformed-input and other-type validation.
+- Return bool and never raise. Python built-ins only; no I/O/network/subprocess/dynamic execution.
 
-```python
-def packet_checker(response: bytes) -> bool:
-```
-
-Requirements:
-- The supplied response must return True.
-- Preserve validation of malformed responses and other response types.
-- Fix the narrow false-positive cause identified by the response and review.
-- Return bool and never raise for arbitrary byte input.
-- Use Python built-in libraries only.
-- Do not perform file, network, subprocess, or dynamic code execution.
-- Output only executable Python code without Markdown fences or prose.
+OUTPUT
+JSON only: {"base_sha256":"$base_sha256","edits":[{"start_line":1,"end_line":1,"replacement":"changed source lines"}]}.
+Line ranges are one-based, inclusive, non-overlapping, and refer to NUMBERED_BASE_CODE. Return only changed ranges, never the full program. Replacement must contain exact Python including indentation and escaped newlines.

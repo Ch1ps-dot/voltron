@@ -268,6 +268,8 @@ During and after execution, the repository accumulates several kinds of outputs:
   request-type/response-type pairs saved as JSON with Base64-encoded messages
 - `results-<target>-voltron-<timestamp>/phase_metrics.csv`: per-stage timing
   and LLM token usage for document analysis, model learning, and fuzzing
+- `results-<target>-voltron-<timestamp>/llm_usage_metrics.csv`: LLM call,
+  latency, and token aggregates grouped by prompt usage and model
 - `results-<target>-voltron-<timestamp>/model_learning_iterations.csv`:
   per-iteration model-learning state and protocol feedback metrics
 - `results-<target>-voltron-<timestamp>/generator_iteration_metrics.csv`:
@@ -292,6 +294,19 @@ Each row records the phase status, start/end timestamps, wall-clock duration,
 LLM chat time, LLM call count, and prompt/completion/total token usage. If
 state learning is disabled, `model_learning` is recorded with status
 `skipped`.
+
+`llm_usage_metrics.csv` groups successful LLM calls by the `usage` label passed
+by the prompt call site and by model. Each row records call count, cumulative
+chat time and prompt/completion/total tokens, plus token-reporting call count,
+per-call averages, and single-call maxima. The file is updated atomically after
+each successful call, including calls made outside an active execution phase.
+
+LLM evolution requests use incremental outputs. Generator, parser, mutator,
+checker, and observer evolution returns baseline-hashed, non-overlapping source
+line edits; IR evolution returns message/field operations. Voltron applies the
+delta locally and then runs the existing complete Python or XML validation
+before saving an evolved component. A hash mismatch, overlapping/out-of-range
+edit, unsupported IR operation, or invalid reconstructed artifact is rejected.
 
 `model_learning_iterations.csv` contains one row for each successful
 model-learning iteration. It records the iteration duration, remaining retry

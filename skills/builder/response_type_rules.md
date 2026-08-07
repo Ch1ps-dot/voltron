@@ -1,63 +1,20 @@
-You are an expert in networking protocols and RFC analysis.
+TASK
+Derive stable response-type rules from candidate discriminators and specification evidence.
 
-## Your task:
+INPUT
+RFC: $rfc_num
+PROTOCOL: $pro_name
+CANDIDATE_FIELDS:
+$field_info
+SPEC:
+$rfc_doc
 
-Analyze the candidate response-discriminating fields extracted from the
-{$rfc_num} document of the {$pro_name} protocol. Determine how response message
-types should be identified from one field or a combination of fields.
+RULES
+- Use one field when sufficient; otherwise include the complete discriminator combination.
+- Exclude IDs, sequence/transaction values, random tokens, lengths, and payloads unless explicitly defined as status/result/type codes.
+- Use protocol-defined type names and only supported values. Recover an empty candidate value list only from explicit spec evidence.
+- If evidence is unreliable, return an empty `types` array.
 
-The goal is to produce stable response type rules that can be used by a fuzzer
-to parse, classify, and validate response messages.
-
-## Candidate response fields:
-
-{$field_info}
-
-## Response-related specification context:
-
-{$rfc_doc}
-
-## Instructions:
-
-- Use the candidate fields as the primary evidence.
-- If one field is sufficient to distinguish response message types, use that
-  field alone.
-- If multiple fields must be combined to distinguish meaningful response
-  subtypes, include all required fields in `field_values`.
-- Do not use session IDs, sequence numbers, transaction IDs, packet identifiers,
-  random tokens, lengths, or payload values as type discriminators unless the
-  specification explicitly defines them as status/result/type codes.
-- Prefer protocol-defined names for `type_name`, such as CONNACK_0,
-  PUBACK_SUCCESS, 200, 404, or equivalent protocol terms.
-- Include only values that are explicitly supported by the candidate fields or
-  specification context.
-- If a candidate field has an empty `value` list but the specification context
-  explicitly defines valid values, recover those values from the context.
-- If no reliable type rules can be inferred, return an empty `types` array.
-
-## Output JSON schema:
-
-{
-  "message_direction": "response",
-  "primary_fields": ["field name used first"],
-  "types": [
-    {
-      "type_name": "TYPE_NAME",
-      "field_values": {
-        "FieldName": "value",
-        "OptionalSubtypeField": "value"
-      },
-      "explanation": "Why this field setting identifies the response type."
-    }
-  ]
-}
-
-## Output constraints:
-
-- Output exactly one JSON object.
-- Do not wrap the JSON in Markdown.
-- `message_direction` must be `response`.
-- `primary_fields` must be an array of strings.
-- `types` must be an array.
-- Every type must contain `type_name`, `field_values`, and `explanation`.
-- Every `field_values` object must contain at least one field-value pair.
+OUTPUT
+JSON only: {"message_direction":"response","primary_fields":["Field"],"types":[{"type_name":"TYPE","field_values":{"Field":"value"},"explanation":"why"}]}.
+Every type requires non-empty `field_values`; no Markdown or prose.

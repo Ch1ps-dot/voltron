@@ -1,27 +1,18 @@
-You are an expert Python developer repairing generated protocol-fuzzer code.
+TASK
+Repair generated Python after local validation fails.
 
-The program below failed local validation. Return a corrected replacement that
-preserves its intended protocol behavior while fixing the reported problem.
-
-## Failed program
-
-```python
+INPUT
+FUNCTION: $function_name
+CODE:
 $code
-```
-
-## Validation failure
-
-```text
+ERROR:
 $error
-```
 
-## Required contract
+CONTRACT
+- Return a complete replacement with a callable function named `$function_name` and the original signature.
+- Fix the reported syntax, name, return-value, or runtime cause.
+- Preserve working protocol construction/classification logic; do not use a placeholder.
+- Use only the Python standard library.
 
-- Output only directly executable Python code, without Markdown or prose.
-- Use Python standard-library features only.
-- Define a callable function named `$function_name` with the same intended
-  signature as the failed program.
-- Fix syntax, missing names, invalid return values, and runtime errors revealed
-  by the validation failure.
-- Preserve the valid protocol construction or response-classification logic
-  already present in the failed program; do not replace it with a placeholder.
+OUTPUT
+Executable Python only; no Markdown or prose.

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 from string import Template
@@ -91,7 +92,15 @@ def test_mutator_prompt_includes_runtime_response_feedback():
     async def fake_chat_llm(prompt, usage):
         captured["prompt"] = prompt
         captured["usage"] = usage
-        return "def mutate():\n    return b'MUTATED\\r\\n'\n"
+        baseline = "def generate():\n    return b'PING\\r\\n'\n"
+        return json.dumps({
+            "base_sha256": hashlib.sha256(baseline.encode()).hexdigest(),
+            "edits": [{
+                "start_line": 1,
+                "end_line": 2,
+                "replacement": "def mutate():\n    return b'MUTATED\\r\\n'",
+            }],
+        })
 
     chater.chat_llm = fake_chat_llm
 
@@ -110,12 +119,10 @@ def test_mutator_prompt_includes_runtime_response_feedback():
 
     assert result == "def mutate():\n    return b'MUTATED\\r\\n'\n"
     assert captured["usage"] == "mutator_evolve"
-    assert "Observed response types from the current fuzzing session" in (
-        captured["prompt"]
-    )
-    assert "Saved Best Generator Program" in captured["prompt"]
+    assert "RUNTIME_OBSERVED_RESPONSES" in captured["prompt"]
+    assert "NUMBERED_SAVED_BEST_GENERATOR" in captured["prompt"]
     assert '["ERROR", "PONG"]' in captured["prompt"]
-    assert "not yet been reached" in captured["prompt"]
+    assert "not yet present" in captured["prompt"]
 
 
 def test_code_repair_prompt_includes_failed_code_and_validation_error():

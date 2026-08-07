@@ -66,6 +66,8 @@ class Analyzer:
         self.phase_metrics: dict[str, dict] = {}
         self.active_phase: str | None = None
         self.phase_metrics_path: Path | None = None
+        self.llm_usage_metrics: dict[tuple[str, str], dict] = {}
+        self.llm_usage_metrics_path: Path | None = None
         self.model_learning_iteration_path: Path | None = None
         self.generator_iteration_metrics_path: Path | None = None
         self._generator_checkpoint_id = 0
@@ -93,6 +95,8 @@ class Analyzer:
             self.phase_metrics = {}
             self.active_phase = None
             self.phase_metrics_path = None
+            self.llm_usage_metrics = {}
+            self.llm_usage_metrics_path = None
             self.model_learning_iteration_path = None
             self.generator_iteration_metrics_path = None
             self._generator_checkpoint_id = 0
@@ -109,6 +113,11 @@ class Analyzer:
             try:
                 csv_path = configs.results_path / 'phase_metrics.csv'
                 csv_path.unlink(missing_ok=True)
+                usage_csv_path = (
+                    configs.results_path
+                    / 'llm_usage_metrics.csv'
+                )
+                usage_csv_path.unlink(missing_ok=True)
                 iteration_csv_path = (
                     configs.results_path
                     / 'model_learning_iterations.csv'
@@ -220,21 +229,115 @@ class Analyzer:
             duration_s: float,
             prompt_tokens: int = 0,
             completion_tokens: int = 0,
-            total_tokens: int = 0
+            total_tokens: int = 0,
+            usage: str = '',
+            model: str = '',
+            tokens_reported: bool = True,
     ) -> None:
         with self.lock:
             phase = self.active_phase or self._phase_from_stage()
-            if phase is None:
+            if phase is not None:
+                metric = self.phase_metrics.get(phase)
+                if metric is None or metric.get('written'):
+                    metric = self._new_phase_metric(phase)
+                    self.phase_metrics[phase] = metric
+                metric['chat_time_s'] += duration_s
+                metric['llm_calls'] += 1
+                metric['prompt_tokens'] += prompt_tokens
+                metric['completion_tokens'] += completion_tokens
+                metric['total_tokens'] += total_tokens
+
+            usage_name = str(usage).strip()
+            if not usage_name:
                 return
-            metric = self.phase_metrics.get(phase)
-            if metric is None or metric.get('written'):
-                metric = self._new_phase_metric(phase)
-                self.phase_metrics[phase] = metric
-            metric['chat_time_s'] += duration_s
-            metric['llm_calls'] += 1
-            metric['prompt_tokens'] += prompt_tokens
-            metric['completion_tokens'] += completion_tokens
-            metric['total_tokens'] += total_tokens
+            model_name = str(model).strip()
+            key = (usage_name, model_name)
+            usage_metric = self.llm_usage_metrics.get(key)
+            if usage_metric is None:
+                usage_metric = {
+                    'usage': usage_name,
+                    'model': model_name,
+                    'llm_calls': 0,
+                    'token_reported_calls': 0,
+                    'chat_time_s': 0.0,
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0,
+                    'total_tokens': 0,
+                    'max_prompt_tokens': 0,
+                    'max_completion_tokens': 0,
+                    'max_total_tokens': 0,
+                }
+                self.llm_usage_metrics[key] = usage_metric
+            usage_metric['llm_calls'] += 1
+            if tokens_reported:
+                usage_metric['token_reported_calls'] += 1
+            usage_metric['chat_time_s'] += duration_s
+            usage_metric['prompt_tokens'] += prompt_tokens
+            usage_metric['completion_tokens'] += completion_tokens
+            usage_metric['total_tokens'] += total_tokens
+            usage_metric['max_prompt_tokens'] = max(
+                usage_metric['max_prompt_tokens'],
+                prompt_tokens,
+            )
+            usage_metric['max_completion_tokens'] = max(
+                usage_metric['max_completion_tokens'],
+                completion_tokens,
+            )
+            usage_metric['max_total_tokens'] = max(
+                usage_metric['max_total_tokens'],
+                total_tokens,
+            )
+            self._write_llm_usage_metrics_unlocked()
+
+    def _write_llm_usage_metrics_unlocked(self) -> None:
+        """Persist current per-usage aggregates atomically."""
+        try:
+            csv_path = configs.results_path / 'llm_usage_metrics.csv'
+            self.llm_usage_metrics_path = csv_path
+            temporary = csv_path.with_suffix('.csv.tmp')
+            fieldnames = [
+                'usage',
+                'model',
+                'llm_calls',
+                'token_reported_calls',
+                'chat_time_s',
+                'prompt_tokens',
+                'completion_tokens',
+                'total_tokens',
+                'avg_prompt_tokens',
+                'avg_completion_tokens',
+                'avg_total_tokens',
+                'max_prompt_tokens',
+                'max_completion_tokens',
+                'max_total_tokens',
+            ]
+            with temporary.open(
+                mode='w',
+                encoding='utf-8',
+                newline='',
+            ) as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for key in sorted(self.llm_usage_metrics):
+                    metric = self.llm_usage_metrics[key]
+                    token_calls = metric['token_reported_calls']
+                    token_divisor = token_calls or 1
+                    writer.writerow({
+                        **metric,
+                        'chat_time_s': f"{metric['chat_time_s']:.6f}",
+                        'avg_prompt_tokens': (
+                            f"{metric['prompt_tokens'] / token_divisor:.3f}"
+                        ),
+                        'avg_completion_tokens': (
+                            f"{metric['completion_tokens'] / token_divisor:.3f}"
+                        ),
+                        'avg_total_tokens': (
+                            f"{metric['total_tokens'] / token_divisor:.3f}"
+                        ),
+                    })
+            temporary.replace(csv_path)
+        except Exception:
+            logger.exception('Analyzer: write LLM usage metrics failure')
 
     def _phase_from_stage(
             self

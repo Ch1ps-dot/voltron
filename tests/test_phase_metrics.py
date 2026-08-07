@@ -55,17 +55,91 @@ def test_phase_metrics_reset_removes_previous_csv(tmp_path, monkeypatch):
     monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
     metric = Analyzer()
     csv_path = tmp_path / "phase_metrics.csv"
+    usage_csv_path = tmp_path / "llm_usage_metrics.csv"
     iteration_csv_path = tmp_path / "model_learning_iterations.csv"
     generator_csv_path = tmp_path / "generator_iteration_metrics.csv"
     csv_path.write_text("old\n", encoding="utf-8")
+    usage_csv_path.write_text("old\n", encoding="utf-8")
     iteration_csv_path.write_text("old\n", encoding="utf-8")
     generator_csv_path.write_text("old\n", encoding="utf-8")
 
     metric.reset_phase_metrics()
 
     assert not csv_path.exists()
+    assert not usage_csv_path.exists()
     assert not iteration_csv_path.exists()
     assert not generator_csv_path.exists()
+
+
+def test_llm_usage_metrics_aggregate_by_usage_and_model(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
+    metric = Analyzer()
+    metric.reset_phase_metrics()
+
+    metric.record_llm_usage(
+        duration_s=0.25,
+        prompt_tokens=100,
+        completion_tokens=20,
+        total_tokens=120,
+        usage="generator_gen",
+        model="model-a",
+    )
+    metric.record_llm_usage(
+        duration_s=0.75,
+        prompt_tokens=200,
+        completion_tokens=40,
+        total_tokens=240,
+        usage="generator_gen",
+        model="model-a",
+    )
+    metric.record_llm_usage(
+        duration_s=0.5,
+        prompt_tokens=50,
+        completion_tokens=10,
+        total_tokens=60,
+        usage="parser_gen",
+        model="model-b",
+    )
+    metric.record_llm_usage(
+        duration_s=0.1,
+        prompt_tokens=25,
+        completion_tokens=5,
+        total_tokens=30,
+        usage="generator_gen",
+        model="model-b",
+    )
+
+    rows = read_phase_rows(tmp_path / "llm_usage_metrics.csv")
+    assert len(rows) == 3
+    by_key = {(row["usage"], row["model"]): row for row in rows}
+
+    generator = by_key[("generator_gen", "model-a")]
+    assert generator["model"] == "model-a"
+    assert generator["llm_calls"] == "2"
+    assert generator["token_reported_calls"] == "2"
+    assert generator["chat_time_s"] == "1.000000"
+    assert generator["prompt_tokens"] == "300"
+    assert generator["completion_tokens"] == "60"
+    assert generator["total_tokens"] == "360"
+    assert generator["avg_prompt_tokens"] == "150.000"
+    assert generator["avg_completion_tokens"] == "30.000"
+    assert generator["avg_total_tokens"] == "180.000"
+    assert generator["max_prompt_tokens"] == "200"
+    assert generator["max_completion_tokens"] == "40"
+    assert generator["max_total_tokens"] == "240"
+
+    other_generator = by_key[("generator_gen", "model-b")]
+    assert other_generator["llm_calls"] == "1"
+    assert other_generator["completion_tokens"] == "5"
+
+    parser = by_key[("parser_gen", "model-b")]
+    assert parser["model"] == "model-b"
+    assert parser["llm_calls"] == "1"
+    assert parser["completion_tokens"] == "10"
+    assert metric.phase_metrics == {}
 
 
 def test_model_learning_iteration_metrics_are_recorded(tmp_path, monkeypatch):

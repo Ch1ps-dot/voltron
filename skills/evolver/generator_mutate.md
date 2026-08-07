@@ -1,152 +1,32 @@
+SCOPE
+Authorized controlled fuzz testing only.
 
-Safety and Usage Notice: The following prompt and any code it produces are intended strictly for use within authorized, controlled fuzz-testing research environments. Only execute generated code against systems for which you have explicit permission. Do not use outputs for unauthorized testing, scanning, attacks, or other harmful activities.
+TASK
+Generate one structured mutation that reaches deep parser/state validation and explores an RFC outcome not yet observed.
 
-You are a developer of a **protocol fuzzer** and an expert in **protocol-driven test case generation for deep bug exposure**.
+INPUT
+PROTOCOL: $pro_name
+TYPE_FIELD: $field_name
+REQUEST_TYPE: $msg_type
+IR_FIELD_TABLE_JSON:
+$msg_ir
+SUT_CONTEXT:
+$info
+BASE_SHA256: $base_sha256
+NUMBERED_SAVED_BEST_GENERATOR:
+$code
+RFC_POSSIBLE_RESPONSES:
+$poss_response
+RUNTIME_OBSERVED_RESPONSES:
+$trace
 
-Your task is to **regenerate Python code that creates complex, high-risk mutated protocol messages using structured randomness, boundary stress, and controlled semantic conflicts**, with the explicit goal of **triggering deeper parser/state-machine bugs and abnormal server behaviors** in the Server Under Test (SUT), including:
+CONTRACT
+Define `mutate() -> bytes` with no parameters.
+- Preserve the saved generator's state-reaching structure, then introduce controlled field-level anomalies supported by the IR.
+- Prioritize RFC response types not yet present in runtime observations; avoid patterns that only repeat observed outcomes.
+- Prefer mutations that pass framing and early parsing before stressing deeper validation: boundary/out-of-range numbers, inconsistent declared lengths, empty/long/invalid tokens, malformed quoting/charset, reused/duplicated IDs, unsupported versions, or compound semantic conflicts.
+- Use deterministic mutation families plus bounded randomness, built-ins only, no networking/I/O, and never raise. Keep runtime practical while allowing large free-form payloads when useful.
 
-* unexpected state transitions
-* parser desynchronization
-* assertion-like failures, crashes, hangs, or logic corruption paths
-
----
-
-## **Input**
-
-You will be given:
-
-### **Protocol name**: 
-
-  $pro_name
-
-### **field name**: 
-
-  $field_name
-
-### **Field Value**: 
-
-  $msg_type
-
-### **Message syntax specification in protoIR format**:
-
-  $msg_ir
-  
-### **SUT (Server Under Test) Information**:
-
-  $info
-
-  The SUT information may include:
-
-  * server/client configuration files
-
-### **Saved Best Generator Program**:
-
-   This generator was saved with the best model-learning hypothesis. Preserve
-   its protocol structure and state-reaching properties as the baseline for
-   mutation.
-
-   $code
-
-### **Possible response code extracted from RFC documents**
-
-  $poss_response
-
-### **Observed response types from the current fuzzing session**
-
-  $trace
-
-  The value above is a JSON array containing the response types that the SUT
-  has actually returned for the current request type. It is runtime feedback,
-  not a list of all responses allowed by the RFC. An empty array means that no
-  response type has been observed for this request type yet.
-
----
-
-## **Your Task**
-
-### 1. Analyze the Protocol Structure
-
-* Identify **key semantic fields** in protocol messages (e.g., method names, identifiers, lengths, URIs, version numbers, authentication fields).
-* Use the supplied protoIR to identify field order, constant fields, variable fields, length dependencies, legal values, encodings, delimiters, and payload boundaries.
-* Determine which fields:
-
-  * directly influence protocol validation
-  * are mapped to **exceptional behaviors**
-  * are sensitive to boundary values or malformed content
-* Compare the RFC-derived possible responses with the runtime-observed
-  responses. Identify response types that have not yet been reached and infer
-  which field values, semantic conflicts, or boundary conditions may exercise
-  those missing paths.
-
-### 2. Message Generation Strategy
-
-* Prefer generating messages that are:
-
-  * **semantically invalid according to the protocol specification**
-  * **likely to reach deep server-side validation logic**
-  * **capable of triggering new types of responses**
-  * **likely to execute uncommon error-handling branches**
-  * **likely to expose parser edge bugs (desync, over-read assumptions, stale state reuse)**
-* Use the runtime-observed response types as feedback:
-
-  * prioritize structured mutations that may trigger RFC-derived response
-    types not present in the observed JSON array
-  * avoid merely repeating mutation patterns that only reproduce the same
-    already-observed response types
-  * retain useful structural properties that allow the request to reach deep
-    server-side validation before introducing controlled anomalies
-* For each critical field type, explicitly include candidate value families when applicable:
-
-  * numeric fields: very long numeric strings, negative numbers, zero, or out-of-range values
-  * length-like fields: underflow (shorter than declared), overflow (longer than declared), and inconsistent framing
-  * string/token fields: empty string, very short, extremely long values, invalid charset, mixed separators, and malformed quoting/escaping
-  * blob/payload fields: generate payloads that can be super long (thousands to tens of thousands of bytes/characters, or more if useful), and do not truncate them to a "reasonable" length
-  * identifier/version fields: missing, duplicated, stale/reused, malformed format, and unsupported version tags
-
-### 3. Generate a Python Function
-
-* Produce a single Python function that:
-
-  * constructs **one mutated, error-triggering `$msg_type` message**
-  * starts from the supplied protoIR structure and mutates selected fields in controlled ways
-  * uses **randomized values, boundary-covering mutations, and out-of-range values** for key fields
-  * implements **compound anomalies** (multiple coordinated mutations in one message)
-  * returns a `bytes` object
-  * **Do not raise exceptions during generation**
-  * The program logic should not be overly complex to avoid excessively long execution times.
-  * Prefer deterministic mutation templates plus randomness (not fully unconstrained random bytes).
-
----
-
-### **Code Constraints**
-
-* Use **Python only**
-* Use **only built-in libraries** (`random`, `string`, `struct`, etc.)
-* No third-party packages
-* No input parameters
-* Do NOT include networking code
-* The function must be directly executable
-* If helper logic is needed, keep it inside the same function body
-* For fields that accept free-form text, opaque bytes, or payload content, prefer very large outputs and allow them to exceed typical application limits.
-
----
-
-### **Function Prototype (Must Match Exactly)**
-
-```python
-def mutate():
-  """
-  Generate one complex error-triggering $msg_type message for the $pro_name protocol.
-    - Input: none
-    - Output: bytes
-    - Key fields are randomly generated with boundary coverage
-    - Designed to trigger deep parser/state-machine abnormal behaviors
-  """
-    
-  message = b''
-
-  # Construct a semantically inconsistent, compound-anomaly protocol message
-  # using boundary-heavy values to trigger deep error-handling paths
-
-  return message
-```
+OUTPUT
+JSON only: {"base_sha256":"$base_sha256","edits":[{"start_line":1,"end_line":1,"replacement":"changed source lines"}]}.
+Line ranges are one-based, inclusive, non-overlapping, and refer to NUMBERED_SAVED_BEST_GENERATOR. Return only changed ranges, never the full program. Replacement must contain exact Python including indentation and escaped newlines.

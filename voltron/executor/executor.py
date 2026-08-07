@@ -2260,23 +2260,33 @@ class Executor:
         self,
         record: dict
     ) -> str:
-        compact = json.dumps(record, indent=2, ensure_ascii=False)
+        def compact_value(value):
+            if isinstance(value, list):
+                return [compact_value(item) for item in value]
+            if not isinstance(value, dict):
+                return value
+            if value.get('encoding') == 'base64' and 'data' in value:
+                return {
+                    key: value[key]
+                    for key in ('encoding', 'length', 'truncated', 'data')
+                    if key in value
+                }
+            return {key: compact_value(item) for key, item in value.items()}
+
+        compact = json.dumps(
+            compact_value(record),
+            ensure_ascii=False,
+            separators=(',', ':'),
+        )
         return (
-            'You are a security engineer analyzing a protocol fuzzing crash.\n'
-            'Use the captured request/response sequence, response feedback, '
-            'process exit information, stdout, and stderr to draft a concise '
-            'vulnerability report.\n\n'
-            'The report should include:\n'
-            '1. Summary\n'
-            '2. Affected target/protocol\n'
-            '3. Crash signal or sanitizer evidence\n'
-            '4. Triggering request and preceding protocol context\n'
-            '5. Reproduction steps using the captured message sequence\n'
-            '6. Security impact hypothesis\n'
-            '7. Triage notes and confidence\n\n'
-            'If evidence is insufficient, say so explicitly and avoid '
-            'inventing root causes.\n\n'
-            f'Crash evidence JSON:\n{compact}'
+            'TASK\nDraft a concise protocol-fuzzing crash report.\n\n'
+            f'INPUT\nCRASH_EVIDENCE_JSON: {compact}\n\n'
+            'CONTRACT\nUse only captured exchanges, response feedback, exit '
+            'status, stdout, and stderr. Include Summary, Affected Target and '
+            'Protocol, Crash/Sanitizer Evidence, Trigger and Preceding Context, '
+            'Reproduction, Security Impact Hypothesis, and Triage Confidence. '
+            'State insufficient evidence explicitly; do not invent root causes.\n\n'
+            'OUTPUT\nMarkdown report only.'
         )
 
     def _encode_bytes(
