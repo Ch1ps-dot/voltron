@@ -56,10 +56,12 @@ def test_phase_metrics_reset_removes_previous_csv(tmp_path, monkeypatch):
     metric = Analyzer()
     csv_path = tmp_path / "phase_metrics.csv"
     usage_csv_path = tmp_path / "llm_usage_metrics.csv"
+    validation_path = tmp_path / "llm_response_validation.jsonl"
     iteration_csv_path = tmp_path / "model_learning_iterations.csv"
     generator_csv_path = tmp_path / "generator_iteration_metrics.csv"
     csv_path.write_text("old\n", encoding="utf-8")
     usage_csv_path.write_text("old\n", encoding="utf-8")
+    validation_path.write_text("old\n", encoding="utf-8")
     iteration_csv_path.write_text("old\n", encoding="utf-8")
     generator_csv_path.write_text("old\n", encoding="utf-8")
 
@@ -67,6 +69,7 @@ def test_phase_metrics_reset_removes_previous_csv(tmp_path, monkeypatch):
 
     assert not csv_path.exists()
     assert not usage_csv_path.exists()
+    assert not validation_path.exists()
     assert not iteration_csv_path.exists()
     assert not generator_csv_path.exists()
 

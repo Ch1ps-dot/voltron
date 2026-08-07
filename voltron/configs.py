@@ -35,6 +35,9 @@ class Config:
         # Bound variable RFC/IR/code context inserted into LLM prompts.  The
         # prompt template and its instructions are preserved in full.
         self.prompt_context_max_chars: int = 12_000
+        # Reject unexpectedly large model responses before parsing or storing
+        # them as generated artifacts.
+        self.llm_response_max_chars: int = 100_000
         # Response checkers/observers are generated on demand.  Only the
         # protocol-wide fallback and explicitly configured high-value types
         # are prepared before fuzzing starts.

@@ -117,6 +117,7 @@ generated_code:
   retry_limit: 3
   timeout_seconds: 2.0
   max_message_bytes: 1048576
+  response_max_chars: 100000
 
 # Generate one protocol-wide checker/observer before fuzzing, then create
 # exact and response-family components in the background as types are seen.

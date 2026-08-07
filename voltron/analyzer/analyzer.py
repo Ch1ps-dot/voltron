@@ -68,6 +68,7 @@ class Analyzer:
         self.phase_metrics_path: Path | None = None
         self.llm_usage_metrics: dict[tuple[str, str], dict] = {}
         self.llm_usage_metrics_path: Path | None = None
+        self.llm_response_validation_path: Path | None = None
         self.model_learning_iteration_path: Path | None = None
         self.generator_iteration_metrics_path: Path | None = None
         self._generator_checkpoint_id = 0
@@ -97,6 +98,7 @@ class Analyzer:
             self.phase_metrics_path = None
             self.llm_usage_metrics = {}
             self.llm_usage_metrics_path = None
+            self.llm_response_validation_path = None
             self.model_learning_iteration_path = None
             self.generator_iteration_metrics_path = None
             self._generator_checkpoint_id = 0
@@ -118,6 +120,11 @@ class Analyzer:
                     / 'llm_usage_metrics.csv'
                 )
                 usage_csv_path.unlink(missing_ok=True)
+                validation_path = (
+                    configs.results_path
+                    / 'llm_response_validation.jsonl'
+                )
+                validation_path.unlink(missing_ok=True)
                 iteration_csv_path = (
                     configs.results_path
                     / 'model_learning_iterations.csv'
@@ -233,6 +240,11 @@ class Analyzer:
             usage: str = '',
             model: str = '',
             tokens_reported: bool = True,
+            response_valid: bool | None = None,
+            validation_reason: str = '',
+            response_contract: str = '',
+            response_chars: int = 0,
+            response_sha256: str = '',
     ) -> None:
         with self.lock:
             phase = self.active_phase or self._phase_from_stage()
@@ -266,6 +278,12 @@ class Analyzer:
                     'max_prompt_tokens': 0,
                     'max_completion_tokens': 0,
                     'max_total_tokens': 0,
+                    'valid_responses': 0,
+                    'invalid_responses': 0,
+                    'empty_responses': 0,
+                    'schema_failures': 0,
+                    'truncated_responses': 0,
+                    'discarded_completion_tokens': 0,
                 }
                 self.llm_usage_metrics[key] = usage_metric
             usage_metric['llm_calls'] += 1
@@ -287,7 +305,32 @@ class Analyzer:
                 usage_metric['max_total_tokens'],
                 total_tokens,
             )
+            if response_valid is True:
+                usage_metric['valid_responses'] += 1
+            elif response_valid is False:
+                usage_metric['invalid_responses'] += 1
+                usage_metric['discarded_completion_tokens'] += (
+                    completion_tokens
+                )
+                if validation_reason == 'empty_response':
+                    usage_metric['empty_responses'] += 1
+                elif validation_reason == 'truncated_response':
+                    usage_metric['truncated_responses'] += 1
+                else:
+                    usage_metric['schema_failures'] += 1
             self._write_llm_usage_metrics_unlocked()
+            if response_valid is not None:
+                self._write_llm_response_validation_unlocked({
+                    'timestamp': datetime.now().astimezone().isoformat(),
+                    'usage': usage_name,
+                    'model': model_name,
+                    'contract': str(response_contract),
+                    'status': 'valid' if response_valid else 'invalid',
+                    'reason': str(validation_reason),
+                    'response_chars': max(0, int(response_chars)),
+                    'response_sha256': str(response_sha256),
+                    'completion_tokens': max(0, int(completion_tokens)),
+                })
 
     def _write_llm_usage_metrics_unlocked(self) -> None:
         """Persist current per-usage aggregates atomically."""
@@ -310,6 +353,12 @@ class Analyzer:
                 'max_prompt_tokens',
                 'max_completion_tokens',
                 'max_total_tokens',
+                'valid_responses',
+                'invalid_responses',
+                'empty_responses',
+                'schema_failures',
+                'truncated_responses',
+                'discarded_completion_tokens',
             ]
             with temporary.open(
                 mode='w',
@@ -338,6 +387,20 @@ class Analyzer:
             temporary.replace(csv_path)
         except Exception:
             logger.exception('Analyzer: write LLM usage metrics failure')
+
+    def _write_llm_response_validation_unlocked(
+            self,
+            record: dict,
+    ) -> None:
+        """Append response-validation metadata without storing model content."""
+        try:
+            path = configs.results_path / 'llm_response_validation.jsonl'
+            self.llm_response_validation_path = path
+            with path.open('a', encoding='utf-8') as stream:
+                stream.write(json.dumps(record, ensure_ascii=False))
+                stream.write('\n')
+        except Exception:
+            logger.exception('Analyzer: write LLM response validation failure')
 
     def _phase_from_stage(
             self

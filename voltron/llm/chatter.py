@@ -1,9 +1,8 @@
 from pathlib import Path
 from openai import AsyncOpenAI, OpenAIError
-import ast
+import hashlib
 import json
 import time, re
-from re import Match
 from string import Template
 import asyncio
 from xml.etree import ElementTree
@@ -15,7 +14,12 @@ from voltron.llm.incremental import (
     apply_source_delta,
     content_sha256,
     numbered_source_context,
-    parse_json_artifact,
+)
+from voltron.llm.response_validation import (
+    LLMResponseValidationError,
+    ResponseContract,
+    response_contract_for_usage,
+    validate_response,
 )
 from voltron.utils.logger import format_event, logger_llm as logger
 from voltron.configs import configs
@@ -337,16 +341,31 @@ class AsyncChater:
         return content_sha256(source), numbered_source_context(source, limit)
 
     @staticmethod
-    def _apply_python_delta(source: str, response: str | None) -> str:
-        evolved = apply_source_delta(source, parse_json_artifact(response))
-        ast.parse(evolved)
+    def _apply_python_delta(
+        source: str,
+        response: str | None,
+        required_function: str = '',
+    ) -> str:
+        validated = validate_response(
+            response,
+            ResponseContract(kind='source_delta'),
+        )
+        evolved = apply_source_delta(source, validated.parsed)
+        validate_response(
+            evolved,
+            ResponseContract(
+                kind='python',
+                required_function=required_function,
+                allow_markdown_fence=False,
+            ),
+        )
         return evolved
 
     async def chat_llm(
             self, 
             prompt: str,
             usage: str
-    ) -> str | None:
+    ) -> str:
         """Chat to llm with the prompt
 
         Args:
@@ -356,9 +375,12 @@ class AsyncChater:
         Returns:
             response of llm
         """
-        response = ''
-        
-        # try many time to avoid api error
+        contract = response_contract_for_usage(usage)
+        last_api_error: OpenAIError | None = None
+
+        # Transport retries remain separate from artifact validation. Invalid
+        # completed responses are returned to the caller as typed failures so
+        # the existing component repair/fallback budget stays authoritative.
         for _ in range(50):
             try:
                 start = time.perf_counter()
@@ -383,11 +405,54 @@ class AsyncChater:
                         request,
                         timeout=remaining_s,
                     )
-                if completion == None:
-                    logger.debug("Chat Error")
                 end = time.perf_counter()
-                
-                response = completion.choices[0].message.content
+
+                completion_usage = getattr(completion, 'usage', None)
+
+                def token_count(field: str) -> int:
+                    value = getattr(completion_usage, field, 0)
+                    return (
+                        value
+                        if isinstance(value, int) and not isinstance(value, bool)
+                        else 0
+                    )
+
+                prompt_tokens = token_count('prompt_tokens')
+                completion_tokens = token_count('completion_tokens')
+                total_tokens = token_count('total_tokens')
+                response = None
+                validation_error: LLMResponseValidationError | None = None
+                try:
+                    if completion is None:
+                        raise LLMResponseValidationError(
+                            'missing_completion',
+                            'provider returned null completion',
+                        )
+                    choices = getattr(completion, 'choices', None)
+                    if not isinstance(choices, (list, tuple)) or not choices:
+                        raise LLMResponseValidationError(
+                            'missing_choice',
+                            'completion contains no choices',
+                        )
+                    choice = choices[0]
+                    finish_reason = getattr(choice, 'finish_reason', None)
+                    message = getattr(choice, 'message', None)
+                    response = getattr(message, 'content', None)
+                    if finish_reason in {'length', 'max_tokens'}:
+                        raise LLMResponseValidationError(
+                            'truncated_response',
+                            str(finish_reason),
+                        )
+                    validated = validate_response(response, contract)
+                except LLMResponseValidationError as error:
+                    validation_error = error
+
+                response_text = response if isinstance(response, str) else ''
+                response_sha256 = (
+                    hashlib.sha256(response_text.encode('utf-8')).hexdigest()
+                    if response_text
+                    else ''
+                )
 
                 logger.debug(
                     '%s\nPROMPT\n%s\nRESPONSE\n%s',
@@ -397,9 +462,15 @@ class AsyncChater:
                         model=self.model,
                         duration_s=round(end - start, 3),
                         tokens=(
-                            completion.usage.total_tokens
-                            if completion.usage is not None
+                            total_tokens
+                            if completion_usage is not None
                             else None
+                        ),
+                        response_valid=validation_error is None,
+                        validation_reason=(
+                            validation_error.reason
+                            if validation_error is not None
+                            else ''
                         ),
                     ),
                     prompt,
@@ -407,40 +478,36 @@ class AsyncChater:
                 )
                 with analyzer.lock:
                     analyzer.chat_time_s += end - start
-                    if completion.usage != None:
-                        analyzer.chat_token += completion.usage.total_tokens
+                    if completion_usage is not None:
+                        analyzer.chat_token += total_tokens
                     analyzer.record_llm_usage(
                         duration_s=end - start,
-                        prompt_tokens=(
-                            getattr(completion.usage, 'prompt_tokens', 0)
-                            if completion.usage is not None
-                            else 0
-                        ),
-                        completion_tokens=(
-                            getattr(
-                                completion.usage,
-                                'completion_tokens',
-                                0
-                            )
-                            if completion.usage is not None
-                            else 0
-                        ),
-                        total_tokens=(
-                            getattr(completion.usage, 'total_tokens', 0)
-                            if completion.usage is not None
-                            else 0
-                        ),
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=total_tokens,
                         usage=usage,
                         model=self.model,
-                        tokens_reported=completion.usage is not None,
+                        tokens_reported=completion_usage is not None,
+                        response_valid=validation_error is None,
+                        validation_reason=(
+                            validation_error.reason
+                            if validation_error is not None
+                            else ''
+                        ),
+                        response_contract=contract.kind,
+                        response_chars=len(response_text),
+                        response_sha256=response_sha256,
                     )
-                break
+                if validation_error is not None:
+                    raise validation_error
+                return validated.normalized
             except asyncio.TimeoutError as exc:
                 self._stop_for_deadline()
                 raise LLMDeadlineExceeded(
                     'LLM request exceeded remaining fuzzing time'
                 ) from exc
             except OpenAIError as e:
+                last_api_error = e
                 remaining_s = self._remaining_fuzz_time_s()
                 if remaining_s is not None and remaining_s <= 0:
                     self._stop_for_deadline()
@@ -458,7 +525,12 @@ class AsyncChater:
                         error=str(e),
                     )
                 )
-        return response
+        if last_api_error is not None:
+            raise last_api_error
+        raise LLMResponseValidationError(
+            'missing_completion',
+            'provider returned no completion',
+        )
 
     def llm_query_rfc(
             self
@@ -500,7 +572,7 @@ class AsyncChater:
             prompt=pmp,
             usage = "ir_generation"
         )
-        return self.xml_extract(ans)
+        return self.xml_extract(ans, expected_message=message_name)
     
     async def llm_ir_repair(
             self,
@@ -544,13 +616,17 @@ class AsyncChater:
             section_context=self._compact_context(section_context),
             feedback=self._compact_context(feedback),
         )
-        ans = await self.chat_llm(
-            prompt=pmp,
-            usage="ir_evolve"
-        )
         try:
-            return apply_ir_delta(current_ir, parse_json_artifact(ans))
-        except IncrementalOutputError as error:
+            ans = await self.chat_llm(
+                prompt=pmp,
+                usage="ir_evolve"
+            )
+            validated = validate_response(
+                ans,
+                ResponseContract(kind='ir_delta'),
+            )
+            return apply_ir_delta(current_ir, validated.parsed)
+        except (IncrementalOutputError, LLMResponseValidationError) as error:
             logger.debug('LLM: invalid IR delta: %s', error)
             return ''
 
@@ -586,7 +662,7 @@ class AsyncChater:
             usage = "generator_gen"
         )
 
-        return self.code_extract(ans)
+        return self.code_extract(ans, required_function='generate')
 
     async def llm_code_repair(
             self,
@@ -605,7 +681,7 @@ class AsyncChater:
             prompt=pmp,
             usage='code_repair',
         )
-        return self.code_extract(ans)
+        return self.code_extract(ans, required_function=function_name)
         
     async def llm_generator_evolve(
             self,
@@ -651,7 +727,7 @@ class AsyncChater:
             usage = "generator_evolve"
         )
 
-        return self._apply_python_delta(code, ans)
+        return self._apply_python_delta(code, ans, 'generate')
     
     async def llm_parser_evolve(
             self,
@@ -687,7 +763,7 @@ class AsyncChater:
             usage = "parser_evolve"
         )
 
-        return self._apply_python_delta(old_code, ans)
+        return self._apply_python_delta(old_code, ans, 'packet_parser')
     
     async def llm_mutator_evolve(
             self,
@@ -734,7 +810,7 @@ class AsyncChater:
             usage = "mutator_evolve"
         )
 
-        return self._apply_python_delta(code, ans)
+        return self._apply_python_delta(code, ans, 'mutate')
         
     async def llm_parser_gen(
             self,
@@ -762,7 +838,7 @@ class AsyncChater:
             usage = "parser_gen"
         )
 
-        return self.code_extract(ans)
+        return self.code_extract(ans, required_function='packet_parser')
 
     async def llm_checker_gen(
             self,
@@ -786,7 +862,7 @@ class AsyncChater:
             usage="checker_gen"
         )
 
-        return self.code_extract(ans)
+        return self.code_extract(ans, required_function='packet_checker')
 
     async def llm_observer_gen(
             self,
@@ -807,7 +883,7 @@ class AsyncChater:
             prompt=pmp,
             usage="observer_gen",
         )
-        return self.code_extract(ans)
+        return self.code_extract(ans, required_function='packet_observer')
 
     async def llm_observer_evolve(
             self,
@@ -832,7 +908,11 @@ class AsyncChater:
             prompt=pmp,
             usage="observer_evolve",
         )
-        return self._apply_python_delta(original_code, ans)
+        return self._apply_python_delta(
+            original_code,
+            ans,
+            'packet_observer',
+        )
 
     async def llm_observer_semantic_compare(
             self,
@@ -855,7 +935,7 @@ class AsyncChater:
             prompt=pmp,
             usage="observer_semantic_compare",
         )
-        return self.json_extract(ans)
+        return self.json_extract(ans, schema='observer_semantic_compare')
 
     async def llm_checker_evolve(
             self,
@@ -881,7 +961,11 @@ class AsyncChater:
             prompt=pmp,
             usage="checker_evolve"
         )
-        return self._apply_python_delta(original_code, ans)
+        return self._apply_python_delta(
+            original_code,
+            ans,
+            'packet_checker',
+        )
     
     async def llm_request_query(
             self,
@@ -900,7 +984,7 @@ class AsyncChater:
             usage = "req_query"
         )
 
-        return pmp, self.json_extract(ans)
+        return pmp, self.json_extract(ans, schema='field_query')
     
     async def llm_response_query(
             self,
@@ -919,7 +1003,7 @@ class AsyncChater:
             usage = "res_query"
         )
 
-        return pmp, self.json_extract(ans)
+        return pmp, self.json_extract(ans, schema='field_query')
 
     async def llm_request_type_rules(
             self,
@@ -939,7 +1023,7 @@ class AsyncChater:
             prompt=pmp,
             usage="req_type_rules"
         )
-        return pmp, self.json_extract(ans)
+        return pmp, self.json_extract(ans, schema='request_type_rules')
 
     async def llm_response_type_rules(
             self,
@@ -959,7 +1043,7 @@ class AsyncChater:
             prompt=pmp,
             usage="res_type_rules"
         )
-        return pmp, self.json_extract(ans)
+        return pmp, self.json_extract(ans, schema='response_type_rules')
 
     async def llm_section_type_annotation(
             self,
@@ -985,7 +1069,10 @@ class AsyncChater:
             prompt=pmp,
             usage="section_type_annotation"
         )
-        return pmp, self.json_extract(ans)
+        return pmp, self.json_extract(
+            ans,
+            schema='section_type_annotation',
+        )
     
     async def llm_possible_res(
             self,
@@ -1006,7 +1093,7 @@ class AsyncChater:
             usage = "possible_res"
         )
 
-        return self.json_extract(ans)
+        return self.json_extract(ans, schema='possible_response')
     
     async def llm_infer_dependency(
             self,
@@ -1029,55 +1116,41 @@ class AsyncChater:
             usage = "infer_dependency"
         )
 
-        return self.json_extract(ans)
+        return self.json_extract(ans, schema='dependency')
     
     def code_extract(
             self,
-            ans
+            ans,
+            required_function: str = '',
     ) -> str:
-        pattern = re.compile(
-            r'```(?:python)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()[9:-4]
-            else:
-                return ans
-        return ""
+        return validate_response(
+            ans,
+            ResponseContract(
+                kind='python',
+                required_function=required_function,
+            ),
+        ).normalized
 
     def json_extract(
             self,
-            ans
+            ans,
+            schema: str = '',
     ) -> str:
-        pattern = re.compile(
-            r'```(?:json)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()[7:-4]
-            else:
-                return ans
-        return ""
+        return validate_response(
+            ans,
+            ResponseContract(kind='json', schema=schema),
+        ).normalized
 
     def xml_extract(
             self,
-            ans
+            ans,
+            expected_message: str = '',
     ) -> str:
-        pattern = re.compile(
-            r'```(?:xml)\s*\n(.*?)\n\s*```',
-            re.DOTALL | re.IGNORECASE
-        )
-
-        if ans != None:
-            match: Match | None = pattern.search(ans)
-            if match:
-                return match.group()[6:-4]
-            else:
-                return ans
-        return ""
+        return validate_response(
+            ans,
+            ResponseContract(
+                kind='xml',
+                allowed_xml_roots=frozenset({'message', 'ir'}),
+                expected_message=expected_message,
+            ),
+        ).normalized

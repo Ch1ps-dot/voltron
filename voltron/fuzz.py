@@ -271,6 +271,10 @@ class Fuzzer:
             512,
             int(generated_code.get('prompt_context_max_chars', 12_000)),
         )
+        configs.llm_response_max_chars = max(
+            1,
+            int(generated_code.get('response_max_chars', 100_000)),
+        )
         response_components = configs_yaml.get('response_components', {})
         lazy_generation = response_components.get('lazy_generation', True)
         if not isinstance(lazy_generation, bool):
