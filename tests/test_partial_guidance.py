@@ -38,17 +38,31 @@ def conversation(*steps: tuple[str, bytes, str, bytes]) -> Conversation:
     return result
 
 
-def test_input_output_scaled_threshold_reaches_after_two_no_growth_mqs():
+def test_input_output_scaled_threshold_reaches_after_four_no_growth_mqs():
     recorder = PartialTraceRecorder()
     threshold = ModelLearningThreshold(['PING'])
     trace = conversation(('PING', b'PING\r\n', 'PONG', b'PONG\r\n'))
 
     assert threshold.observe(recorder, recorder.observe(trace)) is False
-    assert threshold.threshold == 2
+    assert threshold.threshold == 4
+    assert threshold.observe(recorder, recorder.observe(trace)) is False
+    assert threshold.observe(recorder, recorder.observe(trace)) is False
     assert threshold.observe(recorder, recorder.observe(trace)) is False
     assert threshold.observe(recorder, recorder.observe(trace)) is True
-    assert threshold.no_growth_mq == 2
+    assert threshold.no_growth_mq == 4
     assert recorder.graph.seed_sequences() == [[('PING', b'PING\r\n')]]
+
+
+def test_input_output_scaled_threshold_uses_higher_large_alphabet_cap():
+    recorder = PartialTraceRecorder()
+    threshold = ModelLearningThreshold([f'REQ{i}' for i in range(48)])
+    recorder.graph.executed_symbols.update(threshold.alphabet)
+    recorder.graph.response_symbols.update(f'RES{i}' for i in range(22))
+
+    assert threshold.observe(recorder, pair_grew=False) is False
+    assert threshold.round_size == 48
+    assert threshold.rounds == 10
+    assert threshold.threshold == 480
 
 
 def test_partial_recorder_rejects_abnormal_conversations():
@@ -98,9 +112,16 @@ def test_real_observation_table_drains_before_threshold_partial_exit(
     )
     learner = MealyLstar(mq, EquOracle(mapper, Executor()), threading.Event())
 
+    # The initial six table cells are fully drained first.  With the higher
+    # conservative threshold, four further no-growth MQs are needed to mark
+    # the table as stalled.
+    mq.query(('A',))
+    mq.query(('B',))
+    mq.query(('A',))
+    mq.query(('B',))
     assert threshold.reached is True
-    # S={-}, E={A,B} requires six initial cells.  The threshold is reached
-    # during that fill, but the current fixed table is still fully drained.
+    # S={-}, E={A,B} requires six initial cells, which remain intact when the
+    # threshold is later reached.
     assert set(learner.table.T) == {('-',), ('-', 'A'), ('-', 'B')}
     assert all(len(row) == 2 for row in learner.table.T.values())
     with pytest.raises(ModelLearningThresholdReached):

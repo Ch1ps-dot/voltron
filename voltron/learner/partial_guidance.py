@@ -144,7 +144,12 @@ class ModelLearningThreshold:
         output_count = max(1, len(recorder.graph.response_symbols))
         pair_space = input_count * output_count
         self.round_size = max(input_count, math.ceil(math.sqrt(pair_space)))
-        self.rounds = min(6, max(2, math.ceil(math.log2(pair_space + 1))))
+        # Give a protocol several complete no-growth passes before treating
+        # the current table as drained.  The former 2..6 range was too eager
+        # for larger, stateful alphabets: it capped at six rounds even when
+        # the request/response space was still broad.  Keep the logarithmic
+        # scaling, but use a conservative 4..10 range.
+        self.rounds = min(10, max(4, math.ceil(math.log2(pair_space + 1))))
         self.threshold = self.round_size * self.rounds
 
         if pair_grew:
