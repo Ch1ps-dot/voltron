@@ -4,6 +4,10 @@ from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
 from voltron.synthesizer.checker import Checker
 from voltron.synthesizer.observer import ResponseObserver
+from voltron.synthesizer.component_paths import (
+    component_type_dir,
+    path_within,
+)
 from voltron.learner.automata import MealyMachine
 from voltron.analyzer.analyzer import analyzer
 from voltron.configs import configs
@@ -16,8 +20,6 @@ import traceback
 from voltron.utils.logger import logger_fuzz as logger
 from dataclasses import asdict, dataclass
 import threading
-from urllib.parse import quote
-
 from pathlib import Path
 
 
@@ -104,6 +106,7 @@ class Mapper:
             producer.observer_path,
         )
         self.ms_path = producer.mutator_path
+        self.best_gs_path = getattr(producer, 'best_generator_path', None)
         
         self.request_types: set[str] = producer.req_types
         self.response_types: set[str] = producer.res_types
@@ -141,7 +144,34 @@ class Mapper:
         self,
         g: Generator
     ) -> Path:
-        return self.gs_path / g.msg_type / f'{g.name}.py'
+        extra_roots = (
+            (self.best_gs_path,)
+            if isinstance(self.best_gs_path, Path)
+            else ()
+        )
+        return self._component_path(self.gs_path, g, *extra_roots)
+
+    @staticmethod
+    def _component_path(
+        root: Path,
+        component,
+        *extra_roots: Path,
+    ) -> Path:
+        typed_path = (
+            component_type_dir(root, component.msg_type)
+            / f'{component.name}.py'
+        )
+        if typed_path.is_file():
+            return typed_path
+        if component.path:
+            metadata_path = Path(component.path)
+            allowed_roots = (root, *extra_roots)
+            if (
+                any(path_within(item, metadata_path) for item in allowed_roots)
+                and metadata_path.is_file()
+            ):
+                return metadata_path
+        return typed_path
     
     def p_path(
         self,
@@ -153,38 +183,24 @@ class Mapper:
         self,
         checker: Checker
     ) -> Path:
-        typed_path = (
-            self.cs_path
-            / quote(checker.msg_type, safe='._-')
-            / f'{checker.name}.py'
-        )
-        if typed_path.is_file():
-            return typed_path
-        if checker.path:
-            return Path(checker.path)
-        return typed_path
+        return self._component_path(self.cs_path, checker)
 
     def o_path(
         self,
         observer: ResponseObserver
     ) -> Path:
-        typed_path = (
-            self.os_path
-            / quote(observer.msg_type, safe='._-')
+        path = self._component_path(
+            self.os_path,
+            observer,
+            self.legacy_os_path,
+        )
+        if path.is_file():
+            return path
+        legacy_path = (
+            component_type_dir(self.legacy_os_path, observer.msg_type)
             / f'{observer.name}.py'
         )
-        if typed_path.is_file():
-            return typed_path
-        legacy_typed_path = (
-            self.legacy_os_path
-            / quote(observer.msg_type, safe='._-')
-            / f'{observer.name}.py'
-        )
-        if legacy_typed_path.is_file():
-            return legacy_typed_path
-        if observer.path:
-            return Path(observer.path)
-        return typed_path
+        return legacy_path if legacy_path.is_file() else path
 
     def h_path(
         self,
@@ -197,7 +213,7 @@ class Mapper:
         self,
         m: Generator
     ) -> Path:
-        return self.ms_path / m.msg_type / f'{m.name}.py'
+        return self._component_path(self.ms_path, m)
         
     def equip_parser(
         self

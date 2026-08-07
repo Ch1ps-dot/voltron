@@ -11,6 +11,7 @@ from voltron.configs import configs
 from voltron.fuzz import Fuzzer
 from voltron.llm.chatter import AsyncChater, LLMDeadlineExceeded
 from voltron.synthesizer.synthesizer import AsyncProducer
+from voltron.learner.partial_guidance import PartialStateGraph, PartialTrace
 
 
 def test_llm_request_is_not_started_after_fuzz_deadline(monkeypatch):
@@ -113,3 +114,58 @@ def test_state_fuzz_does_not_start_berserker_after_model_timeout(
     fuzzer.state_fuzz(stop_event)
 
     assert stop_event.is_set()
+
+
+def test_state_fuzz_hands_deadline_partial_guidance_to_berserker(
+    tmp_path,
+    monkeypatch,
+):
+    stop_event = threading.Event()
+    graph = PartialStateGraph(fingerprint={'target': 'mock'})
+    graph.traces.append(
+        PartialTrace(
+            messages=(('PING', b'PING\r\n'),),
+            responses=('PONG',),
+        )
+    )
+    fuzzer = Fuzzer.__new__(Fuzzer)
+    fuzzer.stop_event = stop_event
+    fuzzer.state_learning = True
+    fuzzer.spec_knowledge = True
+    fuzzer.guided_scheduling = True
+    fuzzer.mapper = SimpleNamespace()
+    fuzzer.exe = object()
+    seen = {}
+
+    monkeypatch.setattr(configs, 'models_path', tmp_path, raising=False)
+    monkeypatch.setattr(fuzz_module, 'MembershipOracle', lambda **_kwargs: object())
+    monkeypatch.setattr(fuzz_module, 'EquOracle', lambda **_kwargs: object())
+    monkeypatch.setattr(
+        fuzzer,
+        'model_learning',
+        lambda *_args: setattr(fuzzer, 'partial_guidance', graph)
+        or stop_event.set()
+        or None,
+    )
+    monkeypatch.setattr(
+        fuzzer,
+        'berserker_fuzz',
+        lambda hypothesis, event, partial_guidance=None: seen.update(
+            hypothesis=hypothesis,
+            event=event,
+            partial_guidance=partial_guidance,
+        ),
+    )
+    monkeypatch.setattr(analyzer, 'begin_phase', lambda *_args: None)
+    monkeypatch.setattr(analyzer, 'end_phase', lambda *_args: None)
+    monkeypatch.setattr(
+        analyzer,
+        'record_generator_checkpoint',
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(analyzer, 'stop_reason', 'deadline', raising=False)
+
+    fuzzer.state_fuzz(stop_event)
+
+    assert seen['partial_guidance'] is graph
+    assert not stop_event.is_set()

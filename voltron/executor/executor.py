@@ -505,6 +505,8 @@ class Executor:
 
     def start_sut_for_interaction(
         self,
+        *,
+        stop_on_failure: bool = True,
     ) -> tuple[bool, subprocess.Popen | None]:
         """Start only the per-interaction SUT process."""
         if self.stop_event.is_set():
@@ -520,7 +522,8 @@ class Executor:
                 stage='sut-cleanup-failed',
                 detail='target port remained occupied after listener cleanup',
             )
-            self._request_stop('sut_failure')
+            if stop_on_failure:
+                self._request_stop('sut_failure')
             return False, None
 
         grace_s = max(0.01, min(0.5, self.setup_time_s))
@@ -534,7 +537,8 @@ class Executor:
                     attempt=attempt,
                     detail='run_exe returned no process',
                 )
-                self._request_stop('sut_failure')
+                if stop_on_failure:
+                    self._request_stop('sut_failure')
                 return False, None
             if self.stop_event.wait(grace_s):
                 self._terminate_process_group(proc, signal.SIGTERM, timeout=1)
@@ -550,7 +554,8 @@ class Executor:
             if attempt < 100:
                 self._wait_for_port_release(self.port)
 
-        self._request_stop('sut_failure')
+        if stop_on_failure:
+            self._request_stop('sut_failure')
         return False, proc
 
     def _wait_for_socket_readiness(
@@ -1086,34 +1091,57 @@ class Executor:
         self._interaction_index += 1
         self._prefetched_initial_response = None
 
-        started, proc = self.start_sut_for_interaction()
-        if not started:
-            return False, None
-        self._track_active_interaction(proc, None, remote_deployment)
-
-        sock = self._wait_for_socket_readiness(proc)
-        if sock is None:
+        retry_limit = max(
+            1,
+            int(getattr(configs, 'sut_interaction_retry_limit', 3)),
+        )
+        retry_delay_s = max(
+            0.0,
+            float(getattr(configs, 'sut_interaction_retry_delay_s', 0.1)),
+        )
+        proc = None
+        sock = None
+        for lifecycle_attempt in range(1, retry_limit + 1):
+            started, proc = self.start_sut_for_interaction(
+                stop_on_failure=False,
+            )
+            if started:
+                self._track_active_interaction(proc, None, remote_deployment)
+                sock = self._wait_for_socket_readiness(proc)
+            if sock is not None:
+                self._track_active_interaction(proc, sock, remote_deployment)
+                if self.run_subject_readiness(sock):
+                    break
+                if not remote_deployment:
+                    self._log_sut_start_failure(
+                        proc,
+                        stage=(
+                            self.last_readiness_result.stage
+                            if self.last_readiness_result is not None
+                            else 'protocol-readiness-failed'
+                        ),
+                        attempt=lifecycle_attempt,
+                        detail=(
+                            self.last_readiness_result.error
+                            if self.last_readiness_result is not None
+                            else 'protocol readiness hook failed'
+                        ),
+                    )
             self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
-            self._request_stop('sut_failure')
-            return False, None
-        self._track_active_interaction(proc, sock, remote_deployment)
-
-        if not self.run_subject_readiness(sock):
-            self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
-            if not remote_deployment:
-                self._log_sut_start_failure(
-                    proc,
-                    stage=(
-                        self.last_readiness_result.stage
-                        if self.last_readiness_result is not None
-                        else 'protocol-readiness-failed'
-                    ),
-                    detail=(
-                        self.last_readiness_result.error
-                        if self.last_readiness_result is not None
-                        else 'protocol readiness hook failed'
-                    ),
+            sock = None
+            if lifecycle_attempt < retry_limit and not self.stop_event.wait(
+                retry_delay_s
+            ):
+                logger.debug(
+                    'Executor: retrying transient SUT lifecycle failure '
+                    '[attempt=%s/%s]',
+                    lifecycle_attempt + 1,
+                    retry_limit,
                 )
+                continue
+            break
+
+        if sock is None:
             self._request_stop('sut_failure')
             return False, None
         

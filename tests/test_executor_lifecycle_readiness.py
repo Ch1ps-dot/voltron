@@ -157,6 +157,25 @@ def test_target_starts_once_per_interaction_without_restarting_setup(
     assert len(run_count) == 2
 
 
+def test_transient_port_cleanup_failure_can_be_retried_without_global_stop(
+    tmp_path,
+):
+    executor = make_executor(tmp_path)
+    executor.port = 2200
+    executor.kill_listeners = lambda _port: None
+    executor._wait_for_port_release = lambda _port: False
+    executor._log_sut_start_failure = lambda *_args, **_kwargs: None
+
+    started, proc = executor.start_sut_for_interaction(stop_on_failure=False)
+
+    assert started is False
+    assert proc is None
+    assert not executor.stop_event.is_set()
+
+    executor.start_sut_for_interaction()
+    assert executor.stop_event.is_set()
+
+
 def serve_once(handler):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

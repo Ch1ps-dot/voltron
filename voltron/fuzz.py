@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import base64
 import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, subprocess, json
 
 from voltron.executor.conversation import Conversation
@@ -40,6 +41,51 @@ from voltron.learner.partial_guidance import (
 
 class NoCoverageInputError(RuntimeError):
     """Coverage replay cannot proceed because no valid testcase exists."""
+
+
+def decode_parser_validation_samples(raw_samples) -> tuple[bytes, ...]:
+    """Decode bounded target-provided parser contract samples."""
+    if raw_samples is None:
+        return ()
+    if not isinstance(raw_samples, list):
+        raise TypeError('parser_validation_samples must be a list')
+    if len(raw_samples) > 32:
+        raise ValueError('parser_validation_samples cannot exceed 32 entries')
+
+    samples: list[bytes] = []
+    for item in raw_samples:
+        if isinstance(item, str):
+            sample = item.encode('utf-8')
+        elif isinstance(item, dict) and len(item) == 1:
+            encoding, value = next(iter(item.items()))
+            if not isinstance(value, str):
+                raise TypeError(
+                    'parser validation sample payload must be a string'
+                )
+            if encoding == 'text':
+                sample = value.encode('utf-8')
+            elif encoding == 'hex':
+                sample = bytes.fromhex(value)
+            elif encoding == 'base64':
+                sample = base64.b64decode(value, validate=True)
+            else:
+                raise ValueError(
+                    'parser validation sample encoding must be text, hex, '
+                    'or base64'
+                )
+        else:
+            raise TypeError(
+                'parser validation samples must be strings or one-key maps'
+            )
+        if not sample:
+            raise ValueError('parser validation samples must be non-empty')
+        if len(sample) > 64 * 1024:
+            raise ValueError(
+                'one parser validation sample exceeds 65536 bytes'
+            )
+        if sample not in samples:
+            samples.append(sample)
+    return tuple(samples)
 
 def exit_handler():
     for thread in threading.enumerate():
@@ -115,6 +161,9 @@ class Fuzzer:
         configs.monitor = configs_yaml[self.target_name].get('monitor', {})
         executor_config = configs_yaml.get('executor', {})
         target_config = configs_yaml[self.target_name]
+        configs.parser_validation_samples = decode_parser_validation_samples(
+            target_config.get('parser_validation_samples', [])
+        )
         configs.setup_timeout_s = max(
             0.1,
             float(target_config.get(
@@ -588,8 +637,27 @@ class Fuzzer:
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
             if stop_event.is_set():
-                logger.debug('Fuzzer: model learning stopped at timeout')
-                return
+                # A learning deadline is not a target or component failure.
+                # If the learner saved usable partial traces, hand them to the
+                # normal scheduler and start its fuzzing clock at this phase
+                # boundary.  Other stop reasons remain terminal.
+                partial = getattr(self, 'partial_guidance', None)
+                if (
+                    getattr(analyzer, 'stop_reason', None) == 'deadline'
+                    and partial is not None
+                    and partial.seed_sequences()
+                ):
+                    logger.debug(
+                        'Fuzzer: continuing from deadline-limited model '
+                        'learning with partial guidance'
+                    )
+                    stop_event.clear()
+                    with analyzer.lock:
+                        analyzer.stop_reason = None
+                        analyzer.start_time = time.time()
+                else:
+                    logger.debug('Fuzzer: model learning stopped at timeout')
+                    return
             self.berserker_fuzz(
                 hypothesis,
                 stop_event,
@@ -923,10 +991,22 @@ class Fuzzer:
                 best_hypothesis = h_lsit[-1] if h_lsit else None
                 with analyzer.lock:
                     analyzer.stage = 'fuzzer evolve'
-                evolved_types = self._evolve_after_learning_threshold(
-                    best_hypothesis,
-                    self.partial_guidance,
-                )
+                try:
+                    evolved_types = self._evolve_after_learning_threshold(
+                        best_hypothesis,
+                        self.partial_guidance,
+                    )
+                except LLMDeadlineExceeded:
+                    # This call occurs inside the threshold handler, so the
+                    # outer LLMDeadlineExceeded clause below cannot catch it.
+                    # Preserve the H/partial just captured and let
+                    # state_fuzz transfer it to the scheduler.
+                    logger.debug(
+                        'Fuzzer: threshold component evolution reached '
+                        'the learning deadline'
+                    )
+                    self._request_stop('deadline')
+                    break
                 analyzer.record_generator_checkpoint(
                     phase='model_learning',
                     checkpoint_type='threshold_relearn_evolve',
@@ -948,7 +1028,21 @@ class Fuzzer:
                 break
             except ModelLearningStopped:
                 logger.debug('Fuzzer: model learning stopped')
-                if getattr(analyzer, 'stop_reason', None) is None:
+                if getattr(analyzer, 'stop_reason', None) == 'deadline':
+                    # A deadline can interrupt a table before the no-growth
+                    # threshold is reached.  Its successful MQ traces are
+                    # still safe partial guidance and must not be discarded.
+                    table = getattr(ml, 'table', None)
+                    recorder = getattr(mq, 'trace_recorder', None)
+                    if table is not None and recorder is not None:
+                        self.partial_guidance = self._save_partial_guidance(
+                            mq,
+                            table,
+                            reason='deadline_partial',
+                            iteration=int(cur_id),
+                        )
+                        self.learning_outcome = 'deadline_partial'
+                elif getattr(analyzer, 'stop_reason', None) is None:
                     self._request_stop('model_learning_failure')
                 break
             except Exception as error:

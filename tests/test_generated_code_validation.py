@@ -69,6 +69,56 @@ def test_checker_validation_isolates_timeout_and_requires_boolean():
     assert valid.ok
 
 
+def test_parser_base_probes_may_be_unclassified():
+    parser = '''def packet_parser(response: bytes) -> bytes:
+    if response.startswith(b"220"):
+        return b"220"
+    return b""
+'''
+    assert validate_generated_code(
+        parser,
+        'packet_parser',
+        'parser',
+        timeout_s=1,
+    ).ok
+
+
+def test_parser_requires_nonempty_only_for_explicit_runtime_samples():
+    parser = '''def packet_parser(response: bytes) -> bytes:
+    if response.startswith(b"220"):
+        return b"220"
+    return b""
+'''
+    valid = validate_generated_code(
+        parser,
+        'packet_parser',
+        'parser',
+        timeout_s=1,
+        runtime_samples=(b'220 service ready\r\n',),
+        require_nonempty_samples=True,
+    )
+    invalid = validate_generated_code(
+        parser,
+        'packet_parser',
+        'parser',
+        timeout_s=1,
+        runtime_samples=(b'unclassified real response',),
+        require_nonempty_samples=True,
+    )
+    permissive = validate_generated_code(
+        parser,
+        'packet_parser',
+        'parser',
+        timeout_s=1,
+        runtime_samples=(b'unclassified real response',),
+        require_nonempty_samples=False,
+    )
+
+    assert valid.ok
+    assert 'could not classify runtime sample' in invalid.error
+    assert permissive.ok
+
+
 def test_observer_evolution_validation_requires_samples_to_converge():
     distinct = '''import hashlib
 def packet_observer(response: bytes) -> str:

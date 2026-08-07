@@ -176,11 +176,6 @@ def _validation_worker(
                     raise ValueError(
                         f'output_too_large: {len(result)} > {max_output_bytes}'
                     )
-                if index > 0 and not result:
-                    raise ValueError(
-                        'empty_result: parser could not classify a '
-                        'non-empty validation sample'
-                    )
                 if (
                     require_nonempty_samples
                     and index >= len(base_probes)

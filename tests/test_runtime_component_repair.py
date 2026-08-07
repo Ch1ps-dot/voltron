@@ -107,15 +107,17 @@ def test_parser_runtime_failure_degrades_to_unknown_after_repair_exhaustion():
     assert executor.parser_fallback_count == 1
 
 
-def test_parser_validation_rejects_empty_nonempty_probe():
+def test_parser_validation_rejects_empty_explicit_runtime_sample():
     result = validate_generated_code(
         "def packet_parser(_response):\n    return b''\n",
         "packet_parser",
         "parser",
+        runtime_samples=(b"220 service ready\r\n",),
+        require_nonempty_samples=True,
     )
 
     assert result.ok is False
-    assert "non-empty validation sample" in result.error
+    assert "could not classify runtime sample" in result.error
 
 
 def test_runtime_repair_is_deduplicated_and_records_artifacts(

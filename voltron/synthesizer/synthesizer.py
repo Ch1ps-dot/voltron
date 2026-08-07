@@ -4,7 +4,6 @@ from tqdm import tqdm
 import json, asyncio, hashlib, threading, time, queue, re
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
-from urllib.parse import quote
 
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.parser import Parser
@@ -13,6 +12,11 @@ from voltron.synthesizer.observer import ResponseObserver
 from voltron.synthesizer.code_validation import (
     RAW_SHA256_OBSERVER,
     validate_generated_code,
+)
+from voltron.synthesizer.component_paths import (
+    component_type_dir,
+    path_within,
+    type_to_slug,
 )
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.utils.logger import logger_fuzz as logger
@@ -83,6 +87,10 @@ class AsyncProducer:
             self.legacy_observer_path / 'hasher_info.json'
         )
         self.mutator_info_path = self.mutator_path / 'mutator_info.json'
+        self.type_path_map_path = self.synthesizer_path / 'type_path_map.json'
+        self._type_path_map_lock = threading.RLock()
+        self._type_path_map: dict[str, str] = {}
+        self._type_path_map_loaded = False
         self.generation_manifest_path = (
             configs.results_path / 'generation_manifest.jsonl'
         )
@@ -253,6 +261,87 @@ class AsyncProducer:
             }
             self.mutators = {}
 
+    def _ensure_type_path_map(self, root: Path) -> None:
+        if not hasattr(self, '_type_path_map_lock'):
+            self._type_path_map_lock = threading.RLock()
+        if not hasattr(self, '_type_path_map'):
+            self._type_path_map = {}
+        if getattr(self, '_type_path_map_loaded', False):
+            return
+        path = getattr(
+            self,
+            'type_path_map_path',
+            root.parent / 'type_path_map.json',
+        )
+        self.type_path_map_path = path
+        if path.is_file():
+            try:
+                payload = json.loads(path.read_text(encoding='utf-8'))
+                mappings = payload.get('types', {})
+                if isinstance(mappings, dict):
+                    self._type_path_map = {
+                        str(name): str(slug)
+                        for name, slug in mappings.items()
+                    }
+            except (OSError, ValueError, TypeError):
+                logger.warning(
+                    'Producer: ignoring invalid type path map at %s',
+                    path,
+                )
+        self._type_path_map_loaded = True
+
+    def _record_type_path(self, root: Path, type_name: str) -> str:
+        """Record the display-name to filesystem-name mapping atomically."""
+        slug = type_to_slug(type_name)
+        self._ensure_type_path_map(root)
+        with self._type_path_map_lock:
+            for known_type, known_slug in self._type_path_map.items():
+                if known_slug == slug and known_type != type_name:
+                    raise ValueError(
+                        'component type path collision: '
+                        f'{type_name!r} and {known_type!r} -> {slug!r}'
+                    )
+            if self._type_path_map.get(type_name) != slug:
+                self._type_path_map[type_name] = slug
+                self._atomic_write_json(
+                    self.type_path_map_path,
+                    {
+                        'version': 1,
+                        'encoding': 'percent-encoded UTF-8 with digest suffix',
+                        'types': dict(sorted(self._type_path_map.items())),
+                    },
+                )
+        return slug
+
+    def _component_type_dir(
+        self,
+        root: Path,
+        type_name: str,
+        *,
+        record: bool = True,
+    ) -> Path:
+        if record:
+            self._record_type_path(root, type_name)
+        return component_type_dir(root, type_name)
+
+    def _component_source_path(
+        self,
+        root: Path,
+        component: Generator | Checker | ResponseObserver,
+    ) -> Path:
+        """Resolve cached source without accepting paths outside its root."""
+        typed_path = (
+            self._component_type_dir(root, component.msg_type, record=False)
+            / f'{component.name}.py'
+        )
+        if typed_path.is_file():
+            return typed_path
+        if component.path:
+            metadata_path = Path(component.path)
+            if path_within(root, metadata_path) and metadata_path.is_file():
+                return metadata_path
+        return typed_path
+
     def capture_current_equipment(
         self,
         parser: Parser | None = None,
@@ -277,16 +366,13 @@ class AsyncProducer:
         saved_generators: dict[str, Generator] = {}
 
         for msg_type, generator in generators.items():
-            source_path = Path(generator.path)
-            if not source_path.is_file():
-                source_path = (
-                    self.generator_path
-                    / msg_type
-                    / f'{generator.name}.py'
-                )
+            source_path = self._component_source_path(
+                self.generator_path,
+                generator,
+            )
             snapshot_path = (
                 self.best_generator_path
-                / f'{quote(msg_type, safe="._-")}.py'
+                / f'{type_to_slug(msg_type)}.py'
             )
             snapshot_path.write_text(
                 source_path.read_text(encoding='utf-8'),
@@ -454,14 +540,10 @@ class AsyncProducer:
                 invalid_types.append(response_type)
                 continue
             observer = versions[-1]
-            path = Path(observer.path)
-            typed_path = (
-                self.observer_path
-                / quote(response_type, safe='._-')
-                / f'{observer.name}.py'
+            path = self._component_source_path(
+                self.observer_path,
+                observer,
             )
-            if typed_path.is_file():
-                path = typed_path
             if not path.is_file():
                 invalid_types.append(response_type)
                 continue
@@ -490,7 +572,10 @@ class AsyncProducer:
         filtered: dict[str, list[Generator]] = {}
         for msg_type, versions in self.mutators.items():
             for mutator in reversed(versions):
-                path = self.mutator_path / msg_type / f'{mutator.name}.py'
+                path = self._component_source_path(
+                    self.mutator_path,
+                    mutator,
+                )
                 if not path.is_file() and mutator.path:
                     path = Path(mutator.path)
                 if not path.is_file():
@@ -519,7 +604,10 @@ class AsyncProducer:
         filtered: dict[str, list[Generator]] = {}
         for msg_type, versions in self.generators.items():
             for generator in versions:
-                path = self.generator_path / msg_type / f'{generator.name}.py'
+                path = self._component_source_path(
+                    self.generator_path,
+                    generator,
+                )
                 if not path.is_file() and generator.path:
                     path = Path(generator.path)
                 if not path.is_file():
@@ -646,7 +734,24 @@ class AsyncProducer:
             elif isinstance(result, Exception):
                 failed[msg_type] = f'{type(result).__name__}: {result}'
             else:
-                self._save_initial_generator(*result)
+                try:
+                    self._save_initial_generator(*result)
+                except Exception as error:
+                    failure = f'{type(error).__name__}: {error}'
+                    failed[msg_type] = failure
+                    self._record_generation(
+                        'generator',
+                        msg_type,
+                        'save_failed',
+                        0,
+                        result[1],
+                        failure,
+                    )
+                    logger.exception(
+                        'Producer: failed to save generator for %s',
+                        msg_type,
+                    )
+                    continue
                 generated.append(result)
 
         if deadline_error is not None:
@@ -659,7 +764,7 @@ class AsyncProducer:
         input_code: str,
     ) -> None:
         """Persist each validated initial generator as soon as it succeeds."""
-        msg_dir = self.generator_path / msg_type
+        msg_dir = self._component_type_dir(self.generator_path, msg_type)
         msg_dir.mkdir(parents=True, exist_ok=True)
         init_gen_path = msg_dir / 'id0.py'
         init_gen_path.write_text(input_code, encoding='utf-8')
@@ -758,7 +863,10 @@ class AsyncProducer:
 
         old_generator = generator_versions[-1]
         old_g_name = old_generator.name
-        old_g_path = self.generator_path / msg_type / f'{old_g_name}.py'
+        old_g_path = self._component_source_path(
+            self.generator_path,
+            old_generator,
+        )
         if not old_g_path.is_file():
             logger.error(
                 'Producer: skipping generator evolution for %s: '
@@ -787,10 +895,9 @@ class AsyncProducer:
                     )
                     continue
                 dependency_generator = dependency_generators[-1]
-                code_dep_path = (
-                    self.generator_path
-                    / last_req
-                    / f'{dependency_generator.name}.py'
+                code_dep_path = self._component_source_path(
+                    self.generator_path,
+                    dependency_generator,
                 )
                 if not code_dep_path.is_file():
                     logger.debug(
@@ -912,7 +1019,10 @@ class AsyncProducer:
             if result is None:
                 continue
             msg_type, input_code = result
-            msg_dir = self.generator_path / f'{msg_type}'
+            msg_dir = self._component_type_dir(
+                self.generator_path,
+                msg_type,
+            )
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
 
@@ -1203,7 +1313,10 @@ class AsyncProducer:
             if result is None:
                 continue
             msg_type, mutate_code = result
-            msg_dir = self.mutator_path / f'{msg_type}'
+            msg_dir = self._component_type_dir(
+                self.mutator_path,
+                msg_type,
+            )
             if not msg_dir.is_dir():
                 msg_dir.mkdir()
             
@@ -1241,6 +1354,7 @@ class AsyncProducer:
     ):
         res_info = self._primary_response_field_info()
         type_rules = self._response_type_rules_info()
+        runtime_samples = self._parser_validation_samples()
         failed_code: str | None = None
         failure_error = ''
         retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
@@ -1265,9 +1379,16 @@ class AsyncProducer:
                     'packet_parser',
                     'parser',
                     timeout_s=self._generated_code_timeout(),
+                    runtime_samples=runtime_samples,
+                    require_nonempty_samples=bool(runtime_samples),
                 )
                 if not validation.ok:
-                    raise ValueError(validation.error)
+                    raise ValueError(
+                        self._parser_validation_failure(
+                            validation.error,
+                            runtime_samples,
+                        )
+                    )
                 self._record_generation(
                     'parser', '__all__',
                     'generated' if failure_count == 0 else 'repaired',
@@ -1422,7 +1543,10 @@ class AsyncProducer:
                 msg_type, checker_code = result
                 if self.checkers.get(msg_type):
                     continue
-                msg_dir = self.checker_path / quote(msg_type, safe='._-')
+                msg_dir = self._component_type_dir(
+                    self.checker_path,
+                    msg_type,
+                )
                 msg_dir.mkdir(parents=True, exist_ok=True)
                 checker_path = msg_dir / 'id0.py'
                 with open(checker_path, 'w', encoding='utf-8') as f:
@@ -1574,7 +1698,10 @@ class AsyncProducer:
                 msg_type, observer_code = result
                 if self.observers.get(msg_type):
                     continue
-                msg_dir = self.observer_path / quote(msg_type, safe='._-')
+                msg_dir = self._component_type_dir(
+                    self.observer_path,
+                    msg_type,
+                )
                 msg_dir.mkdir(parents=True, exist_ok=True)
                 observer_path = msg_dir / 'id0.py'
                 with observer_path.open('w', encoding='utf-8') as f:
@@ -1611,14 +1738,10 @@ class AsyncProducer:
             )
             return None
         current = versions[-1]
-        typed_path = (
-            self.observer_path
-            / quote(response_type, safe='._-')
-            / f'{current.name}.py'
+        current_path = self._component_source_path(
+            self.observer_path,
+            current,
         )
-        current_path = typed_path
-        if not current_path.is_file() and current.path:
-            current_path = Path(current.path)
         if not current_path.is_file():
             logger.debug(
                 f'Producer: observer source missing for evolution {current_path}'
@@ -1653,7 +1776,10 @@ class AsyncProducer:
             if observer.name.startswith('id') and observer.name[2:].isdigit()
         ]
         name = f'id{max(numeric_ids, default=-1) + 1}'
-        target_dir = self.observer_path / quote(response_type, safe='._-')
+        target_dir = self._component_type_dir(
+            self.observer_path,
+            response_type,
+        )
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / f'{name}.py'
         with target_path.open('w', encoding='utf-8') as f:
@@ -1889,14 +2015,10 @@ class AsyncProducer:
             return None
 
         current = versions[-1]
-        typed_checker_path = (
-            self.checker_path
-            / quote(checker_type, safe='._-')
-            / f'{current.name}.py'
+        checker_path = self._component_source_path(
+            self.checker_path,
+            current,
         )
-        checker_path = typed_checker_path
-        if not checker_path.is_file() and current.path:
-            checker_path = Path(current.path)
         if not checker_path.is_file():
             logger.debug(
                 f'Producer: checker source missing for evolution {checker_path}'
@@ -1923,7 +2045,10 @@ class AsyncProducer:
             if checker.name.startswith('id') and checker.name[2:].isdigit()
         ]
         name = f'id{max(numeric_ids, default=-1) + 1}'
-        target_dir = self.checker_path / quote(checker_type, safe='._-')
+        target_dir = self._component_type_dir(
+            self.checker_path,
+            checker_type,
+        )
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / f'{name}.py'
         with target_path.open('w', encoding='utf-8') as f:
@@ -2586,7 +2711,12 @@ class AsyncProducer:
                     require_nonempty_samples=True,
                 )
                 if not validation.ok:
-                    raise ValueError(validation.error)
+                    raise ValueError(
+                        self._parser_validation_failure(
+                            validation.error,
+                            (message,),
+                        )
+                    )
                 self._record_generation(
                     'parser_evolution', '__all__',
                     'generated' if failure_count == 0 else 'repaired',
@@ -2680,6 +2810,35 @@ class AsyncProducer:
             return json.dumps(rules)
         return '{}'
 
+    @staticmethod
+    def _parser_validation_samples() -> tuple[bytes, ...]:
+        samples = getattr(configs, 'parser_validation_samples', ())
+        if not isinstance(samples, (list, tuple)):
+            return ()
+        return tuple(
+            sample
+            for sample in samples
+            if isinstance(sample, bytes) and sample
+        )
+
+    def _parser_validation_failure(
+        self,
+        error: str,
+        samples: tuple[bytes, ...],
+    ) -> str:
+        if not samples:
+            return error
+        field = self._primary_response_field_name()
+        summaries = ', '.join(
+            f'len={len(sample)} hex={sample[:96].hex()}'
+            for sample in samples[:8]
+        )
+        return (
+            f'{error}\nExpected non-empty bytes classification for real '
+            f'protocol samples using response field {field!r}. '
+            f'Failing validation samples: {summaries}'
+        )
+
     def _parser_cache_matches_primary_field(
         self
     ) -> bool:
@@ -2769,7 +2928,10 @@ class AsyncProducer:
                 versions = collection.setdefault(component_type, [])
                 old_name = versions[-1].name if versions else 'init'
                 name = f'id{len(versions)}'
-                path = root / component_type / f'{name}.py'
+                path = (
+                    self._component_type_dir(root, component_type)
+                    / f'{name}.py'
+                )
                 self._atomic_write_text(path, code)
                 metadata = Generator(
                     msg_type=component_type,
@@ -2796,8 +2958,10 @@ class AsyncProducer:
                 old_name = versions[-1].name if versions else 'init'
                 name = f'id{len(versions)}'
                 path = (
-                    self.checker_path
-                    / quote(component_type, safe='._-')
+                    self._component_type_dir(
+                        self.checker_path,
+                        component_type,
+                    )
                     / f'{name}.py'
                 )
                 self._atomic_write_text(path, code)
@@ -2824,8 +2988,10 @@ class AsyncProducer:
                 old_name = versions[-1].name if versions else 'init'
                 name = f'id{len(versions)}'
                 path = (
-                    self.observer_path
-                    / quote(component_type, safe='._-')
+                    self._component_type_dir(
+                        self.observer_path,
+                        component_type,
+                    )
                     / f'{name}.py'
                 )
                 self._atomic_write_text(path, code)
@@ -2865,7 +3031,14 @@ class AsyncProducer:
             'observer': 'packet_observer',
         }[component]
         failed_code = source_code
-        failure_error = error
+        runtime_samples = (
+            (runtime_input,) if runtime_input is not None else ()
+        )
+        failure_error = (
+            self._parser_validation_failure(error, runtime_samples)
+            if component == 'parser'
+            else error
+        )
         retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
         for attempt in range(1, retry_limit + 1):
             candidate: str | None = None
@@ -2874,9 +3047,6 @@ class AsyncProducer:
                     code=failed_code,
                     error=failure_error,
                     function_name=function_name,
-                )
-                runtime_samples = (
-                    (runtime_input,) if runtime_input is not None else ()
                 )
                 validation = validate_generated_code(
                     candidate,
@@ -2889,7 +3059,13 @@ class AsyncProducer:
                     require_nonempty_samples=(component == 'parser'),
                 )
                 if not validation.ok:
-                    raise ValueError(validation.error)
+                    validation_error = validation.error
+                    if component == 'parser':
+                        validation_error = self._parser_validation_failure(
+                            validation_error,
+                            runtime_samples,
+                        )
+                    raise ValueError(validation_error)
                 metadata = self._publish_runtime_component(
                     component,
                     component_type,

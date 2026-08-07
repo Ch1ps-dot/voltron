@@ -31,6 +31,7 @@ class Config:
         self.generation_retry_limit: int = 3
         self.generated_code_timeout_s: float = 2.0
         self.generated_message_max_bytes: int = 1024 * 1024
+        self.parser_validation_samples: tuple[bytes, ...] = ()
         # Bound variable RFC/IR/code context inserted into LLM prompts.  The
         # prompt template and its instructions are preserved in full.
         self.prompt_context_max_chars: int = 12_000
@@ -47,6 +48,14 @@ class Config:
         # learning attempts before falling back to partial guidance.
         self.threshold_relearn_limit: int = 3
         self.bootstrap_partial_evolution: bool = True
+        # Empty membership-query outputs are commonly transient around a SUT
+        # restart.  Retry them locally before declaring model learning failed.
+        self.model_learning_empty_response_retries: int = 3
+        # A complete interaction startup/readiness attempt can also race a
+        # freshly restarted local target.  These retries are per interaction,
+        # not additional experiment rounds.
+        self.sut_interaction_retry_limit: int = 3
+        self.sut_interaction_retry_delay_s: float = 0.1
         
         self.target_name: str
         self.trans_layer: str

@@ -64,6 +64,37 @@ class ObTable:
         else:
             self.stop_event.set()
         raise ModelLearningStopped(reason)
+
+    def _query_with_empty_retry(
+        self,
+        word: tuple[str, ...],
+    ) -> list[str] | None:
+        """Retry a transient empty membership-query result before failing.
+
+        A target restart or a short receive race can produce an empty
+        conversation even though the next identical query is valid.  Do not
+        turn one such result into a process-wide stop event.
+        """
+        attempts = max(
+            1,
+            int(getattr(configs, 'model_learning_empty_response_retries', 3)),
+        )
+        for attempt in range(1, attempts + 1):
+            if self.stop_event.is_set():
+                return None
+            output = self.mq.query(word)
+            if output:
+                return output
+            if attempt < attempts:
+                logger.debug(
+                    'fill table: empty output; retrying query %s (%s/%s)',
+                    word,
+                    attempt,
+                    attempts,
+                )
+                if self.stop_event.wait(0.05):
+                    return None
+        return None
         
     def table_init(self):
         self._fill_table()
@@ -108,7 +139,7 @@ class ObTable:
                         self.T[s][e] = ('POLLERR',)
                         continue
                                     
-                    out = self.mq.query(s + e)
+                    out = self._query_with_empty_retry(s + e)
                     
                     if (out):
                         if len(s) > 0:
@@ -172,7 +203,7 @@ class ObTable:
                         try_times = 3
                         out = []
                         while True:
-                            out = self.mq.query(si + e)
+                            out = self._query_with_empty_retry(si + e)
                             if (out):
                                 # sometimes the randomness of server will cause timeout
                                 # when output is inconsistent with previous results, just try again

@@ -9,10 +9,12 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.configs import configs
 from voltron.executor.conversation import Conversation
 from voltron.fuzz import Fuzzer
+from voltron.llm.chatter import LLMDeadlineExceeded
 from voltron.learner.equ_oracle import EquOracle
 from voltron.learner.mem_oracle import MembershipOracle
 from voltron.learner.mlstar import (
     MealyLstar,
+    ModelLearningStopped,
     ModelLearningThresholdReached,
 )
 from voltron.learner.automata import MealyMachine
@@ -417,6 +419,58 @@ def test_threshold_relearning_exhausts_only_after_configured_retries(
     assert fuzzer.producer.partial_calls == 2
     assert analyzer.iter == 3
     assert fuzzer.learning_outcome == 'partial_after_retry_exhausted'
+
+
+def test_threshold_evolution_deadline_is_not_model_learning_failure(
+    tmp_path,
+    monkeypatch,
+):
+    table = SimpleNamespace(S={('-',)}, E={('PING',)}, T={})
+
+    class Learner:
+        def __init__(self, *_args):
+            pass
+
+        def run(self, _model_id):
+            raise ModelLearningThresholdReached(table)
+
+    class Producer:
+        def generator_evo_from_partial(self, _partial):
+            raise LLMDeadlineExceeded('deadline')
+
+    monkeypatch.setattr('voltron.fuzz.MealyLstar', Learner)
+    fuzzer = _prepare_relearning_fuzzer(tmp_path, monkeypatch)
+    fuzzer.producer = Producer()
+    monkeypatch.setattr(analyzer, 'stop_reason', None, raising=False)
+
+    assert fuzzer.model_learning(_threshold_mq(0), object(), fuzzer.stop_event) is None
+    assert fuzzer.stop_event.is_set()
+    assert analyzer.stop_reason == 'deadline'
+
+
+def test_learning_deadline_persists_partial_before_threshold(
+    tmp_path,
+    monkeypatch,
+):
+    table = SimpleNamespace(S={('-',)}, E={('PING',)}, T={})
+
+    class Learner:
+        def __init__(self, *_args):
+            self.table = table
+
+        def run(self, _model_id):
+            analyzer.request_stop('deadline', fuzzer.stop_event)
+            raise ModelLearningStopped('deadline')
+
+    monkeypatch.setattr('voltron.fuzz.MealyLstar', Learner)
+    fuzzer = _prepare_relearning_fuzzer(tmp_path, monkeypatch)
+    monkeypatch.setattr(analyzer, 'stop_reason', None, raising=False)
+    initial_mq = _threshold_mq(0)
+
+    assert fuzzer.model_learning(initial_mq, object(), fuzzer.stop_event) is None
+    assert fuzzer.learning_outcome == 'deadline_partial'
+    assert fuzzer.partial_guidance.reason == 'deadline_partial'
+    assert fuzzer.partial_guidance.seed_sequences()
 
 
 def test_partial_generator_evolution_uses_sparse_types_without_fake_h(
