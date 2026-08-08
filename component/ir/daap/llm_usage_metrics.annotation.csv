@@ -1,2 +1,0 @@
-usage,model,llm_calls,token_reported_calls,chat_time_s,prompt_tokens,completion_tokens,total_tokens,avg_prompt_tokens,avg_completion_tokens,avg_total_tokens,max_prompt_tokens,max_completion_tokens,max_total_tokens,valid_responses,invalid_responses,empty_responses,schema_failures,truncated_responses,discarded_completion_tokens
-doc_parse,deepseek-v4-flash,462,462,1130.826174,290918,77649,368567,629.693,168.071,797.764,4310,2409,4656,270,192,177,15,0,23500

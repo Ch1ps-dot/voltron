@@ -1,2 +1,10 @@
 usage,model,llm_calls,token_reported_calls,chat_time_s,prompt_tokens,completion_tokens,total_tokens,avg_prompt_tokens,avg_completion_tokens,avg_total_tokens,max_prompt_tokens,max_completion_tokens,max_total_tokens,valid_responses,invalid_responses,empty_responses,schema_failures,truncated_responses,discarded_completion_tokens
-ir_generation,deepseek-v4-flash,2,2,320.500259,6031,36416,42447,3015.500,18208.000,21223.500,3016,19269,22284,2,0,0,0,0,0
+infer_dependency,deepseek-v4-flash,81,81,3129.230371,255355,384265,639620,3152.531,4744.012,7896.543,3448,30276,33354,81,0,0,0,0,0
+ir_generation,deepseek-v4-flash,10,10,1820.989021,31517,244433,275950,3151.700,24443.300,27595.000,3480,36460,39654,10,0,0,0,0,0
+ir_repair,deepseek-v4-flash,1,1,187.357434,439,23956,24395,439.000,23956.000,24395.000,439,23956,24395,1,0,0,0,0,0
+possible_res,deepseek-v4-flash,9,9,140.541327,27734,16114,43848,3081.556,1790.444,4872.000,3260,5729,8793,9,0,0,0,0,0
+req_query,deepseek-v4-flash,1,1,134.780975,3198,17553,20751,3198.000,17553.000,20751.000,3198,17553,20751,1,0,0,0,0,0
+req_type_rules,deepseek-v4-flash,1,1,66.250231,3392,9149,12541,3392.000,9149.000,12541.000,3392,9149,12541,1,0,0,0,0,0
+res_query,deepseek-v4-flash,1,1,168.320976,3439,22658,26097,3439.000,22658.000,26097.000,3439,22658,26097,1,0,0,0,0,0
+res_type_rules,deepseek-v4-flash,1,1,139.040913,3710,17920,21630,3710.000,17920.000,21630.000,3710,17920,21630,1,0,0,0,0,0
+section_type_annotation,deepseek-v4-flash,220,220,1870.511717,156580,191896,348476,711.727,872.255,1583.982,4330,3559,5568,184,36,0,36,0,20036

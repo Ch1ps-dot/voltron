@@ -1,6 +1,0 @@
-usage,model,llm_calls,token_reported_calls,chat_time_s,prompt_tokens,completion_tokens,total_tokens,avg_prompt_tokens,avg_completion_tokens,avg_total_tokens,max_prompt_tokens,max_completion_tokens,max_total_tokens,valid_responses,invalid_responses,empty_responses,schema_failures,truncated_responses,discarded_completion_tokens
-req_query,deepseek-v4-flash,1,1,282.913025,3743,31925,35668,3743.000,31925.000,35668.000,3743,31925,35668,1,0,0,0,0,0
-req_type_rules,deepseek-v4-flash,1,1,142.086675,3850,14160,18010,3850.000,14160.000,18010.000,3850,14160,18010,1,0,0,0,0,0
-res_query,deepseek-v4-flash,1,1,249.516120,3735,27597,31332,3735.000,27597.000,31332.000,3735,27597,31332,1,0,0,0,0,0
-res_type_rules,deepseek-v4-flash,1,1,203.989249,3894,22037,25931,3894.000,22037.000,25931.000,3894,22037,25931,1,0,0,0,0,0
-section_type_annotation,deepseek-v4-flash,36,36,404.945762,22268,38114,60382,618.556,1058.722,1677.278,4041,3147,7188,32,4,0,4,0,3163
