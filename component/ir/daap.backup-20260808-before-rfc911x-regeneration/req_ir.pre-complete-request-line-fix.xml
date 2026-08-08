@@ -11,13 +11,14 @@
   <field name="accept-encoding" type="variable" length="undefined" value="gzip"/> <!-- Accepted content coding; sample is gzip. -->
 </message>
   <message name="database-containers">
-  <field name="method" type="constant" length="3B" value="GET"/><!-- HTTP retrieval method for the section 4.8 resource. -->
-  <field name="method-space" type="constant" length="1B" value=" "/><!-- Single SP between method and request-target. -->
-  <field name="request-target" type="variable" length="undefined" value="/databases/{database-id}/containers"/><!-- Full origin-form target from /databases/[num]/containers; {database-id} is numeric. -->
-  <field name="target-space" type="constant" length="1B" value=" "/><!-- Single SP before HTTP-version. -->
-  <field name="http-version" type="constant" length="8B" value="HTTP/1.1"/><!-- HTTP/1.1 version token. -->
-  <field name="request-line-crlf" type="constant" length="2B" value="&#13;&#10;"/><!-- Request-line framing (CRLF). -->
-</message><message name="update" note="Direction: request; DAAP /update is issued as an HTTP request-line GET.">
+  <field name="databases-prefix" type="constant" length="B" value="/databases/"/>
+  <!-- Fixed URI prefix from /databases/[num]/containers. -->
+  <field name="num" type="variable" length="undefined" value="[0-9]+"/>
+  <!-- [num] is the numeric database identifier in the request URI. -->
+  <field name="containers-suffix" type="constant" length="B" value="/containers"/>
+  <!-- Fixed URI suffix selecting the container/playlist list. -->
+</message>
+  <message name="update" note="Direction: request; DAAP /update is issued as an HTTP request-line GET.">
   <field name="method" type="constant" length="B" value="GET" note="Fixed HTTP method."/>
   <field name="method-separator" type="constant" length="B" value=" " note="Space before request-target."/>
   <field name="path" type="constant" length="B" value="/update" note="DAAP update endpoint (spec 4.5)."/>
@@ -101,17 +102,15 @@
   <field name="Accept-Encoding" type="variable" length="undefined" value="content-coding"/><!-- HTTP Accept-Encoding header; DAAP sample uses gzip. -->
 </message>
   <message name="database-container-items">
-  <!-- DAAP request direction; retrieves all items contained in the named playlist (DAAP section 4.9). -->
-  <field name="Method" type="constant" length="B" value="GET"/>
-  <!-- Fixed HTTP method for this read-only item-list request. -->
-  <field name="SP" type="constant" length="B" value=" "/>
-  <!-- Single space delimiter after the method. -->
-  <field name="Request-Target" type="variable" length="undefined" value="/databases/[0-9]+/containers/[0-9]+/items"/>
-  <!-- Origin-form target from DAAP section 4.9; each [0-9]+ is a decimal database-id/container-id variable. -->
-  <field name="SP" type="constant" length="B" value=" "/>
-  <!-- Single space delimiter before the HTTP version. -->
-  <field name="HTTP-Version" type="constant" length="B" value="HTTP/1.1"/>
-  <!-- Fixed HTTP/1.1 protocol version token. -->
-  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF framing terminating the request line; no request body is defined for this GET. -->
-</message></ir>
+  <field name="literal_databases" type="constant" length="B" value="/databases/"/>
+  <!-- Fixed request-target prefix for the DAAP playlist-items database resource. -->
+  <field name="database_id" type="variable" length="undefined" value="[0-9]+"/>
+  <!-- Database identifier from the URI template [num]; ASCII decimal, no separate length field. -->
+  <field name="literal_containers" type="constant" length="B" value="/containers/"/>
+  <!-- Fixed path segment separating the database id from the container id. -->
+  <field name="container_id" type="variable" length="undefined" value="[0-9]+"/>
+  <!-- Container/playlist identifier from the URI template [num]; ASCII decimal, no separate length field. -->
+  <field name="literal_items" type="constant" length="B" value="/items"/>
+  <!-- Fixed suffix selecting the items collection inside the container. -->
+</message>
+</ir>

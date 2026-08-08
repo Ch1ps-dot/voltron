@@ -1,5 +1,6 @@
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.rfcparser.setciontree import SectionNode, SectionTree
+from voltron.configs import configs
 
 
 def make_parser() -> AsyncRFCParser:
@@ -113,3 +114,23 @@ def test_state_dependency_context_uses_sectiontree_annotations():
     assert "PUBLISH request format." in context
     assert "CONNECT to PUBLISH dependency." in context
     assert "CONNACK response format." not in context
+
+
+def test_field_query_context_preserves_each_rfc(monkeypatch):
+    parser = make_parser()
+    supplemental = make_tree()
+    supplemental.name = "http"
+    supplemental.doc_content = supplemental.doc_content.replace(
+        "CONNECT",
+        "HTTPGET",
+    )
+    parser.tree_dict = {"mqtt": parser.tree_dict["mqtt"], "http": supplemental}
+    parser.rfc_name = ["mqtt", "http"]
+    monkeypatch.setattr(configs, "prompt_context_max_chars", 512)
+
+    context = parser._field_query_context("request")
+
+    assert "[SOURCE mqtt]" in context
+    assert "CONNECT request format." in context
+    assert "[SOURCE http]" in context
+    assert "HTTPGET request format." in context

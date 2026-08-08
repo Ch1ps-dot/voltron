@@ -1,15 +1,67 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <ir>
-  <message name="DAAPResponse">
-    <!-- DAAP response body. The HTTP response entity is a single DMAP tagged chunk; all multi-byte values are big-endian. HTTP headers and gzip encoding are outside this message definition. -->
-
-    <field name="ContentCode" type="variable" length="4B" value="4-byte OSType code: 'msrv', 'mccr', 'mlog', 'mupd', 'avdb', ..."/>
-    <!-- Top-level content code identifying the response container. Examples: 'msrv' = server info response, 'mccr' = content codes response, 'mlog' = login response, 'mupd' = update response. -->
-
-    <field name="ContentLength" type="variable" length="4B" value="0..4294967295"/>
-    <!-- Big-endian unsigned length of the Data field only; it does not include the ContentCode and ContentLength header bytes. Some servers send an incorrect top-level length, so robust decoders may need to derive the top-level Data size from the HTTP body length minus 8. -->
-
-    <field name="Data" type="variable" length="undefined" value="Sequence of zero or more nested chunks, each using the same [ContentCode(4B) + ContentLength(4B) + Data] layout"/>
-    <!-- The payload consists of child tagged chunks. For a server info response (ContentCode = 'msrv'), the child chunk sequence is: 'mstt', 'mpro', 'apro', 'minm', 'mslr', 'mstm', 'msal', 'msup', 'mspi', 'msex', 'msbr', 'msqy', 'msix', 'msrs', 'msdc'. For a content codes response (ContentCode = 'mccr'), it contains 'mstt' followed by one or more 'mdcl' dictionaries. The Data length is normally the value of ContentLength; however, the top-level ContentLength is known to be unreliable, so use total HTTP body length minus 8 when parsing the top-level chunk. -->
+  <message name="response message of daap protocol">
+  <field name="msrv" type="constant" length="B" value="msrv"/>
+  <!-- Top-level container dmap.serverinforesponse ('msrv'); its 4-byte length is unreliable per spec, so the response body length is used instead. -->
+  <field name="mstt" type="constant" length="B" value="mstt"/>
+  <!-- Content code for dmap.status. -->
+  <field name="dmap.status" type="variable" length="B" value="200"/>
+  <!-- dmap.status: response status code (type long, 4 bytes); typically 200 OK. -->
+  <field name="mpro" type="constant" length="B" value="mpro"/>
+  <!-- Content code for dmap.protocolversion. -->
+  <field name="dmap.protocolversion" type="constant" length="B" value="1.0.0"/>
+  <!-- dmap.protocolversion: DMAP protocol version (type version, 4 bytes); spec currently fixes it at 1.0.0. -->
+  <field name="apro" type="constant" length="B" value="apro"/>
+  <!-- Content code for daap.protocolversion. -->
+  <field name="daap.protocolversion" type="constant" length="B" value="1.0.0"/>
+  <!-- daap.protocolversion: DAAP protocol version (type version, 4 bytes); spec currently fixes it at 1.0.0. -->
+  <field name="minm" type="constant" length="B" value="minm"/>
+  <!-- Content code for dmap.itemname. -->
+  <field name="dmap.itemname" type="variable" length="undefined" value="Example Server"/>
+  <!-- dmap.itemname: server name (type string, UTF-8, variable length determined by chunk length). -->
+  <field name="mslr" type="constant" length="B" value="mslr"/>
+  <!-- Content code for dmap.loginrequired. -->
+  <field name="dmap.loginrequired" type="variable" length="B" value="0"/>
+  <!-- dmap.loginrequired: optional char flag; if present, client must log in for queries; 0 means not required in this example. -->
+  <field name="mstm" type="constant" length="B" value="mstm"/>
+  <!-- Content code for dmap.timeoutinterval. -->
+  <field name="dmap.timeoutinterval" type="variable" length="B" value="1800"/>
+  <!-- dmap.timeoutinterval: connection timeout interval in seconds (type long, 4 bytes). -->
+  <field name="msal" type="constant" length="B" value="msal"/>
+  <!-- Content code for dmap.supportsautologout. -->
+  <field name="dmap.supportsautologout" type="variable" length="B" value="0"/>
+  <!-- dmap.supportsautologout: char flag; if present, server can automatically log clients out; 0 in this example. -->
+  <field name="msup" type="constant" length="B" value="msup"/>
+  <!-- Content code for dmap.supportsupdate. -->
+  <field name="dmap.supportsupdate" type="variable" length="B" value="0"/>
+  <!-- dmap.supportsupdate: char flag; if present, server supports /update; 0 in this example. -->
+  <field name="mspi" type="constant" length="B" value="mspi"/>
+  <!-- Content code for dmap.supportspersistentids. -->
+  <field name="dmap.supportspersistentids" type="variable" length="B" value="0"/>
+  <!-- dmap.supportspersistentids: char flag; if present, server supports persistent IDs; 0 in this example. -->
+  <field name="msex" type="constant" length="B" value="msex"/>
+  <!-- Content code for dmap.supportsextensions. -->
+  <field name="dmap.supportsextensions" type="variable" length="B" value="0"/>
+  <!-- dmap.supportsextensions: char flag; if present, server supports extensions; 0 in this example. -->
+  <field name="msbr" type="constant" length="B" value="msbr"/>
+  <!-- Content code for dmap.supportsbrowse. -->
+  <field name="dmap.supportsbrowse" type="variable" length="B" value="0"/>
+  <!-- dmap.supportsbrowse: char flag; if present, server supports browse; 0 in this example. -->
+  <field name="msqy" type="constant" length="B" value="msqy"/>
+  <!-- Content code for dmap.supportsquery. -->
+  <field name="dmap.supportsquery" type="variable" length="B" value="0"/>
+  <!-- dmap.supportsquery: char flag; if present, server supports query; 0 in this example. -->
+  <field name="msix" type="constant" length="B" value="msix"/>
+  <!-- Content code for dmap.supportsindex. -->
+  <field name="dmap.supportsindex" type="variable" length="B" value="0"/>
+  <!-- dmap.supportsindex: char flag; if present, server supports index; 0 in this example. -->
+  <field name="msrs" type="constant" length="B" value="msrs"/>
+  <!-- Content code for dmap.supportsresolve. -->
+  <field name="dmap.supportsresolve" type="variable" length="B" value="0"/>
+  <!-- dmap.supportsresolve: char flag; if present, server supports /resolve; 0 in this example. -->
+  <field name="msdc" type="constant" length="B" value="msdc"/>
+  <!-- Content code for dmap.databasescount. -->
+  <field name="dmap.databasescount" type="variable" length="B" value="1"/>
+  <!-- dmap.databasescount: number of databases known to the server (type long, 4 bytes); 1 in this example. -->
 </message>
 </ir>

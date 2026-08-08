@@ -11,7 +11,12 @@ import click
 @click.command(help='fuzzer')
 @click.option("-s", "--sut", type=str, required=True, help="server under test")
 @click.option("-a", "--algorithm", type=str, default='state', help="fuzzing algorithm")
-@click.option("-t", "--time", type=int, help="fuzzing time (minute)")
+@click.option(
+    "-t",
+    "--time",
+    type=click.IntRange(min=1),
+    help="fuzzing time (minute; minimum 1)",
+)
 @click.option("-c", "--cmdline", type=str, default='auto', help="cmd line to invoke target")
 @click.option("-o", "--output", type=str, default='default', help="output path for fuzzing results")
 @click.option(

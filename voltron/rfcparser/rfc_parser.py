@@ -491,7 +491,7 @@ class AsyncRFCParser:
                     pmp, req_json = await self.chater.llm_request_query(
                         rfc_num = ' '.join(self.rfc_name),
                         pro_name = self.pro_name,
-                        rfc_doc = ''.join([s for s in self.req_doc])
+                        rfc_doc = self._field_query_context('request')
                     )
 
                     if (req_json != None):
@@ -522,7 +522,7 @@ class AsyncRFCParser:
                     pmp, res_json = await self.chater.llm_response_query(
                         rfc_num = ' '.join(self.rfc_name),
                         pro_name = self.pro_name,
-                        rfc_doc = ''.join([s for s in self.res_doc])
+                        rfc_doc = self._field_query_context('response')
                     )
 
                     if (res_json != None):
@@ -555,7 +555,7 @@ class AsyncRFCParser:
                     rfc_num=' '.join(self.rfc_name),
                     pro_name=self.pro_name,
                     field_info=json.dumps(req_json),
-                    rfc_doc=''.join([s for s in self.req_doc]),
+                    rfc_doc=self._field_query_context('request'),
                 )
                 if rules_json is None:
                     raise ValueError('empty request type rules')
@@ -588,7 +588,7 @@ class AsyncRFCParser:
                     rfc_num=' '.join(self.rfc_name),
                     pro_name=self.pro_name,
                     field_info=json.dumps(res_json),
-                    rfc_doc=''.join([s for s in self.res_doc]),
+                    rfc_doc=self._field_query_context('response'),
                 )
                 if rules_json is None:
                     raise ValueError('empty response type rules')
@@ -701,21 +701,28 @@ class AsyncRFCParser:
             field_type: str
     ):
         rfc_doc = self._message_ir_context(msg_type, field_type)
+        generation_timeout_s = max(
+            0.01,
+            float(getattr(configs, 'ir_generation_timeout_s', 300.0)),
+        )
         async with sem:
             try:
                 msg_ir = await asyncio.wait_for(
                     self.chater.llm_ir_generation(
                         pro_name=self.pro_name,
                         message_name=msg_type,
+                        message_direction=(
+                            'request' if field_type == 'req' else 'response'
+                        ),
                         rfc_doc=rfc_doc,
                     ),
-                    timeout=self.ANNOTATION_TIMEOUT_S,
+                    timeout=generation_timeout_s,
                 )
             except asyncio.TimeoutError as error:
                 raise RuntimeError(
                     'RFCParser: message IR generation timed out '
                     f'[{field_type}] [{msg_type}] after '
-                    f'{self.ANNOTATION_TIMEOUT_S}s'
+                    f'{generation_timeout_s}s'
                 ) from error
             last_error = 'empty IR response'
             for attempt in range(1, self.IR_REPAIR_MAX_ATTEMPTS + 1):
@@ -741,7 +748,7 @@ class AsyncRFCParser:
                             ir=str(msg_ir or ''),
                             error=last_error,
                         ),
-                        timeout=self.ANNOTATION_TIMEOUT_S,
+                        timeout=generation_timeout_s,
                     )
                 except Exception as error:
                     last_error = str(error)
@@ -797,6 +804,74 @@ class AsyncRFCParser:
             else:
                 sections = list(self.all_doc)
         return '\n\n'.join(sections)
+
+    def _field_query_context(self, direction: str) -> str:
+        """Keep protocol-specific evidence when several RFCs share a budget.
+
+        A global join followed by head/tail truncation can drop an entire RFC,
+        especially because the coarse document sets are unordered.  Build one
+        deterministic block per configured source and compact each block
+        independently.  The first source is the protocol's primary document,
+        so it receives half of the available context budget.
+        """
+        accepted_types = (
+            {'request', 'all'}
+            if direction == 'request'
+            else {'response', 'all'}
+        )
+        rfc_names = [str(name) for name in self.rfc_name]
+        source_blocks: list[tuple[str, str]] = []
+        for name in rfc_names:
+            st = self.tree_dict.get(name)
+            if st is None:
+                continue
+            sections: list[str] = []
+            seen: set[str] = set()
+            for node in st.leafs:
+                if node.content_type not in accepted_types:
+                    continue
+                content = st.fetch_node_content(node)
+                if not content or content in seen:
+                    continue
+                seen.add(content)
+                sections.append(content)
+            if sections:
+                source_blocks.append((name, '\n\n'.join(sections)))
+
+        if not source_blocks:
+            fallback = self.req_doc if direction == 'request' else self.res_doc
+            return '\n\n'.join(sorted(fallback))
+
+        max_chars = max(
+            512,
+            int(getattr(configs, 'prompt_context_max_chars', 12_000)),
+        )
+        if len(source_blocks) == 1:
+            budgets = [max_chars]
+        else:
+            primary_budget = max_chars // 2
+            secondary_budget = max_chars - primary_budget
+            each_secondary = secondary_budget // (len(source_blocks) - 1)
+            budgets = [primary_budget] + [each_secondary] * (
+                len(source_blocks) - 1
+            )
+            budgets[-1] += max_chars - sum(budgets)
+
+        blocks: list[str] = []
+        for (name, content), budget in zip(source_blocks, budgets):
+            label = f'[SOURCE {name}]\n'
+            content_budget = max(1, budget - len(label) - 2)
+            if len(content) > content_budget:
+                marker = '\n[... source truncated ...]\n'
+                retained = max(2, content_budget - len(marker))
+                head_chars = retained * 2 // 3
+                content = (
+                    content[:head_chars]
+                    + marker
+                    + content[-(retained - head_chars):]
+                )
+            blocks.append(label + content)
+        return '\n\n'.join(blocks)
     
     async def _msg_model_gen_async(
             self,

@@ -62,6 +62,27 @@ def _configure_rfc_parser(target_name: str) -> None:
     configs.api_key_doc = str(llm_doc['api_key'])
     configs.model_doc = str(llm_doc['model'])
     configs.async_sem_doc = int(llm_doc['async_sem'])
+    generated_code = config_data.get('generated_code', {})
+    if not isinstance(generated_code, dict):
+        generated_code = {}
+    configs.prompt_context_max_chars = max(
+        512,
+        int(generated_code.get('prompt_context_max_chars', 12_000)),
+    )
+    configs.llm_response_max_chars = max(
+        1,
+        int(generated_code.get('response_max_chars', 100_000)),
+    )
+    configs.ir_generation_timeout_s = max(
+        1.0,
+        float(generated_code.get('ir_generation_timeout_seconds', 300.0)),
+    )
+    # Standalone parsing still makes LLM calls, so give usage/validation
+    # metrics the same protocol-scoped destination as the generated IR.
+    configs.results_path = (
+        configs.base_path / 'component' / 'ir' / protocol
+    )
+    configs.results_path.mkdir(parents=True, exist_ok=True)
 
 
 def parse_target_section_trees(

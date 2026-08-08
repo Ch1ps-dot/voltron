@@ -20,6 +20,8 @@ llm_doc:
   api_key: test-key
   model: test-model
   async_sem: 3
+generated_code:
+  ir_generation_timeout_seconds: 45
 """.lstrip(),
         encoding="utf-8",
     )
@@ -58,6 +60,11 @@ llm_doc:
         tmp_path / "config" / "rfcs" / "rfc2428.txt",
     ]
     assert configs.async_sem_doc == 3
+    assert configs.ir_generation_timeout_s == 45.0
+    assert configs.results_path == (
+        tmp_path / "component" / "ir" / "ftp"
+    )
+    assert configs.results_path.is_dir()
     assert [result.output_path for result in results] == [
         tmp_path / "component" / "tree" / "ftp" / "rfc959.pkl",
         tmp_path / "component" / "tree" / "ftp" / "rfc2428.pkl",

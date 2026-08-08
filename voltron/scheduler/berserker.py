@@ -47,6 +47,7 @@ class Berserker:
         machine: MealyMachine | None,
         use_guidance: bool = True,
         partial_guidance: PartialStateGraph | None = None,
+        controller=None,
     ) -> None:
         self.seed_retention = SeedRetentionPolicy()
         self.unique_resp = self.seed_retention.unique_responses
@@ -71,6 +72,7 @@ class Berserker:
 
         self.mapper = mapper
         self.exe = exe
+        self.controller = controller
         self.alphabet = list(mapper.request_types)
         self.use_guidance = use_guidance
         self.req_dep: dict[str, dict[str, dict]] = (
@@ -142,6 +144,17 @@ class Berserker:
                 }
                 for state_id, state in access_sequences.items()
             }
+
+    def _should_stop(self) -> bool:
+        """Check the global controller before starting more scheduler work."""
+        controller = self.controller
+        if controller is None:
+            controller = getattr(self.exe, 'run_controller', None)
+        should_stop = getattr(controller, 'should_stop', None)
+        if callable(should_stop):
+            return bool(should_stop())
+        stop_event = getattr(self.exe, 'stop_event', None)
+        return bool(stop_event is not None and stop_event.is_set())
 
     @property
     def max_seq_len(self) -> int:
@@ -518,7 +531,10 @@ class Berserker:
         analyzer.finished = energy
         
         # fuzzing the SUT until the energy is depleted, where energy is increased when new behaviors are observed and decreased when no new behaviors are found
-        while (energy >= 0 if self.use_guidance else energy > 0):
+        while (
+            (energy >= 0 if self.use_guidance else energy > 0)
+            and not self._should_stop()
+        ):
             last_resp_num = analyzer.res_types_num()
             last_trans_nums = analyzer.resp_trans_num()
             last_non_compliant_num = analyzer.non_compliant_num
@@ -556,6 +572,8 @@ class Berserker:
                 poll_wait_ms=3000,
                 run_checker=True,
             )
+            if self._should_stop():
+                break
             cur_trans_nums = analyzer.resp_trans_num()
             cur_resp_num = analyzer.res_types_num()
             transition_increment = cur_trans_nums - last_trans_nums

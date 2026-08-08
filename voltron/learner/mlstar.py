@@ -65,6 +65,18 @@ class ObTable:
             self.stop_event.set()
         raise ModelLearningStopped(reason)
 
+    def _deadline_reached(self) -> bool:
+        """Check the run controller, with a standalone legacy fallback."""
+        controller = getattr(configs, 'run_controller', None)
+        should_stop = getattr(controller, 'should_stop', None)
+        if callable(should_stop):
+            return bool(should_stop())
+        if configs.time_limit_s < time.time() - analyzer.start_time:
+            logger.debug('Fuzzer: timeout')
+            analyzer.request_stop('deadline', self.stop_event)
+            return True
+        return False
+
     def _query_with_empty_retry(
         self,
         word: tuple[str, ...],
@@ -120,9 +132,7 @@ class ObTable:
                 
                 else:
                     
-                    if (configs.time_limit_s < time.time() - analyzer.start_time):
-                        logger.debug('Fuzzer: timeout')
-                        analyzer.request_stop('deadline', self.stop_event)
+                    self._deadline_reached()
                     if self.stop_event.is_set():
                         self._stop_learning('model learning stopped')
                         
@@ -172,9 +182,7 @@ class ObTable:
                     
                 for e in self.E:
                     iter_si += 1
-                    if (configs.time_limit_s < time.time() - analyzer.start_time):
-                        logger.debug('Fuzzer: timeout')
-                        analyzer.request_stop('deadline', self.stop_event)
+                    self._deadline_reached()
                         
                     if self.stop_event.is_set():
                         self._stop_learning('model learning stopped')

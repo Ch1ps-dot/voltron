@@ -55,6 +55,10 @@ class AsyncChater:
     @staticmethod
     def _remaining_fuzz_time_s() -> float | None:
         """Return the remaining fuzzing budget, if a fuzzing run is active."""
+        controller = getattr(configs, 'run_controller', None)
+        remaining_s = getattr(controller, 'remaining_s', None)
+        if callable(remaining_s):
+            return float(remaining_s())
         time_limit_s = getattr(configs, 'time_limit_s', None)
         start_time = getattr(analyzer, 'start_time', None)
         if not isinstance(time_limit_s, (int, float)):
@@ -65,6 +69,12 @@ class AsyncChater:
 
     @staticmethod
     def _stop_for_deadline() -> None:
+        controller = getattr(configs, 'run_controller', None)
+        request_stop = getattr(controller, 'request_stop', None)
+        if callable(request_stop):
+            request_stop('deadline')
+            logger.debug('LLM: fuzzing deadline reached; cancelling request')
+            return
         request_stop = getattr(analyzer, 'request_stop', None)
         if callable(request_stop):
             request_stop('deadline')
@@ -560,12 +570,14 @@ class AsyncChater:
         self,
         pro_name: str,
         message_name: str,
+        message_direction: str,
         rfc_doc: str
     ):
         tmp = self.pmp._tem_ir_generation
         pmp = tmp.substitute(
             pro_name=pro_name,
             message_name=message_name,
+            message_direction=message_direction,
             rfc_doc=self._compact_context(rfc_doc),
         )
         ans = await self.chat_llm(
@@ -1108,8 +1120,8 @@ class AsyncChater:
             pro_name=pro_name, 
             current_request=current_request, 
             last_request=last_request, 
-            response_types=response_types, 
-            rfc_content=rfc_content
+            response_types=self._compact_context(response_types),
+            rfc_content=self._compact_context(rfc_content),
         )
         ans = await self.chat_llm(
             prompt=pmp,

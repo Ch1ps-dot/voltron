@@ -176,8 +176,9 @@ def test_message_ir_generation_has_bounded_failure():
 def test_message_ir_generation_times_out():
     parser = AsyncRFCParser.__new__(AsyncRFCParser)
     parser.pro_name = "daap"
-    parser.ANNOTATION_TIMEOUT_S = 0.01
     parser._message_ir_context = lambda *_: "DAAP request documentation"
+    previous_timeout = configs.ir_generation_timeout_s
+    configs.ir_generation_timeout_s = 0.01
 
     class Chater:
         async def llm_ir_generation(self, **kwargs):
@@ -185,12 +186,15 @@ def test_message_ir_generation_times_out():
 
     parser.chater = Chater()
 
-    with pytest.raises(RuntimeError, match="generation timed out"):
-        asyncio.run(
-            parser._msg_model_gen_one(
-                "/databases", asyncio.Semaphore(1), "req"
+    try:
+        with pytest.raises(RuntimeError, match="generation timed out"):
+            asyncio.run(
+                parser._msg_model_gen_one(
+                    "/databases", asyncio.Semaphore(1), "req"
+                )
             )
-        )
+    finally:
+        configs.ir_generation_timeout_s = previous_timeout
 
 
 def test_damaged_sectiontree_cache_is_regenerated(tmp_path, monkeypatch):

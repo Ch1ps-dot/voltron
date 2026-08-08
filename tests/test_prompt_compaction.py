@@ -1,6 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
+from string import Template
 from types import SimpleNamespace
 
 from voltron.analyzer.analyzer import analyzer
@@ -120,3 +121,56 @@ def test_chat_uses_one_fixed_short_system_prompt(monkeypatch):
     assert recorded["usage"] == "test"
     assert recorded["model"] == "test-model"
     assert recorded["tokens_reported"] is False
+
+
+def test_dependency_prompt_compacts_rfc_context(monkeypatch):
+    captured = {}
+    chatter = AsyncChater.__new__(AsyncChater)
+    chatter.pmp = SimpleNamespace(
+        _tem_infer_dependency=Template(
+            "$pro_name|$last_request|$current_request|$response_types|"
+            "$rfc_content"
+        )
+    )
+
+    async def chat_llm(*, prompt, usage):
+        captured["prompt"] = prompt
+        captured["usage"] = usage
+        return '{"request_dependency":"independent","next_response":[]}'
+
+    chatter.chat_llm = chat_llm
+    monkeypatch.setattr(configs, "prompt_context_max_chars", 512)
+
+    result = asyncio.run(
+        chatter.llm_infer_dependency(
+            pro_name="demo",
+            last_request="A",
+            current_request="B",
+            response_types='["OK"]',
+            rfc_content="start " + ("x" * 4000) + " end",
+        )
+    )
+
+    assert json.loads(result)["request_dependency"] == "independent"
+    assert captured["usage"] == "infer_dependency"
+    assert "Voltron context truncated" in captured["prompt"]
+    assert len(captured["prompt"]) < 600
+
+
+def test_ir_generation_prompt_carries_message_direction():
+    template = Template(
+        (ROOT / "skills" / "builder" / "ir_generation.md").read_text(
+            encoding="utf-8",
+        )
+    )
+
+    prompt = template.substitute(
+        pro_name="daap",
+        message_name="login",
+        message_direction="request",
+        rfc_doc="GET /login",
+    )
+
+    assert "DIRECTION: request" in prompt
+    assert "on-wire request message" in prompt
+    assert "complete request line" in prompt

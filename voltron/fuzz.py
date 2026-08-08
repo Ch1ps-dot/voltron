@@ -23,6 +23,7 @@ from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
 from voltron.config_loader import load_runtime_config
+from voltron.run_controller import RunController
 
 from voltron.learner.mlstar import (
     MealyLstar,
@@ -125,6 +126,7 @@ class Fuzzer:
         self._signal_handler_installed = False
         self._worker_threads: list[threading.Thread] = []
         self.stop_event = threading.Event()
+        self.run_controller: RunController | None = None
         analyzer.stop_event = self.stop_event
         atexit.register(self.cleanup)
         self._install_signal_handlers()
@@ -263,6 +265,10 @@ class Fuzzer:
             0.1,
             float(generated_code.get('timeout_seconds', 2.0)),
         )
+        configs.ir_generation_timeout_s = max(
+            1.0,
+            float(generated_code.get('ir_generation_timeout_seconds', 300.0)),
+        )
         configs.generated_message_max_bytes = max(
             1,
             int(generated_code.get('max_message_bytes', 1024 * 1024)),
@@ -372,6 +378,28 @@ class Fuzzer:
         else:
             self.stop_event.set()
 
+    def _should_stop_for_deadline(self) -> bool:
+        """Check the immutable run deadline, retaining standalone fallbacks."""
+        controller = getattr(self, 'run_controller', None)
+        if controller is None:
+            controller = getattr(configs, 'run_controller', None)
+        should_stop = getattr(controller, 'should_stop', None)
+        if callable(should_stop):
+            return bool(should_stop())
+        stop_event = getattr(self, 'stop_event', None)
+        if stop_event is not None and stop_event.is_set():
+            return True
+        limit = getattr(configs, 'time_limit_s', None)
+        started = getattr(analyzer, 'start_time', None)
+        if (
+            isinstance(limit, (int, float))
+            and isinstance(started, (int, float))
+            and time.time() - started >= limit
+        ):
+            self._request_stop('deadline')
+            return True
+        return False
+
     def _finalize_run_status(self) -> int:
         """Persist an authoritative run result and return its process code."""
         now = time.time()
@@ -467,6 +495,15 @@ class Fuzzer:
             analyzer.run_status = 'running'
             analyzer.planned_duration_s = self.time_limit_s
 
+        self.run_controller = RunController(
+            self.time_limit_s,
+            self.stop_event,
+            self._request_stop,
+        )
+        configs.run_controller = self.run_controller
+        if hasattr(self, 'exe'):
+            self.exe.run_controller = self.run_controller
+
         exit_code = 2
         run_error: BaseException | None = None
         try:
@@ -494,6 +531,7 @@ class Fuzzer:
             )
             self._worker_threads = [t_fuzz, t_ui]
 
+            self.run_controller.start()
             t_fuzz.start()
             t_ui.start()
 
@@ -514,6 +552,12 @@ class Fuzzer:
             self._request_stop('failure')
             run_error = error
         finally:
+            self.run_controller.close()
+            if getattr(configs, 'run_controller', None) is self.run_controller:
+                configs.run_controller = None
+            executor = getattr(self, 'exe', None)
+            if getattr(executor, 'run_controller', None) is self.run_controller:
+                executor.run_controller = None
             exit_code = self._finalize_run_status()
             self.cleanup()
         logger.debug('Fuzzer: finish fuzzing')
@@ -641,27 +685,11 @@ class Fuzzer:
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
             if stop_event.is_set():
-                # A learning deadline is not a target or component failure.
-                # If the learner saved usable partial traces, hand them to the
-                # normal scheduler and start its fuzzing clock at this phase
-                # boundary.  Other stop reasons remain terminal.
-                partial = getattr(self, 'partial_guidance', None)
-                if (
-                    getattr(analyzer, 'stop_reason', None) == 'deadline'
-                    and partial is not None
-                    and partial.seed_sequences()
-                ):
-                    logger.debug(
-                        'Fuzzer: continuing from deadline-limited model '
-                        'learning with partial guidance'
-                    )
-                    stop_event.clear()
-                    with analyzer.lock:
-                        analyzer.stop_reason = None
-                        analyzer.start_time = time.time()
-                else:
-                    logger.debug('Fuzzer: model learning stopped at timeout')
-                    return
+                # Partial traces are retained for a later run, but global
+                # deadline expiry is terminal for this run.  In particular,
+                # do not clear the event or reset the clock here.
+                logger.debug('Fuzzer: model learning stopped')
+                return
             self.berserker_fuzz(
                 hypothesis,
                 stop_event,
@@ -1054,9 +1082,9 @@ class Fuzzer:
                 self._request_stop('model_learning_failure')
                 raise RuntimeError('model learning failed') from error
 
-            if configs.time_limit_s < time.time() - analyzer.start_time:
-                logger.debug('Fuzzer: timeout')
-                self._request_stop('deadline')
+            if self._should_stop_for_deadline():
+                logger.debug('Fuzzer: deadline reached during model learning')
+                break
 
         return h_lsit[-1] if h_lsit else None
 
@@ -1149,16 +1177,22 @@ class Fuzzer:
             partial_guidance=(
                 partial_guidance if self.guided_scheduling else None
             ),
+            controller=getattr(self, 'run_controller', None),
         )
 
         analyzer.begin_phase('fuzzing')
         fuzz_phase_status = 'completed'
         try:
-            while not stop_event.is_set():
+            while (
+                not stop_event.is_set()
+                and not self._should_stop_for_deadline()
+            ):
                 try:
                     # init new learning process with previous model and run fuzzer
 
                     req_res = berserker.run(2000)
+                    if self._should_stop_for_deadline():
+                        break
                     if self.spec_knowledge:
                         self.producer.generator_mutate(
                             req_res,
@@ -1178,9 +1212,8 @@ class Fuzzer:
                     self._request_stop('failure')
                     raise
 
-                if (configs.time_limit_s < time.time() - analyzer.start_time):
-                    logger.debug('Fuzzer: timeout')
-                    self._request_stop('deadline')
+                if self._should_stop_for_deadline():
+                    logger.debug('Fuzzer: deadline reached during fuzzing')
                     analyzer.collect_results()
         finally:
             analyzer.finalize_generator_metrics(

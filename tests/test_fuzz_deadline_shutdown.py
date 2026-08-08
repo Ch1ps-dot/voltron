@@ -41,6 +41,34 @@ def test_llm_request_is_not_started_after_fuzz_deadline(monkeypatch):
     assert stop_event.is_set()
 
 
+def test_llm_deadline_uses_run_controller_when_present(monkeypatch):
+    calls = []
+    deadline_requests = []
+
+    async def create(**_kwargs):
+        calls.append(True)
+        return None
+
+    chatter = AsyncChater.__new__(AsyncChater)
+    chatter.clt = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=create),
+        )
+    )
+    chatter.model = 'test-model'
+    controller = SimpleNamespace(
+        remaining_s=lambda: 0.0,
+        request_stop=lambda reason: deadline_requests.append(reason),
+    )
+    monkeypatch.setattr(configs, 'run_controller', controller, raising=False)
+
+    with pytest.raises(LLMDeadlineExceeded):
+        asyncio.run(chatter.chat_llm('prompt', 'test'))
+
+    assert calls == []
+    assert deadline_requests == ['deadline']
+
+
 def test_model_learning_returns_cleanly_when_llm_deadline_is_reached(
     tmp_path,
     monkeypatch,
@@ -159,7 +187,7 @@ def test_state_fuzz_does_not_start_berserker_after_model_timeout(
     assert stop_event.is_set()
 
 
-def test_state_fuzz_hands_deadline_partial_guidance_to_berserker(
+def test_state_fuzz_keeps_partial_guidance_but_does_not_reset_deadline(
     tmp_path,
     monkeypatch,
 ):
@@ -178,7 +206,7 @@ def test_state_fuzz_hands_deadline_partial_guidance_to_berserker(
     fuzzer.guided_scheduling = True
     fuzzer.mapper = SimpleNamespace()
     fuzzer.exe = object()
-    seen = {}
+    started = time.time() - 10
 
     monkeypatch.setattr(configs, 'models_path', tmp_path, raising=False)
     monkeypatch.setattr(fuzz_module, 'MembershipOracle', lambda **_kwargs: object())
@@ -193,10 +221,8 @@ def test_state_fuzz_hands_deadline_partial_guidance_to_berserker(
     monkeypatch.setattr(
         fuzzer,
         'berserker_fuzz',
-        lambda hypothesis, event, partial_guidance=None: seen.update(
-            hypothesis=hypothesis,
-            event=event,
-            partial_guidance=partial_guidance,
+        lambda *_args, **_kwargs: pytest.fail(
+            'berserker must not start after the global deadline'
         ),
     )
     monkeypatch.setattr(analyzer, 'begin_phase', lambda *_args: None)
@@ -207,8 +233,10 @@ def test_state_fuzz_hands_deadline_partial_guidance_to_berserker(
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(analyzer, 'stop_reason', 'deadline', raising=False)
+    monkeypatch.setattr(analyzer, 'start_time', started, raising=False)
 
     fuzzer.state_fuzz(stop_event)
 
-    assert seen['partial_guidance'] is graph
-    assert not stop_event.is_set()
+    assert fuzzer.partial_guidance is graph
+    assert stop_event.is_set()
+    assert analyzer.start_time == started

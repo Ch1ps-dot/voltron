@@ -219,6 +219,7 @@ class Executor:
         self._active_interaction_lock = threading.RLock()
         self._prefetched_initial_response: bytes | None = None
         self.stop_event = stop_event
+        self.run_controller = getattr(configs, 'run_controller', None)
 
     def _request_stop(self, reason: str) -> None:
         runtime_analyzer = getattr(self, 'analyzer', analyzer)
@@ -227,6 +228,41 @@ class Executor:
             request_stop(reason, self.stop_event)
         else:
             self.stop_event.set()
+
+    def _should_stop(self) -> bool:
+        """Check the shared deadline before beginning or extending I/O."""
+        controller = getattr(self, 'run_controller', None)
+        should_stop = getattr(controller, 'should_stop', None)
+        if callable(should_stop) and should_stop():
+            return True
+        return self.stop_event.is_set()
+
+    def _poll_with_stop(
+        self,
+        poller: select.poll,
+        timeout_ms: int | float,
+    ) -> list[tuple[int, int]] | None:
+        """Poll in short slices so a deadline can interrupt socket I/O.
+
+        ``None`` means the run was stopped; an empty list retains the normal
+        socket-timeout meaning.
+        """
+        if self._should_stop():
+            return None
+        timeout_s = max(0.0, float(timeout_ms) / 1000.0)
+        if timeout_s == 0.0:
+            return []
+        deadline = time.monotonic() + timeout_s
+        while True:
+            if self._should_stop():
+                return None
+            remaining_s = deadline - time.monotonic()
+            if remaining_s <= 0.0:
+                return []
+            slice_ms = max(1, min(100, int(remaining_s * 1000)))
+            events = poller.poll(slice_ms)
+            if events:
+                return events
             
     def cov_setup(
         self,
@@ -509,7 +545,7 @@ class Executor:
         stop_on_failure: bool = True,
     ) -> tuple[bool, subprocess.Popen | None]:
         """Start only the per-interaction SUT process."""
-        if self.stop_event.is_set():
+        if self._should_stop():
             return False, None
         if self._is_remote_deployment():
             self._monitor().start()
@@ -637,13 +673,15 @@ class Executor:
         )
         try:
             while time.monotonic() < deadline:
-                if self.stop_event.is_set():
+                if self._should_stop():
                     raise InterruptedError('fuzzing stopped during FTP readiness')
                 remaining_ms = max(
                     1,
                     int((deadline - time.monotonic()) * 1000),
                 )
-                events = poller.poll(remaining_ms)
+                events = self._poll_with_stop(poller, remaining_ms)
+                if events is None:
+                    raise InterruptedError('fuzzing stopped during FTP readiness')
                 if not events:
                     continue
                 _fd, event = events[0]
@@ -1028,7 +1066,7 @@ class Executor:
                     pair_recorder.observe(conversation, phase=phase)
             if flag:
                 outcome = 'completed'
-            elif self.stop_event.is_set():
+            elif self._should_stop():
                 outcome = 'stopped'
             else:
                 outcome = 'failed'
@@ -1082,7 +1120,7 @@ class Executor:
         # logger.debug('exe: begin inter')
         # prepare some settings and setup SUT
         remote_deployment = self._is_remote_deployment()
-        if self.stop_event.is_set():
+        if self._should_stop():
             return False, None
         if not self.initialize_environment():
             return False, None
@@ -1156,7 +1194,7 @@ class Executor:
             poll_timeout_ms=100,
             show_fuzz_ui=run_checker,
         )
-        if self.stop_event.is_set():
+        if self._should_stop():
             self.stop_sut_for_interaction(signal.SIGTERM, timeout=1)
             return False, None
         last_recv = '-'
@@ -1184,7 +1222,7 @@ class Executor:
         last_msg = bytes()
         last_request_recorded = True
         for msg_type, msg in msg_seq:
-            if self.stop_event.is_set():
+            if self._should_stop():
                 break
             
             if not remote_deployment and proc.poll() is not None:
@@ -1639,7 +1677,7 @@ class Executor:
         if sock is None or sock.fileno() < 0:
             logger.debug("net_send: invalid socket")
             return False, None
-        if self.stop_event.is_set():
+        if self._should_stop():
             return False, None
         
         poller = select.poll()
@@ -1649,7 +1687,9 @@ class Executor:
             if (self.trans_layer == 'tcp'):
                 
                 # handler poll timeout
-                events = poller.poll(self.send_time_ms)
+                events = self._poll_with_stop(poller, self.send_time_ms)
+                if events is None:
+                    return False, None
                 if not events:
                     logger.debug("net_send: poll timeout")
                     return False, None
@@ -1679,7 +1719,9 @@ class Executor:
             
             # TODO: support udp
             elif (self.trans_layer == 'udp'):
-                events = poller.poll(self.send_time_ms)
+                events = self._poll_with_stop(poller, self.send_time_ms)
+                if events is None:
+                    return False, None
                 if not events:
                     logger.debug("net_send: poll timeout")
                     return False, None
@@ -1862,7 +1904,7 @@ class Executor:
         if sock is None or sock.fileno() < 0:
             logger.debug("Executor: socket closed")
             return None, None
-        if self.stop_event.is_set():
+        if self._should_stop():
             return None, None
         
         """ 
@@ -1881,7 +1923,9 @@ class Executor:
         
         try:
             if (self.trans_layer == 'tcp'):
-                events = poller.poll(time_out_ms)
+                events = self._poll_with_stop(poller, time_out_ms)
+                if events is None:
+                    return None, None
 
                 # handler recv timeout
                 if not events:
@@ -1898,7 +1942,9 @@ class Executor:
                     buf = b''
                     
                     while True:
-                        events = poller.poll(10)
+                        events = self._poll_with_stop(poller, 10)
+                        if events is None:
+                            return None, None
                         if not events:
                             break
                         chunk = sock.recv(2048)
@@ -1924,7 +1970,9 @@ class Executor:
                         )
                 
             elif (self.trans_layer == 'udp'):
-                events = poller.poll(100) # poll timeout will influence the performance, need to adjust
+                events = self._poll_with_stop(poller, 100)
+                if events is None:
+                    return None, None
                 if not events:
                     logger.debug('recv: poll timeout')
                     return 'TIMEOUT', None
@@ -1933,7 +1981,9 @@ class Executor:
                 if event & select.POLLIN:
                     buf = b''
                     while True:
-                        events = poller.poll(100)
+                        events = self._poll_with_stop(poller, 100)
+                        if events is None:
+                            return None, None
                         if not events:
                             break
                         chunk, _ = sock.recvfrom(2048)

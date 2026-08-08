@@ -30,6 +30,7 @@ class Config:
         self.ir_evolution_max_rounds_per_type: int = 1
         self.generation_retry_limit: int = 3
         self.generated_code_timeout_s: float = 2.0
+        self.ir_generation_timeout_s: float = 300.0
         self.generated_message_max_bytes: int = 1024 * 1024
         self.parser_validation_samples: tuple[bytes, ...] = ()
         # Bound variable RFC/IR/code context inserted into LLM prompts.  The
@@ -87,6 +88,9 @@ class Config:
         self.monitor: dict = {}
         
         self.time_limit_s: int
+        # Assigned by ``Fuzzer.fuzz`` for one active fuzzing run.  Runtime
+        # components intentionally treat it as optional for standalone use.
+        self.run_controller = None
 
 configs = Config()
 configs.base_path = Path(__file__).resolve().parents[1]
