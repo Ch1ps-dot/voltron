@@ -848,11 +848,24 @@ class Fuzzer:
         h_path = configs.models_path / 'evolved_hypothesis.pkl'
         try_limit = 3
         threshold_relearn_count = 0
+        active_learning_iteration: int | None = None
         self.learning_outcome = 'completed'
+
+        def record_incomplete_learning_iteration(status: str) -> None:
+            if active_learning_iteration is None:
+                return
+            analyzer.record_iteration_state_metrics(
+                phase='model_learning',
+                iteration=active_learning_iteration,
+                sample_point='run_final',
+                status=status,
+                skip_if_iteration_recorded=True,
+            )
 
         while not stop_event.is_set():
             try:
                 cur_id = str(analyzer.iter)
+                active_learning_iteration = int(cur_id)
                 with analyzer.lock:
                     analyzer.iter += 1
                     analyzer.reset_automata_cnt()
@@ -1057,6 +1070,7 @@ class Fuzzer:
             except LLMDeadlineExceeded:
                 logger.debug('Fuzzer: model learning stopped')
                 self._request_stop('deadline')
+                record_incomplete_learning_iteration('deadline')
                 break
             except ModelLearningStopped:
                 logger.debug('Fuzzer: model learning stopped')
@@ -1076,10 +1090,15 @@ class Fuzzer:
                         self.learning_outcome = 'deadline_partial'
                 elif getattr(analyzer, 'stop_reason', None) is None:
                     self._request_stop('model_learning_failure')
+                record_incomplete_learning_iteration(
+                    getattr(analyzer, 'stop_reason', None)
+                    or 'model_learning_failure'
+                )
                 break
             except Exception as error:
                 logger.exception('Fuzzer: model learning failed')
                 self._request_stop('model_learning_failure')
+                record_incomplete_learning_iteration('model_learning_failure')
                 raise RuntimeError('model learning failed') from error
 
             if self._should_stop_for_deadline():
@@ -1182,6 +1201,7 @@ class Fuzzer:
 
         analyzer.begin_phase('fuzzing')
         fuzz_phase_status = 'completed'
+        active_fuzz_iteration: int | None = None
         try:
             while (
                 not stop_event.is_set()
@@ -1190,7 +1210,17 @@ class Fuzzer:
                 try:
                     # init new learning process with previous model and run fuzzer
 
+                    active_fuzz_iteration = int(analyzer.iter)
                     req_res = berserker.run(2000)
+                    analyzer.record_iteration_state_metrics(
+                        phase='fuzzing',
+                        iteration=active_fuzz_iteration,
+                        sample_point='berserker_iteration_end',
+                        status=(
+                            getattr(analyzer, 'stop_reason', None)
+                            or 'completed'
+                        ),
+                    )
                     if self._should_stop_for_deadline():
                         break
                     if self.spec_knowledge:
@@ -1216,6 +1246,17 @@ class Fuzzer:
                     logger.debug('Fuzzer: deadline reached during fuzzing')
                     analyzer.collect_results()
         finally:
+            if active_fuzz_iteration is not None:
+                analyzer.record_iteration_state_metrics(
+                    phase='fuzzing',
+                    iteration=active_fuzz_iteration,
+                    sample_point='run_final',
+                    status=(
+                        getattr(analyzer, 'stop_reason', None)
+                        or fuzz_phase_status
+                    ),
+                    skip_if_iteration_recorded=True,
+                )
             analyzer.finalize_generator_metrics(
                 phase_iteration=analyzer.iter,
             )

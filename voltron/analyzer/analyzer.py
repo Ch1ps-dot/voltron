@@ -71,6 +71,8 @@ class Analyzer:
         self.llm_response_validation_path: Path | None = None
         self.model_learning_iteration_path: Path | None = None
         self.generator_iteration_metrics_path: Path | None = None
+        self.iteration_state_metrics_path: Path | None = None
+        self._recorded_iteration_state_metrics: set[tuple[str, int]] = set()
         self._generator_checkpoint_id = 0
         self._last_generator_checkpoint: dict | None = None
         self._last_generator_operation_id: str | None = None
@@ -101,6 +103,8 @@ class Analyzer:
             self.llm_response_validation_path = None
             self.model_learning_iteration_path = None
             self.generator_iteration_metrics_path = None
+            self.iteration_state_metrics_path = None
+            self._recorded_iteration_state_metrics = set()
             self._generator_checkpoint_id = 0
             self._last_generator_checkpoint = None
             self._last_generator_operation_id = None
@@ -135,6 +139,11 @@ class Analyzer:
                     / 'generator_iteration_metrics.csv'
                 )
                 generator_csv_path.unlink(missing_ok=True)
+                iteration_state_csv_path = (
+                    configs.results_path
+                    / 'iteration_state_metrics.csv'
+                )
+                iteration_state_csv_path.unlink(missing_ok=True)
             except Exception:
                 logger.exception('Analyzer: reset phase metrics failure')
 
@@ -577,10 +586,100 @@ class Analyzer:
                         self.lifetime_resp_trans_events_num()
                     ),
                 })
+            self.record_iteration_state_metrics(
+                phase='model_learning',
+                iteration=iteration,
+                sample_point='learning_iteration_end',
+                status=status,
+            )
         except Exception:
             logger.exception(
                 'Analyzer: write model learning iteration metrics failure'
             )
+
+    def record_iteration_state_metrics(
+            self,
+            phase: str,
+            iteration: int,
+            sample_point: str,
+            status: str,
+            *,
+            skip_if_iteration_recorded: bool = False,
+    ) -> bool:
+        """Persist one algorithm-iteration snapshot of response-graph size.
+
+        Unlike ``states.csv``, this table is emitted once at a defined outer
+        loop boundary.  ``nodes`` and ``edges`` therefore retain the existing
+        phase-cumulative response-graph meaning, while the ``iteration_*``
+        columns describe only work observed in the completed iteration.
+        """
+        try:
+            iteration = int(iteration)
+        except (TypeError, ValueError):
+            logger.warning(
+                'Analyzer: skip iteration state metrics with invalid '
+                'iteration=%r',
+                iteration,
+            )
+            return False
+
+        with self.lock:
+            key = (phase, iteration)
+            if (
+                skip_if_iteration_recorded
+                and key in self._recorded_iteration_state_metrics
+            ):
+                return False
+
+            csv_path = configs.results_path / 'iteration_state_metrics.csv'
+            write_header = (
+                not csv_path.is_file()
+                or csv_path.stat().st_size == 0
+            )
+            now = time.time()
+            started = getattr(self, 'start_time', now)
+            fieldnames = [
+                'phase',
+                'iteration',
+                'sample_point',
+                'status',
+                'elapsed_seconds',
+                'nodes',
+                'edges',
+                'iteration_nodes',
+                'iteration_edges',
+                'lifetime_nodes',
+                'lifetime_edges',
+            ]
+            try:
+                with csv_path.open(mode='a', encoding='utf-8', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    if write_header:
+                        writer.writeheader()
+                    writer.writerow({
+                        'phase': phase,
+                        'iteration': iteration,
+                        'sample_point': sample_point,
+                        'status': status,
+                        'elapsed_seconds': (
+                            f'{max(0.0, now - started):.6f}'
+                        ),
+                        'nodes': self.res_types_num(),
+                        'edges': self.resp_trans_num(),
+                        'iteration_nodes': len(self.cur_res_types_cnt),
+                        'iteration_edges': len(self.cur_resp_trans_cnt),
+                        'lifetime_nodes': self.lifetime_res_types_num(),
+                        'lifetime_edges': self.lifetime_resp_trans_num(),
+                    })
+                self.iteration_state_metrics_path = csv_path
+                if sample_point != 'run_final':
+                    self._recorded_iteration_state_metrics.add(key)
+                return True
+            except Exception:
+                logger.exception(
+                    'Analyzer: write iteration state metrics failure'
+                )
+                return False
 
     def record_generator_checkpoint(
             self,

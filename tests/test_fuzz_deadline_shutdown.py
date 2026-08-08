@@ -86,9 +86,23 @@ def test_model_learning_returns_cleanly_when_llm_deadline_is_reached(
     monkeypatch.setattr(configs, "models_path", tmp_path, raising=False)
     monkeypatch.setattr(fuzz_module, "MealyLstar", DeadlineLearning)
     monkeypatch.setattr(analyzer, "iter", 0, raising=False)
+    monkeypatch.setattr(analyzer, "stop_reason", None, raising=False)
+    iteration_metrics = []
+    monkeypatch.setattr(
+        analyzer,
+        "record_iteration_state_metrics",
+        lambda **kwargs: iteration_metrics.append(kwargs),
+    )
 
     assert fuzzer.model_learning(object(), object(), fuzzer.stop_event) is None
     assert fuzzer.stop_event.is_set()
+    assert iteration_metrics == [{
+        "phase": "model_learning",
+        "iteration": 0,
+        "sample_point": "run_final",
+        "status": "deadline",
+        "skip_if_iteration_recorded": True,
+    }]
 
 
 def test_parser_generation_does_not_retry_after_llm_deadline():
@@ -128,6 +142,7 @@ def test_berserker_fuzz_uses_energy_2000(monkeypatch):
     monkeypatch.setattr(fuzz_module, "Berserker", RecordingBerserker)
     monkeypatch.setattr(configs, "time_limit_s", 3600, raising=False)
     monkeypatch.setattr(analyzer, "start_time", time.time(), raising=False)
+    monkeypatch.setattr(analyzer, "stop_reason", None, raising=False)
     monkeypatch.setattr(analyzer, "cur_res_types_cnt", {}, raising=False)
     monkeypatch.setattr(analyzer, "begin_phase", lambda *_args: None)
     monkeypatch.setattr(analyzer, "end_phase", lambda *_args: None)
@@ -143,10 +158,29 @@ def test_berserker_fuzz_uses_energy_2000(monkeypatch):
         "finalize_generator_metrics",
         lambda **_kwargs: None,
     )
+    iteration_metrics = []
+    monkeypatch.setattr(
+        analyzer,
+        "record_iteration_state_metrics",
+        lambda **kwargs: iteration_metrics.append(kwargs),
+    )
 
     fuzzer.berserker_fuzz(None, stop_event)
 
     assert energies == [2000]
+    assert iteration_metrics[0] == {
+        "phase": "fuzzing",
+        "iteration": 0,
+        "sample_point": "berserker_iteration_end",
+        "status": "completed",
+    }
+    assert iteration_metrics[1] == {
+        "phase": "fuzzing",
+        "iteration": 0,
+        "sample_point": "run_final",
+        "status": "completed",
+        "skip_if_iteration_recorded": True,
+    }
 
 
 def test_state_fuzz_does_not_start_berserker_after_model_timeout(

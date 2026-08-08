@@ -59,11 +59,13 @@ def test_phase_metrics_reset_removes_previous_csv(tmp_path, monkeypatch):
     validation_path = tmp_path / "llm_response_validation.jsonl"
     iteration_csv_path = tmp_path / "model_learning_iterations.csv"
     generator_csv_path = tmp_path / "generator_iteration_metrics.csv"
+    iteration_state_csv_path = tmp_path / "iteration_state_metrics.csv"
     csv_path.write_text("old\n", encoding="utf-8")
     usage_csv_path.write_text("old\n", encoding="utf-8")
     validation_path.write_text("old\n", encoding="utf-8")
     iteration_csv_path.write_text("old\n", encoding="utf-8")
     generator_csv_path.write_text("old\n", encoding="utf-8")
+    iteration_state_csv_path.write_text("old\n", encoding="utf-8")
 
     metric.reset_phase_metrics()
 
@@ -72,6 +74,7 @@ def test_phase_metrics_reset_removes_previous_csv(tmp_path, monkeypatch):
     assert not validation_path.exists()
     assert not iteration_csv_path.exists()
     assert not generator_csv_path.exists()
+    assert not iteration_state_csv_path.exists()
 
 
 def test_llm_usage_metrics_aggregate_by_usage_and_model(
@@ -211,6 +214,73 @@ def test_model_learning_iteration_metrics_are_recorded(tmp_path, monkeypatch):
     assert row["lifetime_response_type_events"] == "8"
     assert row["lifetime_response_transitions"] == "3"
     assert row["lifetime_response_transition_events"] == "8"
+
+    iteration_rows = read_phase_rows(
+        tmp_path / "iteration_state_metrics.csv"
+    )
+    assert len(iteration_rows) == 1
+    iteration_row = iteration_rows[0]
+    assert iteration_row["phase"] == "model_learning"
+    assert iteration_row["iteration"] == "2"
+    assert iteration_row["sample_point"] == "learning_iteration_end"
+    assert iteration_row["status"] == "improved"
+    assert iteration_row["nodes"] == "3"
+    assert iteration_row["edges"] == "2"
+    assert iteration_row["iteration_nodes"] == "2"
+    assert iteration_row["iteration_edges"] == "1"
+    assert iteration_row["lifetime_nodes"] == "3"
+    assert iteration_row["lifetime_edges"] == "3"
+
+
+def test_iteration_state_metrics_capture_iteration_and_final_deduplication(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
+    monkeypatch.setattr("voltron.analyzer.analyzer.time.time", lambda: 125.5)
+    metric = Analyzer()
+    metric.start_time = 100.0
+    metric.res_types_cnt = {"220": 2, "331": 1}
+    metric.resp_trans_cnt = {"-/220": 2, "220/331": 1}
+    metric.cur_res_types_cnt = {"220": 2, "331": 1}
+    metric.cur_resp_trans_cnt = {"-/220": 2}
+    metric.lifetime_res_types_cnt = {"220": 3, "331": 1, "500": 1}
+    metric.lifetime_resp_trans_cnt = {
+        "-/220": 3,
+        "220/331": 1,
+        "331/500": 1,
+    }
+
+    assert metric.record_iteration_state_metrics(
+        phase="fuzzing",
+        iteration=4,
+        sample_point="berserker_iteration_end",
+        status="completed",
+    )
+    assert not metric.record_iteration_state_metrics(
+        phase="fuzzing",
+        iteration=4,
+        sample_point="run_final",
+        status="deadline",
+        skip_if_iteration_recorded=True,
+    )
+
+    rows = read_phase_rows(tmp_path / "iteration_state_metrics.csv")
+    assert len(rows) == 1
+    row = rows[0]
+    assert row == {
+        "phase": "fuzzing",
+        "iteration": "4",
+        "sample_point": "berserker_iteration_end",
+        "status": "completed",
+        "elapsed_seconds": "25.500000",
+        "nodes": "2",
+        "edges": "2",
+        "iteration_nodes": "2",
+        "iteration_edges": "1",
+        "lifetime_nodes": "3",
+        "lifetime_edges": "3",
+    }
 
 
 def test_lifetime_response_metrics_survive_phase_resets():
