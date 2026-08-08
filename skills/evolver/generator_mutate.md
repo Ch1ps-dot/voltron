@@ -28,5 +28,6 @@ Define `mutate() -> bytes` with no parameters.
 - Use deterministic mutation families plus bounded randomness, built-ins only, no networking/I/O, and never raise. Keep runtime practical while allowing large free-form payloads when useful.
 
 OUTPUT
-JSON only: {"base_sha256":"$base_sha256","edits":[{"start_line":1,"end_line":1,"replacement":"changed source lines"}]}.
-Line ranges are one-based, inclusive, non-overlapping, and refer to NUMBERED_SAVED_BEST_GENERATOR. Return only changed ranges, never the full program. Replacement must contain exact Python including indentation and escaped newlines.
+JSON only. For a change, return {"base_sha256":"$base_sha256","action":"patch","edits":[{"start_line":1,"end_line":1,"replacement":"changed source lines"}]}.
+If no evidence-backed mutation can safely improve on the saved generator, return {"base_sha256":"$base_sha256","action":"no_change","reason":"already_satisfies_goal|insufficient_evidence|no_safe_change","edits":[]}.
+Line ranges are one-based, inclusive, non-overlapping, and refer to NUMBERED_SAVED_BEST_GENERATOR. For patch, return only changed ranges, never the full program. Replacement must contain exact Python including indentation and escaped newlines.

@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 from voltron.llm.prompt import Prompter
 from voltron.llm.incremental import (
     IncrementalOutputError,
+    SourceDeltaResult,
     apply_ir_delta,
     apply_source_delta,
     content_sha256,
@@ -355,7 +356,7 @@ class AsyncChater:
         source: str,
         response: str | None,
         required_function: str = '',
-    ) -> str:
+    ) -> SourceDeltaResult:
         validated = validate_response(
             response,
             ResponseContract(kind='source_delta'),

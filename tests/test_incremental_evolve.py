@@ -10,6 +10,7 @@ from lxml import etree
 from voltron.llm.chatter import AsyncChater
 from voltron.llm.incremental import (
     IncrementalOutputError,
+    SourceDeltaResult,
     apply_ir_delta,
     apply_source_delta,
     content_sha256,
@@ -44,6 +45,8 @@ def test_source_delta_applies_non_overlapping_line_replacements():
 
     evolved = apply_source_delta(source, delta)
 
+    assert isinstance(evolved, SourceDeltaResult)
+    assert evolved.changed is True
     assert evolved == (
         "def generate():\n"
         "    value = b'B'\n"
@@ -72,6 +75,44 @@ def test_source_delta_applies_non_overlapping_line_replacements():
 def test_source_delta_rejects_wrong_baseline_or_overlaps(delta):
     with pytest.raises(IncrementalOutputError):
         apply_source_delta("a\nb\n", delta)
+
+
+def test_source_delta_can_explicitly_keep_the_matching_baseline():
+    source = "def generate():\n    return b'PING'\n"
+    delta = {
+        "base_sha256": content_sha256(source),
+        "action": "no_change",
+        "reason": "insufficient_evidence",
+        "edits": [],
+    }
+
+    evolved = apply_source_delta(source, delta)
+
+    assert evolved == source
+    assert evolved.changed is False
+    assert evolved.reason == "insufficient_evidence"
+
+
+@pytest.mark.parametrize(
+    "delta",
+    [
+        {
+            "base_sha256": content_sha256("x\n"),
+            "action": "no_change",
+            "reason": "insufficient_evidence",
+            "edits": [{"start_line": 1, "end_line": 1, "replacement": "y"}],
+        },
+        {
+            "base_sha256": content_sha256("x\n"),
+            "action": "no_change",
+            "reason": "unsupported",
+            "edits": [],
+        },
+    ],
+)
+def test_source_delta_rejects_invalid_no_change(delta):
+    with pytest.raises(IncrementalOutputError):
+        apply_source_delta("x\n", delta)
 
 
 def test_numbered_source_context_preserves_real_line_numbers_when_compacted():
@@ -337,6 +378,7 @@ def test_python_evolve_methods_apply_model_delta(
     result = asyncio.run(getattr(chatter, method_name)(**kwargs))
 
     assert result == expected
+    assert result.changed is True
     assert content_sha256(source) in captured["prompt"]
     assert "1|" in captured["prompt"]
     assert "edits" in captured["prompt"]
@@ -350,6 +392,55 @@ def test_python_evolve_methods_apply_model_delta(
     namespace = {}
     exec(result, namespace)
     assert callable(namespace[function_names[method_name]])
+
+
+def test_python_evolve_methods_preserve_a_valid_no_change_result():
+    template = Template(
+        (ROOT / "skills/evolver/generator_evolve.md").read_text(encoding="utf-8")
+    )
+    chatter = AsyncChater.__new__(AsyncChater)
+    chatter.pmp = SimpleNamespace(_tem_generator_evolve=template)
+    source = "def generate():\n    return b'A'\n"
+
+    async def fake_chat_llm(*, prompt, usage):
+        assert prompt
+        assert usage == "generator_evolve"
+        return json.dumps({
+            "base_sha256": content_sha256(source),
+            "action": "no_change",
+            "reason": "already_satisfies_goal",
+            "edits": [],
+        })
+
+    chatter.chat_llm = fake_chat_llm
+
+    result = asyncio.run(chatter.llm_generator_evolve(
+        pro_name="demo",
+        field_name="method",
+        msg_type="PING",
+        code=source,
+        msg_ir="<message />",
+        info="sut",
+        trace="",
+        related_code="",
+    ))
+
+    assert result == source
+    assert result.changed is False
+    assert result.reason == "already_satisfies_goal"
+
+
+def test_all_source_evolve_prompts_describe_the_no_change_result():
+    for path in (
+        "skills/evolver/generator_evolve.md",
+        "skills/evolver/parser_evolve.md",
+        "skills/evolver/generator_mutate.md",
+        "skills/evolver/observer_evolve.md",
+        "skills/evolver/checker_evolve.md",
+    ):
+        prompt = (ROOT / path).read_text(encoding="utf-8")
+        assert '"action":"no_change"' in prompt
+        assert '"reason"' in prompt
 
 
 def test_ir_evolve_method_applies_ops_and_returns_xml():

@@ -442,6 +442,53 @@ def test_threshold_relearning_exhausts_only_after_configured_retries(
     assert fuzzer.learning_outcome == 'partial_after_retry_exhausted'
 
 
+def test_threshold_relearning_keeps_running_after_explicit_no_change(
+    tmp_path,
+    monkeypatch,
+):
+    table = SimpleNamespace(S={('-',)}, E={('PING',)}, T={})
+
+    class Learner:
+        def __init__(self, *_args):
+            pass
+
+        def run(self, _model_id):
+            raise ModelLearningThresholdReached(table)
+
+    class Producer:
+        def __init__(self):
+            self.partial_calls = 0
+            self._last_generator_evolution_outcome = {}
+
+        def generator_evo_from_partial(self, _partial):
+            self.partial_calls += 1
+            self._last_generator_evolution_outcome = {
+                'attempted': 1,
+                'changed': 0,
+                'no_change': 1,
+                'failed': 0,
+            }
+            return []
+
+    monkeypatch.setattr('voltron.fuzz.MealyLstar', Learner)
+    fuzzer = _prepare_relearning_fuzzer(tmp_path, monkeypatch)
+    fuzzer.producer = Producer()
+    monkeypatch.setattr(configs, 'threshold_relearn_limit', 2, raising=False)
+    monkeypatch.setattr(configs, 'run_controller', None, raising=False)
+    monkeypatch.setattr(analyzer, 'stop_reason', None, raising=False)
+    fuzzer._learning_oracle_factory = lambda: (_threshold_mq(1), object())
+
+    result = fuzzer.model_learning(
+        _threshold_mq(0), object(), fuzzer.stop_event
+    )
+
+    assert result is None
+    assert fuzzer.producer.partial_calls == 2
+    assert not fuzzer.stop_event.is_set()
+    assert analyzer.stop_reason is None
+    assert fuzzer.learning_outcome == 'partial_after_retry_exhausted'
+
+
 def test_threshold_evolution_deadline_is_not_model_learning_failure(
     tmp_path,
     monkeypatch,

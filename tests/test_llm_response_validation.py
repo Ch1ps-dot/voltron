@@ -102,6 +102,25 @@ def test_source_delta_validation_is_followed_by_required_function_check():
     assert failure.value.reason == "missing_function"
 
 
+def test_source_delta_no_change_requires_an_allowed_reason_and_empty_edits():
+    contract = ResponseContract(kind="source_delta")
+    valid = {
+        "base_sha256": "a" * 64,
+        "action": "no_change",
+        "reason": "no_safe_change",
+        "edits": [],
+    }
+    assert validate_response(json.dumps(valid), contract).parsed == valid
+
+    invalid = dict(valid, edits=[{
+        "start_line": 1,
+        "end_line": 1,
+        "replacement": "pass",
+    }])
+    with pytest.raises(LLMResponseValidationError, match="no_change requires"):
+        validate_response(json.dumps(invalid), contract)
+
+
 def _completion(content, *, finish_reason=None, completion_tokens=4):
     return SimpleNamespace(
         choices=[SimpleNamespace(

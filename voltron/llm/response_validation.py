@@ -429,12 +429,38 @@ def _validate_source_delta(value: Any) -> None:
             "schema_failure",
             "source delta base_sha256 must be a lowercase SHA-256",
         )
-    edits = value["edits"]
-    if not isinstance(edits, list) or not edits or len(edits) > 64:
+    action = value.get("action", "patch")
+    if action not in {"patch", "no_change"}:
         raise LLMResponseValidationError(
             "schema_failure",
-            "source delta requires 1 to 64 edits",
+            "source delta action must be patch or no_change",
         )
+    edits = value["edits"]
+    if not isinstance(edits, list) or len(edits) > 64:
+        raise LLMResponseValidationError(
+            "schema_failure",
+            "source delta edits must contain at most 64 edits",
+        )
+    if action == "patch" and not edits:
+        raise LLMResponseValidationError(
+            "schema_failure",
+            "source delta patch requires 1 to 64 edits",
+        )
+    if action == "no_change":
+        if edits:
+            raise LLMResponseValidationError(
+                "schema_failure",
+                "source delta no_change requires empty edits",
+            )
+        if value.get("reason") not in {
+            "already_satisfies_goal",
+            "insufficient_evidence",
+            "no_safe_change",
+        }:
+            raise LLMResponseValidationError(
+                "schema_failure",
+                "source delta no_change has an invalid reason",
+            )
     for index, edit in enumerate(edits):
         if not isinstance(edit, dict):
             raise LLMResponseValidationError(

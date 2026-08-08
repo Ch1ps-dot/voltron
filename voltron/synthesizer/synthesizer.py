@@ -137,6 +137,10 @@ class AsyncProducer:
         attempt: int,
         code: str | None = None,
         error: str = '',
+        *,
+        base_sha256: str | None = None,
+        changed: bool | None = None,
+        reason: str = '',
     ) -> None:
         record = {
             'timestamp': time.time(),
@@ -149,6 +153,9 @@ class AsyncProducer:
                 if code is not None
                 else None
             ),
+            'base_sha256': base_sha256,
+            'changed': changed,
+            'reason': reason[:2000],
             'error': error[:2000],
         }
         try:
@@ -169,6 +176,16 @@ class AsyncProducer:
                     stream.write('\n')
         except Exception:
             logger.exception('Producer: failed to record generation manifest')
+
+    @staticmethod
+    def _evolution_changed(code: str) -> bool:
+        """Treat legacy string-returning test doubles as changed source."""
+        return bool(getattr(code, 'changed', True))
+
+    @staticmethod
+    def _evolution_reason(code: str) -> str:
+        reason = getattr(code, 'reason', '')
+        return reason if isinstance(reason, str) else ''
             
     def run(
         self
@@ -669,7 +686,7 @@ class AsyncProducer:
                             error=failure_error,
                             function_name='generate',
                         )
-                    
+
                     validation = validate_generated_code(
                         input_code,
                         'generate',
@@ -951,6 +968,17 @@ class AsyncProducer:
                         raise ValueError(validation.error)
                     with analyzer.lock:
                         analyzer.finished += 1
+                    if not self._evolution_changed(input_code):
+                        self._record_generation(
+                            'generator_evolution', msg_type, 'no_change',
+                            failure_count + 1, input_code,
+                            base_sha256=hashlib.sha256(
+                                old_code.encode('utf-8')
+                            ).hexdigest(),
+                            changed=False,
+                            reason=self._evolution_reason(input_code),
+                        )
+                        return msg_type, input_code
                     self._record_generation(
                         'generator_evolution', msg_type,
                         'generated' if failure_count == 0 else 'repaired',
@@ -1013,12 +1041,29 @@ class AsyncProducer:
         return results
 
     def _save_evolved_generators(self, results) -> list[str]:
-        """Publish locally validated generator evolution results."""
+        """Publish locally validated generator evolution results.
+
+        Keep a compact outcome summary for the model-learning recovery path.
+        An empty returned type list is otherwise ambiguous: every requested
+        generator may have explicitly selected ``no_change``, or every
+        synthesis attempt may have failed.  Only the former is a safe no-op.
+        """
         evolved_types: list[str] = []
+        outcome = {
+            'attempted': len(results),
+            'changed': 0,
+            'no_change': 0,
+            'failed': 0,
+        }
         for result in results:
             if result is None:
+                outcome['failed'] += 1
                 continue
             msg_type, input_code = result
+            if not self._evolution_changed(input_code):
+                outcome['no_change'] += 1
+                continue
+            outcome['changed'] += 1
             msg_dir = self._component_type_dir(
                 self.generator_path,
                 msg_type,
@@ -1045,6 +1090,7 @@ class AsyncProducer:
 
         with open(self.generator_info_path, 'w', encoding='utf-8') as f:
             json.dump(self.generator_info(), f)
+        self._last_generator_evolution_outcome = outcome
         return evolved_types
 
     def generator_evo(
@@ -1184,7 +1230,30 @@ class AsyncProducer:
                             error=failure_error,
                             function_name='mutate',
                         )
-                    
+
+                    if not self._evolution_changed(mutate_code):
+                        baseline_validation = validate_generated_code(
+                            mutate_code,
+                            'generate',
+                            'generator',
+                            timeout_s=self._generated_code_timeout(),
+                            max_output_bytes=self._generated_message_limit(),
+                        )
+                        if not baseline_validation.ok:
+                            raise ValueError(baseline_validation.error)
+                        with analyzer.lock:
+                            analyzer.finished += 1
+                        self._record_generation(
+                            'mutator', msg_type, 'no_change',
+                            failure_count + 1, mutate_code,
+                            base_sha256=hashlib.sha256(
+                                old_code.encode('utf-8')
+                            ).hexdigest(),
+                            changed=False,
+                            reason=self._evolution_reason(mutate_code),
+                        )
+                        return None
+
                     # berserker_code = await self.chater.llm_mutator_berserker(
                     #     code=old_code,
                     #     pro_name=self.rfcp.pro_name,
@@ -1890,6 +1959,31 @@ class AsyncProducer:
                         error=failure_error,
                         function_name='packet_observer',
                     )
+                if not self._evolution_changed(code):
+                    baseline_validation = validate_generated_code(
+                        code,
+                        'packet_observer',
+                        'observer',
+                        timeout_s=self._generated_code_timeout(),
+                        observer_samples=tuple(samples),
+                        require_equal_observations=True,
+                    )
+                    outcome = (
+                        'no_change'
+                        if baseline_validation.ok
+                        else 'no_change_unresolved'
+                    )
+                    self._record_generation(
+                        'observer_evolution', response_type, outcome,
+                        failure_count + 1, code,
+                        error='' if baseline_validation.ok else baseline_validation.error,
+                        base_sha256=hashlib.sha256(
+                            original_code.encode('utf-8')
+                        ).hexdigest(),
+                        changed=False,
+                        reason=self._evolution_reason(code),
+                    )
+                    return None
                 validation = validate_generated_code(
                     code,
                     'packet_observer',
@@ -2093,6 +2187,42 @@ class AsyncProducer:
                     response=response,
                     review_summary=review_summary,
                 )
+                if not self._evolution_changed(checker_code):
+                    baseline_validation = validate_generated_code(
+                        checker_code,
+                        'packet_checker',
+                        'checker',
+                        timeout_s=self._generated_code_timeout(),
+                    )
+                    accepted = False
+                    if baseline_validation.ok:
+                        namespace = {}
+                        exec(checker_code, namespace)
+                        checker_func = namespace['packet_checker']
+                        accepted = checker_func(response) is True
+                    outcome = (
+                        'no_change'
+                        if baseline_validation.ok and accepted
+                        else 'no_change_unresolved'
+                    )
+                    self._record_generation(
+                        'checker_evolution', response_type, outcome, 1,
+                        checker_code,
+                        error=(
+                            '' if outcome == 'no_change'
+                            else (
+                                baseline_validation.error
+                                if not baseline_validation.ok
+                                else 'current checker still rejects reviewed response'
+                            )
+                        ),
+                        base_sha256=hashlib.sha256(
+                            original_code.encode('utf-8')
+                        ).hexdigest(),
+                        changed=False,
+                        reason=self._evolution_reason(checker_code),
+                    )
+                    return None
                 compile(checker_code, '<checker_evolve>', 'exec')
                 namespace = {}
                 exec(checker_code, namespace)
@@ -2698,7 +2828,35 @@ class AsyncProducer:
                         error=failure_error,
                         function_name='packet_parser',
                     )
-                
+                if not self._evolution_changed(pkt_parser_code):
+                    baseline_validation = validate_generated_code(
+                        pkt_parser_code,
+                        'packet_parser',
+                        'parser',
+                        timeout_s=self._generated_code_timeout(),
+                        runtime_samples=(message,),
+                        require_nonempty_samples=True,
+                    )
+                    outcome = (
+                        'no_change'
+                        if baseline_validation.ok
+                        else 'no_change_unresolved'
+                    )
+                    self._record_generation(
+                        'parser_evolution', '__all__', outcome,
+                        failure_count + 1, pkt_parser_code,
+                        error='' if baseline_validation.ok else self._parser_validation_failure(
+                            baseline_validation.error,
+                            (message,),
+                        ),
+                        base_sha256=hashlib.sha256(
+                            old_code.encode('utf-8')
+                        ).hexdigest(),
+                        changed=False,
+                        reason=self._evolution_reason(pkt_parser_code),
+                    )
+                    return None
+
                 # test generated code
                 with analyzer.lock:
                     analyzer.finished += 1
@@ -3112,11 +3270,14 @@ class AsyncProducer:
     def parser_evo(
         self,
         message
-    ) -> None:
+    ) -> bool:
         """Generate and save parser
         """
         # produce new parser
         parser_code = asyncio.run(self._parser_evo_one(message))
+        if parser_code is None:
+            logger.debug('Producer: parser evolution kept the current parser')
+            return False
         
         par_dir = self.parser_path
         if not par_dir.is_dir():
@@ -3143,6 +3304,7 @@ class AsyncProducer:
             json.dump(self.parser_info(), f)
         
         logger.debug("[Producer]: finish parser evolve")
+        return True
 
     def generator_info(
         self

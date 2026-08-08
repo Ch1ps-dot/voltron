@@ -14,6 +14,38 @@ class IncrementalOutputError(ValueError):
     """Raised when a model delta is malformed or targets the wrong baseline."""
 
 
+class SourceDeltaResult(str):
+    """A source-delta application result that preserves string compatibility."""
+
+    changed: bool
+    reason: str | None
+
+    def __new__(
+        cls,
+        source: str,
+        *,
+        changed: bool,
+        reason: str | None = None,
+    ) -> "SourceDeltaResult":
+        result = super().__new__(cls, source)
+        result.changed = changed
+        result.reason = reason
+        return result
+
+    def __getnewargs_ex__(self):
+        return (
+            (str(self),),
+            {"changed": self.changed, "reason": self.reason},
+        )
+
+
+NO_CHANGE_REASONS = frozenset({
+    "already_satisfies_goal",
+    "insufficient_evidence",
+    "no_safe_change",
+})
+
+
 def content_sha256(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -86,14 +118,24 @@ def numbered_source_context(source: str, max_chars: int = 12_000) -> str:
     return "\n".join([*head, marker, *tail])
 
 
-def apply_source_delta(source: str, delta: dict[str, Any]) -> str:
-    """Apply non-overlapping, one-based inclusive line replacements."""
+def apply_source_delta(source: str, delta: dict[str, Any]) -> SourceDeltaResult:
+    """Apply a validated source delta or preserve its verified baseline."""
     expected_hash = content_sha256(source)
     if delta.get("base_sha256") != expected_hash:
         raise IncrementalOutputError("source delta base_sha256 mismatch")
     edits = delta.get("edits")
+    action = delta.get("action", "patch")
+    if action == "no_change":
+        reason = delta.get("reason")
+        if edits != []:
+            raise IncrementalOutputError("source delta no_change requires empty edits")
+        if reason not in NO_CHANGE_REASONS:
+            raise IncrementalOutputError("source delta no_change has an invalid reason")
+        return SourceDeltaResult(source, changed=False, reason=reason)
+    if action != "patch":
+        raise IncrementalOutputError("source delta action must be patch or no_change")
     if not isinstance(edits, list) or not edits:
-        raise IncrementalOutputError("source delta requires a non-empty edits list")
+        raise IncrementalOutputError("source delta patch requires a non-empty edits list")
 
     lines = source.splitlines(keepends=True)
     if not lines:
@@ -141,7 +183,7 @@ def apply_source_delta(source: str, delta: dict[str, Any]) -> str:
     evolved = "".join(lines)
     if evolved == source:
         raise IncrementalOutputError("source delta made no change")
-    return evolved
+    return SourceDeltaResult(evolved, changed=True)
 
 
 def _messages(root) -> list:

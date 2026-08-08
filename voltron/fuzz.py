@@ -764,7 +764,13 @@ class Fuzzer:
         best_hypothesis: MealyMachine | None,
         partial: PartialStateGraph,
     ) -> list[str]:
-        """Produce new generators before retrying a thresholded iteration."""
+        """Recover from a thresholded iteration without discarding a no-op.
+
+        Explicit source-delta ``no_change`` responses mean the current,
+        locally validated generator remains the right component to use.  They
+        are distinct from synthesis failures, even though both produce an
+        empty list of newly published generator types.
+        """
         if not self.spec_knowledge:
             raise RuntimeError(
                 'model-learning threshold cannot evolve components when '
@@ -788,12 +794,31 @@ class Fuzzer:
                     'producer does not support bootstrap partial evolution'
                 )
             result = evolve_partial(partial)
-        if not result:
-            raise RuntimeError(
-                'model-learning threshold evolution produced no usable '
-                'generator versions'
+        if result:
+            return list(result)
+
+        outcome = getattr(
+            self.producer,
+            '_last_generator_evolution_outcome',
+            None,
+        )
+        if (
+            isinstance(outcome, dict)
+            and outcome.get('attempted', 0) > 0
+            and outcome.get('changed', 0) == 0
+            and outcome.get('no_change', 0) == outcome.get('attempted')
+            and outcome.get('failed', 0) == 0
+        ):
+            logger.debug(
+                'Fuzzer: threshold generator evolution made no changes; '
+                'retaining current validated generators'
             )
-        return list(result)
+            return []
+
+        raise RuntimeError(
+            'model-learning threshold evolution produced no usable '
+            'generator versions'
+        )
 
     def _activate_captured_equipment(self, generators, parser) -> None:
         """Select the component versions that produced the chosen model."""
