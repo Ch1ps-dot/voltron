@@ -77,6 +77,9 @@ class Config:
         self.api_key_fuzz: str
         self.model_fuzz: str
         self.async_sem_fuzz: int
+        # At most this fraction of request types is evolved into mutators in
+        # one fuzzing round.  The LLM concurrency remains a separate cap.
+        self.mutator_round_ratio: float = 0.25
 
         self.base_url_compliance: str
         self.api_key_compliance: str

@@ -237,6 +237,37 @@ class Executor:
             return True
         return self.stop_event.is_set()
 
+    def _consume_interaction_provenance(
+        self,
+        msg_seq: list[tuple[str, bytes]],
+    ) -> list[dict[str, str]]:
+        mapper = getattr(self, 'mapper', None)
+        consume = getattr(mapper, 'consume_message_provenance', None)
+        if not callable(consume):
+            return []
+        try:
+            return consume(msg_seq)
+        except Exception:
+            logger.exception('Executor: component provenance lookup failed')
+            return []
+
+    def _set_state_snapshot_components(
+        self,
+        components: list[dict[str, str]],
+        request_type: str,
+    ) -> None:
+        setter = getattr(
+            self.analyzer,
+            'set_state_snapshot_components',
+            None,
+        )
+        if callable(setter):
+            setter(
+                components,
+                request_type,
+                getattr(self, '_parser_version', ''),
+            )
+
     def _poll_with_stop(
         self,
         poller: select.poll,
@@ -1128,6 +1159,7 @@ class Executor:
             self._interaction_index = 0
         self._interaction_index += 1
         self._prefetched_initial_response = None
+        component_provenance = self._consume_interaction_provenance(msg_seq)
 
         retry_limit = max(
             1,
@@ -1199,6 +1231,7 @@ class Executor:
             return False, None
         last_recv = '-'
         if(resp_code and resp_data):
+            self._set_state_snapshot_components([], '-')
             is_valid_response = self.check_response_during_fuzzing(
                 '-',
                 resp_code,
@@ -1221,7 +1254,7 @@ class Executor:
         last_msg_type = '-'
         last_msg = bytes()
         last_request_recorded = True
-        for msg_type, msg in msg_seq:
+        for request_index, (msg_type, msg) in enumerate(msg_seq):
             if self._should_stop():
                 break
             
@@ -1325,6 +1358,11 @@ class Executor:
                     if(resp_code == None):
                         logger.debug('Executor: parse error')
                         continue
+
+                    self._set_state_snapshot_components(
+                        component_provenance[:request_index + 1],
+                        msg_type,
+                    )
 
                     is_valid_response = True
                     if resp_data is not None:

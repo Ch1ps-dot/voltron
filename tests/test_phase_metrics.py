@@ -1,4 +1,5 @@
 import csv
+import json
 from types import SimpleNamespace
 
 from voltron.analyzer.analyzer import Analyzer
@@ -347,6 +348,52 @@ def test_state_snapshots_are_written_only_for_new_response_graph_items(
     assert {
         row["data"] for row in second_snapshot if row["data_type"] == "edges"
     } == {"1"}
+
+
+def test_state_snapshots_include_frozen_component_provenance(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
+    monkeypatch.setattr("voltron.analyzer.analyzer.time.time", lambda: 125.5)
+    metric = Analyzer()
+    metric.target_name = "demo"
+    metric.start_time = 100.0
+    components = [
+        {
+            "request_type": "LOGIN",
+            "kind": "generator",
+            "version": "id2",
+            "evolve_round": "evolve-1",
+        },
+        {
+            "request_type": "UPDATE",
+            "kind": "mutator",
+            "version": "id3",
+            "evolve_round": "mutate-5",
+        },
+    ]
+
+    metric.set_state_snapshot_phase("fuzzing", 5)
+    metric.set_state_snapshot_components(components, "UPDATE", "id4")
+    components[-1]["version"] = "id99"
+    metric.res_types_update("200")
+    metric.resp_trans_update("-/200")
+
+    rows = read_phase_rows(tmp_path / "states.csv")
+    assert len(rows) == 12
+    assert {row["phase"] for row in rows} == {"fuzzing"}
+    assert {row["phase_iteration"] for row in rows} == {"5"}
+    assert {row["evolve_round"] for row in rows} == {"mutate-5"}
+    assert {row["generator"] for row in rows} == {"UPDATE"}
+    assert {row["version"] for row in rows} == {"id3"}
+    assert {row["component_kind"] for row in rows} == {"mutator"}
+    assert {row["request_type"] for row in rows} == {"UPDATE"}
+    assert {row["parser_version"] for row in rows} == {"id4"}
+    assert {
+        json.loads(row["component_versions"])[-1]["version"]
+        for row in rows
+    } == {"id3"}
 
 
 def test_generator_checkpoints_record_cumulative_values_and_deltas(

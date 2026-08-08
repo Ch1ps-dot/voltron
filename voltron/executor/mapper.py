@@ -132,13 +132,120 @@ class Mapper:
         ] = {}
         self._quarantined_components: set[tuple[str, str, str]] = set()
         self._last_known_good: dict[tuple[str, str], object] = {}
+        self._component_evolution_rounds: dict[
+            tuple[str, str, str], str
+        ] = {}
+        self._message_provenance: dict[
+            int, tuple[bytes, dict[str, str]]
+        ] = {}
         
         self.cur_parser: Parser  = self.equip_parser()
+        self._initialize_component_evolution_rounds()
         
         
         self.message_pool: dict[str, dict[str, bytes]] = {} # store actual message
         
         logger.debug('Mapper: finish init')
+
+    def _initialize_component_evolution_rounds(self) -> None:
+        """Label cached equipment as this run's initial baseline."""
+        for msg_type, versions in self.generators.items():
+            for generator in versions:
+                self._component_evolution_rounds.setdefault(
+                    ('generator', msg_type, generator.name),
+                    'initial_generator',
+                )
+        for msg_type, versions in self.mutators.items():
+            for mutator in versions:
+                self._component_evolution_rounds.setdefault(
+                    ('mutator', msg_type, mutator.name),
+                    'initial_mutator',
+                )
+        parser = getattr(self, 'cur_parser', None)
+        parser_name = getattr(parser, 'name', '')
+        if parser_name:
+            self._component_evolution_rounds.setdefault(
+                ('parser', '__all__', parser_name),
+                'initial_parser',
+            )
+
+    def record_component_evolution(
+        self,
+        kind: str,
+        message_types: list[str] | set[str] | tuple[str, ...],
+        evolve_round: str,
+    ) -> None:
+        """Associate newly published component versions with their operation."""
+        if kind == 'generator':
+            source = self.generators
+        elif kind == 'mutator':
+            source = self.mutators
+        else:
+            return
+        for msg_type in message_types:
+            versions = source.get(msg_type, [])
+            if not versions:
+                continue
+            component = versions[-1]
+            self._component_evolution_rounds[
+                (kind, msg_type, component.name)
+            ] = str(evolve_round)
+
+    def _remember_message_provenance(
+        self,
+        message: bytes,
+        *,
+        request_type: str,
+        kind: str,
+        version: str,
+    ) -> None:
+        if not isinstance(message, bytes):
+            return
+        rounds = getattr(self, '_component_evolution_rounds', {})
+        record = {
+            'request_type': request_type,
+            'kind': kind,
+            'version': version,
+            'evolve_round': rounds.get(
+                (kind, request_type, version),
+                f'initial_{kind}',
+            ),
+        }
+        provenance = getattr(self, '_message_provenance', None)
+        if provenance is None:
+            provenance = {}
+            self._message_provenance = provenance
+        provenance[id(message)] = (message, record)
+        # Retain only a bounded amount when a caller selects messages but
+        # never passes them to Executor.interact().
+        while len(provenance) > 4096:
+            provenance.pop(next(iter(provenance)))
+
+    def consume_message_provenance(
+        self,
+        msg_seq: list[tuple[str, bytes]],
+    ) -> list[dict[str, str]]:
+        """Return provenance for one interaction and release consumed bytes."""
+        provenance = getattr(self, '_message_provenance', {})
+        records: list[dict[str, str]] = []
+        consumed: set[int] = set()
+        for request_type, message in msg_seq:
+            entry = provenance.get(id(message))
+            if entry is not None and entry[0] is message:
+                record = dict(entry[1])
+                record['request_type'] = request_type
+                records.append(record)
+                consumed.add(id(message))
+            else:
+                records.append({
+                    'request_type': request_type,
+                    'kind': '',
+                    'version': '',
+                    'evolve_round': '',
+                })
+        for key in consumed:
+            provenance.pop(key, None)
+        return records
     
     def g_path(
         self,
@@ -294,6 +401,12 @@ class Mapper:
                     if msg is not None:
                         msg_type = g.msg_type
                         ms.append((msg_type, msg))
+                        self._remember_message_provenance(
+                            msg,
+                            request_type=msg_type,
+                            kind='generator',
+                            version=g.name,
+                        )
                     else:
                         logger.debug(f'Mapper: generator failed {g.msg_type}/{g.name}')
                 except Exception:
@@ -338,6 +451,12 @@ class Mapper:
                     if msg is not None:
                         msg_type = m.msg_type
                         ms.append((msg_type, msg))
+                        self._remember_message_provenance(
+                            msg,
+                            request_type=msg_type,
+                            kind='mutator',
+                            version=m.name,
+                        )
                         selected = True
                     else:
                         logger.debug(f'Mapper: mutator failed {m.msg_type}/{m.name}')

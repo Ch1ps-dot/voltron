@@ -221,6 +221,20 @@ class Fuzzer:
         configs.api_key_fuzz = configs_yaml['llm_fuzz']['api_key']
         configs.model_fuzz = configs_yaml['llm_fuzz']['model']
         configs.async_sem_fuzz = configs_yaml['llm_fuzz']['async_sem']
+        fuzzing_config = configs_yaml.get('fuzzing', {})
+        try:
+            mutator_round_ratio = float(
+                fuzzing_config.get('mutator_round_ratio', 0.25)
+            )
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                'fuzzing.mutator_round_ratio must be a number in (0, 1]'
+            ) from error
+        if not 0 < mutator_round_ratio <= 1:
+            raise ValueError(
+                'fuzzing.mutator_round_ratio must be in (0, 1]'
+            )
+        configs.mutator_round_ratio = mutator_round_ratio
         configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()
@@ -820,6 +834,19 @@ class Fuzzer:
             'generator versions'
         )
 
+    def _record_component_evolution(
+        self,
+        kind: str,
+        message_types,
+        evolve_round: str,
+    ) -> None:
+        if not message_types:
+            return
+        mapper = getattr(self, 'mapper', None)
+        record = getattr(mapper, 'record_component_evolution', None)
+        if callable(record):
+            record(kind, message_types, evolve_round)
+
     def _activate_captured_equipment(self, generators, parser) -> None:
         """Select the component versions that produced the chosen model."""
         mapper_generators = getattr(self.mapper, 'generators', None)
@@ -894,6 +921,10 @@ class Fuzzer:
                 with analyzer.lock:
                     analyzer.iter += 1
                     analyzer.reset_automata_cnt()
+                analyzer.set_state_snapshot_phase(
+                    'model_learning',
+                    active_learning_iteration,
+                )
 
                 iteration_start = time.time()
                 with analyzer.lock:
@@ -936,7 +967,12 @@ class Fuzzer:
                             model_id=str(h.id),
                             iteration_status=iteration_status,
                         )
-                        self.producer.generator_evo(h)
+                        evolved_types = self.producer.generator_evo(h)
+                        self._record_component_evolution(
+                            'generator',
+                            evolved_types,
+                            f'evolve-{cur_id}',
+                        )
                     mq, eq = self._next_learning_oracles(mq, eq)
                     continue
 
@@ -995,7 +1031,12 @@ class Fuzzer:
                         model_id=str(h.id),
                         iteration_status=iteration_status,
                     )
-                    self.producer.generator_evo(h)
+                    evolved_types = self.producer.generator_evo(h)
+                    self._record_component_evolution(
+                        'generator',
+                        evolved_types,
+                        f'evolve-{cur_id}',
+                    )
                 mq, eq = self._next_learning_oracles(mq, eq)
                 continue
 
@@ -1089,6 +1130,11 @@ class Fuzzer:
                         else 'bootstrap_partial_evolution'
                     ),
                     mutated_types=evolved_types,
+                )
+                self._record_component_evolution(
+                    'generator',
+                    evolved_types,
+                    f'threshold-evolve-{cur_id}',
                 )
                 mq, eq = self._next_learning_oracles(mq, eq)
                 continue
@@ -1236,6 +1282,10 @@ class Fuzzer:
                     # init new learning process with previous model and run fuzzer
 
                     active_fuzz_iteration = int(analyzer.iter)
+                    analyzer.set_state_snapshot_phase(
+                        'fuzzing',
+                        active_fuzz_iteration,
+                    )
                     req_res = berserker.run(2000)
                     analyzer.record_iteration_state_metrics(
                         phase='fuzzing',
@@ -1249,9 +1299,14 @@ class Fuzzer:
                     if self._should_stop_for_deadline():
                         break
                     if self.spec_knowledge:
-                        self.producer.generator_mutate(
+                        evolved_mutators = self.producer.generator_mutate(
                             req_res,
                             iteration=analyzer.iter,
+                        )
+                        self._record_component_evolution(
+                            'mutator',
+                            evolved_mutators,
+                            f'mutate-{active_fuzz_iteration}',
                         )
                     pre_resp = analyzer.cur_res_types_cnt.keys()
 

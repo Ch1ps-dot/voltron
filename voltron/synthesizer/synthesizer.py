@@ -1,7 +1,7 @@
 from pathlib import Path
 from lxml import etree # type: ignore
 from tqdm import tqdm
-import json, asyncio, hashlib, threading, time, queue, re
+import json, asyncio, hashlib, math, threading, time, queue, re
 from collections.abc import Callable
 from tqdm.asyncio import tqdm_asyncio
 
@@ -1333,7 +1333,9 @@ class AsyncProducer:
             return []
 
         configured_limit = getattr(configs, 'async_sem_fuzz', len(req_types))
-        limit = max(1, min(configured_limit, len(req_types)))
+        ratio = float(getattr(configs, 'mutator_round_ratio', 0.25))
+        ratio_limit = math.ceil(len(req_types) * ratio)
+        limit = max(1, min(configured_limit, ratio_limit, len(req_types)))
         cursor = getattr(self, '_generator_mutate_cursor', 0) % len(req_types)
         selected = [
             req_types[(cursor + offset) % len(req_types)]
@@ -1346,7 +1348,7 @@ class AsyncProducer:
         self,
         req_res,
         iteration: int | None = None,
-    ) -> None:
+    ) -> list[str]:
         """Generate and save input mutator
         
         Attribute:
@@ -1378,6 +1380,7 @@ class AsyncProducer:
         )
         
         # resolve mutator
+        evolved_types: list[str] = []
         for result in results:
             if result is None:
                 continue
@@ -1409,6 +1412,7 @@ class AsyncProducer:
                 # set mutator name as {msg_type}
                 self.mutators.setdefault(msg_type, [])
                 self.mutators[msg_type].append(Generator(**info))
+                evolved_types.append(msg_type)
                 
         # save the information of new generator to file   
         with open(self.mutator_info_path, 'w', encoding='utf-8') as f:
@@ -1417,6 +1421,7 @@ class AsyncProducer:
         with analyzer.lock:
             analyzer.clean_progress()
         logger.debug("[Producer]: finish mutator generation")
+        return evolved_types
 
     async def _parser_gen_async(
             self

@@ -90,6 +90,15 @@ class Analyzer:
         
         self.sut_proc: subprocess.Popen | None = None
         self._state_snapshot_path: Path | None = None
+        # Context is set by the fuzzer and Executor immediately before a
+        # response can change the state graph.  It is copied into every row
+        # of one discovery snapshot, never reconstructed from newer
+        # components at CSV-write time.
+        self._state_snapshot_phase = ''
+        self._state_snapshot_phase_iteration: int | None = None
+        self._state_snapshot_components: tuple[dict[str, str], ...] = ()
+        self._state_snapshot_request_type = ''
+        self._state_snapshot_parser_version = ''
 
     def reset_phase_metrics(
             self
@@ -110,6 +119,11 @@ class Analyzer:
             self._last_generator_operation_id = None
             self._generator_metrics_finalized = False
             self._state_snapshot_path = None
+            self._state_snapshot_phase = ''
+            self._state_snapshot_phase_iteration = None
+            self._state_snapshot_components = ()
+            self._state_snapshot_request_type = ''
+            self._state_snapshot_parser_version = ''
             self.lifetime_res_types_cnt = {}
             self.lifetime_resp_trans_cnt = {}
             self.stop_reason = None
@@ -941,6 +955,38 @@ class Analyzer:
         """
         return
 
+    def set_state_snapshot_phase(
+            self,
+            phase: str,
+            phase_iteration: int | None,
+    ) -> None:
+        """Set phase-local provenance for subsequent state discoveries."""
+        with self.lock:
+            self._state_snapshot_phase = str(phase or '')
+            self._state_snapshot_phase_iteration = phase_iteration
+
+    def set_state_snapshot_components(
+            self,
+            components: list[dict[str, object]],
+            request_type: str,
+            parser_version: str,
+    ) -> None:
+        """Freeze the components that produced the response being counted."""
+        normalized: list[dict[str, str]] = []
+        for component in components:
+            if not isinstance(component, dict):
+                continue
+            normalized.append({
+                'request_type': str(component.get('request_type', '')),
+                'kind': str(component.get('kind', '')),
+                'version': str(component.get('version', '')),
+                'evolve_round': str(component.get('evolve_round', '')),
+            })
+        with self.lock:
+            self._state_snapshot_components = tuple(normalized)
+            self._state_snapshot_request_type = str(request_type or '')
+            self._state_snapshot_parser_version = str(parser_version or '')
+
     def _record_state_snapshot(
             self,
             event: str,
@@ -975,7 +1021,24 @@ class Analyzer:
                 'event_value',
                 'event_timestamp',
                 'elapsed_seconds',
+                'phase',
+                'phase_iteration',
+                'evolve_round',
+                'generator',
+                'version',
+                'component_kind',
+                'request_type',
+                'parser_version',
+                'component_versions',
             ]
+            components = self._state_snapshot_components
+            active_component = components[-1] if components else {}
+            component_versions = json.dumps(
+                list(components),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(',', ':'),
+            )
             values = (
                 ('nodes', self.res_types_num()),
                 ('edges', self.resp_trans_num()),
@@ -1012,6 +1075,25 @@ class Analyzer:
                             'event_value': event_value,
                             'event_timestamp': f'{timestamp:.6f}',
                             'elapsed_seconds': f'{elapsed_seconds:.6f}',
+                            'phase': self._state_snapshot_phase,
+                            'phase_iteration': (
+                                ''
+                                if self._state_snapshot_phase_iteration is None
+                                else self._state_snapshot_phase_iteration
+                            ),
+                            'evolve_round': active_component.get(
+                                'evolve_round',
+                                '',
+                            ),
+                            'generator': active_component.get(
+                                'request_type',
+                                '',
+                            ),
+                            'version': active_component.get('version', ''),
+                            'component_kind': active_component.get('kind', ''),
+                            'request_type': self._state_snapshot_request_type,
+                            'parser_version': self._state_snapshot_parser_version,
+                            'component_versions': component_versions,
                         })
                 self._state_snapshot_path = series_file
             except Exception:

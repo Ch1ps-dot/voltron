@@ -113,6 +113,11 @@ llm_compliance:
   model: none
   async_sem: 8
 
+# Per fuzzing iteration, evolve at most 25% of the request types.  The
+# llm_fuzz async_sem remains an independent upper bound on concurrent calls.
+fuzzing:
+  mutator_round_ratio: 0.25
+
 generated_code:
   retry_limit: 3
   timeout_seconds: 2.0
