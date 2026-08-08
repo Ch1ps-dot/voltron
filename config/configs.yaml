@@ -97,19 +97,19 @@ executor:
 
 llm_doc:
   base_url: https://api.deepseek.com
-  api_key: sk-cec1037f00164961ad06e0eb4950383b
+  api_key: ${VOLTRON_LLM_DOC_API_KEY}
   model: deepseek-v4-flash
   async_sem: 8
 
 llm_fuzz:
   base_url: none
-  api_key: none
+  api_key: ${VOLTRON_LLM_FUZZ_API_KEY}
   model: none
   async_sem: 8
 
 llm_compliance:
   base_url: none
-  api_key: none
+  api_key: ${VOLTRON_LLM_COMPLIANCE_API_KEY}
   model: none
   async_sem: 8
 

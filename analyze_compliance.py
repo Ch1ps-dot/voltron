@@ -11,11 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
 from fastbm25 import fastbm25
 from tqdm import tqdm
 
 from voltron.configs import configs
+from voltron.config_loader import load_runtime_config
 from voltron.llm.chatter import AsyncChater
 from voltron.rfcparser.setciontree import SectionTree
 
@@ -121,9 +121,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_target_config(target_name: str) -> dict[str, Any]:
-    config_path = configs.base_path / "config" / "configs.yaml"
-    with config_path.open("r", encoding="utf-8") as f:
-        config_data = yaml.safe_load(f)
+    config_dir = configs.base_path / "config"
+    config_path = config_dir / "configs.yaml"
+    config_data = load_runtime_config(config_dir)
 
     target = config_data.get(target_name)
     if not isinstance(target, dict):

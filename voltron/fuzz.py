@@ -22,6 +22,7 @@ from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
+from voltron.config_loader import load_runtime_config
 
 from voltron.learner.mlstar import (
     MealyLstar,
@@ -140,10 +141,9 @@ class Fuzzer:
     ) -> None:
         self.configs_yaml: str
         try:
-            with open(configs.base_path / 'config' /'configs.yaml', 'r', encoding='utf-8') as f:
-                configs_yaml = yaml.safe_load(f)
-                if self.target_name not in configs_yaml.keys():
-                    raise Exception(f'Fuzzer: unknown target {self.target_name}')
+            configs_yaml = load_runtime_config(configs.base_path / 'config')
+            if self.target_name not in configs_yaml.keys():
+                raise Exception(f'Fuzzer: unknown target {self.target_name}')
         except Exception:
             logger.exception('Fuzzer: config load failure')
             

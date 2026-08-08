@@ -1,0 +1,9 @@
+# Copy to configs.local.yaml (which is ignored) only when a local override is
+# needed. Prefer the VOLTRON_LLM_*_API_KEY environment variables in CI.
+llm_doc:
+  api_key: local-api-key-not-for-commit
+
+# llm_fuzz:
+#   api_key: local-api-key-not-for-commit
+# llm_compliance:
+#   api_key: local-api-key-not-for-commit

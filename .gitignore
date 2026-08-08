@@ -1,6 +1,12 @@
 # Local target and LLM credentials
 fuzz_logs
 voltronbench/
+config/configs.local.yaml
+config/*.private.yaml
+.env
+.env.*
+!.env.example
+*.secrets.yaml
 __pycache__/
 # Python 编译缓存文件
 __pycache__/

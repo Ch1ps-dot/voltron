@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
 from voltron.configs import configs
+from voltron.config_loader import load_runtime_config
 from voltron.llm.chatter import AsyncChater
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 
@@ -17,9 +16,9 @@ class SectionTreeParseResult:
 
 def _configure_rfc_parser(target_name: str) -> None:
     """Load only the configuration required by the RFC parser."""
-    config_path = configs.base_path / 'config' / 'configs.yaml'
-    with config_path.open('r', encoding='utf-8') as stream:
-        config_data = yaml.safe_load(stream)
+    config_dir = configs.base_path / 'config'
+    config_path = config_dir / 'configs.yaml'
+    config_data = load_runtime_config(config_dir)
 
     if not isinstance(config_data, dict):
         raise ValueError(f'invalid configuration mapping: {config_path}')
