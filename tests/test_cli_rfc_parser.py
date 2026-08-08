@@ -49,7 +49,9 @@ def test_fuzzing_mode_still_requires_time():
     assert 'Missing option "-t" / "--time" for fuzzing mode.' in result.output
 
 
-def test_compliance_analysis_option_is_forwarded_to_fuzzer(monkeypatch):
+def test_compliance_analysis_default_and_option_are_forwarded_to_fuzzer(
+    monkeypatch,
+):
     captured = {}
 
     class FakeFuzzer:
@@ -63,11 +65,20 @@ def test_compliance_analysis_option_is_forwarded_to_fuzzer(monkeypatch):
 
     result = CliRunner().invoke(
         cli_module.main,
-        ["--sut", "lightftp", "--time", "1", "--no-compliance-analysis"],
+        ["--sut", "lightftp", "--time", "1"],
     )
 
     assert result.exit_code == 0
     assert captured["compliance_analysis"] is False
+
+    captured.clear()
+    result = CliRunner().invoke(
+        cli_module.main,
+        ["--sut", "lightftp", "--time", "1", "--compliance-analysis"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["compliance_analysis"] is True
 
 
 def test_observer_option_is_forwarded_to_fuzzer(monkeypatch):

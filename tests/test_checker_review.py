@@ -74,7 +74,8 @@ def make_conversation(
     return cons
 
 
-def test_confirmed_violation_is_saved_once():
+def test_confirmed_violation_is_saved_once(monkeypatch):
+    monkeypatch.setattr(configs, "compliance_analysis", True)
     executor, producer = make_executor("non_compliant")
     saved = []
     operations = []
@@ -230,7 +231,8 @@ def test_persisted_dedup_supports_legacy_analysis_without_hash(tmp_path):
     assert len(list(target.glob("cons_*.analysis.json"))) == 1
 
 
-def test_compliant_false_positive_evolves_and_hot_reloads_checker():
+def test_compliant_false_positive_evolves_and_hot_reloads_checker(monkeypatch):
+    monkeypatch.setattr(configs, "compliance_analysis", True)
     executor, producer = make_executor("compliant")
     loaded = []
     executor.load_checkers = lambda checkers: loaded.append(checkers)
@@ -243,7 +245,8 @@ def test_compliant_false_positive_evolves_and_hot_reloads_checker():
     assert executor.analyzer.current_operation == ""
 
 
-def test_same_response_code_is_reviewed_once_across_request_types():
+def test_same_response_code_is_reviewed_once_across_request_types(monkeypatch):
+    monkeypatch.setattr(configs, "compliance_analysis", True)
     executor, producer = make_executor("uncertain")
 
     executor.handle_nonconforming_response(

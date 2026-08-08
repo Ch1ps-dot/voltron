@@ -23,7 +23,7 @@ class Config:
         self.spec_knowledge: bool = True
         self.state_learning: bool = True
         self.guided_scheduling: bool = True
-        self.compliance_analysis: bool = True
+        self.compliance_analysis: bool = False
         self.observer_enabled: bool = True
         self.ir_evolution_enabled: bool = True
         self.ir_evolution_failure_threshold: int = 3
@@ -80,6 +80,9 @@ class Config:
         # At most this fraction of request types is evolved into mutators in
         # one fuzzing round.  The LLM concurrency remains a separate cap.
         self.mutator_round_ratio: float = 0.25
+        # Bound LLM-driven mutator evolution for one fuzzing phase.  Zero is
+        # the explicit opt-out for experiments that require an unlimited run.
+        self.mutator_round_limit: int = 12
 
         self.base_url_compliance: str
         self.api_key_compliance: str

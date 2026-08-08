@@ -54,11 +54,11 @@ import click
 )
 @click.option(
     "--compliance-analysis/--no-compliance-analysis",
-    default=True,
+    default=False,
     show_default=True,
     help=(
         "Review checker rejections with the compliance LLM and evolve "
-        "false-positive checkers."
+        "false-positive checkers (disabled by default)."
     ),
 )
 @click.option(

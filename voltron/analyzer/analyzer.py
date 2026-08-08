@@ -705,6 +705,9 @@ class Analyzer:
             iteration_status: str = '',
             mutated_types: list[str] | None = None,
             baseline_operation_id: str = '',
+            mutator_round_limit: int | None = None,
+            mutator_rounds_attempted: int | None = None,
+            published_mutator_types: list[str] | None = None,
     ) -> None:
         """Persist one whole-run response snapshot around generator updates."""
         with self.lock:
@@ -773,6 +776,9 @@ class Analyzer:
                 'lifetime_response_transitions',
                 'delta_transition_events',
                 'delta_response_transitions',
+                'mutator_round_limit',
+                'mutator_rounds_attempted',
+                'published_mutator_types',
             ]
             try:
                 with csv_path.open(
@@ -825,6 +831,20 @@ class Analyzer:
                         ),
                         'delta_response_transitions': (
                             deltas['response_transitions']
+                        ),
+                        'mutator_round_limit': (
+                            ''
+                            if mutator_round_limit is None
+                            else mutator_round_limit
+                        ),
+                        'mutator_rounds_attempted': (
+                            ''
+                            if mutator_rounds_attempted is None
+                            else mutator_rounds_attempted
+                        ),
+                        'published_mutator_types': json.dumps(
+                            published_mutator_types or [],
+                            separators=(',', ':'),
                         ),
                     })
                     f.flush()

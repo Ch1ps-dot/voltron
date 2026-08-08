@@ -497,3 +497,38 @@ def test_generator_checkpoints_record_cumulative_values_and_deltas(
     assert rows[5]["delta_response_types"] == "0"
     assert rows[5]["delta_transition_events"] == "1"
     assert rows[5]["delta_response_transitions"] == "0"
+
+
+def test_generator_checkpoint_records_mutator_round_limit_metadata(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(configs, "results_path", tmp_path, raising=False)
+    metric = Analyzer()
+    metric.start_time = 0
+
+    metric.record_generator_checkpoint(
+        phase="fuzzing",
+        checkpoint_type="fuzzing_baseline",
+        phase_iteration=0,
+        baseline_operation_id="initial_mutator",
+    )
+    metric.record_generator_checkpoint(
+        phase="fuzzing",
+        checkpoint_type="mutator_round_limit_reached",
+        phase_iteration=11,
+        iteration_status="frozen",
+        mutator_round_limit=12,
+        mutator_rounds_attempted=12,
+        published_mutator_types=["PASS", "USER"],
+    )
+
+    rows = read_phase_rows(tmp_path / "generator_iteration_metrics.csv")
+    assert len(rows) == 2
+    row = rows[-1]
+    assert row["checkpoint_type"] == "mutator_round_limit_reached"
+    assert row["phase_iteration"] == "11"
+    assert row["iteration_status"] == "frozen"
+    assert row["mutator_round_limit"] == "12"
+    assert row["mutator_rounds_attempted"] == "12"
+    assert json.loads(row["published_mutator_types"]) == ["PASS", "USER"]

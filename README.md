@@ -356,12 +356,13 @@ for that round in `mutated_types`.
 
 ## Compliance Analysis
 
-During fuzzing, checker rejections are reviewed with the compliance LLM by
-default.  Disable those in-run LLM reviews (and the associated checker repair)
-while retaining normal fuzzing and pair collection with:
+During fuzzing, in-run compliance analysis is disabled by default: checker
+rejections do not trigger an LLM review or checker repair.  Normal fuzzing and
+pair collection continue unchanged.  Enable those in-run reviews explicitly
+with:
 
 ```bash
-uv run cli.py -s lighttpd -t 60 --no-compliance-analysis
+uv run cli.py -s lighttpd -t 60 --compliance-analysis
 ```
 
 `analyze_compliance.py` remains a separate post-processing command and is not

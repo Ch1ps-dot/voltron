@@ -108,7 +108,7 @@ class Fuzzer:
             spec_knowledge: bool = True,
             state_learning: bool = True,
             guided_scheduling: bool = True,
-            compliance_analysis: bool = True,
+            compliance_analysis: bool = False,
             observer_enabled: bool = True,
         ) -> None:
         self.target_name = target_name
@@ -235,6 +235,32 @@ class Fuzzer:
                 'fuzzing.mutator_round_ratio must be in (0, 1]'
             )
         configs.mutator_round_ratio = mutator_round_ratio
+        raw_mutator_round_limit = fuzzing_config.get(
+            'mutator_round_limit',
+            12,
+        )
+        if isinstance(raw_mutator_round_limit, bool):
+            raise ValueError(
+                'fuzzing.mutator_round_limit must be a non-negative integer'
+            )
+        if (
+            isinstance(raw_mutator_round_limit, float)
+            and not raw_mutator_round_limit.is_integer()
+        ):
+            raise ValueError(
+                'fuzzing.mutator_round_limit must be a non-negative integer'
+            )
+        try:
+            mutator_round_limit = int(raw_mutator_round_limit)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                'fuzzing.mutator_round_limit must be a non-negative integer'
+            ) from error
+        if mutator_round_limit < 0:
+            raise ValueError(
+                'fuzzing.mutator_round_limit must be a non-negative integer'
+            )
+        configs.mutator_round_limit = mutator_round_limit
         configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()
@@ -1273,6 +1299,12 @@ class Fuzzer:
         analyzer.begin_phase('fuzzing')
         fuzz_phase_status = 'completed'
         active_fuzz_iteration: int | None = None
+        mutator_round_limit = max(
+            0,
+            int(getattr(configs, 'mutator_round_limit', 12)),
+        )
+        mutator_rounds_attempted = 0
+        published_mutator_types: set[str] = set()
         try:
             while (
                 not stop_event.is_set()
@@ -1298,16 +1330,50 @@ class Fuzzer:
                     )
                     if self._should_stop_for_deadline():
                         break
-                    if self.spec_knowledge:
+                    if self.spec_knowledge and (
+                        mutator_round_limit == 0
+                        or mutator_rounds_attempted < mutator_round_limit
+                    ):
+                        # Reserve budget before the LLM call.  A no-change or
+                        # invalid result still consumed a mutation attempt and
+                        # must not allow an unbounded retry loop.
+                        mutator_rounds_attempted += 1
                         evolved_mutators = self.producer.generator_mutate(
                             req_res,
                             iteration=analyzer.iter,
                         )
+                        published_mutator_types.update(evolved_mutators)
                         self._record_component_evolution(
                             'mutator',
                             evolved_mutators,
                             f'mutate-{active_fuzz_iteration}',
                         )
+                        if (
+                            mutator_round_limit > 0
+                            and mutator_rounds_attempted
+                            == mutator_round_limit
+                        ):
+                            analyzer.record_generator_checkpoint(
+                                phase='fuzzing',
+                                checkpoint_type=(
+                                    'mutator_round_limit_reached'
+                                ),
+                                phase_iteration=active_fuzz_iteration,
+                                iteration_status='frozen',
+                                mutator_round_limit=mutator_round_limit,
+                                mutator_rounds_attempted=(
+                                    mutator_rounds_attempted
+                                ),
+                                published_mutator_types=sorted(
+                                    published_mutator_types
+                                ),
+                            )
+                            logger.info(
+                                'Fuzzer: mutator round limit reached '
+                                '(%d); continuing fuzzing with frozen '
+                                'mutators',
+                                mutator_round_limit,
+                            )
                     pre_resp = analyzer.cur_res_types_cnt.keys()
 
                     # save the results

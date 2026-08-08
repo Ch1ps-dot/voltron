@@ -117,6 +117,9 @@ llm_compliance:
 # llm_fuzz async_sem remains an independent upper bound on concurrent calls.
 fuzzing:
   mutator_round_ratio: 0.25
+  # After 12 LLM mutation attempts, keep fuzzing with the latest validated
+  # mutators.  Set to 0 only for an explicitly unlimited experiment.
+  mutator_round_limit: 12
 
 generated_code:
   retry_limit: 3
