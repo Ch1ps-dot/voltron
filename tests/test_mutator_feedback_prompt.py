@@ -123,6 +123,8 @@ def test_mutator_prompt_includes_runtime_response_feedback():
     assert "NUMBERED_SAVED_BEST_GENERATOR" in captured["prompt"]
     assert '["ERROR", "PONG"]' in captured["prompt"]
     assert "not yet present" in captured["prompt"]
+    assert "normally with `generate()` as its entry" in captured["prompt"]
+    assert "exactly one\ntop-level `mutate() -> bytes`" in captured["prompt"]
 
 
 def test_code_repair_prompt_includes_failed_code_and_validation_error():

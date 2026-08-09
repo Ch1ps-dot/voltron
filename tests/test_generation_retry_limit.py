@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -8,6 +9,7 @@ from voltron.analyzer.analyzer import analyzer
 from lxml import etree
 
 from voltron.configs import configs
+from voltron.llm.chatter import AsyncChater
 from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.code_validation import RAW_SHA256_OBSERVER
 from voltron.synthesizer.synthesizer import AsyncProducer
@@ -160,6 +162,70 @@ def test_invalid_mutator_is_retried_three_times_then_skipped(tmp_path, monkeypat
     assert result is None
     assert chater.generate_calls == 1
     assert chater.repair_calls == 2
+
+
+def test_mutator_delta_missing_entry_is_repaired_from_candidate(
+    tmp_path,
+    monkeypatch,
+):
+    _set_retry_limit(monkeypatch)
+    generator_path = tmp_path / "generator.py"
+    baseline = "def generate():\n    return b'PING\\r\\n'\n"
+    generator_path.write_text(baseline, encoding="utf-8")
+
+    class DeltaThenRepairChater:
+        def __init__(self):
+            self.evolve_calls = 0
+            self.repair_kwargs = None
+
+        async def llm_mutator_evolve(self, *, code, **_kwargs):
+            self.evolve_calls += 1
+            delta = json.dumps({
+                "base_sha256": hashlib.sha256(code.encode()).hexdigest(),
+                "edits": [{
+                    "start_line": 1,
+                    "end_line": 2,
+                    "replacement": "def generate():\n    return b'BROKEN\\r\\n'",
+                }],
+            })
+            return AsyncChater._apply_python_delta(code, delta, "mutate")
+
+        async def llm_code_repair(self, **kwargs):
+            self.repair_kwargs = kwargs
+            return "def mutate():\n    return b'MUTATED\\r\\n'\n"
+
+    chater = DeltaThenRepairChater()
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.generators = {
+        "PING": [
+            Generator(
+                msg_type="PING",
+                name="id0",
+                evolved_from="",
+                path=str(generator_path),
+            )
+        ]
+    }
+    producer.best_generators = {}
+    producer.chater = chater
+    producer.rfcp = SimpleNamespace(pro_name="example", req_fields=["method"])
+    producer.poss_response = {"PING": []}
+    producer._request_ir_info = lambda _msg_type: "<message />"
+    producer._record_generation = lambda *_args, **_kwargs: None
+
+    result = asyncio.run(
+        producer._generator_mutate_one(
+            "PING", "SUT information", {"PING": set()}, asyncio.Semaphore(1)
+        )
+    )
+
+    assert result == ("PING", "def mutate():\n    return b'MUTATED\\r\\n'\n")
+    assert chater.evolve_calls == 1
+    assert chater.repair_kwargs["code"] == (
+        "def generate():\n    return b'BROKEN\\r\\n'\n"
+    )
+    assert "missing_function: mutate" in chater.repair_kwargs["error"]
+    assert chater.repair_kwargs["function_name"] == "mutate"
 
 
 def test_invalid_checker_and_observer_are_retried_three_times_then_skipped(

@@ -7,7 +7,10 @@ import pytest
 
 from voltron.analyzer.analyzer import Analyzer, analyzer
 from voltron.configs import configs
-from voltron.llm.chatter import AsyncChater
+from voltron.llm.chatter import (
+    AsyncChater,
+    CandidateSourceValidationError,
+)
 from voltron.llm.incremental import content_sha256
 from voltron.llm.response_validation import (
     LLMResponseValidationError,
@@ -96,10 +99,44 @@ def test_source_delta_validation_is_followed_by_required_function_check():
         }],
     })
 
-    with pytest.raises(LLMResponseValidationError) as failure:
+    with pytest.raises(CandidateSourceValidationError) as failure:
         AsyncChater._apply_python_delta(source, delta, "generate")
 
     assert failure.value.reason == "missing_function"
+    assert failure.value.candidate_source == "value = 1\n"
+
+
+def test_source_delta_no_change_keeps_a_generator_baseline():
+    source = "def generate():\n    return b'PING'\n"
+    delta = json.dumps({
+        "base_sha256": content_sha256(source),
+        "action": "no_change",
+        "reason": "no_safe_change",
+        "edits": [],
+    })
+
+    result = AsyncChater._apply_python_delta(source, delta, "mutate")
+
+    assert result == source
+    assert result.changed is False
+
+
+def test_source_delta_invalid_python_exposes_candidate_for_repair():
+    source = "def generate():\n    return b'PING'\n"
+    delta = json.dumps({
+        "base_sha256": content_sha256(source),
+        "edits": [{
+            "start_line": 1,
+            "end_line": 2,
+            "replacement": "def mutate(:\n",
+        }],
+    })
+
+    with pytest.raises(CandidateSourceValidationError) as failure:
+        AsyncChater._apply_python_delta(source, delta, "mutate")
+
+    assert failure.value.reason == "invalid_python"
+    assert failure.value.candidate_source == "def mutate(:\n"
 
 
 def test_source_delta_no_change_requires_an_allowed_reason_and_empty_edits():

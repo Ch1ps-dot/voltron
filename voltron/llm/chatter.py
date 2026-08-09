@@ -34,6 +34,18 @@ class LLMDeadlineExceeded(RuntimeError):
     """Raised when an LLM request would outlive the fuzzing deadline."""
 
 
+class CandidateSourceValidationError(LLMResponseValidationError):
+    """Expose an applied source delta that failed its Python contract."""
+
+    def __init__(
+        self,
+        error: LLMResponseValidationError,
+        candidate_source: str,
+    ) -> None:
+        super().__init__(error.reason, error.detail)
+        self.candidate_source = candidate_source
+
+
 class AsyncChater:
     """Chat with llm through api and manage the context.
     """
@@ -362,14 +374,23 @@ class AsyncChater:
             ResponseContract(kind='source_delta'),
         )
         evolved = apply_source_delta(source, validated.parsed)
-        validate_response(
-            evolved,
-            ResponseContract(
-                kind='python',
-                required_function=required_function,
-                allow_markdown_fence=False,
-            ),
-        )
+        # A mutator ``no_change`` intentionally retains its generator
+        # baseline.  The caller recognizes that SourceDeltaResult and keeps
+        # the current validated mutator, so requiring ``mutate`` here would
+        # make an otherwise valid no-change response impossible.
+        if not evolved.changed:
+            return evolved
+        try:
+            validate_response(
+                evolved,
+                ResponseContract(
+                    kind='python',
+                    required_function=required_function,
+                    allow_markdown_fence=False,
+                ),
+            )
+        except LLMResponseValidationError as error:
+            raise CandidateSourceValidationError(error, str(evolved)) from error
         return evolved
 
     async def chat_llm(

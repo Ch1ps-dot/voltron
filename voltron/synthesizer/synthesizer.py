@@ -28,7 +28,11 @@ from voltron.analyzer.compliance import (
     parse_compliance_result,
     retrieve_response_sections,
 )
-from voltron.llm.chatter import AsyncChater, LLMDeadlineExceeded
+from voltron.llm.chatter import (
+    AsyncChater,
+    CandidateSourceValidationError,
+    LLMDeadlineExceeded,
+)
 from voltron.learner.automata import MealyMachine
 from dataclasses import dataclass, asdict, field
     
@@ -1290,6 +1294,19 @@ class AsyncProducer:
                         mutate_code, failure_error,
                     )
                     break
+                except CandidateSourceValidationError as error:
+                    # The delta itself was valid and produced this source;
+                    # retain it so repair receives the exact missing-entry or
+                    # syntax failure instead of repeating the original prompt.
+                    mutate_code = error.candidate_source
+                    failed_code = mutate_code
+                    failure_error = f'{type(error).__name__}: {error}'
+                    failure_count += 1
+                    self._record_generation(
+                        'mutator', msg_type, 'invalid', failure_count,
+                        mutate_code, failure_error,
+                    )
+                    logger.exception('Producer: mutator candidate failed validation')
                 except Exception as error:
                     if mutate_code is not None:
                         failed_code = mutate_code
