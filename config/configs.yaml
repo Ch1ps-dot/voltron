@@ -12,7 +12,7 @@ forked-daapd:
   protocol: daap
   host: 127.0.0.1
   port: 3689
-  rfc_name: ["daap"]
+  rfc_name: ["daap", "rfc9110", "rfc9112"]
   trans_layer: tcp
   server: parent
   readiness_script: ready.sh
@@ -97,7 +97,7 @@ executor:
 
 llm_doc:
   base_url: https://api.deepseek.com
-  api_key: ${VOLTRON_LLM_DOC_API_KEY}
+  api_key: sk-c0ae991067aa4e57916e8871e8e2388e
   model: deepseek-v4-flash
   async_sem: 8
 
@@ -124,6 +124,7 @@ fuzzing:
 generated_code:
   retry_limit: 3
   timeout_seconds: 2.0
+  ir_generation_timeout_seconds: 300.0
   max_message_bytes: 1048576
   response_max_chars: 100000
 
