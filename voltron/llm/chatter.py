@@ -531,6 +531,10 @@ class AsyncChater:
                         response_sha256=response_sha256,
                     )
                 if validation_error is not None:
+                    # Preserve the raw candidate so callers can repair a
+                    # response that failed before normalization (for example
+                    # a malformed Markdown fence).
+                    validation_error.response = response_text
                     raise validation_error
                 return validated.normalized
             except asyncio.TimeoutError as exc:

@@ -122,7 +122,9 @@ fuzzing:
   mutator_round_limit: 24
 
 generated_code:
-  retry_limit: 3
+  # Retry initial generator/parser/checker/observer synthesis up to five
+  # attempts before failing the component initialization.
+  retry_limit: 5
   timeout_seconds: 2.0
   ir_generation_timeout_seconds: 300.0
   max_message_bytes: 1048576

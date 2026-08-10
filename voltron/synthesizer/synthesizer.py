@@ -711,6 +711,8 @@ class AsyncProducer:
                 except Exception as e:
                     if input_code is not None:
                         failed_code = input_code
+                    elif getattr(e, 'response', None):
+                        failed_code = e.response
                     failure_error = f'{type(e).__name__}: {e}'
                     failure_count += 1
                     self._record_generation(
@@ -1491,6 +1493,8 @@ class AsyncProducer:
             except Exception as e:
                 if pkt_parser_code is not None:
                     failed_code = pkt_parser_code
+                elif getattr(e, 'response', None):
+                    failed_code = e.response
                 failure_error = f'{type(e).__name__}: {e}'
                 failure_count += 1
                 self._record_generation(

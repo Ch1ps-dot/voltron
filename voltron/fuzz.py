@@ -304,7 +304,7 @@ class Fuzzer:
         generated_code = configs_yaml.get('generated_code', {})
         configs.generation_retry_limit = max(
             1,
-            int(generated_code.get('retry_limit', 3)),
+            int(generated_code.get('retry_limit', 5)),
         )
         configs.generated_code_timeout_s = max(
             0.1,

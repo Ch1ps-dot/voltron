@@ -28,7 +28,7 @@ class Config:
         self.ir_evolution_enabled: bool = True
         self.ir_evolution_failure_threshold: int = 3
         self.ir_evolution_max_rounds_per_type: int = 1
-        self.generation_retry_limit: int = 3
+        self.generation_retry_limit: int = 5
         self.generated_code_timeout_s: float = 2.0
         self.ir_generation_timeout_s: float = 300.0
         self.generated_message_max_bytes: int = 1024 * 1024
