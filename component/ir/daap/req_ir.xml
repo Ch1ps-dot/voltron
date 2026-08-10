@@ -1,233 +1,241 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <ir>
-  <message name="logout">
-    <!-- DAAP logout uses the HTTP GET method. -->
-    <field name="method" type="constant" length="B" value="GET"/>
-    <!-- Single space between the method and request-target. -->
-    <field name="method-separator" type="constant" length="B" value=" "/>
-    <!-- Fixed /logout path for this message; HTTP request-target grammar permits variable origin-form paths. -->
-    <field name="request-target" type="variable" length="undefined" value="/logout"/>
-    <!-- Single space between the request-target and HTTP version. -->
-    <field name="request-target-separator" type="constant" length="B" value=" "/>
-    <!-- HTTP version shown in DAAP request lines. -->
-    <field name="http-version" type="constant" length="B" value="HTTP/1.1"/>
-    <!-- CRLF terminates the request line; logout has no request body. -->
-    <field name="line-ending" type="constant" length="B" value="&#13;&#10;"/>
+  <message name="PRI">
+    <!-- PRI method used in the HTTP/2 connection preface to signal the start of an HTTP/2 connection; never used by actual clients -->
+
+    <field name="Method" type="constant" length="3B" value="PRI"/>
+    <!-- HTTP method token fixed to 'PRI' for connection preface identification -->
+
+    <field name="Space" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating method from request target -->
+
+    <field name="RequestTarget" type="constant" length="1B" value="*"/>
+    <!-- Request target fixed to asterisk, as defined for the PRI method -->
+
+    <field name="Space" type="constant" length="1B" value="0x20"/>
+    <!-- Space character separating request target from HTTP version -->
+
+    <field name="HttpVersion" type="constant" length="8B" value="HTTP/2.0"/>
+    <!-- Protocol version string indicating HTTP/2.0 -->
+
+    <field name="StartLineEnd" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the request line -->
+
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed representing the empty header section (end of headers) -->
 </message>
-  <message name="resolve">
-  <field name="method" type="constant" length="B" value="GET"/>
-  <!-- DAAP requests use the HTTP GET method. -->
-  <field name="method-space" type="constant" length="B" value=" "/>
-  <!-- Space separating the method from the request-target. -->
-  <field name="request-target" type="constant" length="B" value="/resolve"/>
-  <!-- Full HTTP request-target from DAAP section 4.10; the leading slash is part of the wire value. -->
-  <field name="target-space" type="constant" length="B" value=" "/>
-  <!-- Space separating the request-target from the HTTP version. -->
-  <field name="http-version" type="constant" length="B" value="HTTP/1.1"/>
-  <!-- HTTP version used by the DAAP sample request. -->
-  <field name="request-line-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF terminates the HTTP request line. -->
-  <field name="host-header-name" type="constant" length="B" value="Host: "/>
-  <!-- HTTP/1.1 Host header field-name; required for request framing. -->
-  <field name="host-header-value" type="variable" length="undefined" value="[^\r\n]+"/>
-  <!-- Destination host and optional port; varies per DAAP server. -->
-  <field name="host-header-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF terminates the Host header. -->
-  <field name="client-daap-version-header-name" type="constant" length="B" value="Client-DAAP-Version: "/>
-  <!-- DAAP-specific extra header from DAAP section 2. -->
-  <field name="client-daap-version-header-value" type="constant" length="B" value="1.0"/>
-  <!-- Version value sent by iTunes; specified as 1.0. -->
-  <field name="client-daap-version-header-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF terminates the Client-DAAP-Version header. -->
-  <field name="header-terminator" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Empty line ends the header section; this GET request has no body. -->
+  <message name="GET">
+    <!-- HTTP GET request message: retrieves a current representation of the target resource -->
+
+    <field name="Method" type="constant" length="3B" value="GET"/>
+    <!-- The HTTP method token 'GET', indicating a request to retrieve the resource -->
+
+    <field name="Separator1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating the method from the request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="URI reference (absolute path or absolute URI)"/>
+    <!-- The target URI of the request; typically an absolute path (e.g., /index.html), but may be an absolute URI or asterisk (*) for OPTIONS -->
+
+    <field name="Separator2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space character separating the request target from the HTTP version -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="'HTTP/' major '.' minor"/>
+    <!-- HTTP protocol version, e.g., 'HTTP/1.1' or 'HTTP/2'. Determines message framing and capabilities -->
+
+    <field name="EndOfLine1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed ending the request line (CRLF) -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="Zero or more header lines, each terminated by CRLF, ending with an empty CRLF line"/>
+    <!-- Contains zero or more HTTP header fields in the format 'field-name: field-value' CRLF.
+         The header section is terminated by an additional CRLF (empty line).
+         Example headers: Host, User-Agent, Accept, etc.
+         No message body follows for a standard GET request (body is not defined for GET semantics). -->
 </message>
-  <message name="update">
-  <field name="method" type="constant" length="B" value="GET"><!-- HTTP method; all DAAP requests use GET (Section 2). --></field>
-  <field name="method-space" type="constant" length="B" value=" "><!-- Single SP separating method and request-target. --></field>
-  <field name="request-target" type="constant" length="B" value="/update"><!-- DAAP update resource; returns the current revision number (Section 4.5). --></field>
-  <field name="target-space" type="constant" length="B" value=" "><!-- Single SP separating request-target and HTTP version. --></field>
-  <field name="http-version" type="constant" length="B" value="HTTP/1.1"><!-- HTTP version from the sample request framing. --></field>
-  <field name="request-line-crlf" type="constant" length="B" value="&#13;&#10;"><!-- End of request line. --></field>
-  <field name="host-header-prefix" type="constant" length="B" value="Host: "><!-- Fixed HTTP Host header prefix. --></field>
-  <field name="host-header-value" type="variable" length="undefined" value="daap.example.com"><!-- Server host from the sample; actual value is the target DAAP server. --></field>
-  <field name="host-header-crlf" type="constant" length="B" value="&#13;&#10;"><!-- End of Host header. --></field>
-  <field name="accept-header-prefix" type="constant" length="B" value="Accept: "><!-- Fixed HTTP Accept header prefix. --></field>
-  <field name="accept-header-value" type="constant" length="B" value="*/*"><!-- Accept any representation; value from the sample request. --></field>
-  <field name="accept-header-crlf" type="constant" length="B" value="&#13;&#10;"><!-- End of Accept header. --></field>
-  <field name="user-agent-header-prefix" type="constant" length="B" value="User-Agent: "><!-- Fixed HTTP User-Agent header prefix. --></field>
-  <field name="user-agent-header-value" type="variable" length="undefined" value="iTunes/4.0 (Macintosh; N; PPC)"><!-- DAAP client identifier; sample value, may vary by client. --></field>
-  <field name="user-agent-header-crlf" type="constant" length="B" value="&#13;&#10;"><!-- End of User-Agent header. --></field>
-  <field name="client-daap-version-header-prefix" type="constant" length="B" value="Client-DAAP-Version: "><!-- Fixed DAAP-specific request header prefix. --></field>
-  <field name="client-daap-version-header-value" type="constant" length="B" value="1.0"><!-- DAAP protocol version sent by iTunes (Section 2). --></field>
-  <field name="client-daap-version-header-crlf" type="constant" length="B" value="&#13;&#10;"><!-- End of Client-DAAP-Version header. --></field>
-  <field name="accept-encoding-header-prefix" type="constant" length="B" value="Accept-Encoding: "><!-- Fixed HTTP Accept-Encoding header prefix. --></field>
-  <field name="accept-encoding-header-value" type="constant" length="B" value="gzip"><!-- Request gzip encoding, as in the sample request. --></field>
-  <field name="accept-encoding-header-crlf" type="constant" length="B" value="&#13;&#10;"><!-- End of Accept-Encoding header. --></field>
-  <field name="header-terminator" type="constant" length="B" value="&#13;&#10;"><!-- Empty line after headers; the update request has no body. --></field>
+  <message name="TRACE">
+    <!-- The TRACE method requests a remote, application-level loop-back of the request message. It is used for diagnostics and testing. The final recipient SHOULD reflect the received message back to the client as the content of a 200 (OK) response. -->
+
+    <field name="Method" type="constant" length="5B" value="TRACE"/>
+    <!-- The HTTP method token indicating a loop-back test -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between method and request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="URI characters (ASCII printable except space and DEL), see RFC 3986"/>
+    <!-- The target resource for the request; this field is variable in length and content -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between request target and HTTP version -->
+
+    <field name="HTTPVersion" type="constant" length="8B" value="HTTP/1.1"/>
+    <!-- Constant protocol version string (could also be HTTP/1.0 or other, but typically HTTP/1.1); note that the version is part of the request line -->
+
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End-of-line marker for the request line (CR followed by LF) -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="Zero or more HTTP header field lines, each terminated by CRLF; last line is empty (CRLF)"/>
+    <!-- Contains all header fields (e.g., Host, Max-Forwards, Via) and ends with an empty line. Each header field line follows the format: field-name ":" OWS field-value CRLF. For TRACE, a client MUST NOT include a body. -->
 </message>
-  <message name="database-containers">
-  <field name="method" type="constant" length="B" value="GET"/><!-- HTTP method; DAAP requests are always GET. -->
-  <field name="method-space" type="constant" length="B" value=" "/><!-- Space separating method and request-target. -->
-  <field name="path-prefix" type="constant" length="B" value="/databases/"/><!-- Fixed prefix of the containers resource URI. -->
-  <field name="database-id" type="variable" length="undefined" value="[0-9]+"/><!-- Numeric database id ([num] from spec section 4.8). -->
-  <field name="path-suffix" type="constant" length="B" value="/containers"/><!-- Fixed suffix naming the containers/playlists resource. -->
-  <field name="version-space" type="constant" length="B" value=" "/><!-- Space before HTTP version. -->
-  <field name="http-version" type="constant" length="B" value="HTTP/1.1"/><!-- HTTP version used in the sample request. -->
-  <field name="request-line-crlf" type="constant" length="B" value="&#13;&#10;"/><!-- CRLF ends the request line. -->
-  <field name="host-header-name" type="constant" length="B" value="Host"/><!-- HTTP/1.1 Host header. -->
-  <field name="host-header-separator" type="constant" length="B" value=": "/><!-- Header name/value separator. -->
-  <field name="host-header-value" type="variable" length="undefined" value="host[:port]"/><!-- DAAP server host, optionally with port 3689. -->
-  <field name="host-header-crlf" type="constant" length="B" value="&#13;&#10;"/><!-- CRLF ends the Host header. -->
-  <field name="daap-version-header-name" type="constant" length="B" value="Client-DAAP-Version"/><!-- DAAP protocol version header. -->
-  <field name="daap-version-header-separator" type="constant" length="B" value=": "/><!-- Header separator. -->
-  <field name="daap-version-header-value" type="constant" length="B" value="1.0"/><!-- iTunes sends DAAP version 1.0. -->
-  <field name="daap-version-header-crlf" type="constant" length="B" value="&#13;&#10;"/><!-- CRLF ends the DAAP version header. -->
-  <field name="accept-encoding-header-name" type="constant" length="B" value="Accept-Encoding"/><!-- Header announcing acceptable encodings. -->
-  <field name="accept-encoding-header-separator" type="constant" length="B" value=": "/><!-- Header separator. -->
-  <field name="accept-encoding-header-value" type="constant" length="B" value="gzip"/><!-- gzip content encoding used by iTunes requests. -->
-  <field name="accept-encoding-header-crlf" type="constant" length="B" value="&#13;&#10;"/><!-- CRLF ends the Accept-Encoding header. -->
-  <field name="request-end-crlf" type="constant" length="B" value="&#13;&#10;"/><!-- Empty line terminates the HTTP request header block. -->
+  <message name="PUT">
+  <!-- HTTP PUT request message: replaces the target resource&#39;s representation with the enclosed content.
+       The message consists of a request-line, header section, and optional body. -->
+
+  <field name="Method" type="constant" length="3B" value="PUT"/>
+  <!-- Request method token indicating a PUT operation -->
+
+  <field name="SP1" type="constant" length="1B" value="0x20"/>
+  <!-- Space separator between method and request target -->
+
+  <field name="RequestTarget" type="variable" length="undefined" value="VCHAR (excluding SP, CR, LF) / %x20 (percent-encoded)"/>
+  <!-- Target URI of the resource (absolute path or absolute URI).
+       Length is variable, terminated by the next SP. -->
+
+  <field name="SP2" type="constant" length="1B" value="0x20"/>
+  <!-- Space separator between request target and HTTP version -->
+
+  <field name="HTTPVersion" type="variable" length="undefined" value="&quot;HTTP/&quot; 1*DIGIT &quot;.&quot; 1*DIGIT"/>
+  <!-- Protocol version identifier, e.g., &quot;HTTP/1.1&quot;. Case-insensitive token. -->
+
+  <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+  <!-- End of request-line (CR and LF) -->
+
+  <field name="HeaderSection" type="variable" length="undefined" value="*( field-name &quot;:&quot; OWS field-value CRLF ) CRLF"/>
+  <!-- Zero or more header field lines followed by an empty line (CRLF).
+       Each field line: case-insensitive field name, colon, optional whitespace, field value, CRLF.
+       Headers may include Content-Length, Content-Type, Host, etc. -->
+
+  <field name="MessageBody" type="variable" length="undefined" value="*OCTET"/>
+  <!-- Optional content of the PUT request. Typically a representation of the resource.
+       Length is determined by Content-Length header or transfer-encoding. -->
 </message>
-  <message name="container-items">
-  <field name="method" type="constant" length="B" value="GET"/>
-  <!-- DAAP requests use HTTP GET (spec section 2). -->
-  <field name="space-before-target" type="constant" length="B" value="0x20"/>
-  <!-- Single space in the request line after the method. -->
-  <field name="request-target" type="variable" length="undefined" value="/databases/{database-id}/containers/{container-id}/items"/>
-  <!-- DAAP spec section 4.9 endpoint; database-id and container-id are unsigned decimal integers ([0-9]+). -->
-  <field name="space-before-version" type="constant" length="B" value="0x20"/>
-  <!-- Single space in the request line before the HTTP version. -->
-  <field name="http-version" type="constant" length="B" value="HTTP/1.1"/>
-  <!-- HTTP version from the DAAP sample request. -->
-  <field name="request-line-crlf" type="constant" length="B" value="0x0D0A"/>
-  <!-- CRLF terminates the request line. -->
-  <field name="host-header" type="variable" length="undefined" value="Host: {host}"/>
-  <!-- HTTP/1.1 Host header; {host} is the DAAP server authority, e.g. daap.example.com. -->
-  <field name="host-header-crlf" type="constant" length="B" value="0x0D0A"/>
-  <!-- CRLF terminates the Host header. -->
-  <field name="client-daap-version-header" type="constant" length="B" value="Client-DAAP-Version: 1.0"/>
-  <!-- The DAAP-specific request header; iTunes sends value 1.0 (spec section 2). -->
-  <field name="daap-header-crlf" type="constant" length="B" value="0x0D0A"/>
-  <!-- CRLF terminates the Client-DAAP-Version header. -->
-  <field name="header-terminator" type="constant" length="B" value="0x0D0A"/>
-  <!-- Blank line terminating the HTTP header section; GET has no request body. -->
+  <message name="HEAD">
+    <!-- HTTP HEAD request: identical to GET but the server MUST NOT return content in the response. Used to retrieve metadata about the representation without transferring the data. -->
+
+    <field name="Method" type="constant" length="4B" value="HEAD"/>
+    <!-- HTTP method token indicating a HEAD request -->
+
+    <field name="SpaceAfterMethod" type="constant" length="1B" value="0x20"/>
+    <!-- Single space (SP) separator between method and request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="ASCII (URI path or absolute-form, no whitespace)"/>
+    <!-- The target resource – typically the absolute path (e.g., /index.html) or an asterisk for OPTIONS; for HEAD, may include query string -->
+
+    <field name="SpaceBeforeVersion" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator before the HTTP version -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="'HTTP/' 1*DIGIT '.' 1*DIGIT"/>
+    <!-- Protocol version identifier, e.g., HTTP/1.1 or HTTP/2 (though HTTP/2 uses pseudo-headers, this protoIR models the textual request line) -->
+
+    <field name="CRLFAfterVersion" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the request line -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="zero or more header fields (name ':' SP value CRLF) terminated by an empty line"/>
+    <!-- Collection of request header fields (e.g., Host, User-Agent, Accept, etc.). Each header is a line: field-name ':' optional-SP field-value CRLF. The end of headers is signaled by an empty line (CRLF). No separate field for the empty line because it is part of the header section termination. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="optional, usually empty for HEAD requests; if present, SHOULD NOT be generated by client (per RFC)"/>
+    <!-- Optional body; for HEAD requests, the client SHOULD NOT generate content. If present, the body length is determined by Content-Length or Transfer-Encoding in the header section. -->
 </message>
-  <message name="database-items">
-  <field name="method" type="constant" length="undefined" value="GET"/>
-  <!-- HTTP request method; DAAP requests use GET. -->
-  <field name="space-after-method" type="constant" length="undefined" value=" "/>
-  <!-- Single space separating the method and request-target. -->
-  <field name="request-target" type="variable" length="undefined" value="/databases/{num}/items"/>
-  <!-- Full request-target in origin-form; {num} is the numeric database id from section 4.7. -->
-  <field name="space-before-version" type="constant" length="undefined" value=" "/>
-  <!-- Single space separating the request-target and HTTP version. -->
-  <field name="http-version" type="constant" length="undefined" value="HTTP/1.1"/>
-  <!-- HTTP version used in the sample DAAP request. -->
-  <field name="request-line-crlf" type="constant" length="undefined" value="\r\n"/>
-  <!-- CRLF framing terminating the request line. -->
-  <field name="host-header" type="variable" length="undefined" value="Host: {host}\r\n"/>
-  <!-- HTTP/1.1 Host header; {host} is the target DAAP server authority, optionally including port 3689. -->
-  <field name="client-daap-version-header" type="constant" length="undefined" value="Client-DAAP-Version: 1.0\r\n"/>
-  <!-- DAAP-specific header; exact fixed value from section 2. -->
-  <field name="header-terminator" type="constant" length="undefined" value="\r\n"/>
-  <!-- Empty line terminating the header section; the request has no body. -->
+  <message name="OPTIONS">
+    <!-- HTTP OPTIONS request: query communication options for a resource or server -->
+
+    <field name="Method" type="constant" length="7B" value="OPTIONS"/>
+    <!-- HTTP method token, always uppercase "OPTIONS" -->
+
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between method and request-target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="URI reference (e.g., '*' for server-wide, or absolute-path, or absolute-URI)"/>
+    <!-- Target of the request: asterisk for server-wide query, or specific resource path/URI -->
+
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between request-target and HTTP version -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="'HTTP/' followed by major.minor digits (e.g., 'HTTP/1.1')"/>
+    <!-- Protocol version identifier -->
+
+    <field name="RequestLineCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed terminating the request line -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="Zero or more header lines (field-name ':' OWS field-value CRLF), ending with an empty line (CRLF)"/>
+    <!-- Header fields: each line consists of a field name, colon, optional whitespace, field value, and CRLF.  The header section is terminated by an empty line (CRLF) -->
+
+    <field name="EmptyLine" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (CRLF) marking the end of header section and separating from body (if present) -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="Optional content; length determined by Content-Length or chunked transfer-encoding"/>
+    <!-- Body of the OPTIONS request (rarely used; if present must have Content-Type header) -->
 </message>
-  <message name="content-codes">
-  <field name="request-line" type="constant" length="B" value="GET /content-codes HTTP/1.1&#13;&#10;"/>
-  <!-- Complete HTTP request line: method GET, full request-target /content-codes, HTTP version 1.1, CRLF framing. -->
-  <field name="host-header-name" type="constant" length="B" value="Host: "/>
-  <!-- HTTP/1.1 Host header field name; a Host header is required on the wire. -->
-  <field name="host-value" type="variable" length="undefined" value="daap.example.com"/>
-  <!-- Host authority from the sample request; variable per server endpoint. -->
-  <field name="host-header-ending" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF terminating the Host header. -->
-  <field name="daap-version-header-name" type="constant" length="B" value="Client-DAAP-Version: "/>
-  <!-- DAAP-specific HTTP header name from the sample request. -->
-  <field name="daap-version-value" type="constant" length="B" value="1.0"/>
-  <!-- DAAP version value sent by iTunes; fixed value from Basic Form. -->
-  <field name="daap-version-header-ending" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF terminating the Client-DAAP-Version header. -->
-  <field name="header-terminator" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Empty line ending the HTTP header section; the content-codes request has no request body. -->
+  <message name="DELETE">
+    <!-- HTTP DELETE request: instructs the origin server to delete the resource identified by the Request-URI -->
+
+    <field name="Method" type="constant" length="5B" value="DELETE"/>
+    <!-- Request method token, indicating a DELETE operation (RFC 7231 Section 4.3.5) -->
+
+    <field name="SP1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method from request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="URI characters (absolute‑path or absolute‑URI)"/>
+    <!-- The resource to delete; typically an absolute path (e.g., /path/to/resource) -->
+
+    <field name="SP2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating request target from HTTP version -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="&quot;HTTP/&quot; 1*DIGIT &quot;.&quot; 1*DIGIT"/>
+    <!-- Protocol version (e.g., "HTTP/1.1") -->
+
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage return and line feed terminating the request line -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="ASCII text (RFC 7230 Section 3.2)"/>
+    <!-- Zero or more header lines, each ending with CRLF, followed by an empty line (CRLF) that terminates the header section.
+         The entire block includes the final empty line. Headers common to DELETE: Host, Authorization, etc. -->
+
+    <field name="Body" type="variable" length="undefined" value="binary data (optional)"/>
+    <!-- Optional message content; DELETE requests typically have no body (RFC 7231 Section 4.3.5).
+         If present, the length is indicated by Content‑Length or Transfer‑Encoding. -->
 </message>
-  <message name="server-info">
-  <field name="method" type="constant" length="B" value="GET"/>
-  <!-- DAAP requests use the HTTP GET method. -->
-  <field name="space-after-method" type="constant" length="B" value=" "/>
-  <!-- SP separator in the request line. -->
-  <field name="request-target" type="constant" length="B" value="/server-info"/>
-  <!-- Complete request-target for this message; the leading slash is required. -->
-  <field name="space-after-request-target" type="constant" length="B" value=" "/>
-  <!-- SP separator in the request line. -->
-  <field name="http-version" type="constant" length="B" value="HTTP/1.1"/>
-  <!-- HTTP version from the sample request. -->
-  <field name="request-line-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF framing that terminates the request line. -->
-  <field name="host-field-name" type="constant" length="B" value="Host"/>
-  <!-- Host header field name. -->
-  <field name="host-field-delimiter" type="constant" length="B" value=": "/>
-  <!-- Colon and optional space between the header name and value. -->
-  <field name="host-value" type="variable" length="undefined" value="daap.example.com"/>
-  <!-- Target server authority; sample value from section 5.1. -->
-  <field name="host-line-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF ending the Host header line. -->
-  <field name="accept-field-name" type="constant" length="B" value="Accept"/>
-  <!-- Accept header field name. -->
-  <field name="accept-field-delimiter" type="constant" length="B" value=": "/>
-  <!-- Colon and optional space between the header name and value. -->
-  <field name="accept-value" type="variable" length="undefined" value="*/*"/>
-  <!-- Media range accepted by the client; sample value is */*. -->
-  <field name="accept-line-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF ending the Accept header line. -->
-  <field name="user-agent-field-name" type="constant" length="B" value="User-Agent"/>
-  <!-- User-Agent header field name. -->
-  <field name="user-agent-field-delimiter" type="constant" length="B" value=": "/>
-  <!-- Colon and optional space between the header name and value. -->
-  <field name="user-agent-value" type="variable" length="undefined" value="iTunes/4.0 (Macintosh; N; PPC)"/>
-  <!-- Client product token and comment; sample value from section 5.1. -->
-  <field name="user-agent-line-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF ending the User-Agent header line. -->
-  <field name="client-daap-version-field-name" type="constant" length="B" value="Client-DAAP-Version"/>
-  <!-- DAAP-specific client version header. -->
-  <field name="client-daap-version-field-delimiter" type="constant" length="B" value=": "/>
-  <!-- Colon and optional space between the header name and value. -->
-  <field name="client-daap-version-value" type="constant" length="B" value="1.0"/>
-  <!-- DAAP protocol version supplied by iTunes; sample value is 1.0. -->
-  <field name="client-daap-version-line-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF ending the Client-DAAP-Version header line. -->
-  <field name="accept-encoding-field-name" type="constant" length="B" value="Accept-Encoding"/>
-  <!-- Accept-Encoding header field name. -->
-  <field name="accept-encoding-field-delimiter" type="constant" length="B" value=": "/>
-  <!-- Colon and optional space between the header name and value. -->
-  <field name="accept-encoding-value" type="variable" length="undefined" value="gzip"/>
-  <!-- Content coding token; sample is gzip, and section 2 says most DAAP requests use gzip. -->
-  <field name="accept-encoding-line-crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF ending the Accept-Encoding header line. -->
-  <field name="end-of-headers" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Empty line after the header fields; server-info has no request body. -->
+  <message name="CONNECT">
+    <!-- The CONNECT method requests a tunnel to the target origin server, usually through a proxy. In HTTP/1.1, the request line uses authority-form (host:port) as the request target. This message has no content; data tunneled after the initial response. -->
+
+    <field name="Method" type="constant" length="7B" value="CONNECT"/>
+    <!-- HTTP method token for CONNECT, always uppercase -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating method from request target -->
+
+    <field name="RequestTarget" type="variable" length="undefined" value="host (1*255 token) ':' port (1*5 DIGIT)"/>
+    <!-- Authority-form request target: host and port separated by colon. The host is a token or IP address, port is decimal. Must include port even for default ports. Example: server.example.com:443 -->
+
+    <field name="SP" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separating request target from HTTP version -->
+
+    <field name="HTTPVersion" type="variable" length="undefined" value="HTTP/1.1 or HTTP/1.0 or HTTP/2"/>
+    <!-- Protocol version: fixed format "HTTP/" major "." minor (e.g., "HTTP/1.1"). Typically HTTP/1.1 for CONNECT. -->
+
+    <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return Line Feed terminating the request line -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="*(field-name ':' SP field-value CRLF) CRLF"/>
+    <!-- One or more header fields followed by an empty line. Each header is name: value terminated by CRLF. The section ends with a final CRLF. Required headers include Host (host:port matching request target). Optional headers include Proxy-Authorization, Connection, etc. Field names are tokens; values are tokens or quoted strings. This section does not include a Content-Length or Transfer-Encoding because CONNECT has no body. -->
 </message>
-  <message name="login" direction="request">
-  <field name="request-line" type="constant" length="undefined" value="GET /login HTTP/1.1&#13;&#10;">
-    <!-- Complete HTTP request line: method GET, request-target /login, HTTP/1.1, CRLF framing. -->
-  </field>
-  <field name="Host" type="variable" length="undefined" value="Host: authority&#13;&#10;">
-    <!-- HTTP/1.1 Host header; authority is the DAAP server host[:port]. -->
-  </field>
-  <field name="Accept" type="constant" length="undefined" value="Accept: */*&#13;&#10;">
-    <!-- Generic Accept header shown in the DAAP sample request. -->
-  </field>
-  <field name="User-Agent" type="variable" length="undefined" value="User-Agent: iTunes/4.0 (Macintosh; N; PPC)&#13;&#10;">
-    <!-- Client identifier; sample iTunes/4.0 User-Agent, not a DAAP protocol constant. -->
-  </field>
-  <field name="Client-DAAP-Version" type="constant" length="undefined" value="Client-DAAP-Version: 1.0&#13;&#10;">
-    <!-- The only DAAP-specific extra header; iTunes sends DAAP version 1.0. -->
-  </field>
-  <field name="Accept-Encoding" type="constant" length="undefined" value="Accept-Encoding: gzip&#13;&#10;">
-    <!-- Client advertises gzip support; server responses may use gzip content encoding. -->
-  </field>
-  <field name="empty-line" type="constant" length="undefined" value="&#13;&#10;">
-    <!-- Empty CRLF line terminates the header section; the login GET has no request body. -->
-  </field>
+  <message name="POST">
+    <!-- HTTP POST request message: used to submit data to be processed to the identified resource, often causing a change on the server -->
+    <field name="Method" type="constant" length="3B" value="POST"/>
+    <!-- HTTP method token indicating a POST request -->
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between method and request target -->
+    <field name="RequestTarget" type="variable" length="undefined" value="URI characters (absolute path or absolute URI) excluding SP, CR, LF"/>
+    <!-- The request URI (e.g., /path; absolute URI for proxy requests); may include query string; does not include the HTTP version -->
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Single space separator between request target and HTTP version -->
+    <field name="HTTPVersion" type="variable" length="undefined" value="'HTTP/' DIGIT '.' DIGIT"/>
+    <!-- Protocol version, typically "HTTP/1.1"; major and minor digits separated by dot -->
+    <field name="CRLF1" type="constant" length="2B" value="0x0D0A"/>
+    <!-- End-of-line marker terminating the request line -->
+    <field name="HeaderFields" type="variable" length="undefined" value="Zero or more header lines (each line: field-name ':' SP field-value CRLF)"/>
+    <!-- Zero or more HTTP header fields; each line consists of a field name, colon, optional space, field value, and CRLF. The set of headers may include Host, Content-Length, Content-Type, etc. The field ends just before the terminating empty line (see next field). If no headers, this field is empty (length 0). -->
+    <field name="TerminatingCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Empty line (single CRLF) that separates header section from body; required even if no header fields are present -->
+    <field name="MessageBody" type="variable" length="undefined" value="Arbitrary octets (8-bit bytes)"/>
+    <!-- Optional request body; contains the representation being submitted (e.g., form data, JSON). Absent for requests without body content. Length usually indicated by Content-Length header or chunked transfer encoding. -->
 </message>
 </ir>

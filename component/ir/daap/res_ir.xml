@@ -1,35 +1,43 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <ir>
-  <message name="response message of daap protocol">
-  <!-- HTTP status line -->
-  <field name="HTTP-version" type="constant" length="B" value="HTTP/1.1"/> <!-- HTTP response version -->
-  <field name="Status-Code" type="variable" length="B" value="3DIGIT"/> <!-- 200 in the DAAP success sample -->
-  <field name="Reason-Phrase" type="variable" length="undefined" value="*( HTAB / SP / VCHAR / obs-text )"/> <!-- sample: OK -->
+  <message name="HTTP_Response">
+    <!-- HTTP response message consisting of status line, optional headers, an empty line, and an optional body -->
 
-  <!-- HTTP headers -->
-  <field name="Date" type="variable" length="undefined" value="HTTP-date"/> <!-- sample: Thu, 01 May 2003 18:00:28 GMT -->
-  <field name="DAAP-Server" type="variable" length="undefined" value="server-id"/> <!-- sample: iTunes/4.0 (Mac OS X) -->
-  <field name="Content-Type" type="constant" length="B" value="application/x-dmap-tagged"/> <!-- required DAAP body media type -->
-  <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT"/> <!-- octet count of the message body; frames the DMAP body -->
-  <!-- Content-Encoding is omitted here to model the uncompressed variant explicitly allowed by the spec. If gzip is negotiated, the same logical DMAP body is carried after content decoding. -->
+    <field name="ProtocolName" type="constant" length="4B" value="HTTP"/>
+    <!-- Literal "HTTP" indicating the protocol -->
 
-  <!-- DAAP/DMAP body: the /server-info response root container is dmap.serverinforesponse (msrv). -->
-  <field name="dmap.serverinforesponse (msrv)" type="variable" length="undefined" value="DMAP container">
-    <field name="dmap.status (mstt)" type="variable" length="B" value="3DIGIT"/> <!-- response status; 200 in the sample -->
-    <field name="dmap.protocolversion (mpro)" type="constant" length="B" value="1.0.0"/> <!-- DMAP protocol version -->
-    <field name="daap.protocolversion (apro)" type="constant" length="B" value="1.0.0"/> <!-- DAAP protocol version -->
-    <field name="dmap.itemname (minm)" type="variable" length="undefined" value="UTF-8 string"/> <!-- server name; sample: Example Server -->
-    <field name="dmap.loginrequired (mslr)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.timeoutinterval (mstm)" type="variable" length="B" value="integer"/> <!-- seconds; sample: 1800 -->
-    <field name="dmap.supportsautologout (msal)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.supportsupdate (msup)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.supportspersistentids (mspi)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.supportsextensions (msex)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.supportsbrowse (msbr)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.supportsquery (msqy)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.supportsindex (msix)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.supportsresolve (msrs)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
-    <field name="dmap.databasescount (msdc)" type="variable" length="B" value="integer"/> <!-- sample: 1 -->
-  </field>
+    <field name="Slash" type="constant" length="1B" value="0x2F"/>
+    <!-- Forward slash separating "HTTP" from the version numbers -->
+
+    <field name="MajorVersion" type="variable" length="undefined" value="1*DIGIT"/>
+    <!-- Major version number of the HTTP protocol (e.g., 1) -->
+
+    <field name="Dot" type="constant" length="1B" value="0x2E"/>
+    <!-- Dot separating major and minor version numbers -->
+
+    <field name="MinorVersion" type="variable" length="undefined" value="1*DIGIT"/>
+    <!-- Minor version number (e.g., 1) -->
+
+    <field name="Space1" type="constant" length="1B" value="0x20"/>
+    <!-- Space between version and status code -->
+
+    <field name="StatusCode" type="variable" length="3B" value="3DIGIT"/>
+    <!-- Three-digit status code indicating the result of the request (e.g., 200, 404) -->
+
+    <field name="Space2" type="constant" length="1B" value="0x20"/>
+    <!-- Space between status code and reason phrase -->
+
+    <field name="ReasonPhrase" type="variable" length="undefined" value="*TEXT (any OCTET except CTLs, but including LWS)"/>
+    <!-- Short textual description of the status code (e.g., OK, Not Found) -->
+
+    <field name="StatusLineCRLF" type="constant" length="2B" value="0x0D0A"/>
+    <!-- Carriage Return and Line Feed ending the status line -->
+
+    <field name="HeaderSection" type="variable" length="undefined" value="*(field-name ':' OWS field-value OWS CRLF) CRLF"/>
+    <!-- Zero or more header fields (each followed by CRLF) and a terminating empty line (CRLF).
+         Field names and values follow HTTP header syntax (RFC 9110). OWS = optional whitespace. -->
+
+    <field name="MessageBody" type="variable" length="undefined" value="arbitrary octets"/>
+    <!-- Body of the response, if present. Length is determined by Content-Length header or chunked transfer encoding. -->
 </message>
 </ir>

@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<ir>
+  <message name="response message of daap protocol">
+  <!-- HTTP status line -->
+  <field name="HTTP-version" type="constant" length="B" value="HTTP/1.1"/> <!-- HTTP response version -->
+  <field name="Status-Code" type="variable" length="B" value="3DIGIT"/> <!-- 200 in the DAAP success sample -->
+  <field name="Reason-Phrase" type="variable" length="undefined" value="*( HTAB / SP / VCHAR / obs-text )"/> <!-- sample: OK -->
+
+  <!-- HTTP headers -->
+  <field name="Date" type="variable" length="undefined" value="HTTP-date"/> <!-- sample: Thu, 01 May 2003 18:00:28 GMT -->
+  <field name="DAAP-Server" type="variable" length="undefined" value="server-id"/> <!-- sample: iTunes/4.0 (Mac OS X) -->
+  <field name="Content-Type" type="constant" length="B" value="application/x-dmap-tagged"/> <!-- required DAAP body media type -->
+  <field name="Content-Length" type="variable" length="undefined" value="1*DIGIT"/> <!-- octet count of the message body; frames the DMAP body -->
+  <!-- Content-Encoding is omitted here to model the uncompressed variant explicitly allowed by the spec. If gzip is negotiated, the same logical DMAP body is carried after content decoding. -->
+
+  <!-- DAAP/DMAP body: the /server-info response root container is dmap.serverinforesponse (msrv). -->
+  <field name="dmap.serverinforesponse (msrv)" type="variable" length="undefined" value="DMAP container">
+    <field name="dmap.status (mstt)" type="variable" length="B" value="3DIGIT"/> <!-- response status; 200 in the sample -->
+    <field name="dmap.protocolversion (mpro)" type="constant" length="B" value="1.0.0"/> <!-- DMAP protocol version -->
+    <field name="daap.protocolversion (apro)" type="constant" length="B" value="1.0.0"/> <!-- DAAP protocol version -->
+    <field name="dmap.itemname (minm)" type="variable" length="undefined" value="UTF-8 string"/> <!-- server name; sample: Example Server -->
+    <field name="dmap.loginrequired (mslr)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.timeoutinterval (mstm)" type="variable" length="B" value="integer"/> <!-- seconds; sample: 1800 -->
+    <field name="dmap.supportsautologout (msal)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.supportsupdate (msup)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.supportspersistentids (mspi)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.supportsextensions (msex)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.supportsbrowse (msbr)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.supportsquery (msqy)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.supportsindex (msix)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.supportsresolve (msrs)" type="variable" length="B" value="0x00 / 0x01"/> <!-- sample: 0 -->
+    <field name="dmap.databasescount (msdc)" type="variable" length="B" value="integer"/> <!-- sample: 1 -->
+  </field>
+</message>
+</ir>

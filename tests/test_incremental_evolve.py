@@ -443,6 +443,18 @@ def test_all_source_evolve_prompts_describe_the_no_change_result():
         assert '"reason"' in prompt
 
 
+def test_generator_evolve_and_mutate_prompts_allow_info_resource_paths():
+    evolve_prompt = (ROOT / "skills/evolver/generator_evolve.md").read_text(
+        encoding="utf-8"
+    )
+    mutate_prompt = (ROOT / "skills/evolver/generator_mutate.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Use target-specific URLs or named resources stated in SUT_CONTEXT" in evolve_prompt
+    assert "You may use target-specific URLs or named resources stated in SUT_CONTEXT" in mutate_prompt
+
+
 def test_ir_evolve_method_applies_ops_and_returns_xml():
     template = Template(
         (ROOT / "skills/evolver/ir_evolve.md").read_text(encoding="utf-8")

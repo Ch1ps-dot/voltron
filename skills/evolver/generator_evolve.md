@@ -21,6 +21,7 @@ CONTRACT
 Return `generate() -> bytes` with no parameters.
 - Diagnose and fix invalid order/values/encoding/framing, missing fields, length/payload errors, or unsatisfied state preconditions evidenced by the inputs.
 - Preserve IR structure and SUT compatibility; use related generators only for supported cross-message/state dependencies.
+- Use target-specific URLs or named resources stated in SUT_CONTEXT when they are needed to access the intended endpoint or resource.
 - Vary valid under-tested fields/optional elements toward unobserved legal transitions; output exactly one `$msg_type` message per call.
 - Do not invent protocol rules. Self-contained Python built-ins only; no networking; never return non-bytes.
 
