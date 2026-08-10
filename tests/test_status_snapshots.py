@@ -48,14 +48,16 @@ def test_status_snapshot_is_atomic_and_serializes_concurrent_writers(
     for worker in workers:
         worker.join()
 
-    status_file = tmp_path / 'fuzzer_status'
+    status_file = tmp_path / 'diagnostics' / 'status' / 'fuzzer_status'
     fields = _status_fields(status_file)
     assert fields['run_status'] == 'running'
     assert fields['active_phase'] == 'model_learning'
     assert fields['stage'] == 'model learning'
     assert fields['status_sequence'] == '7'
     assert float(fields['phase_elapsed_seconds']) >= 0
-    assert not list(tmp_path.glob('.fuzzer_status.*.tmp'))
+    assert not list(
+        (tmp_path / 'diagnostics' / 'status').glob('.fuzzer_status.*.tmp')
+    )
 
 
 def test_status_heartbeat_refreshes_then_stops(monkeypatch):
@@ -200,7 +202,9 @@ def test_fuzz_writes_startup_and_final_status_snapshots(tmp_path, monkeypatch):
 
     assert fuzzer.fuzz('state', 1) == 2
 
-    fields = _status_fields(tmp_path / 'fuzzer_status')
+    fields = _status_fields(
+        tmp_path / 'diagnostics' / 'status' / 'fuzzer_status'
+    )
     assert fields['run_status'] == 'incomplete'
     assert fields['snapshot_reason'] == 'collect_results'
     assert int(fields['status_sequence']) >= 2

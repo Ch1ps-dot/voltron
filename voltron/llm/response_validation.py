@@ -63,7 +63,10 @@ _CONTRACTS: dict[str, ResponseContract] = {
     ),
     "ir_repair": ResponseContract(
         kind="xml",
-        allowed_xml_roots=frozenset({"message", "ir"}),
+        # Repair is invoked for one failed message at a time.  Requiring the
+        # same single-message root as generation prevents a wrapper `<ir>`
+        # from being nested into the batch document by the caller.
+        allowed_xml_roots=frozenset({"message"}),
     ),
     "ir_evolve": ResponseContract(kind="ir_delta"),
     "generator_gen": ResponseContract(

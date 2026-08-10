@@ -1,14 +1,14 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <ir>
-  <message name="SMTPResponse">
-  <!-- An SMTP response message consisting of a three-digit numeric reply code, an optional separator (hyphen for multiline continuation or space for final/ single-line), optional text, and a CRLF terminator. Multiline replies are composed of multiple such lines where all but the last use a hyphen separator. -->
-  <field name="ReplyCode" type="variable" length="3B" value="ASCII '0'-'9' (first digit 2-5, second 0-5, third 0-9)"/>
-  <!-- Three ASCII decimal digits indicating the status of the previous command; the first digit denotes severity (2=success, 3=intermediate, 4=transient error, 5=permanent error), the second digit categorizes the response, and the third provides finer granularity. -->
-  <field name="Separator" type="variable" length="1B" value="0x20 (SP) or 0x2D (hyphen)"/>
-  <!-- A single byte that is either a space (for the final line of a reply) or a hyphen (for continuation lines in a multiline reply). The spec allows the space to be omitted when no text follows, but clients must be prepared for that. -->
-  <field name="Textstring" type="variable" length="undefined" value="0x09 (HT), 0x20-0x7E (printable US-ASCII), except CR and LF"/>
-  <!-- Optional free-form human-readable text. When present, it provides additional information about the reply. The total line length (including ReplyCode, Separator, Textstring, and CRLF) MUST NOT exceed 512 octets. -->
-  <field name="CRLF" type="constant" length="2B" value="0x0D0A"/>
-  <!-- Carriage Return and Line Feed character sequence that terminates the reply line. -->
+  <message name="response message of smtp protocol">
+  <!-- A multi-line reply is one or more repetitions of the code/separator/text/CRLF pattern; '-' separates continuation lines and SP precedes the final text. -->
+  <field name="reply-code" type="variable" length="3B" value="[0-9]{3}"/>
+  <!-- Three-digit numeric completion code. -->
+  <field name="separator" type="variable" length="undefined" value="[ -]?"/>
+  <!-- Optional single-byte separator: SP before text, '-' for continuation; absent when no text follows. -->
+  <field name="text" type="variable" length="undefined" value="[ -~]*"/>
+  <!-- Optional free-form ASCII text, excluding CR/LF; must be empty when separator is absent. -->
+  <field name="crlf" type="constant" length="2B" value="&#13;&#10;"/>
+  <!-- CRLF terminates every SMTP line. -->
 </message>
 </ir>

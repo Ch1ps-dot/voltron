@@ -88,6 +88,26 @@ def test_xml_response_checks_root_and_expected_message():
     assert message_failure.value.reason == "missing_message"
 
 
+def test_ir_repair_requires_single_message_root():
+    from voltron.llm.response_validation import (
+        ResponseContract,
+        validate_response,
+    )
+
+    contract = ResponseContract(
+        kind="xml",
+        allowed_xml_roots=frozenset({"message"}),
+    )
+    valid = validate_response(
+        '<message name="PING"><field name="x" type="constant" '
+        'length="B" value="PING"/></message>',
+        contract,
+    )
+    assert valid.parsed.tag == "message"
+    with pytest.raises(LLMResponseValidationError) as failure:
+        validate_response('<ir><message name="PING"/></ir>', contract)
+    assert failure.value.reason == "invalid_xml_root"
+
 def test_source_delta_validation_is_followed_by_required_function_check():
     source = "def generate():\n    return b'PING'\n"
     delta = json.dumps({
@@ -283,7 +303,10 @@ def test_validation_metrics_count_discarded_tokens_without_raw_response(
     assert row["discarded_completion_tokens"] == "7"
 
     event = json.loads(
-        (tmp_path / "llm_response_validation.jsonl").read_text(
+        (
+            tmp_path / "diagnostics" / "events"
+            / "llm_response_validation.jsonl"
+        ).read_text(
             encoding="utf-8"
         )
     )

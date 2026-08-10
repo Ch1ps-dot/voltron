@@ -72,7 +72,9 @@ def test_finalize_run_status_requires_fuzz_phase_for_deadline_completion(
 
     assert fuzzer._finalize_run_status() == 2
     status = json.loads(
-        (tmp_path / 'run_status.json').read_text(encoding='utf-8')
+        (tmp_path / 'diagnostics' / 'status' / 'run_status.json').read_text(
+            encoding='utf-8'
+        )
     )
     assert status['run_status'] == 'deadline_before_fuzzing'
     assert status['exit_code'] == 2
@@ -98,7 +100,9 @@ def test_finalize_run_status_accepts_deadline_after_fuzz_phase(
 
     assert fuzzer._finalize_run_status() == 0
     status = json.loads(
-        (tmp_path / 'run_status.json').read_text(encoding='utf-8')
+        (tmp_path / 'diagnostics' / 'status' / 'run_status.json').read_text(
+            encoding='utf-8'
+        )
     )
     assert status['run_status'] == 'completed'
     assert status['exit_code'] == 0

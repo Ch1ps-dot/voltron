@@ -7,6 +7,7 @@ import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, 
 from voltron.executor.conversation import Conversation
 
 from voltron.utils.logger import configure_file_logging, logger_fuzz as logger
+from voltron.utils.result_layout import diagnostics_path
 
 from voltron.llm.chatter import AsyncChater, LLMDeadlineExceeded
 
@@ -590,7 +591,10 @@ class Fuzzer:
             },
         }
         try:
-            target = configs.results_path / 'run_status.json'
+            target = diagnostics_path(
+                configs.results_path, 'status', 'run_status.json'
+            )
+            target.parent.mkdir(parents=True, exist_ok=True)
             temporary = target.with_suffix('.json.tmp')
             temporary.write_text(
                 json.dumps(status, indent=2, ensure_ascii=False) + '\n',

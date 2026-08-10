@@ -5,6 +5,7 @@ import os
 import threading, time, pprint
 from pathlib import Path
 from voltron.utils.logger import logger_fuzz as logger
+from voltron.utils.result_layout import diagnostics_path
 from voltron.configs import configs
 import threading, subprocess
 
@@ -147,9 +148,10 @@ class Analyzer:
                     / 'llm_usage_metrics.csv'
                 )
                 usage_csv_path.unlink(missing_ok=True)
-                validation_path = (
-                    configs.results_path
-                    / 'llm_response_validation.jsonl'
+                validation_path = diagnostics_path(
+                    configs.results_path,
+                    'events',
+                    'llm_response_validation.jsonl',
                 )
                 validation_path.unlink(missing_ok=True)
                 iteration_csv_path = (
@@ -426,8 +428,13 @@ class Analyzer:
     ) -> None:
         """Append response-validation metadata without storing model content."""
         try:
-            path = configs.results_path / 'llm_response_validation.jsonl'
+            path = diagnostics_path(
+                configs.results_path,
+                'events',
+                'llm_response_validation.jsonl',
+            )
             self.llm_response_validation_path = path
+            path.parent.mkdir(parents=True, exist_ok=True)
             with path.open('a', encoding='utf-8') as stream:
                 stream.write(json.dumps(record, ensure_ascii=False))
                 stream.write('\n')
@@ -968,7 +975,9 @@ class Analyzer:
                     ('chat_token', self.chat_token),
                 ]
 
-            status_file = results_path / 'fuzzer_status'
+            status_file = diagnostics_path(
+                results_path, 'status', 'fuzzer_status'
+            )
             temporary_file = status_file.with_name(
                 f'.{status_file.name}.{os.getpid()}.'
                 f'{threading.get_ident()}.tmp'

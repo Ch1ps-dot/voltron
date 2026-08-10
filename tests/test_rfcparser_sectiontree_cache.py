@@ -65,6 +65,63 @@ def test_document_annotation_falls_back_after_bounded_attempts():
     assert node.content_type == "none"
 
 
+def test_document_annotation_treats_empty_answer_as_none_without_retry():
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.rfc_name = ["rfc959"]
+    parser.pro_name = "ftp"
+    calls = []
+
+    class EmptyChater:
+        async def llm_doc_parse(self, **kwargs):
+            calls.append(kwargs)
+            return ""
+
+    parser.chater = EmptyChater()
+    tree = make_tree("rfc959", "protocol section")
+    from voltron.rfcparser.setciontree import SectionNode
+
+    node = SectionNode(1, 0, len(tree.doc_content), "1. Message")
+    tree.leafs = [node]
+
+    asyncio.run(
+        parser._spe_parse_one(node, asyncio.Semaphore(1), tree)
+    )
+
+    assert len(calls) == 1
+    assert node.content_type == "none"
+
+
+def test_document_annotation_treats_empty_validation_error_as_none():
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.rfc_name = ["rfc959"]
+    parser.pro_name = "ftp"
+    calls = []
+
+    class EmptyValidationChater:
+        async def llm_doc_parse(self, **kwargs):
+            calls.append(kwargs)
+            from voltron.llm.response_validation import (
+                LLMResponseValidationError,
+            )
+            raise LLMResponseValidationError(
+                "empty_response", "content is blank"
+            )
+
+    parser.chater = EmptyValidationChater()
+    tree = make_tree("rfc959", "protocol section")
+    from voltron.rfcparser.setciontree import SectionNode
+
+    node = SectionNode(1, 0, len(tree.doc_content), "1. Message")
+    tree.leafs = [node]
+
+    asyncio.run(
+        parser._spe_parse_one(node, asyncio.Semaphore(1), tree)
+    )
+
+    assert len(calls) == 1
+    assert node.content_type == "none"
+
+
 @pytest.mark.parametrize(
     ("name", "content", "expected"),
     [

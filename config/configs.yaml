@@ -97,9 +97,9 @@ executor:
 
 llm_doc:
   base_url: https://api.deepseek.com
-  api_key: sk-c0ae991067aa4e57916e8871e8e2388e
+  api_key: sk-9f286133ee1c4b4bbd4be76711580b02
   model: deepseek-v4-flash
-  async_sem: 8
+  async_sem: 512
 
 llm_fuzz:
   base_url: none

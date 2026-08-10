@@ -9,6 +9,7 @@ from voltron.utils.logger import (
     format_event,
     logger_fuzz as logger,
 )
+from voltron.utils.result_layout import diagnostics_path
 from voltron.executor.mapper import Mapper, RuntimeComponentRepairError
 from voltron.synthesizer.synthesizer import Generator, Parser
 from voltron.synthesizer.checker import Checker
@@ -353,9 +354,11 @@ class Executor:
         payload = {'timestamp': time.time(), **record}
         try:
             with lock:
-                with (
-                    results_path / 'executor_lifecycle.jsonl'
-                ).open('a', encoding='utf-8') as stream:
+                target = diagnostics_path(
+                    results_path, 'events', 'executor_lifecycle.jsonl'
+                )
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open('a', encoding='utf-8') as stream:
                     json.dump(payload, stream, ensure_ascii=False)
                     stream.write('\n')
         except Exception:
@@ -3107,9 +3110,13 @@ class Executor:
                 'observer': asdict(observation),
             }
             try:
-                with (
-                    results_path / 'response_component_usage.jsonl'
-                ).open('a', encoding='utf-8') as stream:
+                usage_path = diagnostics_path(
+                    results_path,
+                    'events',
+                    'response_component_usage.jsonl',
+                )
+                usage_path.parent.mkdir(parents=True, exist_ok=True)
+                with usage_path.open('a', encoding='utf-8') as stream:
                     json.dump(record, stream, ensure_ascii=False)
                     stream.write('\n')
 
@@ -3145,9 +3152,12 @@ class Executor:
                         self._component_provisional_count
                     ),
                 }
-                summary_path = (
-                    results_path / 'response_component_summary.json'
+                summary_path = diagnostics_path(
+                    results_path,
+                    'summary',
+                    'response_component_summary.json',
                 )
+                summary_path.parent.mkdir(parents=True, exist_ok=True)
                 temporary_path = summary_path.with_suffix('.json.tmp')
                 with temporary_path.open('w', encoding='utf-8') as stream:
                     json.dump(summary, stream, indent=2, ensure_ascii=False)

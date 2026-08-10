@@ -2,6 +2,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from voltron.utils.result_layout import diagnostics_path
+
 
 _FILE_HANDLER_MARKER = '_voltron_file_handler'
 
@@ -87,7 +89,10 @@ def configure_file_logging(
     )
 
     for logger in (logger_fuzz, logger_llm):
-        log_path = (results_path / f'{logger.name}.log').resolve()
+        log_path = diagnostics_path(
+            results_path, 'logs', f'{logger.name}.log'
+        ).resolve()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         existing_handler = next(
             (
                 handler

@@ -230,7 +230,10 @@ def test_component_usage_summary_keeps_four_state_and_provisional_counts(
     )
 
     summary = json.loads(
-        (tmp_path / "response_component_summary.json").read_text(
+        (
+            tmp_path / "diagnostics" / "summary"
+            / "response_component_summary.json"
+        ).read_text(
             encoding="utf-8"
         )
     )
@@ -238,5 +241,6 @@ def test_component_usage_summary_keeps_four_state_and_provisional_counts(
     assert summary["checker_status"] == {"unchecked": 1}
     assert summary["observer_provisional_count"] == 1
     assert len((
-        tmp_path / "response_component_usage.jsonl"
+        tmp_path / "diagnostics" / "events"
+        / "response_component_usage.jsonl"
     ).read_text(encoding="utf-8").splitlines()) == 1

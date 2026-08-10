@@ -415,6 +415,18 @@ class AsyncRFCParser:
                         if isinstance(ans, str)
                         else ''
                     )
+                    if not normalized:
+                        # An empty model answer carries no evidence that the
+                        # excerpt belongs to a request or response.  Treat it
+                        # as the conservative ``none`` class instead of
+                        # spending the bounded retry budget on the same
+                        # empty completion.
+                        node.content_type = 'none'
+                        logger.debug(
+                            f'[Tree Annotate]: {node.name}:none '
+                            '(empty response)'
+                        )
+                        return
                     if normalized not in {'request', 'response', 'all', 'none'}:
                         raise ValueError(
                             f'invalid document annotation: {ans!r}'
@@ -425,6 +437,13 @@ class AsyncRFCParser:
                     node.content_type = normalized
                     return
                 except Exception as error:
+                    if getattr(error, 'reason', None) == 'empty_response':
+                        node.content_type = 'none'
+                        logger.debug(
+                            f'[Tree Annotate]: {node.name}:none '
+                            '(empty response validation failure)'
+                        )
+                        return
                     logger.debug(
                         'RFCParser: specification annotation attempt '
                         f'{attempt}/{self.ANNOTATION_MAX_ATTEMPTS} failed '

@@ -1,0 +1,4 @@
+usage,model,llm_calls,token_reported_calls,chat_time_s,prompt_tokens,completion_tokens,total_tokens,avg_prompt_tokens,avg_completion_tokens,avg_total_tokens,max_prompt_tokens,max_completion_tokens,max_total_tokens,valid_responses,invalid_responses,empty_responses,schema_failures,truncated_responses,discarded_completion_tokens
+infer_dependency,deepseek-v4-flash,324,324,49371.467911,1024609,4618271,5642880,3162.373,14253.923,17416.296,3576,44174,47215,324,0,0,0,0,0
+ir_generation,deepseek-v4-flash,19,19,3629.292987,52998,332251,385249,2789.368,17486.895,20276.263,3541,26419,29420,19,0,0,0,0,0
+possible_res,deepseek-v4-flash,18,18,3669.406139,59724,362216,421940,3318.000,20123.111,23441.111,3399,44313,47617,18,0,0,0,0,0
