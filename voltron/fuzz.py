@@ -789,7 +789,24 @@ class Fuzzer:
             self.partial_guidance: PartialStateGraph | None = None
             begin_time = time.time()
             if self.state_learning:
+                total_limit = getattr(self, 'time_limit_s', None)
+                if not isinstance(total_limit, (int, float)) or total_limit <= 0:
+                    total_limit = getattr(configs, 'time_limit_s', None)
+                learning_budget = (
+                    max(1.0, float(total_limit) * 0.25)
+                    if isinstance(total_limit, (int, float)) and total_limit > 0
+                    else None
+                )
+                self.learning_budget_s = learning_budget
+                self.learning_start_time = time.monotonic()
+                self.learning_deadline = (
+                    self.learning_start_time + learning_budget
+                    if learning_budget is not None else None
+                )
                 analyzer.begin_phase('model_learning')
+                # Create the externally visible status file before the first
+                # learning load/API call, so early model-learning failures
+                # still leave a diagnosable snapshot.
                 self._write_status_snapshot('model_learning_started')
                 analyzer.record_generator_checkpoint(
                     phase='model_learning',
@@ -1031,6 +1048,7 @@ class Fuzzer:
         threshold_relearn_count = 0
         active_learning_iteration: int | None = None
         self.learning_outcome = 'completed'
+        learning_deadline = getattr(self, 'learning_deadline', None)
 
         def record_incomplete_learning_iteration(status: str) -> None:
             if active_learning_iteration is None:
@@ -1044,6 +1062,13 @@ class Fuzzer:
             )
 
         while not stop_event.is_set():
+            if (
+                isinstance(learning_deadline, (int, float))
+                and time.monotonic() >= learning_deadline
+            ):
+                self.learning_outcome = 'learning_budget_exceeded'
+                logger.debug('Fuzzer: model learning budget exhausted')
+                break
             try:
                 cur_id = str(analyzer.iter)
                 active_learning_iteration = int(cur_id)
@@ -1061,6 +1086,10 @@ class Fuzzer:
                 ml = MealyLstar(mq, eq, self.stop_event)
                 h = ml.run(cur_id)
                 iteration_duration = time.time() - iteration_start
+                budget_exceeded = (
+                    isinstance(learning_deadline, (int, float))
+                    and time.monotonic() >= learning_deadline
+                )
                 # A completed hypothesis breaks a consecutive threshold
                 # streak.  Future stagnation gets its own bounded recovery
                 # window and is still bounded by the normal H-quality limit.
@@ -1069,6 +1098,22 @@ class Fuzzer:
                 self.mapper.register_mapper(h)
                 h.res_types = analyzer.cur_res_types_cnt
                 h.res_trans_types = analyzer.cur_resp_trans_cnt
+
+                if budget_exceeded:
+                    if not h_lsit:
+                        h_lsit.append(h)
+                        best_generators, best_parser = (
+                            self.producer.capture_current_equipment(
+                                self.mapper.cur_parser
+                            )
+                        )
+                    self.learning_outcome = 'learning_budget_exceeded'
+                    analyzer.record_model_learning_iteration(
+                        iteration=int(cur_id), hypothesis=h,
+                        duration_s=iteration_duration,
+                        status='budget_exceeded', try_limit=try_limit,
+                    )
+                    break
 
                 iteration_status = 'initial'
                 with analyzer.lock:
