@@ -1,6 +1,7 @@
 import csv
 from datetime import datetime
 import json
+import os
 import threading, time, pprint
 from pathlib import Path
 from voltron.utils.logger import logger_fuzz as logger
@@ -87,6 +88,12 @@ class Analyzer:
         self.run_status: str = 'not_started'
         self.planned_duration_s: float | None = None
         self.actual_duration_s: float | None = None
+        # ``fuzzer_status`` is read by external monitors while the fuzzer is
+        # running.  Serialize snapshot writers so an older heartbeat can
+        # never replace a newer final status.
+        self._status_snapshot_lock = threading.RLock()
+        self.status_snapshot_sequence = 0
+        self.status_last_update_timestamp: float | None = None
         
         self.sut_proc: subprocess.Popen | None = None
         self._state_snapshot_path: Path | None = None
@@ -130,6 +137,8 @@ class Analyzer:
             self.run_status = 'not_started'
             self.planned_duration_s = None
             self.actual_duration_s = None
+            self.status_snapshot_sequence = 0
+            self.status_last_update_timestamp = None
             try:
                 csv_path = configs.results_path / 'phase_metrics.csv'
                 csv_path.unlink(missing_ok=True)
@@ -883,57 +892,132 @@ class Analyzer:
             phase_iteration=phase_iteration,
         )
 
+    def write_status_snapshot(
+            self,
+            reason: str = 'event',
+    ) -> bool:
+        """Atomically write one lightweight runtime status snapshot.
+
+        This method deliberately writes only ``fuzzer_status``.  It is safe
+        to call from a periodic heartbeat while model learning is blocked and
+        avoids repeatedly rewriting state/metric artifacts on that path.
+        """
+        results_path = getattr(configs, 'results_path', None)
+        if not isinstance(results_path, Path):
+            return False
+
+        with self._status_snapshot_lock:
+            now = time.time()
+            with self.lock:
+                start_time = getattr(self, 'start_time', now)
+                if not isinstance(start_time, (int, float)):
+                    start_time = now
+                active_phase = self.active_phase or ''
+                phase_metric = self.phase_metrics.get(active_phase, {})
+                phase_start = phase_metric.get('start_time')
+                phase_elapsed = (
+                    max(0.0, now - phase_start)
+                    if isinstance(phase_start, (int, float))
+                    else 0.0
+                )
+                self.status_snapshot_sequence += 1
+                sequence = self.status_snapshot_sequence
+                self.status_last_update_timestamp = now
+                fields = [
+                    ('start_time', start_time),
+                    ('running_time', self.seconds_to_hms(
+                        max(0.0, now - start_time)
+                    )),
+                    ('stop_reason', self.stop_reason or 'unknown'),
+                    ('run_status', self.run_status),
+                    ('planned_duration_s', (
+                        self.planned_duration_s
+                        if self.planned_duration_s is not None else ''
+                    )),
+                    ('actual_duration_s', (
+                        self.actual_duration_s
+                        if self.actual_duration_s is not None else ''
+                    )),
+                    ('active_phase', active_phase or 'none'),
+                    ('stage', self.stage or 'none'),
+                    ('phase_elapsed_seconds', f'{phase_elapsed:.6f}'),
+                    ('last_update_timestamp', f'{now:.6f}'),
+                    ('status_sequence', sequence),
+                    ('snapshot_reason', reason or 'event'),
+                    ('target_name', getattr(self, 'target_name', '')),
+                    ('protocol_name', getattr(self, 'pro_name', '')),
+                    ('exec_path_num', self.path_num),
+                    ('sent_request', self.req_num),
+                    ('recv_resp', self.res_num),
+                    ('distinct_resp', self.res_types_num()),
+                    ('resp_transitions', self.resp_trans_num()),
+                    ('lifetime_resp_events', self.lifetime_res_events_num()),
+                    ('lifetime_distinct_resp', self.lifetime_res_types_num()),
+                    ('lifetime_resp_transition_events', (
+                        self.lifetime_resp_trans_events_num()
+                    )),
+                    ('lifetime_resp_transitions', (
+                        self.lifetime_resp_trans_num()
+                    )),
+                    ('crash_num', self.crash_num),
+                    ('non_compliant', self.non_compliant_num),
+                    ('model_learn_time_s', self.seconds_to_hms(
+                        self.model_learning_time_s
+                    )),
+                    ('chat_time_s', self.seconds_to_hms(self.chat_time_s)),
+                    ('chat_token', self.chat_token),
+                ]
+
+            status_file = results_path / 'fuzzer_status'
+            temporary_file = status_file.with_name(
+                f'.{status_file.name}.{os.getpid()}.'
+                f'{threading.get_ident()}.tmp'
+            )
+            try:
+                status_file.parent.mkdir(parents=True, exist_ok=True)
+                with temporary_file.open(mode='w', encoding='utf-8') as f:
+                    for name, value in fields:
+                        width = (
+                            15
+                            if name in {
+                                'start_time',
+                                'running_time',
+                                'stop_reason',
+                                'run_status',
+                                'target_name',
+                                'protocol_name',
+                                'exec_path_num',
+                                'sent_request',
+                                'recv_resp',
+                                'distinct_resp',
+                                'resp_transitions',
+                                'crash_num',
+                                'non_compliant',
+                                'model_learn_time_s',
+                                'chat_time_s',
+                                'chat_token',
+                            }
+                            else 21
+                            if name in {
+                                'planned_duration_s',
+                                'actual_duration_s',
+                            }
+                            else 31
+                        )
+                        f.write(f'{name:<{width}}: {value}\n')
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temporary_file, status_file)
+                return True
+            except Exception:
+                temporary_file.unlink(missing_ok=True)
+                logger.exception('Analyzer: write fuzzer status failure')
+                return False
+
     def collect_results(
             self
-    ):  
-        status_file = configs.results_path / f'fuzzer_status'
-        try:
-            with status_file.open(mode='w', encoding='utf-8') as f:
-                f.write(f'{"start_time":<15}: {self.start_time}\n')
-                f.write(f'{"running_time":<15}: {self.seconds_to_hms(time.time() - self.start_time)}\n')
-                f.write(f'{"stop_reason":<15}: {self.stop_reason or "unknown"}\n')
-                f.write(f'{"run_status":<15}: {self.run_status}\n')
-                f.write(
-                    f'{"planned_duration_s":<21}: '
-                    f'{self.planned_duration_s if self.planned_duration_s is not None else ""}\n'
-                )
-                f.write(
-                    f'{"actual_duration_s":<21}: '
-                    f'{self.actual_duration_s if self.actual_duration_s is not None else ""}\n'
-                )
-                f.write(f'{"target_name":<15}: {self.target_name}\n')
-                f.write(f'{"protocol_name":<15}: {self.pro_name}\n')
-                f.write(f'{"exec_path_num":<15}: {self.path_num}\n')
-                f.write(f'{"sent_request":<15}: {self.req_num}\n')
-                f.write(f'{"recv_resp":<15}: {self.res_num}\n')
-                f.write(f'{"distinct_resp":<15}: {self.res_types_num()}\n')
-                f.write(f'{"resp_transitions":<15}: {self.resp_trans_num()}\n')
-                f.write(
-                    f'{"lifetime_resp_events":<31}: '
-                    f'{self.lifetime_res_events_num()}\n'
-                )
-                f.write(
-                    f'{"lifetime_distinct_resp":<31}: '
-                    f'{self.lifetime_res_types_num()}\n'
-                )
-                f.write(
-                    f'{"lifetime_resp_transition_events":<31}: '
-                    f'{self.lifetime_resp_trans_events_num()}\n'
-                )
-                f.write(
-                    f'{"lifetime_resp_transitions":<31}: '
-                    f'{self.lifetime_resp_trans_num()}\n'
-                )
-                f.write(f'{"crash_num":<15}: {self.crash_num}\n')
-                f.write(
-                    f'{"non_compliant":<15}: '
-                    f'{self.non_compliant_num}\n'
-                )
-                f.write(f'{"model_learn_time_s":<15}: {self.seconds_to_hms(self.model_learning_time_s)}\n')
-                f.write(f'{"chat_time_s":<15}: {self.seconds_to_hms(self.chat_time_s)}\n')
-                f.write(f'{"chat_token":<15}: {self.chat_token}\n')
-        except Exception:
-            logger.exception('Analyzer: collect status results failure')
+    ):
+        self.write_status_snapshot(reason='collect_results')
 
         self.collect_metric_series()
             

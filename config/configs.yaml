@@ -12,7 +12,7 @@ forked-daapd:
   protocol: daap
   host: 127.0.0.1
   port: 3689
-  rfc_name: ["daap", "rfc9110", "rfc9112"]
+  rfc_name: ["rfc9110","rfc7540","rfc2616","rfc1945"]
   trans_layer: tcp
   server: parent
   readiness_script: ready.sh
@@ -54,7 +54,7 @@ exim:
   protocol: smtp
   host: 127.0.0.1
   port: 25
-  rfc_name: ["rfc5321"]
+  rfc_name: ["rfc5321","rfc3030","rfc2920","rfc3207","rfc4954"]
   trans_layer: tcp
   server: parent
   parser_validation_samples:
@@ -117,9 +117,9 @@ llm_compliance:
 # llm_fuzz async_sem remains an independent upper bound on concurrent calls.
 fuzzing:
   mutator_round_ratio: 0.25
-  # After 12 LLM mutation attempts, keep fuzzing with the latest validated
+  # After 24 LLM mutation attempts, keep fuzzing with the latest validated
   # mutators.  Set to 0 only for an explicitly unlimited experiment.
-  mutator_round_limit: 12
+  mutator_round_limit: 24
 
 generated_code:
   retry_limit: 3

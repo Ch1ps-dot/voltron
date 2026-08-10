@@ -164,6 +164,7 @@ def test_retrieval_and_prompt_include_exchange_and_rfc_context(tmp_path):
     assert "331 password required" in prompt
     assert "rfc959" in prompt
     assert "4.2 Replies" in prompt
+    assert "quoted/spec-located normative evidence" in prompt
 
 
 @pytest.mark.parametrize(

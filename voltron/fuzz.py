@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 import base64
+import math
 import yaml, time, threading, signal, sys, traceback, pickle, copy, os, atexit, subprocess, json
 
 from voltron.executor.conversation import Conversation
@@ -125,6 +126,9 @@ class Fuzzer:
         self._previous_sigint_handler = None
         self._signal_handler_installed = False
         self._worker_threads: list[threading.Thread] = []
+        self._status_heartbeat_lock = threading.RLock()
+        self._status_heartbeat_stop = threading.Event()
+        self._status_heartbeat_thread: threading.Thread | None = None
         self.stop_event = threading.Event()
         self.run_controller: RunController | None = None
         analyzer.stop_event = self.stop_event
@@ -237,7 +241,7 @@ class Fuzzer:
         configs.mutator_round_ratio = mutator_round_ratio
         raw_mutator_round_limit = fuzzing_config.get(
             'mutator_round_limit',
-            12,
+            24,
         )
         if isinstance(raw_mutator_round_limit, bool):
             raise ValueError(
@@ -321,6 +325,28 @@ class Fuzzer:
             1,
             int(generated_code.get('response_max_chars', 100_000)),
         )
+        status_reporting = configs_yaml.get('status_reporting', {})
+        if not isinstance(status_reporting, dict):
+            raise TypeError('status_reporting must be a mapping')
+        raw_status_interval = status_reporting.get('interval_seconds', 30.0)
+        if isinstance(raw_status_interval, bool):
+            raise ValueError(
+                'status_reporting.interval_seconds must be a non-negative '
+                'number'
+            )
+        try:
+            status_interval = float(raw_status_interval)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                'status_reporting.interval_seconds must be a non-negative '
+                'number'
+            ) from error
+        if not math.isfinite(status_interval) or status_interval < 0:
+            raise ValueError(
+                'status_reporting.interval_seconds must be a non-negative '
+                'number'
+            )
+        configs.status_snapshot_interval_s = status_interval
         response_components = configs_yaml.get('response_components', {})
         lazy_generation = response_components.get('lazy_generation', True)
         if not isinstance(lazy_generation, bool):
@@ -417,6 +443,73 @@ class Fuzzer:
             request_stop(reason, self.stop_event)
         else:
             self.stop_event.set()
+
+    def _write_status_snapshot(self, reason: str) -> bool:
+        """Write one lightweight status snapshot outside replay mode."""
+        if getattr(self, 'mode', '') == 'replay':
+            return False
+        writer = getattr(analyzer, 'write_status_snapshot', None)
+        if not callable(writer):
+            return False
+        return bool(writer(reason=reason))
+
+    def _start_status_heartbeat(self) -> None:
+        """Refresh status while a long learning or LLM operation is blocked."""
+        if getattr(self, 'mode', '') == 'replay':
+            return
+        interval = float(getattr(configs, 'status_snapshot_interval_s', 30.0))
+        if not math.isfinite(interval) or interval <= 0:
+            return
+
+        heartbeat_lock = getattr(self, '_status_heartbeat_lock', None)
+        if heartbeat_lock is None:
+            heartbeat_lock = threading.RLock()
+            self._status_heartbeat_lock = heartbeat_lock
+        with heartbeat_lock:
+            existing = getattr(self, '_status_heartbeat_thread', None)
+            if existing is not None and existing.is_alive():
+                return
+            stop = getattr(self, '_status_heartbeat_stop', None)
+            if stop is None:
+                stop = threading.Event()
+                self._status_heartbeat_stop = stop
+            stop.clear()
+
+            def heartbeat() -> None:
+                while not stop.wait(interval):
+                    if getattr(self, 'stop_event', None) is not None and (
+                        self.stop_event.is_set()
+                    ):
+                        return
+                    self._write_status_snapshot('heartbeat')
+
+            thread = threading.Thread(
+                target=heartbeat,
+                name='voltron-status-heartbeat',
+                daemon=True,
+            )
+            self._status_heartbeat_thread = thread
+            thread.start()
+
+    def _stop_status_heartbeat(self) -> None:
+        """Stop the heartbeat before writing a final status snapshot."""
+        heartbeat_lock = getattr(self, '_status_heartbeat_lock', None)
+        if heartbeat_lock is None:
+            return
+        with heartbeat_lock:
+            stop = getattr(self, '_status_heartbeat_stop', None)
+            if stop is not None:
+                stop.set()
+            thread = getattr(self, '_status_heartbeat_thread', None)
+        if (
+            thread is not None
+            and thread is not threading.current_thread()
+            and thread.is_alive()
+        ):
+            thread.join(timeout=1)
+        with heartbeat_lock:
+            if getattr(self, '_status_heartbeat_thread', None) is thread:
+                self._status_heartbeat_thread = None
 
     def _should_stop_for_deadline(self) -> bool:
         """Check the immutable run deadline, retaining standalone fallbacks."""
@@ -572,6 +665,8 @@ class Fuzzer:
             self._worker_threads = [t_fuzz, t_ui]
 
             self.run_controller.start()
+            self._write_status_snapshot('run_started')
+            self._start_status_heartbeat()
             t_fuzz.start()
             t_ui.start()
 
@@ -593,6 +688,7 @@ class Fuzzer:
             run_error = error
         finally:
             self.run_controller.close()
+            self._stop_status_heartbeat()
             if getattr(configs, 'run_controller', None) is self.run_controller:
                 configs.run_controller = None
             executor = getattr(self, 'exe', None)
@@ -690,6 +786,7 @@ class Fuzzer:
             begin_time = time.time()
             if self.state_learning:
                 analyzer.begin_phase('model_learning')
+                self._write_status_snapshot('model_learning_started')
                 analyzer.record_generator_checkpoint(
                     phase='model_learning',
                     checkpoint_type='model_learning_baseline',
@@ -719,8 +816,10 @@ class Fuzzer:
                     if stop_event.is_set() and model_phase_status == 'completed':
                         model_phase_status = analyzer.phase_stop_status()
                     analyzer.end_phase('model_learning', model_phase_status)
+                    self._write_status_snapshot('model_learning_finished')
             else:
                 analyzer.record_skipped_phase('model_learning')
+                self._write_status_snapshot('model_learning_skipped')
             end_time = time.time()
             with analyzer.lock:   
                 analyzer.model_learning_time_s = end_time - begin_time
@@ -1197,6 +1296,8 @@ class Fuzzer:
                 self._request_stop('model_learning_failure')
                 record_incomplete_learning_iteration('model_learning_failure')
                 raise RuntimeError('model learning failed') from error
+            finally:
+                self._write_status_snapshot('model_learning_iteration')
 
             if self._should_stop_for_deadline():
                 logger.debug('Fuzzer: deadline reached during model learning')
@@ -1297,11 +1398,12 @@ class Fuzzer:
         )
 
         analyzer.begin_phase('fuzzing')
+        self._write_status_snapshot('fuzzing_started')
         fuzz_phase_status = 'completed'
         active_fuzz_iteration: int | None = None
         mutator_round_limit = max(
             0,
-            int(getattr(configs, 'mutator_round_limit', 12)),
+            int(getattr(configs, 'mutator_round_limit', 24)),
         )
         mutator_rounds_attempted = 0
         published_mutator_types: set[str] = set()
@@ -1409,6 +1511,7 @@ class Fuzzer:
             if stop_event.is_set() and fuzz_phase_status == 'completed':
                 fuzz_phase_status = analyzer.phase_stop_status()
             analyzer.end_phase('fuzzing', fuzz_phase_status)
+            self._write_status_snapshot('fuzzing_finished')
                 
     def replay_process(
         self,
@@ -1536,6 +1639,8 @@ class Fuzzer:
             if self._cleanup_done:
                 return
             self._cleanup_done = True
+
+            self._stop_status_heartbeat()
 
             try:
                 self.stop_event.set()

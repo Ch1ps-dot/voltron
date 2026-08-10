@@ -9,6 +9,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from string import Template
 from typing import Any
 
 from fastbm25 import fastbm25
@@ -40,6 +41,13 @@ ANALYSIS_SCHEMA = {
         }
     ],
 }
+
+COMPLIANCE_ANALYSIS_PROMPT_PATH = (
+    Path(__file__).resolve().parent
+    / "skills"
+    / "builder"
+    / "compliance_analysis.md"
+)
 
 
 @dataclass(frozen=True)
@@ -367,21 +375,16 @@ def build_prompt(
         "request": prompt_bytes(pair.request),
         "response": prompt_bytes(pair.response),
     }
-    return (
-        "TASK\nJudge whether the captured response violates a normative "
-        "wire-format, semantic, sequencing, or required-response rule.\n\n"
-        "INPUT\n"
-        f"TARGET: {target['target_name']}\n"
-        f"PROTOCOL: {target['protocol']}\n"
-        f"SPEC_NAMES: {json.dumps(target['rfc_names'], separators=(',', ':'))}\n"
-        f"EXCHANGE_JSON: {json.dumps(exchange, ensure_ascii=False, separators=(',', ':'))}\n"
-        f"SPEC_CONTEXT_JSON: {json.dumps(context, ensure_ascii=False, separators=(',', ':'))}\n\n"
-        "RULES\nUse non_compliant only with quoted/spec-located normative "
-        "evidence conflicting with observed bytes. Treat optional or "
-        "implementation-defined behavior as compliant; use uncertain when "
-        "state/history/evidence is insufficient. Do not invent causes.\n\n"
-        "OUTPUT\nJSON only matching: "
-        f"{json.dumps(ANALYSIS_SCHEMA, separators=(',', ':'))}"
+    template = Template(
+        COMPLIANCE_ANALYSIS_PROMPT_PATH.read_text(encoding="utf-8")
+    )
+    return template.substitute(
+        target_name=target["target_name"],
+        protocol=target["protocol"],
+        rfc_names=json.dumps(target["rfc_names"], separators=(",", ":")),
+        exchange=json.dumps(exchange, ensure_ascii=False, separators=(",", ":")),
+        context=json.dumps(context, ensure_ascii=False, separators=(",", ":")),
+        analysis_schema=json.dumps(ANALYSIS_SCHEMA, separators=(",", ":")),
     )
 
 

@@ -336,6 +336,26 @@ The same values are displayed in the runtime UI and written to `fuzzer_status`.
 outcomes such as timeout, closed connection, poll error, and crash retain their
 existing dedicated counters and are not treated as parsed response types.
 
+`fuzzer_status` is an atomically replaced latest-status snapshot. Voltron
+writes it at run start, model-learning and fuzzing phase boundaries, after
+each completed model-learning or Berserker iteration, and during final
+cleanup. A lightweight heartbeat refreshes only this file while a long
+learning, SUT, or LLM operation is in progress; it does not rewrite CSVs or
+testcases. The default interval is 30 seconds. Add the following optional
+runtime configuration to change it; `0` disables only the periodic heartbeat,
+not event or final snapshots:
+
+```yaml
+status_reporting:
+  interval_seconds: 30
+```
+
+In addition to the existing counters, the snapshot includes `active_phase`,
+`stage`, `phase_elapsed_seconds`, `last_update_timestamp`,
+`status_sequence`, and `snapshot_reason`. The final snapshot is written only
+after the heartbeat has stopped, so a stale background write cannot replace the
+final run result.
+
 `states.csv` is event-driven: Voltron appends a six-metric snapshot only when
 it first discovers a response type or a response transition.  The legacy
 `time` field remains elapsed whole minutes for compatibility; `event`,

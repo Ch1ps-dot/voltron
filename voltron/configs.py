@@ -32,6 +32,8 @@ class Config:
         self.generated_code_timeout_s: float = 2.0
         self.ir_generation_timeout_s: float = 300.0
         self.generated_message_max_bytes: int = 1024 * 1024
+        # ``0`` explicitly disables periodic fuzzer-status heartbeats.
+        self.status_snapshot_interval_s: float = 30.0
         self.parser_validation_samples: tuple[bytes, ...] = ()
         # Bound variable RFC/IR/code context inserted into LLM prompts.  The
         # prompt template and its instructions are preserved in full.
@@ -82,7 +84,7 @@ class Config:
         self.mutator_round_ratio: float = 0.25
         # Bound LLM-driven mutator evolution for one fuzzing phase.  Zero is
         # the explicit opt-out for experiments that require an unlimited run.
-        self.mutator_round_limit: int = 12
+        self.mutator_round_limit: int = 24
 
         self.base_url_compliance: str
         self.api_key_compliance: str
