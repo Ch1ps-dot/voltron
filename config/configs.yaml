@@ -120,6 +120,19 @@ fuzzing:
   # After 24 LLM mutation attempts, keep fuzzing with the latest validated
   # mutators.  Set to 0 only for an explicitly unlimited experiment.
   mutator_round_limit: 24
+  offline_mutation:
+    enabled: true
+    probability: 0.3
+    max_mutated_packets_per_sequence: 3
+    max_mutations_per_packet: 4
+    max_delta_bytes: 4
+    # Absolute cap for all offline mutations.  length_extreme chooses either
+    # one byte or extreme_message_length and bypasses max_delta_bytes.
+    max_message_length: 65536
+    extreme_message_length: 4096
+    seed: 0
+    mutate_imported_seeds: true
+    protected_types: []
 
 generated_code:
   # Retry initial generator/parser/checker/observer synthesis up to five

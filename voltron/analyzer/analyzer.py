@@ -95,6 +95,11 @@ class Analyzer:
         self._status_snapshot_lock = threading.RLock()
         self.status_snapshot_sequence = 0
         self.status_last_update_timestamp: float | None = None
+        self.offline_mutation_attempts = 0
+        self.offline_mutation_applied = 0
+        self.offline_mutation_bytes_added = 0
+        self.offline_mutation_bytes_removed = 0
+        self.offline_mutation_operators = {}
         
         self.sut_proc: subprocess.Popen | None = None
         self._state_snapshot_path: Path | None = None
@@ -140,6 +145,11 @@ class Analyzer:
             self.actual_duration_s = None
             self.status_snapshot_sequence = 0
             self.status_last_update_timestamp = None
+            self.offline_mutation_attempts = 0
+            self.offline_mutation_applied = 0
+            self.offline_mutation_bytes_added = 0
+            self.offline_mutation_bytes_removed = 0
+            self.offline_mutation_operators = {}
             try:
                 csv_path = configs.results_path / 'phase_metrics.csv'
                 csv_path.unlink(missing_ok=True)
@@ -968,6 +978,11 @@ class Analyzer:
                     )),
                     ('crash_num', self.crash_num),
                     ('non_compliant', self.non_compliant_num),
+                    ('offline_mutation_attempts', self.offline_mutation_attempts),
+                    ('offline_mutation_applied', self.offline_mutation_applied),
+                    ('offline_mutation_bytes_added', self.offline_mutation_bytes_added),
+                    ('offline_mutation_bytes_removed', self.offline_mutation_bytes_removed),
+                    ('offline_mutation_operators', json.dumps(self.offline_mutation_operators, sort_keys=True)),
                     ('model_learn_time_s', self.seconds_to_hms(
                         self.model_learning_time_s
                     )),

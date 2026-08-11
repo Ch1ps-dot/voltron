@@ -269,6 +269,30 @@ class Fuzzer:
                 'fuzzing.mutator_round_limit must be a non-negative integer'
             )
         configs.mutator_round_limit = mutator_round_limit
+        offline = fuzzing_config.get('offline_mutation', {}) or {}
+        configs.offline_mutation_enabled = bool(offline.get('enabled', True))
+        configs.offline_mutation_probability = max(0.0, min(1.0, float(offline.get('probability', 0.3))))
+        configs.offline_mutation_max_mutated_packets_per_sequence = max(
+            0,
+            int(offline.get(
+                'max_mutated_packets_per_sequence',
+                offline.get('max_mutations_per_sequence', 3),
+            )),
+        )
+        configs.offline_mutation_max_mutations_per_packet = max(
+            0, int(offline.get('max_mutations_per_packet', 4)),
+        )
+        configs.offline_mutation_max_delta_bytes = max(0, int(offline.get('max_delta_bytes', 4)))
+        configs.offline_mutation_max_message_length = max(
+            1, int(offline.get('max_message_length', 65536)),
+        )
+        configs.offline_mutation_extreme_message_length = min(
+            configs.offline_mutation_max_message_length,
+            max(1, int(offline.get('extreme_message_length', 4096))),
+        )
+        configs.offline_mutation_seed = int(offline.get('seed', 0))
+        configs.offline_mutation_imported_seeds = bool(offline.get('mutate_imported_seeds', True))
+        configs.offline_mutation_protected_types = list(offline.get('protected_types', []))
         configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()

@@ -7,6 +7,7 @@ from voltron.configs import configs
 from voltron.scheduler.seed_retention import SeedRetentionPolicy
 from voltron.learner.partial_guidance import PartialStateGraph
 from voltron.utils.logger import logger_fuzz as logger
+from voltron.scheduler.offline_mutator import OfflineMutator
 from typing import TypedDict
 import random, time, threading, os, math
 
@@ -97,6 +98,26 @@ class Berserker:
         self.req_res: dict[str, set[str]] = {}
         
         self.rand = random.Random( time.time_ns() ^ os.getpid() ^ threading.get_ident())
+        self.offline_mutator = OfflineMutator(
+            enabled=getattr(configs, 'offline_mutation_enabled', True),
+            probability=getattr(configs, 'offline_mutation_probability', 0.3),
+            max_mutated_packets_per_sequence=getattr(
+                configs, 'offline_mutation_max_mutated_packets_per_sequence', 3,
+            ),
+            max_mutations_per_packet=getattr(
+                configs, 'offline_mutation_max_mutations_per_packet', 4,
+            ),
+            max_delta_bytes=getattr(configs, 'offline_mutation_max_delta_bytes', 4),
+            max_message_length=getattr(
+                configs, 'offline_mutation_max_message_length', 65536,
+            ),
+            extreme_message_length=getattr(
+                configs, 'offline_mutation_extreme_message_length', 4096,
+            ),
+            seed=getattr(configs, 'offline_mutation_seed', 0),
+            mutate_imported_seeds=getattr(configs, 'offline_mutation_imported_seeds', True),
+            protected_types=getattr(configs, 'offline_mutation_protected_types', []),
+        )
         
         # Define the methods and modes for selecting prefixes, mutators, and suffixes during fuzzing
         # cat: concatenate prefix, mutators, and suffix; 
@@ -589,6 +610,37 @@ class Berserker:
                         req_seq.append(prefix[i])
                     if (i < len_m):
                         req_seq.append(ms[i])
+
+            imported = self.selected_imported_seed_prefix
+            protected_prefix_length = len(prefix)
+            if imported and self.offline_mutator.mutate_imported_seeds:
+                # Imported AFLNet traffic is a concrete fuzz seed, not an
+                # access sequence that must remain intact to reach a model
+                # state.  Its dedicated option therefore overrides the
+                # general prefix protection policy.
+                protected_prefix_length = 0
+            req_seq, offline_changes = self.offline_mutator.mutate_sequence(
+                req_seq,
+                prefix_length=protected_prefix_length,
+                imported=imported,
+            )
+            if offline_changes:
+                for index, operator, _delta in offline_changes:
+                    msg_type, message = req_seq[index]
+                    remember = getattr(self.mapper, '_remember_message_provenance', None)
+                    if callable(remember):
+                        remember(message, request_type=msg_type, kind='offline', version=f'offline:{operator}')
+                stats = self.offline_mutator.stats
+                with analyzer.lock:
+                    analyzer.offline_mutation_attempts = stats.attempts
+                    analyzer.offline_mutation_applied = stats.applied
+                    analyzer.offline_mutation_bytes_added = stats.bytes_added
+                    analyzer.offline_mutation_bytes_removed = stats.bytes_removed
+                    analyzer.offline_mutation_operators = dict(stats.operators)
+            elif self.offline_mutator.stats.attempts:
+                stats = self.offline_mutator.stats
+                with analyzer.lock:
+                    analyzer.offline_mutation_attempts = stats.attempts
 
             flag, cons = self.exe.interact(
                 req_seq,

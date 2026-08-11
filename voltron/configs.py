@@ -88,6 +88,16 @@ class Config:
         # Bound LLM-driven mutator evolution for one fuzzing phase.  Zero is
         # the explicit opt-out for experiments that require an unlimited run.
         self.mutator_round_limit: int = 24
+        self.offline_mutation_enabled: bool = True
+        self.offline_mutation_probability: float = 0.3
+        self.offline_mutation_max_mutated_packets_per_sequence: int = 3
+        self.offline_mutation_max_mutations_per_packet: int = 4
+        self.offline_mutation_max_delta_bytes: int = 4
+        self.offline_mutation_max_message_length: int = 65536
+        self.offline_mutation_extreme_message_length: int = 4096
+        self.offline_mutation_seed: int = 0
+        self.offline_mutation_imported_seeds: bool = True
+        self.offline_mutation_protected_types: list[str] = []
 
         self.base_url_compliance: str
         self.api_key_compliance: str
