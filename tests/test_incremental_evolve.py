@@ -455,6 +455,16 @@ def test_generator_evolve_and_mutate_prompts_allow_info_resource_paths():
     assert "You may use target-specific URLs or named resources stated in SUT_CONTEXT" in mutate_prompt
 
 
+def test_generator_evolve_prompt_requires_context_credentials_for_auth_requests():
+    evolve_prompt = (ROOT / "skills/evolver/generator_evolve.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "When SUT_CONTEXT contains account credentials" in evolve_prompt
+    assert "every authentication-related request type must use those exact credentials" in evolve_prompt
+    assert "Do not invent, alter, or apply credentials to unrelated request types" in evolve_prompt
+
+
 def test_ir_evolve_method_applies_ops_and_returns_xml():
     template = Template(
         (ROOT / "skills/evolver/ir_evolve.md").read_text(encoding="utf-8")

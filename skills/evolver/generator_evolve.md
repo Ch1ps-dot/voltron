@@ -22,6 +22,7 @@ Return `generate() -> bytes` with no parameters.
 - Diagnose and fix invalid order/values/encoding/framing, missing fields, length/payload errors, or unsatisfied state preconditions evidenced by the inputs.
 - Preserve IR structure and SUT compatibility; use related generators only for supported cross-message/state dependencies.
 - Use target-specific URLs or named resources stated in SUT_CONTEXT when they are needed to access the intended endpoint or resource.
+- When SUT_CONTEXT contains account credentials, every authentication-related request type must use those exact credentials in the protocol-defined authentication fields and preserve their applicable state preconditions. Do not invent, alter, or apply credentials to unrelated request types.
 - Vary valid under-tested fields/optional elements toward unobserved legal transitions; output exactly one `$msg_type` message per call.
 - Do not invent protocol rules. Self-contained Python built-ins only; no networking; never return non-bytes.
 
