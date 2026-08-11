@@ -16,6 +16,10 @@ forked-daapd:
   trans_layer: tcp
   server: parent
   readiness_script: ready.sh
+  socket_readiness_timeout_seconds: 20.0
+  socket_readiness_poll_interval_seconds: 0.1
+  protocol_readiness_timeout_seconds: 10.0
+  protocol_readiness_successes: 3
   parser_validation_samples:
     - hex: "485454502f312e3120323030204f4b0d0a436f6e74656e742d4c656e6774683a2032300d0a0d0a6d7372760000000c6d73747400000004000000c8"
 
@@ -92,7 +96,10 @@ lighttpd:
 
 executor:
   setup_timeout_seconds: 30.0
+  socket_readiness_timeout_seconds: 10.0
+  socket_readiness_poll_interval_seconds: 0.1
   readiness_timeout_seconds: 5.0
+  protocol_readiness_successes: 1
   port_release_timeout_seconds: 3.0
 
 llm_doc:

@@ -11,7 +11,10 @@ class Config:
         self.readiness_script: Path | None = None
         self.readiness_adapter: str = ''
         self.setup_timeout_s: float = 30.0
+        self.socket_readiness_timeout_s: float = 10.0
+        self.socket_readiness_poll_interval_s: float = 0.1
         self.readiness_timeout_s: float = 5.0
+        self.protocol_readiness_successes: int = 1
         self.port_release_timeout_s: float = 3.0
         self.models_path: Path
         self.doc_paths: list[Path] = []

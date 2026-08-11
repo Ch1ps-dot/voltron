@@ -36,6 +36,7 @@ def mutate() -> bytes:
 - Before returning a patch, verify that its changed ranges leave the complete
   candidate with that one top-level `mutate` definition and valid Python.
 - Preserve the saved generator's state-reaching structure, then introduce controlled field-level anomalies supported by the IR.
+- Each `mutate()` invocation must return exactly one complete `$msg_type` request. Do not concatenate messages, mutate into a different request type, or return a multi-message sequence.
 - You may use target-specific URLs or named resources stated in SUT_CONTEXT when helpful for accessing the intended endpoint or resource.
 - Prioritize RFC response types not yet present in runtime observations; avoid patterns that only repeat observed outcomes.
 - Prefer mutations that pass framing and early parsing before stressing deeper validation: boundary/out-of-range numbers, inconsistent declared lengths, empty/long/invalid tokens, malformed quoting/charset, reused/duplicated IDs, unsupported versions, or compound semantic conflicts.

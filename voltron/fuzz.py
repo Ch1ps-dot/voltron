@@ -184,8 +184,32 @@ class Fuzzer:
         configs.readiness_timeout_s = max(
             0.1,
             float(target_config.get(
-                'readiness_timeout_seconds',
-                executor_config.get('readiness_timeout_seconds', 5.0),
+                'protocol_readiness_timeout_seconds',
+                target_config.get(
+                    'readiness_timeout_seconds',
+                    executor_config.get('readiness_timeout_seconds', 5.0),
+                ),
+            )),
+        )
+        configs.socket_readiness_timeout_s = max(
+            0.1,
+            float(target_config.get(
+                'socket_readiness_timeout_seconds',
+                executor_config.get('socket_readiness_timeout_seconds', 10.0),
+            )),
+        )
+        configs.socket_readiness_poll_interval_s = max(
+            0.01,
+            float(target_config.get(
+                'socket_readiness_poll_interval_seconds',
+                executor_config.get('socket_readiness_poll_interval_seconds', 0.1),
+            )),
+        )
+        configs.protocol_readiness_successes = max(
+            1,
+            int(target_config.get(
+                'protocol_readiness_successes',
+                executor_config.get('protocol_readiness_successes', 1),
             )),
         )
         configs.port_release_timeout_s = max(

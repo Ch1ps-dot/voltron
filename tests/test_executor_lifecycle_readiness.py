@@ -18,12 +18,24 @@ def make_executor(tmp_path: Path) -> Executor:
     executor.readiness_adapter = ""
     executor.setup_timeout_s = 1.0
     executor.readiness_timeout_s = 1.0
+    executor.socket_readiness_timeout_s = 1.0
+    executor.socket_readiness_poll_interval_s = 0.01
+    executor.protocol_readiness_successes = 1
     executor.port_release_timeout_s = 0.2
     executor.setup_time_s = 0.01
     executor.sut_deployment = "local"
     executor.stop_event = threading.Event()
     executor._prefetched_initial_response = None
     return executor
+
+
+def readiness_analyzer():
+    return SimpleNamespace(
+        lock=threading.RLock(),
+        socket_readiness_timeouts=0,
+        protocol_readiness_failures=0,
+        sut_exited_before_first_send=0,
+    )
 
 
 def write_script(path: Path, body: str) -> None:
@@ -311,3 +323,39 @@ def test_protocol_readiness_failure_is_captured(tmp_path):
     assert executor.last_readiness_result.stage == "protocol-readiness-failed"
     assert executor.last_readiness_result.returncode == 9
     assert "invalid-protocol" in executor.last_readiness_result.stderr
+
+
+def test_protocol_readiness_requires_consecutive_successes(tmp_path):
+    executor = make_executor(tmp_path)
+    executor.analyzer = readiness_analyzer()
+    executor.protocol_readiness_successes = 3
+    executor.readiness_timeout_s = 0.1
+    executor.socket_readiness_poll_interval_s = 0.001
+    executor._should_stop = lambda: False
+    outcomes = iter([False, True, True, True])
+    executor.run_subject_readiness = lambda _sock, timeout_s=None: next(outcomes)
+
+    assert executor.wait_for_subject_readiness() is True
+    assert executor.analyzer.protocol_readiness_failures == 1
+
+
+def test_socket_readiness_timeout_uses_explicit_budget(tmp_path):
+    executor = make_executor(tmp_path)
+    executor.analyzer = readiness_analyzer()
+    executor.socket_readiness_timeout_s = 0.03
+    executor.socket_readiness_poll_interval_s = 0.005
+    executor._is_remote_deployment = lambda: False
+    executor.setup_socket = lambda: None
+    executor._log_sut_start_failure = lambda *_args, **_kwargs: None
+
+    class RunningProcess:
+        @staticmethod
+        def poll():
+            return None
+
+    started = time.monotonic()
+    assert executor._wait_for_socket_readiness(RunningProcess()) is None
+    elapsed = time.monotonic() - started
+
+    assert 0.02 <= elapsed < 0.2
+    assert executor.analyzer.socket_readiness_timeouts == 1

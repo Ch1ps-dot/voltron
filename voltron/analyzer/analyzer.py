@@ -95,6 +95,14 @@ class Analyzer:
         self._status_snapshot_lock = threading.RLock()
         self.status_snapshot_sequence = 0
         self.status_last_update_timestamp: float | None = None
+        self.sut_launch_attempts = 0
+        self.sut_lifecycle_retries = 0
+        self.socket_readiness_timeouts = 0
+        self.protocol_readiness_failures = 0
+        self.sut_ready_latency_last_ms = 0.0
+        self.sut_ready_latency_max_ms = 0.0
+        self.sut_ready_latency_samples_ms: list[float] = []
+        self.sut_exited_before_first_send = 0
         self.offline_mutation_attempts = 0
         self.offline_mutation_applied = 0
         self.offline_mutation_bytes_added = 0
@@ -145,6 +153,14 @@ class Analyzer:
             self.actual_duration_s = None
             self.status_snapshot_sequence = 0
             self.status_last_update_timestamp = None
+            self.sut_launch_attempts = 0
+            self.sut_lifecycle_retries = 0
+            self.socket_readiness_timeouts = 0
+            self.protocol_readiness_failures = 0
+            self.sut_ready_latency_last_ms = 0.0
+            self.sut_ready_latency_max_ms = 0.0
+            self.sut_ready_latency_samples_ms = []
+            self.sut_exited_before_first_send = 0
             self.offline_mutation_attempts = 0
             self.offline_mutation_applied = 0
             self.offline_mutation_bytes_added = 0
@@ -940,6 +956,11 @@ class Analyzer:
                 self.status_snapshot_sequence += 1
                 sequence = self.status_snapshot_sequence
                 self.status_last_update_timestamp = now
+                latency_samples = sorted(self.sut_ready_latency_samples_ms)
+                latency_p95 = (
+                    latency_samples[max(0, int(len(latency_samples) * 0.95) - 1)]
+                    if latency_samples else 0.0
+                )
                 fields = [
                     ('start_time', start_time),
                     ('running_time', self.seconds_to_hms(
@@ -978,6 +999,14 @@ class Analyzer:
                     )),
                     ('crash_num', self.crash_num),
                     ('non_compliant', self.non_compliant_num),
+                    ('sut_launch_attempts', self.sut_launch_attempts),
+                    ('sut_lifecycle_retries', self.sut_lifecycle_retries),
+                    ('socket_readiness_timeouts', self.socket_readiness_timeouts),
+                    ('protocol_readiness_failures', self.protocol_readiness_failures),
+                    ('sut_ready_latency_ms_last', f'{self.sut_ready_latency_last_ms:.3f}'),
+                    ('sut_ready_latency_ms_max', f'{self.sut_ready_latency_max_ms:.3f}'),
+                    ('sut_ready_latency_ms_p95', f'{latency_p95:.3f}'),
+                    ('sut_exited_before_first_send', self.sut_exited_before_first_send),
                     ('offline_mutation_attempts', self.offline_mutation_attempts),
                     ('offline_mutation_applied', self.offline_mutation_applied),
                     ('offline_mutation_bytes_added', self.offline_mutation_bytes_added),

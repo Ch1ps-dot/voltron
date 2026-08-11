@@ -122,10 +122,19 @@ class Executor:
         )
         self.readiness_adapter = getattr(configs, 'readiness_adapter', '')
         self.setup_timeout_s = getattr(configs, 'setup_timeout_s', 30.0)
+        self.socket_readiness_timeout_s = getattr(
+            configs, 'socket_readiness_timeout_s', 10.0,
+        )
+        self.socket_readiness_poll_interval_s = getattr(
+            configs, 'socket_readiness_poll_interval_s', 0.1,
+        )
         self.readiness_timeout_s = getattr(
             configs,
             'readiness_timeout_s',
             5.0,
+        )
+        self.protocol_readiness_successes = getattr(
+            configs, 'protocol_readiness_successes', 1,
         )
         self.port_release_timeout_s = getattr(
             configs,
@@ -223,12 +232,42 @@ class Executor:
         self.run_controller = getattr(configs, 'run_controller', None)
 
     def _request_stop(self, reason: str) -> None:
-        runtime_analyzer = getattr(self, 'analyzer', analyzer)
+        runtime_analyzer = self._runtime_analyzer()
         request_stop = getattr(runtime_analyzer, 'request_stop', None)
         if callable(request_stop):
             request_stop(reason, self.stop_event)
         else:
             self.stop_event.set()
+
+    def _runtime_analyzer(self):
+        """Return the runtime analyzer, including lightweight test doubles."""
+        return getattr(self, 'analyzer', analyzer)
+
+    def _increment_lifecycle_metric(self, name: str, value: int = 1) -> None:
+        runtime_analyzer = self._runtime_analyzer()
+        with runtime_analyzer.lock:
+            setattr(
+                runtime_analyzer,
+                name,
+                getattr(runtime_analyzer, name, 0) + value,
+            )
+
+    def _record_ready_latency(self, latency_ms: float) -> None:
+        runtime_analyzer = self._runtime_analyzer()
+        with runtime_analyzer.lock:
+            runtime_analyzer.sut_ready_latency_last_ms = latency_ms
+            runtime_analyzer.sut_ready_latency_max_ms = max(
+                getattr(runtime_analyzer, 'sut_ready_latency_max_ms', 0.0),
+                latency_ms,
+            )
+            samples = getattr(
+                runtime_analyzer, 'sut_ready_latency_samples_ms', None,
+            )
+            if samples is None:
+                samples = []
+                runtime_analyzer.sut_ready_latency_samples_ms = samples
+            samples.append(latency_ms)
+            del samples[:-256]
 
     def _should_stop(self) -> bool:
         """Check the shared deadline before beginning or extending I/O."""
@@ -633,15 +672,21 @@ class Executor:
         proc: subprocess.Popen | None,
     ) -> socket.socket | None:
         remote = self._is_remote_deployment()
-        # Preserve the historical 100-attempt socket-readiness window for
-        # subjects without a protocol hook.  The separate readiness timeout
-        # only bounds the optional protocol probe.
-        timeout_s = max(self.setup_time_s, 100 * self.setup_time_s)
+        timeout_s = max(0.01, float(getattr(
+            self, 'socket_readiness_timeout_s', 10.0,
+        )))
+        poll_interval_s = max(
+            0.01, float(getattr(
+                self, 'socket_readiness_poll_interval_s', 0.1,
+            )),
+        )
         deadline = time.monotonic() + timeout_s
         attempt = 0
         while attempt == 0 or time.monotonic() < deadline:
             attempt += 1
-            if self.stop_event.wait(self.setup_time_s):
+            if self.stop_event.wait(min(poll_interval_s, max(
+                0.0, deadline - time.monotonic(),
+            ))):
                 return None
             sock = self.setup_socket()
             if sock is not None:
@@ -657,6 +702,9 @@ class Executor:
                     )
                     return None
             elif proc is None or proc.poll() is not None:
+                self._increment_lifecycle_metric(
+                    'sut_exited_before_first_send',
+                )
                 self._log_sut_start_failure(
                     proc,
                     stage='sut-exited-before-socket-ready',
@@ -671,6 +719,7 @@ class Executor:
             attempt=attempt,
             detail=f'service did not become reachable within {timeout_s:.2f}s',
         )
+        self._increment_lifecycle_metric('socket_readiness_timeouts')
         return None
 
     @staticmethod
@@ -781,6 +830,7 @@ class Executor:
     def run_subject_readiness(
         self,
         sock: socket.socket | None = None,
+        timeout_s: float | None = None,
     ) -> bool:
         """Run a configured protocol readiness check.
 
@@ -794,7 +844,10 @@ class Executor:
             if isinstance(adapter_value, str)
             else ''
         )
-        timeout_s = getattr(self, 'readiness_timeout_s', 5.0)
+        timeout_s = (
+            getattr(self, 'readiness_timeout_s', 5.0)
+            if timeout_s is None else timeout_s
+        )
         if adapter:
             started = time.perf_counter()
             try:
@@ -865,6 +918,42 @@ class Executor:
                 stderr=result.stderr,
             )
         return self._publish_subject_readiness(result, str(script))
+
+    def wait_for_subject_readiness(
+        self,
+        sock: socket.socket | None = None,
+    ) -> bool:
+        """Require consecutive protocol-readiness successes in one budget."""
+        required = max(1, int(getattr(
+            self, 'protocol_readiness_successes', 1,
+        )))
+        # Active-socket adapters consume protocol bytes, so they can only be
+        # safely checked once. Target scripts open their own probe socket.
+        if getattr(self, 'readiness_adapter', '') and required > 1:
+            required = 1
+        deadline = time.monotonic() + max(0.01, getattr(
+            self, 'readiness_timeout_s', 5.0,
+        ))
+        consecutive = 0
+        while time.monotonic() < deadline and not self._should_stop():
+            remaining = max(0.01, deadline - time.monotonic())
+            if self.run_subject_readiness(sock, timeout_s=remaining):
+                consecutive += 1
+                if consecutive >= required:
+                    return True
+            else:
+                consecutive = 0
+                self._increment_lifecycle_metric(
+                    'protocol_readiness_failures',
+                )
+            if consecutive < required and self.stop_event.wait(
+                min(
+                    getattr(self, 'socket_readiness_poll_interval_s', 0.1),
+                    remaining,
+                )
+            ):
+                break
+        return False
 
     def _active_lifecycle_lock(self) -> threading.RLock:
         lock = getattr(self, '_active_interaction_lock', None)
@@ -1175,6 +1264,10 @@ class Executor:
         proc = None
         sock = None
         for lifecycle_attempt in range(1, retry_limit + 1):
+            lifecycle_started = time.monotonic()
+            self._increment_lifecycle_metric('sut_launch_attempts')
+            if lifecycle_attempt > 1:
+                self._increment_lifecycle_metric('sut_lifecycle_retries')
             started, proc = self.start_sut_for_interaction(
                 stop_on_failure=False,
             )
@@ -1183,7 +1276,9 @@ class Executor:
                 sock = self._wait_for_socket_readiness(proc)
             if sock is not None:
                 self._track_active_interaction(proc, sock, remote_deployment)
-                if self.run_subject_readiness(sock):
+                if self.wait_for_subject_readiness(sock):
+                    ready_ms = (time.monotonic() - lifecycle_started) * 1000
+                    self._record_ready_latency(ready_ms)
                     break
                 if not remote_deployment:
                     self._log_sut_start_failure(

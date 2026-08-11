@@ -465,6 +465,20 @@ def test_generator_evolve_prompt_requires_context_credentials_for_auth_requests(
     assert "Do not invent, alter, or apply credentials to unrelated request types" in evolve_prompt
 
 
+def test_generator_and_mutator_prompts_require_one_message_of_the_requested_type():
+    prompt_paths = (
+        "skills/builder/generator_generation.md",
+        "skills/evolver/generator_evolve.md",
+        "skills/evolver/generator_mutate.md",
+    )
+
+    for path in prompt_paths:
+        prompt = (ROOT / path).read_text(encoding="utf-8")
+        assert "exactly one complete `$msg_type` request" in prompt
+        assert "Do not concatenate messages" in prompt
+        assert "multi-message sequence" in prompt
+
+
 def test_ir_evolve_method_applies_ops_and_returns_xml():
     template = Template(
         (ROOT / "skills/evolver/ir_evolve.md").read_text(encoding="utf-8")
