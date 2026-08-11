@@ -1,0 +1,27 @@
+{
+  "format": "voltron-aflnet-seed-manifest",
+  "version": 1,
+  "target": "lighttpd",
+  "protocol": "http",
+  "seed_count": 3,
+  "seeds": [
+    {
+      "file": "http_requests_delete_hello.json",
+      "source_sha256": "81f205bddb48e05da28302c6752d68df2b49f9a66df4f80201e9ee9e48047598",
+      "message_count": 1,
+      "sequence_sha256": "81f205bddb48e05da28302c6752d68df2b49f9a66df4f80201e9ee9e48047598"
+    },
+    {
+      "file": "http_requests_get_hello.json",
+      "source_sha256": "8a4849ccf1a879fe17eb86306975d02e6dce37f43cd2ee3cc4870cdbfc17d6be",
+      "message_count": 1,
+      "sequence_sha256": "8a4849ccf1a879fe17eb86306975d02e6dce37f43cd2ee3cc4870cdbfc17d6be"
+    },
+    {
+      "file": "http_requests_options_hello.json",
+      "source_sha256": "4148ba380de8c9b4941a379feab19983ae5fde57336fed3b5c241e3e3f063870",
+      "message_count": 1,
+      "sequence_sha256": "4148ba380de8c9b4941a379feab19983ae5fde57336fed3b5c241e3e3f063870"
+    }
+  ]
+}

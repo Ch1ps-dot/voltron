@@ -1,0 +1,22 @@
+{
+  "format": "voltron-aflnet-seed",
+  "version": 1,
+  "target": "lighttpd",
+  "protocol": "http",
+  "source": {
+    "path": "HTTP/Lighttpd1/in-http/http_requests_delete_hello.raw",
+    "sha256": "81f205bddb48e05da28302c6752d68df2b49f9a66df4f80201e9ee9e48047598",
+    "framing": "aflnet-replay-length-prefix",
+    "length_encoding": "little-endian-u32",
+    "source_kind": "raw_seed_wrapped_like_voltronbench_stateafl"
+  },
+  "messages": [
+    {
+      "index": 0,
+      "length": 89,
+      "payload_b64": "REVMRVRFIC9oZWxsby50eHQgSFRUUC8xLjENCkhvc3Q6IDEyNy4wLjAuMTo4MDgwDQpVc2VyLUFnZW50OiBjdXJsLzguMC4xDQpBY2NlcHQ6ICovKg0KDQo="
+    }
+  ],
+  "sequence_sha256": "81f205bddb48e05da28302c6752d68df2b49f9a66df4f80201e9ee9e48047598",
+  "replay_sha256": "c69c611d03f84f6ee718bdd79399abd8635d52f8b04cd28b06a072017ddc9f63"
+}

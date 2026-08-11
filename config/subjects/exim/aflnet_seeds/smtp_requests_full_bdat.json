@@ -1,0 +1,52 @@
+{
+  "format": "voltron-aflnet-seed",
+  "version": 1,
+  "target": "exim",
+  "protocol": "smtp",
+  "source": {
+    "path": "SMTP/Exim/in-smtp-replay/smtp_requests_full_bdat.raw",
+    "sha256": "0133c889f3f968c747b746e6d25f9498d5aa3ccadb4ebd85849041d7bd9c7f35",
+    "framing": "aflnet-replay-length-prefix",
+    "length_encoding": "little-endian-u32",
+    "source_kind": "aflnet_replay_seed"
+  },
+  "messages": [
+    {
+      "index": 0,
+      "length": 16,
+      "payload_b64": "RUhMTyBsb2NhbGhvc3QNCg=="
+    },
+    {
+      "index": 1,
+      "length": 27,
+      "payload_b64": "TUFJTCBGUk9NOjx1YnVudHVAdWJ1bnR1Pg0K"
+    },
+    {
+      "index": 2,
+      "length": 25,
+      "payload_b64": "UkNQVCBUTzo8dWJ1bnR1QHVidW50dT4NCg=="
+    },
+    {
+      "index": 3,
+      "length": 9,
+      "payload_b64": "QkRBVCAxMA0K"
+    },
+    {
+      "index": 4,
+      "length": 3,
+      "payload_b64": "Lg0K"
+    },
+    {
+      "index": 5,
+      "length": 8,
+      "payload_b64": "QkRBVCA1DQo="
+    },
+    {
+      "index": 6,
+      "length": 6,
+      "payload_b64": "UVVJVA0K"
+    }
+  ],
+  "sequence_sha256": "76b5af00b6e4ced31e7b1a5ab047af3dff7b6c1171d819a84071b78b03f9631b",
+  "replay_sha256": "0133c889f3f968c747b746e6d25f9498d5aa3ccadb4ebd85849041d7bd9c7f35"
+}

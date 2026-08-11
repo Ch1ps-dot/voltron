@@ -1,0 +1,42 @@
+{
+  "format": "voltron-aflnet-seed",
+  "version": 1,
+  "target": "live555",
+  "protocol": "rtsp",
+  "source": {
+    "path": "RTSP/Live555/in-rtsp-replay/rtsp_requests_mkv.raw",
+    "sha256": "439d1c6d8de2f394d83f7974f62b8fd07fe41f189af3a2266e3363e81ec29c10",
+    "framing": "aflnet-replay-length-prefix",
+    "length_encoding": "little-endian-u32",
+    "source_kind": "aflnet_replay_seed"
+  },
+  "messages": [
+    {
+      "index": 0,
+      "length": 162,
+      "payload_b64": "REVTQ1JJQkUgcnRzcDovLzEyNy4wLjAuMTo4NTU0L21hdHJvc2thRmlsZVRlc3QgUlRTUC8xLjANCkNTZXE6IDINClVzZXItQWdlbnQ6IC4vdGVzdFJUU1BDbGllbnQgKExJVkU1NTUgU3RyZWFtaW5nIE1lZGlhIHYyMDE4LjA4LjI4KQ0KQWNjZXB0OiBhcHBsaWNhdGlvbi9zZHANCg0K"
+    },
+    {
+      "index": 1,
+      "length": 193,
+      "payload_b64": "U0VUVVAgcnRzcDovLzEyNy4wLjAuMTo4NTU0L21hdHJvc2thRmlsZVRlc3QvdHJhY2sxIFJUU1AvMS4wDQpDU2VxOiAzDQpVc2VyLUFnZW50OiAuL3Rlc3RSVFNQQ2xpZW50IChMSVZFNTU1IFN0cmVhbWluZyBNZWRpYSB2MjAxOC4wOC4yOCkNClRyYW5zcG9ydDogUlRQL0FWUDt1bmljYXN0O2NsaWVudF9wb3J0PTM3MjE2LTM3MjE3DQoNCg=="
+    },
+    {
+      "index": 2,
+      "length": 212,
+      "payload_b64": "U0VUVVAgcnRzcDovLzEyNy4wLjAuMTo4NTU0L21hdHJvc2thRmlsZVRlc3QvdHJhY2syIFJUU1AvMS4wDQpDU2VxOiA0DQpVc2VyLUFnZW50OiAuL3Rlc3RSVFNQQ2xpZW50IChMSVZFNTU1IFN0cmVhbWluZyBNZWRpYSB2MjAxOC4wOC4yOCkNClRyYW5zcG9ydDogUlRQL0FWUDt1bmljYXN0O2NsaWVudF9wb3J0PTQ5MDIyLTQ5MDIzDQpTZXNzaW9uOiAwMDAwMjJCOA0KDQo="
+    },
+    {
+      "index": 3,
+      "length": 172,
+      "payload_b64": "UExBWSBydHNwOi8vMTI3LjAuMC4xOjg1NTQvbWF0cm9za2FGaWxlVGVzdC8gUlRTUC8xLjANCkNTZXE6IDUNClVzZXItQWdlbnQ6IC4vdGVzdFJUU1BDbGllbnQgKExJVkU1NTUgU3RyZWFtaW5nIE1lZGlhIHYyMDE4LjA4LjI4KQ0KU2Vzc2lvbjogMDAwMDIyQjgNClJhbmdlOiBucHQ9MC4wMDAtDQoNCg=="
+    },
+    {
+      "index": 4,
+      "length": 157,
+      "payload_b64": "VEVBUkRPV04gcnRzcDovLzEyNy4wLjAuMTo4NTU0L21hdHJvc2thRmlsZVRlc3QvIFJUU1AvMS4wDQpDU2VxOiA2DQpVc2VyLUFnZW50OiAuL3Rlc3RSVFNQQ2xpZW50IChMSVZFNTU1IFN0cmVhbWluZyBNZWRpYSB2MjAxOC4wOC4yOCkNClNlc3Npb246IDAwMDAyMkI4DQoNCg=="
+    }
+  ],
+  "sequence_sha256": "4b7092b89dd145ddf26068dfd6c136099289cfedc5e9c2445b85449689a4bedf",
+  "replay_sha256": "439d1c6d8de2f394d83f7974f62b8fd07fe41f189af3a2266e3363e81ec29c10"
+}

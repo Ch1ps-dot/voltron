@@ -47,6 +47,7 @@ class Berserker:
         machine: MealyMachine | None,
         use_guidance: bool = True,
         partial_guidance: PartialStateGraph | None = None,
+        interesting_seed_sequences: list[list[tuple[str, bytes]]] | None = None,
         controller=None,
     ) -> None:
         self.seed_retention = SeedRetentionPolicy()
@@ -65,7 +66,20 @@ class Berserker:
         # well as the explicit prefix path below.  They remain ordinary fuzz
         # seeds, never inferred machine states.
         self.useful_seq.extend(self.partial_seed_sequences)
+        # Imported AFLNet traffic is already a concrete, replayable request
+        # sequence.  Treat it as interesting seed material, not as a mapper
+        # symbol or a model-learning trace.
+        self.imported_seed_sequences = [
+            list(sequence)
+            for sequence in (interesting_seed_sequences or [])
+            if sequence
+        ]
+        self.useful_seq.extend(self.imported_seed_sequences)
+        self.seed_prefix_sequences = (
+            self.partial_seed_sequences + self.imported_seed_sequences
+        )
         self.selected_partial_prefix = False
+        self.selected_imported_seed_prefix = False
         self.partial_prefix_attempts = 0
         self.max_seq_len = 0
         self.seen_req_res_pairs = self.seed_retention.seen_request_response_pairs
@@ -300,14 +314,22 @@ class Berserker:
         self.selected_base_state = None
         self.selected_base_state_mode = ''
         self.selected_partial_prefix = False
-        if self.partial_seed_sequences:
+        self.selected_imported_seed_prefix = False
+        if self.partial_seed_sequences or self.imported_seed_sequences:
             # Prefer concrete MQ prefixes often enough to preserve useful
             # learning evidence, while leaving the rest of the scheduler's
             # random/dependency behavior intact.
             if self.rand.random() < 0.5:
                 self.selected_partial_prefix = True
                 self.partial_prefix_attempts += 1
-                return list(self.rand.choice(self.partial_seed_sequences))
+                selected = self.rand.choice(self.seed_prefix_sequences)
+                if any(
+                    selected is imported
+                    for imported in self.imported_seed_sequences
+                ):
+                    self.selected_partial_prefix = False
+                    self.selected_imported_seed_prefix = True
+                return list(selected)
         mode = ''
         if len(self.useful_seq) == 0:
             mode = 'random'
@@ -552,6 +574,7 @@ class Berserker:
                 if (
                     self.selected_base_state is not None
                     or self.selected_partial_prefix
+                    or self.selected_imported_seed_prefix
                 )
                 else self.rand.choice(self.methods)
             )

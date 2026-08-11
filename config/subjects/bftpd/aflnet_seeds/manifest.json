@@ -1,0 +1,33 @@
+{
+  "format": "voltron-aflnet-seed-manifest",
+  "version": 1,
+  "target": "bftpd",
+  "protocol": "ftp",
+  "seed_count": 4,
+  "seeds": [
+    {
+      "file": "seed_1.json",
+      "source_sha256": "2bd3e3200113d2513aaaf921eb46d52851318eeadaf272b8cd9e5b50dce59e2b",
+      "message_count": 12,
+      "sequence_sha256": "baad421e6bccf143728c92990e886404edbb70f6b052339e9397cbd2fceb8d70"
+    },
+    {
+      "file": "seed_2.json",
+      "source_sha256": "89969e1d658fc02ac95d39ca37767f344f5a989109466d332b7159d506c7c095",
+      "message_count": 12,
+      "sequence_sha256": "c1246ab53450e7f5b9cc19c0aeed3774192c96df99420a5b61639143bf7a3edc"
+    },
+    {
+      "file": "seed_3.json",
+      "source_sha256": "a943657426114f0212e536afa63a46423fa93954d46d571937e210606bbbdba0",
+      "message_count": 13,
+      "sequence_sha256": "0c8904fd9c2f5f11d1e0ba8ce2d1b3ae166d631cd61a6ac1a3d089bc1a4d7f8e"
+    },
+    {
+      "file": "seed_4.json",
+      "source_sha256": "048e7a597aa495862790aa7486a0973a07fe3374d3e9812491f139f6010087e9",
+      "message_count": 10,
+      "sequence_sha256": "2cd1a76636639640f8f5c5584b928d5f340e95a3267e23f885d7bbedcf71370c"
+    }
+  ]
+}

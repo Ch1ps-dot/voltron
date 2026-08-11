@@ -1,0 +1,42 @@
+{
+  "format": "voltron-aflnet-seed",
+  "version": 1,
+  "target": "live555",
+  "protocol": "rtsp",
+  "source": {
+    "path": "RTSP/Live555/in-rtsp-replay/rtsp_requests_mpg.raw",
+    "sha256": "44aa019447ee1206863dadbc543e804107d9cb44407a9d2e81c141b49e25da51",
+    "framing": "aflnet-replay-length-prefix",
+    "length_encoding": "little-endian-u32",
+    "source_kind": "aflnet_replay_seed"
+  },
+  "messages": [
+    {
+      "index": 0,
+      "length": 168,
+      "payload_b64": "REVTQ1JJQkUgcnRzcDovLzEyNy4wLjAuMTo4NTU0L21wZWcxb3IyQXVkaW9WaWRlb1Rlc3QgUlRTUC8xLjANCkNTZXE6IDINClVzZXItQWdlbnQ6IC4vdGVzdFJUU1BDbGllbnQgKExJVkU1NTUgU3RyZWFtaW5nIE1lZGlhIHYyMDE4LjA4LjI4KQ0KQWNjZXB0OiBhcHBsaWNhdGlvbi9zZHANCg0K"
+    },
+    {
+      "index": 1,
+      "length": 199,
+      "payload_b64": "U0VUVVAgcnRzcDovLzEyNy4wLjAuMTo4NTU0L21wZWcxb3IyQXVkaW9WaWRlb1Rlc3QvdHJhY2sxIFJUU1AvMS4wDQpDU2VxOiAzDQpVc2VyLUFnZW50OiAuL3Rlc3RSVFNQQ2xpZW50IChMSVZFNTU1IFN0cmVhbWluZyBNZWRpYSB2MjAxOC4wOC4yOCkNClRyYW5zcG9ydDogUlRQL0FWUDt1bmljYXN0O2NsaWVudF9wb3J0PTUwNzc4LTUwNzc5DQoNCg=="
+    },
+    {
+      "index": 2,
+      "length": 218,
+      "payload_b64": "U0VUVVAgcnRzcDovLzEyNy4wLjAuMTo4NTU0L21wZWcxb3IyQXVkaW9WaWRlb1Rlc3QvdHJhY2syIFJUU1AvMS4wDQpDU2VxOiA0DQpVc2VyLUFnZW50OiAuL3Rlc3RSVFNQQ2xpZW50IChMSVZFNTU1IFN0cmVhbWluZyBNZWRpYSB2MjAxOC4wOC4yOCkNClRyYW5zcG9ydDogUlRQL0FWUDt1bmljYXN0O2NsaWVudF9wb3J0PTQ1NTQ2LTQ1NTQ3DQpTZXNzaW9uOiAwMDAwMjJCOA0KDQo="
+    },
+    {
+      "index": 3,
+      "length": 178,
+      "payload_b64": "UExBWSBydHNwOi8vMTI3LjAuMC4xOjg1NTQvbXBlZzFvcjJBdWRpb1ZpZGVvVGVzdC8gUlRTUC8xLjANCkNTZXE6IDUNClVzZXItQWdlbnQ6IC4vdGVzdFJUU1BDbGllbnQgKExJVkU1NTUgU3RyZWFtaW5nIE1lZGlhIHYyMDE4LjA4LjI4KQ0KU2Vzc2lvbjogMDAwMDIyQjgNClJhbmdlOiBucHQ9MC4wMDAtDQoNCg=="
+    },
+    {
+      "index": 4,
+      "length": 163,
+      "payload_b64": "VEVBUkRPV04gcnRzcDovLzEyNy4wLjAuMTo4NTU0L21wZWcxb3IyQXVkaW9WaWRlb1Rlc3QvIFJUU1AvMS4wDQpDU2VxOiA2DQpVc2VyLUFnZW50OiAuL3Rlc3RSVFNQQ2xpZW50IChMSVZFNTU1IFN0cmVhbWluZyBNZWRpYSB2MjAxOC4wOC4yOCkNClNlc3Npb246IDAwMDAyMkI4DQoNCg=="
+    }
+  ],
+  "sequence_sha256": "1754cc36be5cf3d3561e9dfae88027d6435735d28deac8d0715fb337ca424bc4",
+  "replay_sha256": "44aa019447ee1206863dadbc543e804107d9cb44407a9d2e81c141b49e25da51"
+}

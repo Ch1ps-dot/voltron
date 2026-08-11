@@ -1,0 +1,21 @@
+{
+  "format": "voltron-aflnet-seed-manifest",
+  "version": 1,
+  "target": "lightftp",
+  "protocol": "ftp",
+  "seed_count": 2,
+  "seeds": [
+    {
+      "file": "ftp_requests_full_anonymous.json",
+      "source_sha256": "14949c6bbde95e1f9ba940fc94bc2818ba5ce4f9a412285ff9cd725cb4be3b70",
+      "message_count": 7,
+      "sequence_sha256": "a1dbaec212ce70e8364898d97399ade49e8afa8c521e29837ea9077d7d242358"
+    },
+    {
+      "file": "ftp_requests_full_normal.json",
+      "source_sha256": "a86d8679ae596973eb7f7d28c5d3110eec2be834eb8c8d9b0344bda1c854e7f6",
+      "message_count": 8,
+      "sequence_sha256": "f5c126130d7c446aae3371e366e283aef679ab5735d4fc029a2f2edd89c16908"
+    }
+  ]
+}

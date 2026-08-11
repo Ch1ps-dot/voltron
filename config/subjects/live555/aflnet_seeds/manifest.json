@@ -1,0 +1,51 @@
+{
+  "format": "voltron-aflnet-seed-manifest",
+  "version": 1,
+  "target": "live555",
+  "protocol": "rtsp",
+  "seed_count": 7,
+  "seeds": [
+    {
+      "file": "rtsp_requests_aac.json",
+      "source_sha256": "cacffb786ebecc55734ccf362ba4e28efe32d73d5c5e4eced2fc442095b8ebd5",
+      "message_count": 3,
+      "sequence_sha256": "3aa8aad207f46f9ae1341a1f34467fb76080ff3d3d93bdc535c5541dda815014"
+    },
+    {
+      "file": "rtsp_requests_ac3.json",
+      "source_sha256": "1348fe1bc09ff7fc5321a92b34c4e4c747da3e4be0f5e26e0e189f7ef67dc994",
+      "message_count": 3,
+      "sequence_sha256": "653d695047923a973710f7e5a03a6fd4b87e89c232d6ab3d028a1e4f1e3cc451"
+    },
+    {
+      "file": "rtsp_requests_mkv.json",
+      "source_sha256": "439d1c6d8de2f394d83f7974f62b8fd07fe41f189af3a2266e3363e81ec29c10",
+      "message_count": 5,
+      "sequence_sha256": "4b7092b89dd145ddf26068dfd6c136099289cfedc5e9c2445b85449689a4bedf"
+    },
+    {
+      "file": "rtsp_requests_mp3.json",
+      "source_sha256": "2d9b225c6cf2b5a2485f12e6c15160fa3baaa55b3249f186a8ae8ef87fc6bc87",
+      "message_count": 4,
+      "sequence_sha256": "1c698656e633e6e2eab73abaed638e4a5ddb25228e06e21b447135063fbda66b"
+    },
+    {
+      "file": "rtsp_requests_mpg.json",
+      "source_sha256": "44aa019447ee1206863dadbc543e804107d9cb44407a9d2e81c141b49e25da51",
+      "message_count": 5,
+      "sequence_sha256": "1754cc36be5cf3d3561e9dfae88027d6435735d28deac8d0715fb337ca424bc4"
+    },
+    {
+      "file": "rtsp_requests_wav.json",
+      "source_sha256": "0530162e35be57281be9cccbbc9a35672006a9f30c9d83b22afd9bdbbac09e49",
+      "message_count": 4,
+      "sequence_sha256": "fb400dbfffdf1fcea1edb9d538535c8570bfdbc15b8bd60c0784d18b6257f98e"
+    },
+    {
+      "file": "rtsp_requests_webm.json",
+      "source_sha256": "841459f3265d5189e89792c26b337cc7afff5c352ea47528e8dcb4c95d5df89e",
+      "message_count": 5,
+      "sequence_sha256": "bfb8f044f5a978392b75983162817c28a815167a9409e43481bf0c313b134d47"
+    }
+  ]
+}

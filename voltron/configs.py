@@ -54,6 +54,9 @@ class Config:
         # learning attempts before falling back to partial guidance.
         self.threshold_relearn_limit: int = 3
         self.bootstrap_partial_evolution: bool = True
+        # Load converted AFLNet inputs as post-learning interesting sequences
+        # by default.  They never enter model learning.
+        self.aflnet_seed_loading_enabled: bool = True
         # Empty membership-query outputs are commonly transient around a SUT
         # restart.  Retry them locally before declaring model learning failed.
         self.model_learning_empty_response_retries: int = 3

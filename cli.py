@@ -70,6 +70,15 @@ import click
         "evolution."
     ),
 )
+@click.option(
+    "--load-aflnet-seeds/--no-load-aflnet-seeds",
+    default=True,
+    show_default=True,
+    help=(
+        "Load converted raw AFLNet seeds after model learning as interesting "
+        "fuzzing sequences by default; they stay outside the learned alphabet."
+    ),
+)
 def main(
     sut: str, 
     algorithm: str, 
@@ -83,6 +92,7 @@ def main(
     guided_scheduling: bool,
     compliance_analysis: bool,
     observer: bool,
+    load_aflnet_seeds: bool,
 ):
     if rfc_parser and generate_ir:
         raise click.UsageError(
@@ -125,6 +135,7 @@ def main(
         guided_scheduling=guided_scheduling,
         compliance_analysis=compliance_analysis,
         observer_enabled=observer,
+        aflnet_seed_loading=load_aflnet_seeds,
     )
     exit_code = fuzzer.fuzz(
         algo=algorithm,

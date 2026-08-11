@@ -1,0 +1,21 @@
+{
+  "format": "voltron-aflnet-seed-manifest",
+  "version": 1,
+  "target": "forked-daapd",
+  "protocol": "daap",
+  "seed_count": 2,
+  "seeds": [
+    {
+      "file": "daapd1.json",
+      "source_sha256": "58990de0d361ba9f2f69f64abb8ef52cbc35268de23b40f0fa76ea0534e91a08",
+      "message_count": 71,
+      "sequence_sha256": "05ec0ec956469ba292c692c34c2c6248eea31a95fb277cf743c4d0a1ce3352a1"
+    },
+    {
+      "file": "daapd2.json",
+      "source_sha256": "7660fb350ebe2efcb0458fb691580a193930b2e89ad5d05c6647ffb22427783f",
+      "message_count": 45,
+      "sequence_sha256": "6294e0407fb817312136db0c2866f1a96dc7ffdb6dde6a022e698f0b9d1e97d1"
+    }
+  ]
+}

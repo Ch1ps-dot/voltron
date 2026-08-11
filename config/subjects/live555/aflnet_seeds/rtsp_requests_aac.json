@@ -1,0 +1,32 @@
+{
+  "format": "voltron-aflnet-seed",
+  "version": 1,
+  "target": "live555",
+  "protocol": "rtsp",
+  "source": {
+    "path": "RTSP/Live555/in-rtsp-replay/rtsp_requests_aac.raw",
+    "sha256": "cacffb786ebecc55734ccf362ba4e28efe32d73d5c5e4eced2fc442095b8ebd5",
+    "framing": "aflnet-replay-length-prefix",
+    "length_encoding": "little-endian-u32",
+    "source_kind": "aflnet_replay_seed"
+  },
+  "messages": [
+    {
+      "index": 0,
+      "length": 158,
+      "payload_b64": "REVTQ1JJQkUgcnRzcDovLzEyNy4wLjAuMTo4NTU0L2FhY0F1ZGlvVGVzdCBSVFNQLzEuMA0KQ1NlcTogMg0KVXNlci1BZ2VudDogLi90ZXN0UlRTUENsaWVudCAoTElWRTU1NSBTdHJlYW1pbmcgTWVkaWEgdjIwMTguMDguMjgpDQpBY2NlcHQ6IGFwcGxpY2F0aW9uL3NkcA0KDQo="
+    },
+    {
+      "index": 1,
+      "length": 189,
+      "payload_b64": "U0VUVVAgcnRzcDovLzEyNy4wLjAuMTo4NTU0L2FhY0F1ZGlvVGVzdC90cmFjazEgUlRTUC8xLjANCkNTZXE6IDMNClVzZXItQWdlbnQ6IC4vdGVzdFJUU1BDbGllbnQgKExJVkU1NTUgU3RyZWFtaW5nIE1lZGlhIHYyMDE4LjA4LjI4KQ0KVHJhbnNwb3J0OiBSVFAvQVZQO3VuaWNhc3Q7Y2xpZW50X3BvcnQ9Mzg3ODQtMzg3ODUNCg0K"
+    },
+    {
+      "index": 2,
+      "length": 168,
+      "payload_b64": "UExBWSBydHNwOi8vMTI3LjAuMC4xOjg1NTQvYWFjQXVkaW9UZXN0LyBSVFNQLzEuMA0KQ1NlcTogNA0KVXNlci1BZ2VudDogLi90ZXN0UlRTUENsaWVudCAoTElWRTU1NSBTdHJlYW1pbmcgTWVkaWEgdjIwMTguMDguMjgpDQpTZXNzaW9uOiAwMDAwMjJCOA0KUmFuZ2U6IG5wdD0wLjAwMC0NCg0K"
+    }
+  ],
+  "sequence_sha256": "3aa8aad207f46f9ae1341a1f34467fb76080ff3d3d93bdc535c5541dda815014",
+  "replay_sha256": "cacffb786ebecc55734ccf362ba4e28efe32d73d5c5e4eced2fc442095b8ebd5"
+}

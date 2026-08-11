@@ -21,6 +21,7 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.executor.mapper import Mapper
 from voltron.scheduler.berserker import Berserker
 from voltron.scheduler.seed_retention import SeedRetentionPolicy
+from voltron.aflnet_seeds import load_aflnet_seeds
 from voltron.utils.ui import ui_loop
 
 from voltron.configs import configs
@@ -112,6 +113,7 @@ class Fuzzer:
             guided_scheduling: bool = True,
             compliance_analysis: bool = False,
             observer_enabled: bool = True,
+            aflnet_seed_loading: bool = True,
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
@@ -122,6 +124,7 @@ class Fuzzer:
         self.guided_scheduling = guided_scheduling
         self.compliance_analysis = compliance_analysis
         self.observer_enabled = observer_enabled
+        self.aflnet_seed_loading = aflnet_seed_loading
         self._cleanup_lock = threading.RLock()
         self._cleanup_done = False
         self._previous_sigint_handler = None
@@ -291,6 +294,11 @@ class Fuzzer:
         configs.guided_scheduling = self.guided_scheduling
         configs.compliance_analysis = self.compliance_analysis
         configs.observer_enabled = self.observer_enabled
+        configs.aflnet_seed_loading_enabled = getattr(
+            self,
+            'aflnet_seed_loading',
+            True,
+        )
         ir_evolution = configs_yaml.get('ir_evolution', {})
         configs.ir_evolution_enabled = ir_evolution.get('enabled', True)
         configs.ir_evolution_failure_threshold = ir_evolution.get(
@@ -850,6 +858,9 @@ class Fuzzer:
                 # do not clear the event or reset the clock here.
                 logger.debug('Fuzzer: model learning stopped')
                 return
+            self.load_aflnet_seed_sequences()
+            if stop_event.is_set():
+                return
             self.berserker_fuzz(
                 hypothesis,
                 stop_event,
@@ -860,6 +871,44 @@ class Fuzzer:
             logger.exception('Fuzzer: state fuzzing failed')
             self._request_stop('failure')
             raise
+
+    def load_aflnet_seed_sequences(self) -> list[list[tuple[str, bytes]]]:
+        """Load raw AFLNet streams as post-learning interesting sequences.
+
+        Labels are audit-only.  The raw bytes are passed to Berserker as
+        concrete useful prefixes; they never enter the mapper or the learning
+        oracle, so they cannot change the learned alphabet.
+        """
+        if not getattr(configs, 'aflnet_seed_loading_enabled', False):
+            analyzer.record_skipped_phase('aflnet_seed_loading')
+            self.aflnet_seed_sequences = []
+            return []
+        seeds = load_aflnet_seeds(
+            configs.base_path / 'config' / 'subjects',
+            self.target_name,
+            configs.pro_name,
+        )
+        analyzer.begin_phase('aflnet_seed_loading')
+        status = 'completed'
+        try:
+            sequences = [
+                [
+                    (f'aflnet-seed:{seed.name}:{index}', message)
+                    for index, message in enumerate(seed.messages)
+                ]
+                for seed in seeds
+            ]
+            self.aflnet_seed_sequences = sequences
+            logger.info(
+                'Fuzzer: loaded %d AFLNet seed sequence(s) after model learning',
+                len(sequences),
+            )
+            return sequences
+        except BaseException:
+            status = 'failed'
+            raise
+        finally:
+            analyzer.end_phase('aflnet_seed_loading', status)
             
     def _create_learning_oracles(self):
         """Create fresh per-iteration state-learning state.
@@ -1442,6 +1491,11 @@ class Fuzzer:
             use_guidance=self.guided_scheduling,
             partial_guidance=(
                 partial_guidance if self.guided_scheduling else None
+            ),
+            interesting_seed_sequences=getattr(
+                self,
+                'aflnet_seed_sequences',
+                [],
             ),
             controller=getattr(self, 'run_controller', None),
         )

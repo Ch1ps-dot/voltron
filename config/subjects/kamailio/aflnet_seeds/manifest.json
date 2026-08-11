@@ -1,0 +1,15 @@
+{
+  "format": "voltron-aflnet-seed-manifest",
+  "version": 1,
+  "target": "kamailio",
+  "protocol": "sip",
+  "seed_count": 1,
+  "seeds": [
+    {
+      "file": "sip-1.json",
+      "source_sha256": "7b13891d6e312e195af7f89e54b27c8bed6192a4bc538625e86ca5f1da29ad85",
+      "message_count": 4,
+      "sequence_sha256": "5f951ff91106042e4cfc8b6033addef9373f756842c5d7d0dc823e133ae67743"
+    }
+  ]
+}

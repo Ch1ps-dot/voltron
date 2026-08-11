@@ -1,0 +1,77 @@
+{
+  "format": "voltron-aflnet-seed",
+  "version": 1,
+  "target": "bftpd",
+  "protocol": "ftp",
+  "source": {
+    "path": "FTP/BFTPD/in-ftp-replay/seed_2.raw",
+    "sha256": "89969e1d658fc02ac95d39ca37767f344f5a989109466d332b7159d506c7c095",
+    "framing": "aflnet-replay-length-prefix",
+    "length_encoding": "little-endian-u32",
+    "source_kind": "aflnet_replay_seed"
+  },
+  "messages": [
+    {
+      "index": 0,
+      "length": 13,
+      "payload_b64": "VVNFUiB1YnVudHUNCg=="
+    },
+    {
+      "index": 1,
+      "length": 13,
+      "payload_b64": "UEFTUyB1YnVudHUNCg=="
+    },
+    {
+      "index": 2,
+      "length": 10,
+      "payload_b64": "TUtEIHRlc3QNCg=="
+    },
+    {
+      "index": 3,
+      "length": 10,
+      "payload_b64": "Q1dEIHRlc3QNCg=="
+    },
+    {
+      "index": 4,
+      "length": 5,
+      "payload_b64": "UFdEDQo="
+    },
+    {
+      "index": 5,
+      "length": 11,
+      "payload_b64": "WE1LRCB0ZXN0DQo="
+    },
+    {
+      "index": 6,
+      "length": 11,
+      "payload_b64": "WENXRCB0ZXN0DQo="
+    },
+    {
+      "index": 7,
+      "length": 6,
+      "payload_b64": "WFBXRA0K"
+    },
+    {
+      "index": 8,
+      "length": 6,
+      "payload_b64": "Q0RVUA0K"
+    },
+    {
+      "index": 9,
+      "length": 6,
+      "payload_b64": "WENVUA0K"
+    },
+    {
+      "index": 10,
+      "length": 5,
+      "payload_b64": "UFdEDQo="
+    },
+    {
+      "index": 11,
+      "length": 6,
+      "payload_b64": "UVVJVA0K"
+    }
+  ],
+  "sequence_sha256": "c1246ab53450e7f5b9cc19c0aeed3774192c96df99420a5b61639143bf7a3edc",
+  "replay_sha256": "89969e1d658fc02ac95d39ca37767f344f5a989109466d332b7159d506c7c095"
+}

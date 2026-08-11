@@ -1,0 +1,21 @@
+{
+  "format": "voltron-aflnet-seed-manifest",
+  "version": 1,
+  "target": "exim",
+  "protocol": "smtp",
+  "seed_count": 2,
+  "seeds": [
+    {
+      "file": "smtp_requests_full.json",
+      "source_sha256": "8d5cd528ee62fa641cb19ff2c91dfefee2e4c4830900e94209c6a36d30a56f20",
+      "message_count": 7,
+      "sequence_sha256": "312dc2906a7a82d74565c86236f08a8a1b30481874014b74991388634cbaaf94"
+    },
+    {
+      "file": "smtp_requests_full_bdat.json",
+      "source_sha256": "0133c889f3f968c747b746e6d25f9498d5aa3ccadb4ebd85849041d7bd9c7f35",
+      "message_count": 7,
+      "sequence_sha256": "76b5af00b6e4ced31e7b1a5ab047af3dff7b6c1171d819a84071b78b03f9631b"
+    }
+  ]
+}
