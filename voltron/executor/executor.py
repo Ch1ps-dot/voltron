@@ -17,6 +17,7 @@ from voltron.synthesizer.observer import ResponseObserver
 from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 from voltron.executor.pair_recorder import RequestResponsePairRecorder
+from voltron.executor.response_framing import split_response_frames
 from voltron.executor.sut_monitor import (
     CRASHED,
     EXITED,
@@ -30,7 +31,7 @@ from dataclasses import dataclass, asdict
 
 CRASH_SIGNALS = {-6, -11, -4, -8}
 CRASH_EXIT_CODES = {128 + abs(sig) for sig in CRASH_SIGNALS}
-PARSER_UNKNOWN_RESPONSE = b'UNKNOWN'
+PARSER_FAILURE_RESPONSE = b'PARSE_FAILURE'
 ASAN_CRASH_MARKERS = (
     'ERROR: AddressSanitizer',
     'AddressSanitizer:',
@@ -1457,6 +1458,43 @@ class Executor:
                         logger.debug('Executor: parse error')
                         continue
 
+                    response_frames = list(getattr(
+                        self, '_last_response_frames', [],
+                    ))
+                    frame_metadata = [{
+                        key: value
+                        for key, value in frame.items()
+                        if key != 'data'
+                    } for frame in response_frames]
+                    if resp_code == PARSER_FAILURE_RESPONSE.decode():
+                        # Retain the raw receive batch and frame metadata for
+                        # offline repair, but never turn a parser failure into
+                        # a learned response type or transition.
+                        if req_data is not None:
+                            cons.add_data(
+                                req_data,
+                                resp_data or bytes(),
+                                response_frames=frame_metadata,
+                            )
+                        cons.add_state(msg_type, resp_code)
+                        with self.analyzer.lock:
+                            self.analyzer.recv_batches = getattr(
+                                self.analyzer, 'recv_batches', 0,
+                            ) + 1
+                            self.analyzer.response_frames = getattr(
+                                self.analyzer, 'response_frames', 0,
+                            ) + len(response_frames)
+                            if len(response_frames) > 1:
+                                self.analyzer.multi_frame_requests = getattr(
+                                    self.analyzer,
+                                    'multi_frame_requests', 0,
+                                ) + 1
+                            self.analyzer.parse_failures = getattr(
+                                self.analyzer, 'parse_failures', 0,
+                            ) + 1
+                        last_request_recorded = True
+                        continue
+
                     self._set_state_snapshot_components(
                         component_provenance[:request_index + 1],
                         msg_type,
@@ -1471,11 +1509,33 @@ class Executor:
                             run_checker,
                         )
                     
+                    semantic_frames = [frame for frame in response_frames if frame[
+                        'parse_status'
+                    ] == 'parsed']
+                    if not semantic_frames:
+                        semantic_frames = [{
+                            'response_type': resp_code,
+                            'data': resp_data or bytes(),
+                        }]
                     with self.analyzer.lock:
-                        self.analyzer.res_num += 1
-                        self.analyzer.res_types_update(resp_code)
-                        self.analyzer.resp_trans_update(f'{last_recv}/{resp_code}')
-                    last_recv = resp_code
+                        self.analyzer.recv_batches = getattr(
+                            self.analyzer, 'recv_batches', 0,
+                        ) + 1
+                        self.analyzer.response_frames = getattr(
+                            self.analyzer, 'response_frames', 0,
+                        ) + len(semantic_frames)
+                        if len(semantic_frames) > 1:
+                            self.analyzer.multi_frame_requests = getattr(
+                                self.analyzer, 'multi_frame_requests', 0,
+                            ) + 1
+                        for frame in semantic_frames:
+                            frame_type = frame['response_type']
+                            self.analyzer.res_num += 1
+                            self.analyzer.res_types_update(frame_type)
+                            self.analyzer.resp_trans_update(
+                                f'{last_recv}/{frame_type}'
+                            )
+                            last_recv = frame_type
                     logger.debug(format_event(
                         'network.receive',
                         request_type=msg_type,
@@ -1490,7 +1550,11 @@ class Executor:
                     
                     # record conversation data
                     if req_data is not None:
-                        cons.add_data(req_data, resp_data or bytes())
+                        cons.add_data(
+                            req_data,
+                            resp_data or bytes(),
+                            response_frames=frame_metadata,
+                        )
                     cons.add_state(msg_type, resp_code)
                     last_request_recorded = True
                     if not is_valid_response:
@@ -1888,6 +1952,39 @@ class Executor:
             errors='backslashreplace',
         )
 
+    def _parse_tcp_frames(
+        self,
+        buf: bytes,
+        msg_type: str,
+        show_fuzz_ui: bool,
+    ) -> list[dict]:
+        """Parse protocol frames while preserving the exact receive batch."""
+        batch_id = getattr(self, '_recv_batch_id', 0) + 1
+        self._recv_batch_id = batch_id
+        frames = []
+        for index, frame in enumerate(split_response_frames(
+            getattr(configs, 'pro_name', ''), buf,
+        )):
+            response_type = self._parse_tcp_response(
+                frame.data, msg_type, show_fuzz_ui,
+            )
+            frames.append({
+                'recv_batch_id': batch_id,
+                'frame_index': index,
+                'offset_start': frame.offset_start,
+                'offset_end': frame.offset_end,
+                'timestamp': time.time(),
+                'response_type': response_type,
+                'parse_status': (
+                    'parse_failure'
+                    if response_type == PARSER_FAILURE_RESPONSE.decode()
+                    else 'parsed'
+                ),
+                'data': frame.data,
+            })
+        self._last_response_frames = frames
+        return frames
+
     def _invoke_parser_with_repair(
         self,
         response: bytes,
@@ -1920,15 +2017,26 @@ class Executor:
 
         if show_fuzz_ui:
             self._set_ui_operation('Repairing parser from runtime failure')
+        failure_key = (
+            failed_version,
+            hashlib.sha256(response).hexdigest(),
+        )
+        failed_inputs = getattr(self, '_parser_failed_inputs', set())
+        repair_allowed = failure_key not in failed_inputs
+        if repair_allowed:
+            failed_inputs.add(failure_key)
+            self._parser_failed_inputs = failed_inputs
         try:
-            repair = self.mapper.repair_runtime_component(
-                component='parser',
-                component_type='__all__',
-                version=getattr(self, '_parser_version', 'unknown'),
-                source_code=getattr(self, '_parser_code', ''),
-                error=error,
-                runtime_input=response,
-            )
+            repair = None
+            if repair_allowed:
+                repair = self.mapper.repair_runtime_component(
+                    component='parser',
+                    component_type='__all__',
+                    version=getattr(self, '_parser_version', 'unknown'),
+                    source_code=getattr(self, '_parser_code', ''),
+                    error=error,
+                    runtime_input=response,
+                )
             if repair is not None:
                 parser, _code = repair
                 self.mapper.cur_parser = parser
@@ -1979,7 +2087,7 @@ class Executor:
                 getattr(self, 'parser_fallback_count', 0) + 1
             )
             logger.warning(
-                'Executor: parser repair exhausted; using UNKNOWN fallback '
+                'Executor: parser repair exhausted; using PARSE_FAILURE fallback '
                 '[version=%s input_sha256=%s]',
                 failed_version,
                 hashlib.sha256(response).hexdigest(),
@@ -1996,11 +2104,11 @@ class Executor:
                         'failed_version': failed_version,
                         'input_sha256': hashlib.sha256(response).hexdigest(),
                         'input_length': len(response),
-                        'fallback_response': PARSER_UNKNOWN_RESPONSE.decode(),
+                        'fallback_response': PARSER_FAILURE_RESPONSE.decode(),
                         'error': error[:12000],
                     },
                 )
-            return PARSER_UNKNOWN_RESPONSE
+            return PARSER_FAILURE_RESPONSE
 
         raise RuntimeComponentRepairError(
             f'parser runtime repair exhausted: {error}'
@@ -2020,10 +2128,9 @@ class Executor:
                 poll_timeout_ms=poll_timeout_ms,
                 show_fuzz_ui=show_fuzz_ui,
             )
-        return (
-            self._parse_tcp_response(prefetched, '-', show_fuzz_ui),
-            prefetched,
-        )
+        frames = self._parse_tcp_frames(prefetched, '-', show_fuzz_ui)
+        semantic = [frame for frame in frames if frame['parse_status'] == 'parsed']
+        return ((semantic[-1] if semantic else frames[-1])['response_type'], prefetched)
 
     def net_recv(
             self, 
@@ -2096,12 +2203,14 @@ class Executor:
                     if len(buf) == 0:
                         return 'RCLOSED', None
                     else:
+                        frames = self._parse_tcp_frames(
+                            buf, msg_type, show_fuzz_ui,
+                        )
+                        semantic = [frame for frame in frames if frame[
+                            'parse_status'
+                        ] == 'parsed']
                         return (
-                            self._parse_tcp_response(
-                                buf,
-                                msg_type,
-                                show_fuzz_ui,
-                            ),
+                            (semantic[-1] if semantic else frames[-1])['response_type'],
                             buf,
                         )
                 

@@ -80,7 +80,7 @@ def test_parser_runtime_failure_repairs_and_replays_same_response():
     assert executor._parser_version == "id1"
 
 
-def test_parser_runtime_failure_degrades_to_unknown_after_repair_exhaustion():
+def test_parser_runtime_failure_degrades_to_parse_failure_after_repair_exhaustion():
     response = b"\xff\xfebinary-response"
     repairs = []
 
@@ -100,7 +100,7 @@ def test_parser_runtime_failure_degrades_to_unknown_after_repair_exhaustion():
     executor.parser_degraded = False
     executor.parser_fallback_count = 0
 
-    assert executor._parse_tcp_response(response, "-", False) == "UNKNOWN"
+    assert executor._parse_tcp_response(response, "-", False) == "PARSE_FAILURE"
     assert len(repairs) == 1
     assert repairs[0]["runtime_input"] == response
     assert executor.parser_degraded is True

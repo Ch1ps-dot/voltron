@@ -9,7 +9,7 @@ from voltron.executor.conversation import Conversation
 from voltron.utils.logger import logger_fuzz as logger
 
 
-ABNORMAL_RESPONSES = {'TIMEOUT', 'CRASH', 'CLOSED', 'POLLERR'}
+ABNORMAL_RESPONSES = {'TIMEOUT', 'CRASH', 'CLOSED', 'POLLERR', 'PARSE_FAILURE'}
 
 
 class RequestResponsePairRecorder:
@@ -38,6 +38,11 @@ class RequestResponsePairRecorder:
             request_type = conversation.req_seq[index]
             response_type = conversation.res_seq[index]
             request, response = conversation.content[index]
+            response_frames = (
+                conversation.response_frames[index]
+                if index < len(getattr(conversation, 'response_frames', []))
+                else []
+            )
             if (
                 request_type == '-'
                 or response_type == '-'
@@ -59,6 +64,7 @@ class RequestResponsePairRecorder:
                     response_type,
                     hashlib.sha256(response).hexdigest(),
                 )),
+                response_frames=response_frames,
             ):
                 saved += 1
         return saved
@@ -71,6 +77,7 @@ class RequestResponsePairRecorder:
         response: bytes,
         phase: str,
         component_evidence: dict | None = None,
+        response_frames: list[dict] | None = None,
     ) -> bool:
         relation = (request_type, response_type)
         with self._lock:
@@ -105,6 +112,13 @@ class RequestResponsePairRecorder:
                     'encoding': 'base64',
                     'data': base64.b64encode(response).decode('ascii'),
                 },
+                'response_frames': response_frames or [{
+                    'frame_index': 0,
+                    'offset_start': 0,
+                    'offset_end': len(response),
+                    'response_type': response_type,
+                    'parse_status': 'parsed',
+                }],
                 'phase': phase or 'unknown',
                 'conversation_digest': digest.hexdigest(),
                 'runtime_components': component_evidence or {

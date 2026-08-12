@@ -88,7 +88,7 @@ class PartialTraceRecorder:
                 continue
             if (
                 response in ABNORMAL_RESPONSES
-                or response in {'', '-', 'UNKNOWN'}
+                or response in {'', '-', 'UNKNOWN', 'PARSE_FAILURE'}
                 or index >= len(conversation.content)
             ):
                 return False

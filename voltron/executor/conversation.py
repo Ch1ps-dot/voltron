@@ -13,13 +13,16 @@ class Conversation:
         self.content: list[tuple[bytes, bytes]] = []
         self.req_seq: list[str] = []
         self.res_seq: list[str] = []
-        
+        self.response_frames: list[list[dict]] = []
+
     def add_data(
         self,
         request: bytes,
-        response: bytes
+        response: bytes,
+        response_frames: list[dict] | None = None,
     ):
         self.content.append((request, response))
+        self.response_frames.append(response_frames or [])
         
     def add_state(
         self,
@@ -34,6 +37,3 @@ class Conversation:
         extra_res: str
     ):
         self.res_seq[-1] = f'{self.res_seq[-1]}/{extra_res}'
-        
-                    
-                

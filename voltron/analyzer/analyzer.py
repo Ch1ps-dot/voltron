@@ -108,6 +108,10 @@ class Analyzer:
         self.offline_mutation_bytes_added = 0
         self.offline_mutation_bytes_removed = 0
         self.offline_mutation_operators = {}
+        self.recv_batches = 0
+        self.response_frames = 0
+        self.parse_failures = 0
+        self.multi_frame_requests = 0
         
         self.sut_proc: subprocess.Popen | None = None
         self._state_snapshot_path: Path | None = None
@@ -166,6 +170,10 @@ class Analyzer:
             self.offline_mutation_bytes_added = 0
             self.offline_mutation_bytes_removed = 0
             self.offline_mutation_operators = {}
+            self.recv_batches = 0
+            self.response_frames = 0
+            self.parse_failures = 0
+            self.multi_frame_requests = 0
             try:
                 csv_path = configs.results_path / 'phase_metrics.csv'
                 csv_path.unlink(missing_ok=True)
@@ -1012,6 +1020,10 @@ class Analyzer:
                     ('offline_mutation_bytes_added', self.offline_mutation_bytes_added),
                     ('offline_mutation_bytes_removed', self.offline_mutation_bytes_removed),
                     ('offline_mutation_operators', json.dumps(self.offline_mutation_operators, sort_keys=True)),
+                    ('recv_batches', self.recv_batches),
+                    ('response_frames', self.response_frames),
+                    ('parse_failures', self.parse_failures),
+                    ('multi_frame_requests', self.multi_frame_requests),
                     ('model_learn_time_s', self.seconds_to_hms(
                         self.model_learning_time_s
                     )),

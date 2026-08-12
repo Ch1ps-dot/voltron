@@ -111,3 +111,34 @@ def test_persists_runtime_component_provenance(tmp_path):
         (tmp_path / 'request_response_pairs').glob('pair_*.json')
     ).read_text(encoding='utf-8'))
     assert record['runtime_components'] == runtime_components
+
+
+def test_persists_raw_batch_frame_metadata(tmp_path):
+    recorder = RequestResponsePairRecorder(tmp_path)
+    conversation = Conversation()
+    conversation.add_state('RETR', '226')
+    batch = b'150 opening\r\n226 done\r\n'
+    conversation.add_data(
+        b'RETR file\r\n', batch,
+        response_frames=[
+            {
+                'recv_batch_id': 7, 'frame_index': 0,
+                'offset_start': 0, 'offset_end': 13,
+                'response_type': '150', 'parse_status': 'parsed',
+            },
+            {
+                'recv_batch_id': 7, 'frame_index': 1,
+                'offset_start': 13, 'offset_end': len(batch),
+                'response_type': '226', 'parse_status': 'parsed',
+            },
+        ],
+    )
+
+    assert recorder.observe(conversation, phase='fuzzing') == 1
+    record = json.loads(next(
+        (tmp_path / 'request_response_pairs').glob('pair_*.json')
+    ).read_text(encoding='utf-8'))
+    assert record['response_length'] == len(batch)
+    assert [frame['response_type'] for frame in record['response_frames']] == [
+        '150', '226',
+    ]
