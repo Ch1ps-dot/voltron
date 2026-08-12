@@ -67,8 +67,17 @@ class AsyncProducer:
         if rfcp.res_ir != None:
             self.res_ir = rfcp.res_ir.getroot()
 
-        self.equipment_path = configs.base_path / 'component' / 'equipment' 
-        self.synthesizer_path = self.equipment_path / configs.target_name
+        self.equipment_path = getattr(
+            configs,
+            'equipment_path',
+            configs.base_path / 'component' / 'equipment',
+        )
+        # A selected imported batch already scopes equipment to one target.
+        self.synthesizer_path = (
+            self.equipment_path
+            if getattr(configs, 'model_batch', None) is not None
+            else self.equipment_path / configs.target_name
+        )
         self.generator_path = self.synthesizer_path / 'generators'
         self.mutator_path = self.synthesizer_path / 'mutators'
         self.parser_path = self.synthesizer_path / 'parsers'
@@ -451,12 +460,25 @@ class AsyncProducer:
                 self.best_equipment_info_path.read_text(encoding='utf-8')
             )
             for msg_type, info in manifest.get('generators', {}).items():
-                generator = Generator(**info)
+                normalized_info = dict(info)
+                path = Path(normalized_info.get('path', ''))
+                # Imported snapshots may retain the source host's absolute
+                # path.  The snapshot's filename is canonical, so rebase
+                # only a missing path into this local best-equipment folder.
+                if not path.is_file():
+                    candidate = self.best_generator_path / path.name
+                    if candidate.is_file():
+                        normalized_info['path'] = str(candidate.resolve())
+                generator = Generator(**normalized_info)
                 if Path(generator.path).is_file():
                     self.best_generators[msg_type] = generator
 
-            parser_info = manifest.get('parser', {})
+            parser_info = dict(manifest.get('parser', {}))
             parser_path = parser_info.get('path', '')
+            if parser_path and not Path(parser_path).is_file():
+                if self.best_parser_path.is_file():
+                    parser_info['path'] = str(self.best_parser_path.resolve())
+                    parser_path = parser_info['path']
             if parser_path and Path(parser_path).is_file():
                 self.best_parser_info = parser_info
             logger.debug(

@@ -287,24 +287,6 @@ def test_incremental_outputs_are_smaller_for_realistic_evolve_inputs():
             "def packet_parser(response: bytes):\n    return b'200'\n",
         ),
         (
-            "_tem_mutator_evolve",
-            "skills/evolver/generator_mutate.md",
-            "llm_mutator_evolve",
-            {
-                "pro_name": "demo",
-                "field_name": "method",
-                "msg_type": "PING",
-                "code": "def generate():\n    return b'A'\n",
-                "msg_ir": "<message />",
-                "info": "sut",
-                "poss_response": "PONG",
-                "trace": "[]",
-            },
-            "code",
-            "def mutate():\n    return b'M'",
-            "def mutate():\n    return b'M'\n",
-        ),
-        (
             "_tem_observer_evolve",
             "skills/evolver/observer_evolve.md",
             "llm_observer_evolve",
@@ -434,7 +416,6 @@ def test_all_source_evolve_prompts_describe_the_no_change_result():
     for path in (
         "skills/evolver/generator_evolve.md",
         "skills/evolver/parser_evolve.md",
-        "skills/evolver/generator_mutate.md",
         "skills/evolver/observer_evolve.md",
         "skills/evolver/checker_evolve.md",
     ):

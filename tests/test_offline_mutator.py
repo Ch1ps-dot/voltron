@@ -1,4 +1,7 @@
-from voltron.scheduler.offline_mutator import OfflineMutator
+from voltron.scheduler.offline_mutator import (
+    AFLNET_SINGLE_PACKET_OPERATORS,
+    OfflineMutator,
+)
 
 
 def test_offline_mutator_is_deterministic_and_preserves_prefix_and_type():
@@ -23,6 +26,14 @@ def test_offline_mutator_can_be_disabled_and_mutates_imported_seed():
     mutated, changes = OfflineMutator(
         enabled=True, probability=1, seed=1, mutate_imported_seeds=True
     ).mutate_sequence(sequence, imported=True)
+    assert mutated[0][0] == 'DATA'
+    assert changes
+
+
+def test_offline_mutator_defaults_to_mutating_imported_seed():
+    mutated, changes = OfflineMutator(enabled=True, probability=1, seed=1).mutate_sequence(
+        [('DATA', b'payload')], imported=True,
+    )
     assert mutated[0][0] == 'DATA'
     assert changes
 
@@ -74,3 +85,39 @@ def test_length_extreme_reaches_small_or_configured_large_bound():
     results = {len(mutator._apply('length_extreme', b'payload')) for _ in range(16)}
     assert results <= {1, 24}
     assert results
+
+
+def test_aflnet_single_packet_stages_are_deterministic_and_bounded():
+    data = b"abcdefgh"
+    for operator in AFLNET_SINGLE_PACKET_OPERATORS:
+        kwargs = dict(seed=19, max_message_length=32,
+                      aflnet_dictionary=[b"TOKEN"], aflnet_havoc_stack=4)
+        first = OfflineMutator(**kwargs)._apply(operator, data)
+        second = OfflineMutator(**kwargs)._apply(operator, data)
+        assert first == second
+        if first is not None:
+            assert first
+            assert len(first) <= 32
+
+
+def test_aflnet_single_packet_switch_and_sequence_provenance():
+    disabled = OfflineMutator(aflnet_single_packet=False)
+    assert not set(disabled.operators) & set(AFLNET_SINGLE_PACKET_OPERATORS)
+
+    mutator = OfflineMutator(
+        enabled=True, probability=1, seed=5,
+        max_mutated_packets_per_sequence=1, max_mutations_per_packet=1,
+    )
+    mutator.operators = ("aflnet_byteflip_1",)
+    sequence, changes = mutator.mutate_sequence([("A", b"payload")])
+    assert sequence[0][0] == "A"
+    assert changes and changes[0][1] == "aflnet_byteflip_1"
+    assert mutator.stats.operators["aflnet_byteflip_1"] == 1
+
+
+def test_aflnet_dictionary_stages_are_available_when_configured():
+    mutator = OfflineMutator(seed=23, aflnet_dictionary=[b"XYZ"])
+    overwritten = mutator._apply("aflnet_dict_overwrite", b"abcdefgh")
+    inserted = mutator._apply("aflnet_dict_insert", b"abcdefgh")
+    assert b"XYZ" in overwritten
+    assert b"XYZ" in inserted

@@ -15,6 +15,23 @@ def make_conversation(request: bytes = b'PING\r\n') -> Conversation:
     return conversation
 
 
+def test_sequence_length_and_distinct_response_count_are_not_novelty():
+    """Length and per-conversation variety alone must not retain a seed."""
+    assert not SeedRetentionPolicy.is_interesting(
+        transition_increment=0,
+        response_type_increment=0,
+        sequence_length_increment=4,
+        unique_response_increment=3,
+        request_response_increment=0,
+    )
+
+
+def test_transition_type_or_request_response_relation_remains_novelty():
+    assert SeedRetentionPolicy.is_interesting(1, 0, 0, 0, 0)
+    assert SeedRetentionPolicy.is_interesting(0, 1, 0, 0, 0)
+    assert SeedRetentionPolicy.is_interesting(0, 0, 0, 0, 1)
+
+
 def test_model_learning_retains_only_interesting_conversations_as_seeds():
     conversation = make_conversation()
 

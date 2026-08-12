@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import json
 from pathlib import Path
 from string import Template
@@ -92,15 +91,7 @@ def test_mutator_prompt_includes_runtime_response_feedback():
     async def fake_chat_llm(prompt, usage):
         captured["prompt"] = prompt
         captured["usage"] = usage
-        baseline = "def generate():\n    return b'PING\\r\\n'\n"
-        return json.dumps({
-            "base_sha256": hashlib.sha256(baseline.encode()).hexdigest(),
-            "edits": [{
-                "start_line": 1,
-                "end_line": 2,
-                "replacement": "def mutate():\n    return b'MUTATED\\r\\n'",
-            }],
-        })
+        return "def mutate():\n    return b'MUTATED\\r\\n'\n"
 
     chater.chat_llm = fake_chat_llm
 
@@ -120,12 +111,14 @@ def test_mutator_prompt_includes_runtime_response_feedback():
     assert result == "def mutate():\n    return b'MUTATED\\r\\n'\n"
     assert captured["usage"] == "mutator_evolve"
     assert "RUNTIME_OBSERVED_RESPONSES" in captured["prompt"]
-    assert "NUMBERED_SAVED_BEST_GENERATOR" in captured["prompt"]
+    assert "SAVED_BEST_GENERATOR" in captured["prompt"]
     assert '["ERROR", "PONG"]' in captured["prompt"]
     assert "not yet present" in captured["prompt"]
     assert "URLs or named resources stated in SUT_CONTEXT" in captured["prompt"]
     assert "normally with `generate()` as its entry" in captured["prompt"]
-    assert "exactly one\ntop-level `mutate() -> bytes`" in captured["prompt"]
+    assert "Return Python source only" in captured["prompt"]
+    assert "BASE_SHA256" not in captured["prompt"]
+    assert "JSON only" not in captured["prompt"]
 
 
 def test_code_repair_prompt_includes_failed_code_and_validation_error():

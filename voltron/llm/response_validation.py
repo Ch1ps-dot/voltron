@@ -76,7 +76,11 @@ _CONTRACTS: dict[str, ResponseContract] = {
     "code_repair": ResponseContract(kind="python"),
     "generator_evolve": ResponseContract(kind="source_delta"),
     "parser_evolve": ResponseContract(kind="source_delta"),
-    "mutator_evolve": ResponseContract(kind="source_delta"),
+    "mutator_evolve": ResponseContract(
+        kind="python",
+        required_function="mutate",
+        allow_markdown_fence=False,
+    ),
     "parser_gen": ResponseContract(
         kind="python",
         required_function="packet_parser",

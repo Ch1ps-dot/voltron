@@ -14,6 +14,7 @@ from voltron.llm.chatter import AsyncChater, LLMDeadlineExceeded
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 
 from voltron.synthesizer.synthesizer import AsyncProducer
+from voltron.synthesizer.parser import Parser
 
 from voltron.executor.executor import Executor
 from voltron.analyzer.analyzer import analyzer
@@ -42,6 +43,7 @@ from voltron.learner.partial_guidance import (
     PartialStateGraph,
     PartialTraceRecorder,
 )
+from voltron.learning_bundle import export_learning_bundle
 
 
 class NoCoverageInputError(RuntimeError):
@@ -114,6 +116,8 @@ class Fuzzer:
             compliance_analysis: bool = False,
             observer_enabled: bool = True,
             aflnet_seed_loading: bool = True,
+            learning_only: bool = False,
+            model_batch: str | None = None,
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
@@ -125,6 +129,8 @@ class Fuzzer:
         self.compliance_analysis = compliance_analysis
         self.observer_enabled = observer_enabled
         self.aflnet_seed_loading = aflnet_seed_loading
+        self.learning_only = bool(learning_only)
+        self.model_batch = model_batch
         self._cleanup_lock = threading.RLock()
         self._cleanup_done = False
         self._previous_sigint_handler = None
@@ -239,7 +245,29 @@ class Fuzzer:
             if isinstance(readiness_adapter, str)
             else ''
         )
-        configs.models_path = configs.base_path / 'component' / 'models' / configs.target_name
+        models_root = configs.base_path / 'component' / 'models' / configs.target_name
+        batch_name = getattr(self, 'model_batch', None)
+        if batch_name is not None:
+            batch_path = Path(batch_name)
+            if batch_path.name != batch_name or batch_name in {'.', '..'}:
+                raise ValueError('model batch must be a single directory name')
+            selected_batch = models_root / batch_name
+            if not selected_batch.is_dir():
+                raise ValueError(f'model batch does not exist: {selected_batch}')
+            equipment_path = selected_batch / 'equipment'
+            if not equipment_path.is_dir():
+                raise ValueError(
+                    f'model batch lacks equipment directory: {selected_batch}'
+                )
+            configs.models_path = selected_batch
+            configs.equipment_path = equipment_path
+            configs.model_batch = batch_name
+        else:
+            configs.models_path = models_root
+            configs.equipment_path = (
+                configs.base_path / 'component' / 'equipment'
+            )
+            configs.model_batch = None
         configs.info_path = configs.base_path / 'config' / 'subjects' / configs.target_name / 'info.md'
         for rfc in configs.rfc_name:
             configs.doc_paths.append(configs.base_path / 'config' / 'rfcs' / f'{rfc}.txt')
@@ -293,6 +321,9 @@ class Fuzzer:
                 'fuzzing.mutator_round_limit must be a non-negative integer'
             )
         configs.mutator_round_limit = mutator_round_limit
+        configs.aflnet_seed_exact_replay = bool(
+            fuzzing_config.get('aflnet_seed_exact_replay', True)
+        )
         offline = fuzzing_config.get('offline_mutation', {}) or {}
         configs.offline_mutation_enabled = bool(offline.get('enabled', True))
         configs.offline_mutation_probability = max(0.0, min(1.0, float(offline.get('probability', 0.3))))
@@ -317,6 +348,16 @@ class Fuzzer:
         configs.offline_mutation_seed = int(offline.get('seed', 0))
         configs.offline_mutation_imported_seeds = bool(offline.get('mutate_imported_seeds', True))
         configs.offline_mutation_protected_types = list(offline.get('protected_types', []))
+        configs.offline_mutation_aflnet_single_packet = bool(
+            offline.get('aflnet_single_packet', True)
+        )
+        dictionary = offline.get('aflnet_dictionary', []) or []
+        if not isinstance(dictionary, list):
+            raise ValueError('fuzzing.offline_mutation.aflnet_dictionary must be a list')
+        configs.offline_mutation_aflnet_dictionary = [str(token) for token in dictionary]
+        configs.offline_mutation_aflnet_havoc_stack = max(
+            2, int(offline.get('aflnet_havoc_stack', 4)),
+        )
         configs.server = configs_yaml[self.target_name]['server']
         
         current_time_struct = time.localtime()
@@ -422,13 +463,24 @@ class Fuzzer:
         learning_config = configs_yaml.get('model_learning', {})
         partial_guidance_enabled = learning_config.get(
             'partial_guidance_enabled',
-            True,
+            False,
         )
         if not isinstance(partial_guidance_enabled, bool):
             raise TypeError(
                 'model_learning.partial_guidance_enabled must be a boolean'
             )
         configs.partial_guidance_enabled = partial_guidance_enabled
+        reuse_imported_partial_guidance = learning_config.get(
+            'reuse_imported_partial_guidance',
+            False,
+        )
+        if not isinstance(reuse_imported_partial_guidance, bool):
+            raise TypeError(
+                'model_learning.reuse_imported_partial_guidance must be a boolean'
+            )
+        configs.reuse_imported_partial_guidance = (
+            reuse_imported_partial_guidance
+        )
         configs.threshold_relearn_limit = max(
             0,
             int(learning_config.get('threshold_relearn_limit', 3)),
@@ -621,6 +673,9 @@ class Fuzzer:
         elif reason in {'external_interrupt', 'cancelled'}:
             run_status = 'interrupted'
             exit_code = 130
+        elif reason == 'learning_export_complete':
+            run_status = 'completed_learning_export'
+            exit_code = 0
         elif reason is None:
             run_status = 'incomplete'
             exit_code = 2
@@ -849,7 +904,12 @@ class Fuzzer:
                 if not isinstance(total_limit, (int, float)) or total_limit <= 0:
                     total_limit = getattr(configs, 'time_limit_s', None)
                 learning_budget = (
-                    max(1.0, float(total_limit) * 0.25)
+                    max(
+                        1.0,
+                        float(total_limit)
+                        if getattr(self, 'learning_only', False)
+                        else float(total_limit) * 0.25,
+                    )
                     if isinstance(total_limit, (int, float)) and total_limit > 0
                     else None
                 )
@@ -876,8 +936,24 @@ class Fuzzer:
                     if h_path.is_file():
                         with open(h_path, 'rb') as f:
                             hypothesis = pickle.load(f)
+                        # A completed model is only valid with the exact
+                        # parser/generator snapshot that produced it.  The
+                        # producer loads that snapshot during construction;
+                        # activate it before reusing the cached model.
+                        if (
+                            self.producer.best_generators
+                            and self.producer.best_parser_info
+                        ):
+                            self._activate_captured_equipment(
+                                self.producer.best_generators,
+                                Parser(**self.producer.best_parser_info),
+                            )
 
-                    if hypothesis is None:
+                    imported_partial = self._load_imported_partial_guidance()
+                    if hypothesis is None and imported_partial is not None:
+                        self.partial_guidance = imported_partial
+                        model_phase_status = 'reused_partial_guidance'
+                    elif hypothesis is None:
                         hypothesis = self.model_learning(None, None, stop_event)
                         model_phase_status = getattr(
                             self,
@@ -894,6 +970,18 @@ class Fuzzer:
                         model_phase_status = analyzer.phase_stop_status()
                     analyzer.end_phase('model_learning', model_phase_status)
                     self._write_status_snapshot('model_learning_finished')
+                if getattr(self, 'learning_only', False):
+                    bundle = export_learning_bundle(
+                        base_path=configs.base_path,
+                        results_path=configs.results_path,
+                        target=self.target_name,
+                        protocol=configs.pro_name,
+                        output_path=configs.results_path / 'learning_bundle.tar.gz',
+                    )
+                    logger.info('Fuzzer: exported learning bundle to %s', bundle)
+                    self._request_stop('learning_export_complete')
+                    self._write_status_snapshot('learning_export_complete')
+                    return
             else:
                 analyzer.record_skipped_phase('model_learning')
                 self._write_status_snapshot('model_learning_skipped')
@@ -919,6 +1007,49 @@ class Fuzzer:
             logger.exception('Fuzzer: state fuzzing failed')
             self._request_stop('failure')
             raise
+
+    def _load_imported_partial_guidance(self) -> PartialStateGraph | None:
+        """Load an explicitly enabled partial graph only when equipment matches.
+
+        Partial traces are concrete bytes produced by a particular generator
+        and parser set.  Treating a mismatched pickle as a generic model would
+        replay the wrong protocol messages, so a failed validation deliberately
+        falls back to normal model learning.
+        """
+        if not getattr(configs, 'reuse_imported_partial_guidance', False):
+            return None
+        path = configs.models_path / 'partial_guidance.pkl'
+        if not path.is_file():
+            return None
+        try:
+            with path.open('rb') as stream:
+                graph = pickle.load(stream)
+            if not isinstance(graph, PartialStateGraph):
+                raise TypeError('partial guidance has an unexpected type')
+            expected = self._partial_guidance_fingerprint()
+            fingerprint = graph.fingerprint
+            if (
+                fingerprint.get('target') != expected.get('target')
+                or fingerprint.get('protocol') != expected.get('protocol')
+                or fingerprint.get('parser') != expected.get('parser')
+                or fingerprint.get('generators') != expected.get('generators')
+            ):
+                raise ValueError('partial guidance equipment fingerprint mismatch')
+            if not graph.seed_sequences():
+                raise ValueError('partial guidance has no replayable traces')
+            logger.info(
+                'Fuzzer: reusing validated partial guidance from %s (%d traces)',
+                path,
+                len(graph.traces),
+            )
+            return graph
+        except Exception as error:
+            logger.warning(
+                'Fuzzer: ignoring imported partial guidance %s: %s',
+                path,
+                error,
+            )
+            return None
 
     def load_aflnet_seed_sequences(self) -> list[list[tuple[str, bytes]]]:
         """Load raw AFLNet streams as post-learning interesting sequences.
@@ -972,7 +1103,7 @@ class Fuzzer:
         threshold_tracker = (
             ModelLearningThreshold(request_types)
             if (
-                getattr(configs, 'partial_guidance_enabled', True)
+                getattr(configs, 'partial_guidance_enabled', False)
                 and request_types
             )
             else None
@@ -1545,6 +1676,11 @@ class Fuzzer:
                 'aflnet_seed_sequences',
                 [],
             ),
+            replay_imported_seed_sequences=getattr(
+                configs,
+                'aflnet_seed_exact_replay',
+                True,
+            ),
             controller=getattr(self, 'run_controller', None),
         )
 
@@ -1559,6 +1695,15 @@ class Fuzzer:
         mutator_rounds_attempted = 0
         published_mutator_types: set[str] = set()
         try:
+            replay_imported_seeds = getattr(
+                berserker,
+                'replay_imported_seed_sequences_once',
+                None,
+            )
+            if callable(replay_imported_seeds):
+                replay_imported_seeds()
+            if stop_event.is_set() or self._should_stop_for_deadline():
+                return
             while (
                 not stop_event.is_set()
                 and not self._should_stop_for_deadline()

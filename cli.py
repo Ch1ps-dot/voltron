@@ -6,6 +6,10 @@ from voltron.rfcparser.standalone import (
     generate_target_ir,
     parse_target_section_trees,
 )
+from voltron.config_loader import load_runtime_config
+from voltron.learning_bundle import import_learning_bundle as stage_learning_bundle, LearningBundleError
+from pathlib import Path
+import json
 import click
 
 @click.command(help='fuzzer')
@@ -79,6 +83,29 @@ import click
         "fuzzing sequences by default; they stay outside the learned alphabet."
     ),
 )
+@click.option(
+    "--learn-and-export",
+    is_flag=True,
+    help="Only synthesize components and learn/export a reusable learning bundle.",
+)
+@click.option(
+    "--import-learning-bundle",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Verify a trusted learning bundle in staging for this target.",
+)
+@click.option(
+    "--activate-import",
+    is_flag=True,
+    help="Atomically activate a verified imported bundle after staging.",
+)
+@click.option(
+    "--model-batch",
+    type=str,
+    help=(
+        "Use one imported model batch under component/models/<sut>/<batch>. "
+        "Its model and equipment are loaded together."
+    ),
+)
 def main(
     sut: str, 
     algorithm: str, 
@@ -93,11 +120,39 @@ def main(
     compliance_analysis: bool,
     observer: bool,
     load_aflnet_seeds: bool,
+    learn_and_export: bool,
+    import_learning_bundle: Path | None,
+    activate_import: bool,
+    model_batch: str | None,
 ):
     if rfc_parser and generate_ir:
         raise click.UsageError(
             "--rfc-parser and --generate-ir cannot be used together."
         )
+
+    if activate_import and import_learning_bundle is None:
+        raise click.UsageError('--activate-import requires --import-learning-bundle.')
+    if model_batch is not None and import_learning_bundle is not None:
+        raise click.UsageError(
+            '--model-batch cannot be combined with --import-learning-bundle.'
+        )
+    if import_learning_bundle is not None:
+        runtime = load_runtime_config(configs.base_path / 'config')
+        if sut not in runtime:
+            raise click.ClickException(f'Unknown SUT: {sut}')
+        try:
+            staging, report = stage_learning_bundle(
+                bundle=import_learning_bundle,
+                staging_root=configs.base_path / 'component' / 'import-staging',
+                target=sut,
+                protocol=runtime[sut]['protocol'],
+                activate=activate_import,
+                base_path=configs.base_path,
+            )
+        except (LearningBundleError, OSError, ValueError) as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(json.dumps({'staging': str(staging), **report}, ensure_ascii=False))
+        return
 
     if rfc_parser:
         try:
@@ -136,6 +191,8 @@ def main(
         compliance_analysis=compliance_analysis,
         observer_enabled=observer,
         aflnet_seed_loading=load_aflnet_seeds,
+        learning_only=learn_and_export,
+        model_batch=model_batch,
     )
     exit_code = fuzzer.fuzz(
         algo=algorithm,

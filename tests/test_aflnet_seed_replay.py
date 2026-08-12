@@ -5,6 +5,7 @@ from voltron.configs import configs
 from voltron.fuzz import Fuzzer
 import voltron.fuzz as fuzz_module
 from voltron.scheduler.berserker import Berserker
+from voltron.configs import Config
 
 
 class AnalyzerStub:
@@ -86,3 +87,63 @@ def test_imported_seed_is_a_concrete_interesting_prefix():
     assert berserker.select_base_state() == imported
     assert berserker.selected_imported_seed_prefix is True
     assert berserker.selected_partial_prefix is False
+
+
+def test_imported_seed_exact_replay_preserves_full_sequence():
+    class Mapper:
+        request_types = {'GENERATED'}
+        req_dep = {}
+
+    class Executor:
+        def __init__(self):
+            self.calls = []
+
+        def interact(self, sequence, **kwargs):
+            self.calls.append((sequence, kwargs))
+            return True, None
+
+    first = [
+        ('aflnet-seed:seed_1:0', b'USER a\r\n'),
+        ('aflnet-seed:seed_1:1', b'PASS b\r\n'),
+    ]
+    second = [('aflnet-seed:seed_2:0', b'QUIT\r\n')]
+    executor = Executor()
+    berserker = Berserker(
+        Mapper(),
+        executor,
+        None,
+        interesting_seed_sequences=[first, second],
+    )
+
+    berserker.replay_imported_seed_sequences_once()
+    berserker.replay_imported_seed_sequences_once()
+
+    assert executor.calls == [
+        (first, {'poll_wait_ms': 3000, 'run_checker': True}),
+        (second, {'poll_wait_ms': 3000, 'run_checker': True}),
+    ]
+
+
+def test_imported_seed_exact_replay_can_be_disabled():
+    class Mapper:
+        request_types = {'GENERATED'}
+        req_dep = {}
+
+    class Executor:
+        def interact(self, sequence, **kwargs):
+            raise AssertionError('exact replay should be disabled')
+
+    berserker = Berserker(
+        Mapper(),
+        Executor(),
+        None,
+        interesting_seed_sequences=[[('aflnet-seed:seed:0', b'QUIT\r\n')]],
+        replay_imported_seed_sequences=False,
+    )
+
+    berserker.replay_imported_seed_sequences_once()
+    assert berserker.imported_seed_replay_complete is True
+
+
+def test_exact_replay_is_enabled_in_runtime_defaults():
+    assert Config().aflnet_seed_exact_replay is True

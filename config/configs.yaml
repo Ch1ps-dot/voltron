@@ -127,6 +127,10 @@ fuzzing:
   # After 24 LLM mutation attempts, keep fuzzing with the latest validated
   # mutators.  Set to 0 only for an explicitly unlimited experiment.
   mutator_round_limit: 24
+  # Audit every imported AFLNet replay stream once as its original ordered
+  # sequence.  This run has no generated suffix and no offline mutation;
+  # normal fuzzing still retains the sequence as interesting seed material.
+  aflnet_seed_exact_replay: true
   offline_mutation:
     enabled: true
     probability: 0.3
@@ -140,6 +144,13 @@ fuzzing:
     seed: 0
     mutate_imported_seeds: true
     protected_types: []
+    # Enable AFLNet/AFL single-message stages.  These never splice packets or
+    # mutate protected sequence prefixes.
+    aflnet_single_packet: true
+    # Optional protocol-specific dictionary tokens for overwrite/insert.
+    aflnet_dictionary: []
+    # Maximum number of local edits in one AFL-style havoc stage.
+    aflnet_havoc_stack: 4
 
 generated_code:
   # Retry initial generator/parser/checker/observer synthesis up to five
@@ -155,3 +166,13 @@ generated_code:
 response_components:
   lazy_generation: true
   prewarm_types: []
+
+# Reuse a staged partial-guidance snapshot only when its target/protocol/parser
+# and generator fingerprint matches the local component cache.  Keep this off
+# by default so ordinary runs retain their current model-learning behavior.
+model_learning:
+  # Keep learning until its time budget or complete-model convergence ends.
+  # Enable explicitly to stop stalled observation tables and retain partial
+  # guidance for later fuzzing.
+  partial_guidance_enabled: false
+  reuse_imported_partial_guidance: false

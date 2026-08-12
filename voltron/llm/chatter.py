@@ -829,14 +829,11 @@ class AsyncChater:
             generated mutator
         """
         tmp = self.pmp._tem_mutator_evolve
-        base_sha256, numbered_code = self._source_delta_context(code)
-        
         pmp = tmp.substitute(
             pro_name=pro_name,
             field_name=field_name,
             msg_type=msg_type,
-            code=numbered_code,
-            base_sha256=base_sha256,
+            code=self._compact_context(code),
             msg_ir=self._compact_ir_context(msg_ir, msg_type),
             info=self._compact_context(info),
             poss_response=self._compact_context(poss_response),
@@ -848,7 +845,15 @@ class AsyncChater:
             usage = "mutator_evolve"
         )
 
-        return self._apply_python_delta(code, ans, 'mutate')
+        validated = validate_response(
+            ans,
+            ResponseContract(
+                kind='python',
+                required_function='mutate',
+                allow_markdown_fence=False,
+            ),
+        )
+        return validated.normalized
         
     async def llm_parser_gen(
             self,

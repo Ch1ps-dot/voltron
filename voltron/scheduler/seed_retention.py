@@ -19,9 +19,10 @@ class SeedNovelty:
 class SeedRetentionPolicy:
     """Stateful, phase-local version of Voltron's interesting-seed rule.
 
-    A conversation is useful when it adds a response transition/type, extends
-    the longest observed sequence, introduces a response type within the
-    sequence, or exposes a request/response-type relation.
+    A conversation is useful only when it adds a response transition/type or
+    exposes a new request/response-type relation.  Sequence length and the
+    number of distinct response types are retained as metrics, not novelty
+    signals, because they can grow without revealing new protocol behaviour.
     """
 
     def __init__(self) -> None:
@@ -41,8 +42,6 @@ class SeedRetentionPolicy:
         return (
             transition_increment > 0
             or response_type_increment > 0
-            or sequence_length_increment > 0
-            or unique_response_increment > 0
             or request_response_increment > 0
         )
 

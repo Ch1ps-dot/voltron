@@ -17,6 +17,8 @@ class Config:
         self.protocol_readiness_successes: int = 1
         self.port_release_timeout_s: float = 3.0
         self.models_path: Path
+        self.equipment_path: Path
+        self.model_batch: str | None = None
         self.doc_paths: list[Path] = []
         self.pmp_path: Path
         self.results_path: Path
@@ -49,9 +51,14 @@ class Config:
         # are prepared before fuzzing starts.
         self.response_component_lazy_generation: bool = True
         self.response_component_prewarm_types: list[str] = []
-        # Stop model learning after input/output-scaled MQ stagnation and
-        # preserve replayable traces for partial fuzz guidance.
-        self.partial_guidance_enabled: bool = True
+        # Disabled by default: model learning is bounded by time/convergence.
+        # Enable to stop a stalled observation table and preserve partial
+        # traces for guidance.
+        self.partial_guidance_enabled: bool = False
+        # Reuse a validated ``partial_guidance.pkl`` as Berserker seed/frontier
+        # guidance without spending another model-learning budget.  Disabled by
+        # default because a partial graph is tied to its exact equipment.
+        self.reuse_imported_partial_guidance: bool = False
         # A threshold ends one observation-table attempt, not the whole
         # learning phase.  Regenerate components and start this many fresh
         # learning attempts before falling back to partial guidance.
@@ -91,6 +98,9 @@ class Config:
         # Bound LLM-driven mutator evolution for one fuzzing phase.  Zero is
         # the explicit opt-out for experiments that require an unlimited run.
         self.mutator_round_limit: int = 24
+        # Replay every imported AFLNet sequence once, unmodified and without
+        # a generated suffix, before normal fuzz scheduling begins.
+        self.aflnet_seed_exact_replay: bool = True
         self.offline_mutation_enabled: bool = True
         self.offline_mutation_probability: float = 0.3
         self.offline_mutation_max_mutated_packets_per_sequence: int = 3
@@ -101,6 +111,9 @@ class Config:
         self.offline_mutation_seed: int = 0
         self.offline_mutation_imported_seeds: bool = True
         self.offline_mutation_protected_types: list[str] = []
+        self.offline_mutation_aflnet_single_packet: bool = True
+        self.offline_mutation_aflnet_dictionary: list[str] = []
+        self.offline_mutation_aflnet_havoc_stack: int = 4
 
         self.base_url_compliance: str
         self.api_key_compliance: str

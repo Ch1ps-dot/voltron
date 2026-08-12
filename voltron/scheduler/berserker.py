@@ -49,6 +49,7 @@ class Berserker:
         use_guidance: bool = True,
         partial_guidance: PartialStateGraph | None = None,
         interesting_seed_sequences: list[list[tuple[str, bytes]]] | None = None,
+        replay_imported_seed_sequences: bool = True,
         controller=None,
     ) -> None:
         self.seed_retention = SeedRetentionPolicy()
@@ -75,6 +76,10 @@ class Berserker:
             for sequence in (interesting_seed_sequences or [])
             if sequence
         ]
+        self.replay_imported_seed_sequences = bool(
+            replay_imported_seed_sequences
+        )
+        self.imported_seed_replay_complete = False
         self.useful_seq.extend(self.imported_seed_sequences)
         self.seed_prefix_sequences = (
             self.partial_seed_sequences + self.imported_seed_sequences
@@ -117,6 +122,15 @@ class Berserker:
             seed=getattr(configs, 'offline_mutation_seed', 0),
             mutate_imported_seeds=getattr(configs, 'offline_mutation_imported_seeds', True),
             protected_types=getattr(configs, 'offline_mutation_protected_types', []),
+            aflnet_single_packet=getattr(
+                configs, 'offline_mutation_aflnet_single_packet', True,
+            ),
+            aflnet_dictionary=getattr(
+                configs, 'offline_mutation_aflnet_dictionary', []
+            ),
+            aflnet_havoc_stack=getattr(
+                configs, 'offline_mutation_aflnet_havoc_stack', 4,
+            ),
         )
         
         # Define the methods and modes for selecting prefixes, mutators, and suffixes during fuzzing
@@ -390,6 +404,40 @@ class Berserker:
         
         logger.debug(f'select prefix[{mode}]: {'/'.join([g[0] for g in gs])}')
         return gs
+
+    def replay_imported_seed_sequences_once(self) -> None:
+        """Replay imported AFLNet streams exactly once before fuzz scheduling.
+
+        This is deliberately separate from the interesting-seed path: a
+        scheduler-selected seed may receive a suffix and optional offline
+        mutations, while this audit replay preserves every message byte and
+        sequence boundary from the imported replay asset.
+        """
+        if self.imported_seed_replay_complete:
+            return
+        self.imported_seed_replay_complete = True
+        if not self.replay_imported_seed_sequences:
+            return
+        for sequence in self.imported_seed_sequences:
+            if self._should_stop():
+                return
+            logger.info(
+                'Berserker: exact replay of imported AFLNet seed sequence '
+                '(%d messages)',
+                len(sequence),
+            )
+            try:
+                self.exe.interact(
+                    list(sequence),
+                    poll_wait_ms=3000,
+                    run_checker=True,
+                )
+            except Exception:
+                # An imported corpus sample is diagnostic input.  One bad
+                # replay must not prevent later corpus samples or fuzzing.
+                logger.exception(
+                    'Berserker: imported AFLNet seed exact replay failed'
+                )
 
     def update_state_feedback(
         self,
@@ -709,8 +757,9 @@ class Berserker:
         Args:
             trans_inc: The increment in the number of response transitions observed.
             type_inc: The increment in the number of unique response types observed.
-            len_inc: The increment in the length of the request-response sequence observed.
-            unique_res_inc: The increment in the number of unique response types observed.
+            len_inc: The increment in sequence length, retained for telemetry.
+            unique_res_inc: The increment in distinct response types, retained
+                for telemetry.
             req_res_inc: The number of newly observed request-response type
                 relations in the current conversation.
         """
