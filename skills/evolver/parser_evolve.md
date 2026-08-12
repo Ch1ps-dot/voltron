@@ -5,8 +5,6 @@ INPUT
 PROTOCOL: $pro_name
 PRIMARY_FIELDS_JSON:
 $res_info
-TYPE_RULES_JSON:
-$type_rules
 FAILED_RESPONSE: $message
 BASE_SHA256: $base_sha256
 NUMBERED_BASE_CODE:
@@ -15,8 +13,11 @@ $original_code
 CONTRACT
 Return a complete replacement defining `packet_parser(response: bytes) -> bytes`.
 - Fix the failed response's root cause while preserving prior valid behavior.
-- Match complete type-rule field combinations and return matched `type_name` as UTF-8 bytes.
-- Use the primary field only if no usable type rule exists.
+- Use only PRIMARY_FIELDS_JSON to extract the canonical, stable, protocol-defined
+  primary response-state value. Do not map it to an abstract type name.
+- Exclude reason phrases and volatile headers/body values; return only the
+  response code or fixed primary-field tuple needed to identify the protocol
+  state.
 - Return `b""` for non-bytes, missing/unparseable data, or no match; never raise.
 - Base protocol behavior only on supplied evidence. Python built-ins only.
 

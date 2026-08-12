@@ -1337,7 +1337,13 @@ class Executor:
                 resp_data,
                 run_checker,
             )
-            cons.add_state('-', resp_code)
+            cons.add_state(
+                '-',
+                self._model_response_symbol(
+                    list(getattr(self, '_last_response_frames', [])),
+                    resp_code,
+                ),
+            )
             cons.add_data(bytes(), resp_data)
             if not is_valid_response:
                 self.handle_nonconforming_response(cons, resp_code)
@@ -1555,7 +1561,10 @@ class Executor:
                             resp_data or bytes(),
                             response_frames=frame_metadata,
                         )
-                    cons.add_state(msg_type, resp_code)
+                    cons.add_state(
+                        msg_type,
+                        self._model_response_symbol(response_frames, resp_code),
+                    )
                     last_request_recorded = True
                     if not is_valid_response:
                         self.handle_nonconforming_response(cons, resp_code)
@@ -1951,6 +1960,28 @@ class Executor:
             'utf-8',
             errors='backslashreplace',
         )
+
+    @staticmethod
+    def _model_response_symbol(
+        response_frames: list[dict],
+        fallback: str,
+    ) -> str:
+        """Encode one receive batch as the output of one model input.
+
+        Response accounting stays per frame, but L* requires exactly one
+        output symbol per sent request.  A multi-frame batch therefore uses a
+        canonical JSON array; one-frame traffic retains its legacy response
+        type so existing models and metrics remain comparable.
+        """
+        semantic = [
+            frame.get('response_type')
+            for frame in response_frames
+            if frame.get('parse_status') == 'parsed'
+            and isinstance(frame.get('response_type'), str)
+        ]
+        if len(semantic) <= 1:
+            return semantic[0] if semantic else fallback
+        return json.dumps(semantic, ensure_ascii=False, separators=(',', ':'))
 
     def _parse_tcp_frames(
         self,

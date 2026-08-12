@@ -280,7 +280,6 @@ def test_incremental_outputs_are_smaller_for_realistic_evolve_inputs():
                 "res_info": "[]",
                 "old_code": "def packet_parser(response: bytes):\n    return b''\n",
                 "message": b"200 OK",
-                "type_rules": "{}",
             },
             "old_code",
             "    return b'200'",

@@ -773,7 +773,6 @@ class AsyncChater:
             res_info: str,
             old_code: str,
             message: bytes,
-            type_rules: str = "{}"
     ) -> str:
         """Repair teh python code
 
@@ -791,7 +790,6 @@ class AsyncChater:
         pmp = tmp.substitute(
             pro_name=pro_name,
             res_info=self._compact_context(res_info),
-            type_rules=self._compact_context(type_rules),
             original_code=numbered_code,
             base_sha256=base_sha256,
             message=message,
@@ -859,7 +857,6 @@ class AsyncChater:
             self,
             pro_name: str,
             res_info: str,
-            type_rules: str = "{}"
     ) -> str:
         """Generate python code as fuzzer parser
 
@@ -874,7 +871,6 @@ class AsyncChater:
         pmp = tmp.substitute(
             pro_name=pro_name,
             res_info=self._compact_context(res_info),
-            type_rules=self._compact_context(type_rules),
         )
         ans = await self.chat_llm(
             prompt=pmp,

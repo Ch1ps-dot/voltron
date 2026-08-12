@@ -1,3 +1,4 @@
+from voltron.executor.executor import Executor
 from voltron.executor.response_framing import split_response_frames
 
 
@@ -27,3 +28,28 @@ def test_incomplete_frame_is_retained_without_byte_loss():
     frames = split_response_frames('http', data)
     assert len(frames) == 1
     assert frames[0].data == data
+
+
+def test_model_response_symbol_preserves_single_and_encodes_multi_frames():
+    assert Executor._model_response_symbol(
+        [{'response_type': '226', 'parse_status': 'parsed'}], '226',
+    ) == '226'
+    assert Executor._model_response_symbol(
+        [
+            {'response_type': '150', 'parse_status': 'parsed'},
+            {'response_type': '125', 'parse_status': 'parsed'},
+            {'response_type': '226', 'parse_status': 'parsed'},
+        ],
+        '226',
+    ) == '["150","125","226"]'
+
+
+def test_model_response_symbol_ignores_unparsed_frames():
+    assert Executor._model_response_symbol(
+        [
+            {'response_type': '150', 'parse_status': 'parsed'},
+            {'response_type': 'PARSE_FAILURE', 'parse_status': 'parse_failure'},
+            {'response_type': '226', 'parse_status': 'parsed'},
+        ],
+        '226',
+    ) == '["150","226"]'

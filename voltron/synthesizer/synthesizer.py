@@ -1468,7 +1468,6 @@ class AsyncProducer:
             self
     ):
         res_info = self._primary_response_field_info()
-        type_rules = self._response_type_rules_info()
         runtime_samples = self._parser_validation_samples()
         failed_code: str | None = None
         failure_error = ''
@@ -1481,7 +1480,6 @@ class AsyncProducer:
                     pkt_parser_code = await self.chater.llm_parser_gen(
                         pro_name=self.rfcp.pro_name,
                         res_info=res_info,
-                        type_rules=type_rules,
                     )
                 else:
                     pkt_parser_code = await self.chater.llm_code_repair(
@@ -2841,7 +2839,6 @@ class AsyncProducer:
         message
     ):
         res_info = self._primary_response_field_info()
-        type_rules = self._response_type_rules_info()
         await self._maybe_evolve_response_ir(
             message,
             (
@@ -2867,7 +2864,6 @@ class AsyncProducer:
                         old_code=old_code,
                         pro_name=self.rfcp.pro_name,
                         res_info=res_info,
-                        type_rules=type_rules,
                         message=message,
                     )
                 else:
