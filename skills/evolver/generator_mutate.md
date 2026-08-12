@@ -34,7 +34,27 @@ def mutate() -> bytes:
 ```
 - Before returning, verify that the complete candidate has that one top-level
   `mutate` definition and valid Python.
-- Preserve the saved generator's state-reaching structure, then introduce controlled field-level anomalies supported by the IR.
+- Treat SAVED_BEST_GENERATOR as a field-preserving blueprint, not as a fixed
+  byte string to return. Reconstruct the one request in `mutate()` on every
+  call. Identify each logical field from its construction in the saved code
+  and IR_FIELD_TABLE_JSON, then give each mutable field its own bounded random
+  value-generation strategy. The result must be a randomized fuzzing packet
+  generator, not a short list of hard-coded complete packets.
+- Keep mandatory command tokens, field order, separators, framing, and
+  state-reaching dependencies needed to make a single `$msg_type` request.
+  Randomize the original field-generation methods independently: for example
+  select boundary/normal/oversized numeric values; vary optional-field
+  presence, repetition, ordering where the protocol permits it, delimiters,
+  quoting, escaping, length declarations, identifiers, tokens, strings, and
+  payload bytes. Recompute dependent lengths/checksums when retaining valid
+  framing; deliberately desynchronize them only as one bounded mutation
+  family when the IR supports a declared-length or integrity field.
+- Use `random` from the standard library with bounded choices and sizes. Mix
+  mostly parseable/state-preserving values with targeted malformed values so
+  repeated calls explore both normal and deep validation paths. Do not make
+  all fields random when that would break the prerequisite state transition;
+  keep those prerequisite constants explicit and randomize the fields they
+  enable.
 - Each `mutate()` invocation must return exactly one complete `$msg_type` request. Do not concatenate messages, mutate into a different request type, or return a multi-message sequence.
 - You may use target-specific URLs or named resources stated in SUT_CONTEXT when helpful for accessing the intended endpoint or resource.
 - Prioritize RFC response types not yet present in runtime observations; avoid patterns that only repeat observed outcomes.
