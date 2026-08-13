@@ -168,6 +168,8 @@ def test_runtime_config_reads_status_snapshot_interval(tmp_path, monkeypatch):
     fuzzer.load_configs()
 
     assert configs.status_snapshot_interval_s == 0.125
+    assert configs.partial_guidance_enabled is True
+    assert configs.reuse_imported_partial_guidance is True
 
 
 def test_fuzz_writes_startup_and_final_status_snapshots(tmp_path, monkeypatch):

@@ -99,6 +99,14 @@ import click
     help="Atomically activate a verified imported bundle after staging.",
 )
 @click.option(
+    "--batch-id",
+    type=str,
+    help=(
+        "Optional safe name for an activated imported batch. Requires "
+        "--import-learning-bundle and --activate-import."
+    ),
+)
+@click.option(
     "--model-batch",
     type=str,
     help=(
@@ -123,6 +131,7 @@ def main(
     learn_and_export: bool,
     import_learning_bundle: Path | None,
     activate_import: bool,
+    batch_id: str | None,
     model_batch: str | None,
 ):
     if rfc_parser and generate_ir:
@@ -132,6 +141,10 @@ def main(
 
     if activate_import and import_learning_bundle is None:
         raise click.UsageError('--activate-import requires --import-learning-bundle.')
+    if batch_id is not None and import_learning_bundle is None:
+        raise click.UsageError('--batch-id requires --import-learning-bundle.')
+    if batch_id is not None and not activate_import:
+        raise click.UsageError('--batch-id requires --activate-import.')
     if model_batch is not None and import_learning_bundle is not None:
         raise click.UsageError(
             '--model-batch cannot be combined with --import-learning-bundle.'
@@ -148,6 +161,7 @@ def main(
                 protocol=runtime[sut]['protocol'],
                 activate=activate_import,
                 base_path=configs.base_path,
+                batch_id=batch_id,
             )
         except (LearningBundleError, OSError, ValueError) as exc:
             raise click.ClickException(str(exc)) from exc

@@ -463,7 +463,7 @@ class Fuzzer:
         learning_config = configs_yaml.get('model_learning', {})
         partial_guidance_enabled = learning_config.get(
             'partial_guidance_enabled',
-            False,
+            True,
         )
         if not isinstance(partial_guidance_enabled, bool):
             raise TypeError(
@@ -472,7 +472,7 @@ class Fuzzer:
         configs.partial_guidance_enabled = partial_guidance_enabled
         reuse_imported_partial_guidance = learning_config.get(
             'reuse_imported_partial_guidance',
-            False,
+            True,
         )
         if not isinstance(reuse_imported_partial_guidance, bool):
             raise TypeError(
@@ -1016,7 +1016,7 @@ class Fuzzer:
         replay the wrong protocol messages, so a failed validation deliberately
         falls back to normal model learning.
         """
-        if not getattr(configs, 'reuse_imported_partial_guidance', False):
+        if not getattr(configs, 'reuse_imported_partial_guidance', True):
             return None
         path = configs.models_path / 'partial_guidance.pkl'
         if not path.is_file():
@@ -1103,7 +1103,7 @@ class Fuzzer:
         threshold_tracker = (
             ModelLearningThreshold(request_types)
             if (
-                getattr(configs, 'partial_guidance_enabled', False)
+                getattr(configs, 'partial_guidance_enabled', True)
                 and request_types
             )
             else None

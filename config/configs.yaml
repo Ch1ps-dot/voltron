@@ -167,12 +167,9 @@ response_components:
   lazy_generation: true
   prewarm_types: []
 
-# Reuse a staged partial-guidance snapshot only when its target/protocol/parser
-# and generator fingerprint matches the local component cache.  Keep this off
-# by default so ordinary runs retain their current model-learning behavior.
+# Preserve useful partial learning evidence by default, and reuse an imported
+# partial snapshot only after its target/protocol/parser/generator fingerprint
+# matches the selected component batch.
 model_learning:
-  # Keep learning until its time budget or complete-model convergence ends.
-  # Enable explicitly to stop stalled observation tables and retain partial
-  # guidance for later fuzzing.
-  partial_guidance_enabled: false
-  reuse_imported_partial_guidance: false
+  partial_guidance_enabled: true
+  reuse_imported_partial_guidance: true

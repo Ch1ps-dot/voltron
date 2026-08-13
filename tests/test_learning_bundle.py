@@ -116,6 +116,86 @@ def test_activation_publishes_self_contained_model_batch(tmp_path):
     assert not (batch / "equipment" / "demo").exists()
 
 
+def test_activation_accepts_custom_batch_id_and_writes_receipt(tmp_path):
+    _assets(tmp_path)
+    bundle = export_learning_bundle(
+        base_path=tmp_path,
+        results_path=tmp_path / "results",
+        target="demo",
+        protocol="demo-proto",
+        output_path=tmp_path / "demo.tar.gz",
+    )
+    _staging, report = import_learning_bundle(
+        bundle=bundle,
+        staging_root=tmp_path / "staging",
+        target="demo",
+        protocol="demo-proto",
+        activate=True,
+        base_path=tmp_path,
+        batch_id="example",
+    )
+
+    batch = Path(report["batch_path"])
+    receipt = json.loads((batch / "import_receipt.json").read_text())
+    assert batch.name == report["batch_id"] == "example"
+    assert receipt["batch_id"] == "example"
+    assert receipt["bundle_sha256"]
+
+    try:
+        import_learning_bundle(
+            bundle=bundle,
+            staging_root=tmp_path / "staging",
+            target="demo",
+            protocol="demo-proto",
+            activate=True,
+            base_path=tmp_path,
+            batch_id="example",
+        )
+    except LearningBundleError as exc:
+        assert "already exists" in str(exc)
+    else:
+        raise AssertionError("existing custom batch id was overwritten")
+
+
+def test_custom_batch_id_requires_activation_and_is_safe(tmp_path):
+    _assets(tmp_path)
+    bundle = export_learning_bundle(
+        base_path=tmp_path,
+        results_path=tmp_path / "results",
+        target="demo",
+        protocol="demo-proto",
+        output_path=tmp_path / "demo.tar.gz",
+    )
+    for batch_id in ("../outside", "", "has space"):
+        try:
+            import_learning_bundle(
+                bundle=bundle,
+                staging_root=tmp_path / "staging",
+                target="demo",
+                protocol="demo-proto",
+                activate=True,
+                base_path=tmp_path,
+                batch_id=batch_id,
+            )
+        except LearningBundleError as exc:
+            assert "batch id" in str(exc)
+        else:
+            raise AssertionError(f"unsafe batch id accepted: {batch_id!r}")
+
+    try:
+        import_learning_bundle(
+            bundle=bundle,
+            staging_root=tmp_path / "staging",
+            target="demo",
+            protocol="demo-proto",
+            batch_id="example",
+        )
+    except LearningBundleError as exc:
+        assert "requires activation" in str(exc)
+    else:
+        raise AssertionError("custom batch id accepted without activation")
+
+
 def test_selected_batch_scopes_producer_to_its_own_equipment(
     tmp_path, monkeypatch,
 ):

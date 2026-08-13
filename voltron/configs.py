@@ -51,14 +51,13 @@ class Config:
         # are prepared before fuzzing starts.
         self.response_component_lazy_generation: bool = True
         self.response_component_prewarm_types: list[str] = []
-        # Disabled by default: model learning is bounded by time/convergence.
-        # Enable to stop a stalled observation table and preserve partial
-        # traces for guidance.
-        self.partial_guidance_enabled: bool = False
+        # Preserve replayable partial traces if model learning stalls or its
+        # deadline interrupts an observation table.
+        self.partial_guidance_enabled: bool = True
         # Reuse a validated ``partial_guidance.pkl`` as Berserker seed/frontier
-        # guidance without spending another model-learning budget.  Disabled by
-        # default because a partial graph is tied to its exact equipment.
-        self.reuse_imported_partial_guidance: bool = False
+        # guidance without spending another model-learning budget.  Fingerprint
+        # validation keeps a partial graph tied to its exact equipment.
+        self.reuse_imported_partial_guidance: bool = True
         # A threshold ends one observation-table attempt, not the whole
         # learning phase.  Regenerate components and start this many fresh
         # learning attempts before falling back to partial guidance.

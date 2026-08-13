@@ -14,6 +14,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import re
 from pathlib import Path
 
 from voltron.learner.automata import MealyMachine
@@ -23,10 +24,21 @@ from voltron.synthesizer.component_paths import component_type_dir
 
 BUNDLE_FORMAT = 1
 _ALLOWED_PREFIXES = ("models/", "equipment/", "metrics/", "diagnostics/")
+_BATCH_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
 
 
 class LearningBundleError(RuntimeError):
     pass
+
+
+def _validate_batch_id(batch_id: str) -> str:
+    """Return a safe user-selected name for one target-scoped batch."""
+    if not _BATCH_ID_PATTERN.fullmatch(batch_id) or batch_id in {".", ".."}:
+        raise LearningBundleError(
+            "invalid batch id; use 1-64 ASCII letters, digits, dots, "
+            "underscores, or hyphens, beginning with a letter or digit"
+        )
+    return batch_id
 
 
 def _sha256(path: Path) -> str:
@@ -159,11 +171,19 @@ def validate_learning_bundle(root: Path, *, target: str, protocol: str) -> dict:
 
 def import_learning_bundle(*, bundle: Path, staging_root: Path, target: str,
                            protocol: str, activate: bool = False,
-                           base_path: Path | None = None) -> tuple[Path, dict]:
+                           base_path: Path | None = None,
+                           batch_id: str | None = None) -> tuple[Path, dict]:
     """Verify a trusted bundle in staging and optionally atomically activate it."""
+    if batch_id is not None and not activate:
+        raise LearningBundleError(
+            "batch id requires activation; use --activate-import"
+        )
+    if batch_id is not None:
+        batch_id = _validate_batch_id(batch_id)
     bundle = bundle.resolve()
-    bundle_id = f"{bundle.stem}-{_sha256(bundle)[:12]}"
-    destination = staging_root.resolve() / bundle_id
+    bundle_sha256 = _sha256(bundle)
+    staging_id = f"{bundle.stem}-{bundle_sha256[:12]}"
+    destination = staging_root.resolve() / staging_id
     if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir(parents=True)
@@ -175,7 +195,7 @@ def import_learning_bundle(*, bundle: Path, staging_root: Path, target: str,
         report = validate_learning_bundle(destination, target=target, protocol=protocol)
         report.update({
             "bundle": str(bundle), "staging": str(destination),
-            "batch_id": bundle_id, "activated": False,
+            "batch_id": batch_id or staging_id, "activated": False,
         })
         if activate:
             if base_path is None:
@@ -184,10 +204,11 @@ def import_learning_bundle(*, bundle: Path, staging_root: Path, target: str,
             # overwrite the workspace equipment cache: a batch must load its
             # model and every component from the same provenance boundary.
             batches_root = base_path.resolve() / "component" / "models" / target
-            live = batches_root / bundle_id
+            selected_batch_id = batch_id or staging_id
+            live = batches_root / selected_batch_id
             if live.exists():
                 raise LearningBundleError(f"model batch already exists: {live}")
-            temporary = batches_root / (bundle_id + ".importing")
+            temporary = batches_root / (selected_batch_id + ".importing")
             if temporary.exists():
                 shutil.rmtree(temporary)
             temporary.mkdir(parents=True)
@@ -201,6 +222,24 @@ def import_learning_bundle(*, bundle: Path, staging_root: Path, target: str,
             _copy_tree_if_exists(
                 destination / "equipment" / target,
                 temporary / "equipment",
+            )
+            receipt = {
+                "format": 1,
+                "batch_id": selected_batch_id,
+                "bundle_basename": bundle.name,
+                "bundle_sha256": bundle_sha256,
+                "manifest_target": target,
+                "manifest_protocol": protocol,
+                "imported_at": time.time(),
+                "validation_report": {
+                    key: value
+                    for key, value in report.items()
+                    if key not in {"bundle", "staging", "batch_id", "activated"}
+                },
+            }
+            (temporary / "import_receipt.json").write_text(
+                json.dumps(receipt, indent=2) + "\n",
+                encoding="utf-8",
             )
             temporary.replace(live)
             report["batch_path"] = str(live)
