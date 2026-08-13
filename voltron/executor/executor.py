@@ -1983,22 +1983,33 @@ class Executor:
             return semantic[0] if semantic else fallback
         return json.dumps(semantic, ensure_ascii=False, separators=(',', ':'))
 
-    def _parse_tcp_frames(
+    def _parse_response_frames(
         self,
         buf: bytes,
         msg_type: str,
         show_fuzz_ui: bool,
+        datagrams: list[dict] | None = None,
     ) -> list[dict]:
-        """Parse protocol frames while preserving the exact receive batch."""
+        """Parse framed responses while retaining receive-batch provenance."""
         batch_id = getattr(self, '_recv_batch_id', 0) + 1
         self._recv_batch_id = batch_id
         frames = []
         for index, frame in enumerate(split_response_frames(
             getattr(configs, 'pro_name', ''), buf,
         )):
-            response_type = self._parse_tcp_response(
-                frame.data, msg_type, show_fuzz_ui,
+            framing_incomplete = frame.framing_status != 'framed'
+            response_type = (
+                PARSER_FAILURE_RESPONSE.decode()
+                if framing_incomplete
+                else self._parse_tcp_response(
+                    frame.data, msg_type, show_fuzz_ui,
+                )
             )
+            overlapping_datagrams = [
+                datagram for datagram in (datagrams or [])
+                if datagram['offset_end'] > frame.offset_start
+                and datagram['offset_start'] < frame.offset_end
+            ]
             frames.append({
                 'recv_batch_id': batch_id,
                 'frame_index': index,
@@ -2007,14 +2018,29 @@ class Executor:
                 'timestamp': time.time(),
                 'response_type': response_type,
                 'parse_status': (
-                    'parse_failure'
-                    if response_type == PARSER_FAILURE_RESPONSE.decode()
-                    else 'parsed'
+                    'framing_incomplete'
+                    if framing_incomplete
+                    else (
+                        'parse_failure'
+                        if response_type == PARSER_FAILURE_RESPONSE.decode()
+                        else 'parsed'
+                    )
                 ),
+                'framing_error': frame.framing_error,
+                'datagrams': overlapping_datagrams,
                 'data': frame.data,
             })
         self._last_response_frames = frames
         return frames
+
+    @staticmethod
+    def _response_batch_result(frames: list[dict]) -> str:
+        """Choose the one model output while accounting for every frame."""
+        semantic = [
+            frame for frame in frames
+            if frame['parse_status'] == 'parsed'
+        ]
+        return (semantic[-1] if semantic else frames[-1])['response_type']
 
     def _invoke_parser_with_repair(
         self,
@@ -2159,9 +2185,8 @@ class Executor:
                 poll_timeout_ms=poll_timeout_ms,
                 show_fuzz_ui=show_fuzz_ui,
             )
-        frames = self._parse_tcp_frames(prefetched, '-', show_fuzz_ui)
-        semantic = [frame for frame in frames if frame['parse_status'] == 'parsed']
-        return ((semantic[-1] if semantic else frames[-1])['response_type'], prefetched)
+        frames = self._parse_response_frames(prefetched, '-', show_fuzz_ui)
+        return self._response_batch_result(frames), prefetched
 
     def net_recv(
             self, 
@@ -2234,14 +2259,11 @@ class Executor:
                     if len(buf) == 0:
                         return 'RCLOSED', None
                     else:
-                        frames = self._parse_tcp_frames(
+                        frames = self._parse_response_frames(
                             buf, msg_type, show_fuzz_ui,
                         )
-                        semantic = [frame for frame in frames if frame[
-                            'parse_status'
-                        ] == 'parsed']
                         return (
-                            (semantic[-1] if semantic else frames[-1])['response_type'],
+                            self._response_batch_result(frames),
                             buf,
                         )
                 
@@ -2256,6 +2278,7 @@ class Executor:
                 
                 if event & select.POLLIN:
                     buf = b''
+                    datagrams = []
                     while True:
                         events = self._poll_with_stop(poller, 100)
                         if events is None:
@@ -2265,17 +2288,26 @@ class Executor:
                         chunk, _ = sock.recvfrom(2048)
                         if not chunk:
                             break
+                        offset_start = len(buf)
                         buf += chunk
+                        datagrams.append({
+                            'index': len(datagrams),
+                            'offset_start': offset_start,
+                            'offset_end': len(buf),
+                            'timestamp': time.time(),
+                        })
 
                     if len(buf) == 0:
                         return 'RCLOSED', None
                     else:
+                        frames = self._parse_response_frames(
+                            buf,
+                            msg_type,
+                            show_fuzz_ui,
+                            datagrams=datagrams,
+                        )
                         return (
-                            self._parse_tcp_response(
-                                buf,
-                                msg_type,
-                                show_fuzz_ui,
-                            ),
+                            self._response_batch_result(frames),
                             buf,
                         )
                 else:

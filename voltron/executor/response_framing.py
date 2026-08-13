@@ -1,4 +1,4 @@
-"""Protocol-aware response framing for one TCP receive batch.
+"""Protocol-aware response framing for one receive batch.
 
 The receive batch is retained verbatim for diagnostics.  These splitters only
 separate boundaries that are explicit in the relevant wire protocol; they
@@ -15,6 +15,8 @@ class ResponseFrame:
     data: bytes
     offset_start: int
     offset_end: int
+    framing_status: str = 'framed'
+    framing_error: str | None = None
 
 
 _STATUS_LINE = re.compile(br'^(\d{3})([ -])', re.MULTILINE)
@@ -52,6 +54,20 @@ def _line_protocol_frames(data: bytes) -> list[ResponseFrame]:
     return frames
 
 
+def _incomplete_content_length_frame(
+    data: bytes,
+    reason: str,
+) -> list[ResponseFrame]:
+    """Retain an incomplete batch without guessing a message boundary."""
+    return [ResponseFrame(
+        data=data,
+        offset_start=0,
+        offset_end=len(data),
+        framing_status='framing_incomplete',
+        framing_error=reason,
+    )]
+
+
 def _content_length_frames(data: bytes) -> list[ResponseFrame]:
     frames: list[ResponseFrame] = []
     cursor = 0
@@ -62,7 +78,9 @@ def _content_length_frames(data: bytes) -> list[ResponseFrame]:
             header_end = data.find(b'\n\n', cursor)
             separator_size = 2
         if header_end < 0:
-            break
+            return _incomplete_content_length_frame(
+                data, 'missing_header_terminator',
+            )
         headers = data[cursor:header_end]
         length_match = re.search(br'(?im)^content-length\s*:\s*(\d+)\s*$', headers)
         if length_match is None:
@@ -71,11 +89,15 @@ def _content_length_frames(data: bytes) -> list[ResponseFrame]:
         else:
             end = header_end + separator_size + int(length_match.group(1))
             if end > len(data):
-                break
+                return _incomplete_content_length_frame(
+                    data, 'declared_content_length_exceeds_receive_batch',
+                )
         frames.append(ResponseFrame(data[cursor:end], cursor, end))
         cursor = end
     if cursor < len(data) or not frames:
-        return [ResponseFrame(data, 0, len(data))]
+        return _incomplete_content_length_frame(
+            data, 'trailing_data_without_complete_frame',
+        )
     return frames
 
 
