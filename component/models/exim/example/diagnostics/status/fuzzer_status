@@ -1,0 +1,45 @@
+start_time     : 1786562661.9717665
+running_time   : 02:20:34.8
+stop_reason    : unknown
+run_status     : running
+planned_duration_s   : 86400
+actual_duration_s    : 
+active_phase                   : none
+stage                          : fuzzer evolve
+phase_elapsed_seconds          : 0.000000
+last_update_timestamp          : 1786571096.785295
+status_sequence                : 288
+snapshot_reason                : model_learning_finished
+target_name    : exim
+protocol_name  : smtp
+exec_path_num  : 11070
+sent_request   : 45576
+recv_resp      : 44921
+distinct_resp  : 14
+resp_transitions: 136
+lifetime_resp_events           : 55991
+lifetime_distinct_resp         : 14
+lifetime_resp_transition_events: 55991
+lifetime_resp_transitions      : 136
+crash_num      : 0
+non_compliant  : 0
+sut_launch_attempts            : 11070
+sut_lifecycle_retries          : 0
+socket_readiness_timeouts      : 0
+protocol_readiness_failures    : 0
+sut_ready_latency_ms_last      : 438.478
+sut_ready_latency_ms_max       : 601.537
+sut_ready_latency_ms_p95       : 438.182
+sut_exited_before_first_send   : 0
+offline_mutation_attempts      : 0
+offline_mutation_applied       : 0
+offline_mutation_bytes_added   : 0
+offline_mutation_bytes_removed : 0
+offline_mutation_operators     : {}
+recv_batches                   : 44921
+response_frames                : 44921
+parse_failures                 : 0
+multi_frame_requests           : 0
+model_learn_time_s: 00:00:00
+chat_time_s    : 00:32:6.8
+chat_token     : 280581

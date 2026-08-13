@@ -1,0 +1,211 @@
+{
+  "model_id": "1",
+  "selection_metric": "max_response_transition_types",
+  "generators": {
+    "RSET": {
+      "msg_type": "RSET",
+      "name": "id0",
+      "evolved_from": "init",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/RSET.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "TURN": {
+      "msg_type": "TURN",
+      "name": "id0",
+      "evolved_from": "init",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/TURN.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "STARTTLS": {
+      "msg_type": "STARTTLS",
+      "name": "id0",
+      "evolved_from": "init",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/STARTTLS.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "EXPN": {
+      "msg_type": "EXPN",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/EXPN.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "NOOP": {
+      "msg_type": "NOOP",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/NOOP.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "QUIT": {
+      "msg_type": "QUIT",
+      "name": "id0",
+      "evolved_from": "init",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/QUIT.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "HELP": {
+      "msg_type": "HELP",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/HELP.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "DATA": {
+      "msg_type": "DATA",
+      "name": "id0",
+      "evolved_from": "init",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/DATA.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "SEND": {
+      "msg_type": "SEND",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/SEND.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "VRFY": {
+      "msg_type": "VRFY",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/VRFY.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "HELO": {
+      "msg_type": "HELO",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/HELO.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "RCPT": {
+      "msg_type": "RCPT",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/RCPT.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "EHLO": {
+      "msg_type": "EHLO",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/EHLO.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "MAIL": {
+      "msg_type": "MAIL",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/MAIL.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "BDAT": {
+      "msg_type": "BDAT",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/BDAT.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "SAML": {
+      "msg_type": "SAML",
+      "name": "id1",
+      "evolved_from": "id0",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/SAML.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "AUTH": {
+      "msg_type": "AUTH",
+      "name": "id0",
+      "evolved_from": "init",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/AUTH.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    },
+    "SOML": {
+      "msg_type": "SOML",
+      "name": "id0",
+      "evolved_from": "init",
+      "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/generators/SOML.py",
+      "cur_res": [],
+      "pre_res": [],
+      "fut_res": [],
+      "was_used": 1,
+      "broken": true
+    }
+  },
+  "parser": {
+    "evolved_from": "init",
+    "name": "id0",
+    "state_field": "reply_code",
+    "parsed_res": [],
+    "path": "/home/ubuntu/voltron-runtime/component/models/exim/best_equipment/parser.py"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "batch_id": "example",
+  "bundle_basename": "exim--completed_learning_export--2026-08-12_19-20-23_QigpZn.learning_bundle.tar.gz",
+  "bundle_sha256": "5d1497acac61c53c7a64769ed7ec134b5fd50fdf8ae5d8fa5f2997fcd74e161f",
+  "manifest_target": "exim",
+  "manifest_protocol": "smtp",
+  "imported_at": 1786592176.9762032,
+  "validation_report": {
+    "generator_versions": 40,
+    "parser_versions": 1,
+    "complete_model": true
+  }
+}

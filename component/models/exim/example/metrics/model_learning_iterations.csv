@@ -1,0 +1,6 @@
+iteration,status,duration_s,try_limit,automata_states,automata_transitions,automata_outputs,alphabet_symbols,observation_table_s,observation_table_e,observation_table_t,current_response_types,current_response_type_events,current_response_transitions,current_response_transition_events,total_response_types,total_response_transitions,lifetime_response_types,lifetime_response_type_events,lifetime_response_transitions,lifetime_response_transition_events
+0,initial,1518.922582,3,8,144,144,18,8,18,145,11,11592,93,11592,11,93,11,11592,93,11592
+1,improved,2588.480530,3,11,198,198,18,11,18,199,13,15401,118,15401,13,118,13,26993,118,26993
+2,not_improved,1298.552199,2,7,126,126,18,7,18,127,12,9666,111,9666,14,136,14,36659,136,36659
+3,not_improved,1297.385824,1,7,126,126,18,7,18,127,12,9666,111,9666,14,136,14,46325,136,46325
+4,accepted_final,1297.917603,0,11,198,198,18,11,18,199,12,9666,111,9666,14,136,14,55991,136,55991
