@@ -12,7 +12,7 @@ forked-daapd:
   protocol: daap
   host: 127.0.0.1
   port: 3689
-  rfc_name: ["rfc9110","rfc7540","rfc2616","rfc1945"]
+  rfc_name: ["daap","rfc9110","rfc9112"]
   trans_layer: tcp
   server: parent
   readiness_script: ready.sh
