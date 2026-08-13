@@ -651,8 +651,6 @@ class AsyncProducer:
                     self.generator_path,
                     generator,
                 )
-                if not path.is_file() and generator.path:
-                    path = Path(generator.path)
                 if not path.is_file():
                     continue
                 code = path.read_text(encoding='utf-8')
@@ -1221,9 +1219,24 @@ class AsyncProducer:
         """
         best_generators = getattr(self, 'best_generators', {})
         old_m = best_generators.get(msg_type)
-        if old_m is None:
-            old_m = self.generators[msg_type][-1]
-        old_m_path = old_m.path
+        if hasattr(self, 'generator_path'):
+            source_root = getattr(
+                self, 'best_generator_path', self.generator_path
+            )
+            if old_m is None:
+                old_m = self.generators[msg_type][-1]
+                source_root = self.generator_path
+            old_m_path = self._component_source_path(source_root, old_m)
+        else:
+            # Lightweight unit-test construction predates equipment roots.
+            # A fully initialized producer always takes the scoped branch.
+            old_m = old_m or self.generators[msg_type][-1]
+            old_m_path = Path(old_m.path)
+        if not old_m_path.is_file():
+            raise FileNotFoundError(
+                'generator baseline is missing from its active equipment '
+                f'root: {old_m_path}'
+            )
         old_code = ''
         with open(old_m_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
@@ -3408,8 +3421,22 @@ class AsyncProducer:
         try:
             for msg_type in info:
                 for g in info[msg_type]:
+                    normalized = dict(g)
+                    # Imported bundles retain their source runtime's absolute
+                    # paths.  The active equipment directory is authoritative:
+                    # prefer its typed component path whenever it exists.
+                    local_path = (
+                        self._component_type_dir(
+                            self.generator_path,
+                            msg_type,
+                            record=False,
+                        )
+                        / f"{normalized['name']}.py"
+                    )
+                    if local_path.is_file():
+                        normalized['path'] = str(local_path.resolve())
                     self.generators.setdefault(msg_type, [])
-                    self.generators[msg_type].append(Generator(**g))
+                    self.generators[msg_type].append(Generator(**normalized))
         except Exception as e:
             logger.debug(f'Producer: load error {e}')
     

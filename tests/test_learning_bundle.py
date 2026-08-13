@@ -1,3 +1,4 @@
+import asyncio
 import json
 import pickle
 from pathlib import Path
@@ -10,6 +11,7 @@ from voltron.learning_bundle import (
     import_learning_bundle,
 )
 from voltron.learner.automata import MealyMachine
+from voltron.llm.incremental import SourceDeltaResult
 from voltron.synthesizer.synthesizer import AsyncProducer
 
 
@@ -220,3 +222,57 @@ def test_selected_batch_scopes_producer_to_its_own_equipment(
     assert producer.synthesizer_path == equipment
     assert producer.generator_path == equipment / "generators"
     assert producer.best_equipment_path == batch / "best_equipment"
+
+
+def test_imported_generator_metadata_uses_batch_source_for_online_mutation(
+    tmp_path, monkeypatch,
+):
+    """Old bundle paths must not escape the selected batch during fuzzing."""
+    generators = tmp_path / "batch" / "equipment" / "generators"
+    source = generators / "PING" / "id0.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "def generate():\n    return b'PING\\r\\n'\n", encoding="utf-8"
+    )
+
+    producer = AsyncProducer.__new__(AsyncProducer)
+    producer.generator_path = generators
+    producer.generators = {}
+    producer.generators_info_load({
+        "PING": [{
+            "msg_type": "PING",
+            "name": "id0",
+            "evolved_from": "init",
+            "path": "/missing/runtime/component/equipment/demo/generators/PING/id0.py",
+        }],
+    })
+    assert producer.generators["PING"][0].path == str(source.resolve())
+
+    received = []
+
+    class Chater:
+        async def llm_mutator_evolve(self, *, code, **_kwargs):
+            received.append(code)
+            return SourceDeltaResult(
+                code, changed=False, reason="already_satisfies_goal"
+            )
+
+    producer.chater = Chater()
+    producer.best_generators = {}
+    producer.best_generator_path = tmp_path / "batch" / "best_equipment" / "generators"
+    producer.rfcp = SimpleNamespace(
+        pro_name="demo-proto", req_fields=["MessageType"],
+    )
+    producer.poss_response = {}
+    producer._request_ir_info = lambda _msg_type: "rule"
+    producer._generated_code_timeout = lambda: 1
+    producer._generated_message_limit = lambda: 4096
+    producer._record_generation = lambda *_args, **_kwargs: None
+    monkeypatch.setattr(configs, "generation_retry_limit", 1, raising=False)
+
+    result = asyncio.run(producer._generator_mutate_one(
+        "PING", "target info", {}, asyncio.Semaphore(1),
+    ))
+
+    assert result is None
+    assert received == [source.read_text(encoding="utf-8")]
