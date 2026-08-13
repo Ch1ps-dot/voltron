@@ -946,7 +946,9 @@ class Fuzzer:
                         ):
                             self._activate_captured_equipment(
                                 self.producer.best_generators,
-                                Parser(**self.producer.best_parser_info),
+                                Parser.from_metadata(
+                                    self.producer.best_parser_info
+                                ),
                             )
 
                     imported_partial = self._load_imported_partial_guidance()

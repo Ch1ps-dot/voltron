@@ -87,6 +87,25 @@ def test_best_equipment_snapshot_copies_and_reloads_source(tmp_path):
     assert producer.best_parser_info["name"] == "id3"
 
 
+def test_parser_runtime_construction_ignores_snapshot_path_metadata():
+    metadata = {
+        "evolved_from": "id2",
+        "name": "id3",
+        "state_field": "status",
+        "parsed_res": ["200"],
+        "path": "/remote/models/demo/best_equipment/parser.py",
+    }
+
+    parser = Parser.from_metadata(metadata)
+
+    assert parser == Parser(
+        evolved_from="id2",
+        name="id3",
+        state_field="status",
+        parsed_res=["200"],
+    )
+
+
 def test_model_learning_persists_model_and_equipment_from_best_iteration(
     tmp_path,
     monkeypatch,
