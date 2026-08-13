@@ -1,183 +1,195 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <ir>
-  <message name="BDAT">
-  <!-- SMTP client request for one BDAT chunk command line. The declared number of message-data octets (size) follows this CRLF-terminated command; those octets are the chunk payload, not additional fields of the BDAT command line. -->
-  <field name="command-verb" type="constant" length="B" value="BDAT"/>
-  <!-- SMTP command verb; case-insensitive per RFC 5321, shown in canonical uppercase. -->
-  <field name="space-after-command" type="constant" length="B" value=" "/>
-  <!-- Required single ASCII space (0x20) between command verb and size. -->
-  <field name="size" type="variable" length="undefined" value="1*DIGIT"/>
-  <!-- Decimal number of octets in the chunk that follows this command; 1*DIGIT allows 0, and this size is the frame for the chunk payload. -->
-  <field name="last-parameter" type="variable" length="undefined" value="[SP &quot;LAST&quot;]"/>
-  <!-- Optional final-chunk marker; when present, wire value is exactly " LAST" (one space plus LAST). It is omitted for non-final chunks. -->
+  <message name="MAIL" direction="request" protocol="smtp">
+  <field name="Verb" type="constant" length="undefined" value="MAIL">
+    <!-- SMTP command verb "MAIL"; not case-sensitive (RFC 5321 section 2.4). -->
+  </field>
+  <field name="Space" type="constant" length="undefined" value=" ">
+    <!-- Single SP character separating the verb from the FROM keyword. -->
+  </field>
+  <field name="FromKeyword" type="constant" length="undefined" value="FROM:">
+    <!-- Fixed keyword introducing the sender reverse-path; not case-sensitive. -->
+  </field>
+  <field name="ReversePath" type="variable" length="undefined" value="&lt;[A-d-l:]Mailbox&gt; | &lt;&gt;">
+    <!-- Sender reverse-path (RFC 5321 section 4.1.1.2). Angle brackets are
+         wire delimiters; optional A-d-l source route is deprecated.
+         Mailbox local-part is case-sensitive; domain is case-insensitive
+         (RFC 5321 section 2.4).  "<>" is the null reverse-path. -->
+  </field>
+  <field name="MailParameters" type="variable" length="undefined" value="[SP mail-parameter *(SP mail-parameter)]">
+    <!-- Optional extension parameters (RFC 5321 section 4.1.1.2).
+         Each mail-parameter is a registered tag "=" value pair, e.g.,
+         BODY=BINARYMIME (RFC 3030), AUTH=... (RFC 4954).  PIPELINING
+         adds no MAIL parameters (RFC 2920). -->
+  </field>
+  <field name="CRLF" type="constant" length="undefined" value="&#13;&#10;">
+    <!-- Line terminator: ASCII CR (0x0D) immediately followed by LF (0x0A)
+         (RFC 5321 section 2.3.8). -->
+  </field>
+</message>
+  <message name="DATA">
+  <field name="verb" type="constant" length="B" value="DATA"/>
+  <!-- Command verb: SMTP commands are alphabetic, and the DATA command takes no argument clause, so it is sent as the canonical uppercase verb "DATA". -->
   <field name="crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- SMTP line terminator; commands are transmitted as CRLF-terminated lines, so this CRLF completes the command line. -->
+  <!-- Line terminator: SMTP lines must be terminated by CR immediately followed by LF; no bare CR or LF is permitted on the wire. -->
+</message>
+  <message name="ETRN">
+  <!-- Direction: request. SMTP client sends this ETRN command to the server. -->
+  <field name="command-verb" type="constant" length="4B" value="ETRN"/>
+  <!-- SMTP command verb. ASCII letters; case-insensitive, but uppercase is the conventional wire form. -->
+  <field name="space" type="constant" length="1B" value=" "/>
+  <!-- Required SP delimiter because ETRN has an argument following the verb. -->
+  <field name="option-character" type="variable" length="undefined" value="[ '@' / '#' ]"/>
+  <!-- Optional option character: omitted for ordinary node processing; '@' releases subdomain mail; '#' selects a named local queue. Zero or one byte. -->
+  <field name="node-name" type="variable" length="undefined" value="&lt;node name&gt;"/>
+  <!-- Node name: fully qualified domain name, or local queue name with '#'. ASCII; domain portion is case-insensitive. -->
+  <field name="line-ending" type="constant" length="2B" value="&#13;&#10;"/>
+  <!-- CRLF line ending: ASCII CR 0x0D followed by LF 0x0A, required by SMTP for every command line. -->
+</message>
+  <message name="SAML">
+  <field name="command" type="constant" length="4" value="SAML" note="SMTP command verb “SAML”; case-insensitive, shown in canonical uppercase."/>
+  <field name="space" type="constant" length="1" value=" " note="Required &lt;SP&gt; separator between the command verb and the argument clause."/>
+  <field name="from_keyword" type="constant" length="5" value="FROM:" note="Fixed keyword introducing the reverse-path; case-insensitive per SMTP syntax."/>
+  <field name="reverse_path" type="variable" length="variable" value="Reverse-path" note="Variable SMTP Reverse-path, including angle brackets and optional source route; maximum 256 octets."/>
+  <field name="crlf" type="constant" length="2" value="&#13;&#10;" note="Mandatory SMTP line terminator; commands are transmitted as lines ending in CRLF."/>
 </message>
   <message name="RCPT">
-  <field name="command" type="constant" length="B" value="RCPT"/>
-  <!-- SMTP command verb; case-insensitive. -->
-  <field name="SP" type="constant" length="B" value=" "/>
-  <!-- Separator between command verb and argument. -->
-  <field name="recipient-argument" type="constant" length="B" value="TO:"/>
-  <!-- Recipient argument label; case-insensitive. -->
-  <field name="angle-open" type="constant" length="B" value="&lt;"/>
-  <!-- Opening delimiter of the recipient path. -->
-  <field name="mailbox" type="variable" length="undefined" value="local-part@domain"/>
-  <!-- Recipient mailbox. Standard form is local-part@domain; local-part is case-sensitive and domain must be an FQDN. The reserved mailbox "postmaster" may appear without domain qualification. -->
-  <field name="angle-close" type="constant" length="B" value="&gt;"/>
-  <!-- Closing delimiter of the recipient path. -->
-  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- SMTP line terminator required after every command. -->
+  <field name="command-verb" type="constant" length="B" value="RCPT"/>
+  <!-- Fixed SMTP command verb; the verb token is case-insensitive. -->
+  <field name="separator" type="constant" length="B" value=" "/>
+  <!-- Required single SP between the verb and the TO: argument. -->
+  <field name="to-marker" type="constant" length="B" value="TO:"/>
+  <!-- Fixed case-insensitive RCPT argument marker. -->
+  <field name="forward-path" type="variable" length="undefined" value="( &quot;&lt;Postmaster&gt;&quot; / &quot;&lt;&quot; [ A-d-l &quot;:&quot; ] Mailbox &quot;&gt;&quot; )"/>
+  <!-- Recipient forward-path; angle brackets are on the wire. A-d-l is an optional source route; mailbox local-part is case-sensitive. -->
+  <field name="rcpt-parameters" type="variable" length="undefined" value="[ 1*( SP esmtp-keyword [ &quot;=&quot; esmtp-value ] ) ]"/>
+  <!-- Optional ESMTP RCPT extension parameter list; absent if no extension parameters follow the path. -->
+  <field name="line-ending" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- Mandatory CRLF command-line terminator. -->
 </message>
-  <message name="EHLO">
-    <field name="command" type="constant" length="B" value="EHLO"/>
-    <!-- Command verb; canonical uppercase shown. The EHLO verb is case-insensitive per RFC 5321 section 2.4. -->
-    <field name="SP" type="constant" length="B" value=" "/>
-    <!-- Single ASCII space (0x20) separator between the verb and the required Domain argument. -->
-    <field name="domain" type="variable" length="undefined" value="Let-dig [Ldh-str] *('.' Let-dig [Ldh-str]) / address-literal"/>
-    <!-- Required Domain argument: a primary host name (FQDN resolvable to an address RR) or an address-literal; local aliases and unqualified names are not allowed. See RFC 5321 sections 2.3.5, 4.1.2, and 4.1.4. -->
-    <field name="CRLF" type="constant" length="B" value="CRLF"/>
-    <!-- Line terminator constant: wire bytes are ASCII CR (0x0D) immediately followed by ASCII LF (0x0A); bare CR or LF is not permitted. -->
+  <message name="BDAT">
+  <field name="command" type="constant" length="B" value="BDAT"/>
+  <!-- SMTP command verb; case-insensitive per RFC 5321, canonical wire form is uppercase. -->
+  <field name="SP" type="constant" length="B" value=" "/>
+  <!-- Required space between the BDAT verb and its first argument. -->
+  <field name="chunk-size" type="variable" length="undefined" value="1*DIGIT"/>
+  <!-- Decimal octet count of the chunk data that follows the command line; 0 is permitted. -->
+  <field name="last-marker" type="variable" length="undefined" value="[ SP 'LAST' ]"/>
+  <!-- ABNF optional group; present as the literal bytes " LAST" on the final chunk, otherwise absent. -->
+  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- Required SMTP line terminator; not counted in chunk-size. -->
 </message>
   <message name="RSET">
-  <field name="verb" type="constant" length="B" value="RSET"/>
-  <!-- RSET command verb as specified in RFC 5321 Section 4.1.1.5. RSET takes no arguments, so no SP or argument field follows it. -->
-  <field name="crlf" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Required SMTP line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A); completes the command line. -->
+    <field name="command_verb" type="constant" length="B" value="RSET"/><!-- SMTP command verb: RFC 5321 ABNF literal "RSET" is case-insensitive; uppercase is shown as the canonical form. RSET takes no arguments, so no SP or argument clause is transmitted. -->
+    <field name="crlf" type="constant" length="B" value="&#13;&#10;"/><!-- <CRLF> line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A), as required by RFC 5321 Sections 2.3.8 and 4.1.1. -->
+</message>
+  <message name="EHLO" direction="request">
+  <field name="verb" type="constant" length="B" value="EHLO"/>
+  <!-- EHLO command verb; RFC 5321 §2.4 permits case variations, but canonical uppercase is shown. -->
+  <field name="SP" type="constant" length="B" value=" "/>
+  <!-- Required single ASCII space separator between verb and argument (§2.4). -->
+  <field name="client-domain" type="variable" length="undefined" value="Domain / address-literal"/>
+  <!-- EHLO argument: client-supplied domain name or address literal; variable ASCII token. -->
+  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- SMTP command lines end with CR immediately followed by LF (§2.3.8). -->
 </message>
   <message name="HELP">
-    <field name="command" type="constant" length="B" value="HELP"/>
-    <!-- HELP command verb; ASCII and case-insensitive, canonical uppercase. -->
-    <field name="argument" type="variable" length="undefined" value="[ SP String ]"/>
-    <!-- Optional argument clause: one SP followed by String when present; zero bytes when absent. String is printable ASCII excluding CR/LF. -->
-    <field name="line_terminator" type="constant" length="B" value="0x0D0A"/>
-    <!-- Required CRLF line terminator: ASCII CR 0x0D immediately followed by ASCII LF 0x0A; receiver acts after this sequence. Total command line including verb and CRLF MUST NOT exceed 512 octets. -->
+  <field name="verb" type="constant" length="4B" value="HELP">
+    <!-- SMTP command verb; ASCII "HELP". The grammar is case-insensitive, but the canonical/uppercase form is shown. -->
+  </field>
+  <field name="argument" type="variable" length="undefined" value="[ SP String ]">
+    <!-- Optional HELP topic. This field contributes no bytes when omitted. When present, it begins with one ASCII SP and is followed by a String containing no CR or LF; the total command line, including "HELP" and <CRLF>, MUST NOT exceed 512 octets. -->
+  </field>
+  <field name="line-terminator" type="constant" length="2B" value="&#13;&#10;">
+    <!-- SMTP <CRLF> line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A). -->
+  </field>
+</message>
+  <message name="HELO">
+    <field name="verb" type="constant" length="B" value="HELO"/><!-- SMTP command verb; case-insensitive per RFC 5321 Section 2.4. -->
+    <field name="SP" type="constant" length="B" value=" "/><!-- Single ASCII space separator (0x20) between verb and Domain. -->
+    <field name="Domain" type="variable" length="undefined" value="Domain"/><!-- HELO argument; Domain per RFC 5321 Section 4.1.2; US-ASCII; variable length; total command line including CRLF is at most 512 octets. -->
+    <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/><!-- Line terminator; ASCII CR (0x0D) followed immediately by LF (0x0A). -->
 </message>
   <message name="TURN">
-    <field name="command-verb" type="constant" length="B" value="TURN"/>
-    <!-- SMTP command verb; TURN takes no arguments, so the verb is followed directly by the line terminator. SMTP verbs are case-insensitive, and TURN is the canonical uppercase form. -->
-    <field name="line-terminator" type="constant" length="B" value="&#13;&#10;"/>
-    <!-- Required CRLF line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A), per RFC 5321 Section 2.3.8. -->
-</message>
-  <message name="QUIT">
-    <field name="command" type="constant" length="B" value="QUIT"/>
-    <!-- SMTP QUIT command verb. QUIT takes no arguments, so it is followed directly by the line terminator. The ABNF verb is case-insensitive; canonical uppercase is shown. -->
-    <field name="crlf" type="constant" length="B" value="&#13;&#10;"/>
-    <!-- CRLF line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A), per RFC 5321 Section 2.3.8. This completes the request line. -->
+  <field name="verb" type="constant" length="4B" value="TURN"/>
+  <!-- SMTP command verbs are case-insensitive; uppercase is shown. TURN takes no arguments, so no SP/argument field is present. -->
+  <field name="crlf" type="constant" length="2B" value="&#13;&#10;"/>
+  <!-- Required SMTP line terminator: CR (0x0D) immediately followed by LF (0x0A). -->
 </message>
   <message name="STARTTLS">
   <field name="verb" type="constant" length="B" value="STARTTLS"/>
-  <!-- STARTTLS command verb; no argument field follows because this verb takes no parameters. SMTP verbs are case-insensitive; canonical uppercase form is shown. -->
-  <field name="crlf" type="constant" length="B" value="0x0D0A"/>
-  <!-- Required SMTP line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A); no other line terminator is permitted. -->
+  <!-- SMTP command verb; the STARTTLS extension defines this verb with no parameters. SMTP verbs are US-ASCII and case-insensitive; uppercase is the canonical wire form. -->
+  <field name="crlf" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- Required command-line framing: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A). No argument or SP is present. -->
 </message>
-  <message name="DATA">
-  <!-- SMTP DATA request command. The DATA verb is sent as a complete line with no arguments. -->
-  <field name="command" type="constant" length="B" value="DATA"/>
-  <!-- Canonical command verb; SMTP verbs are case-insensitive. -->
-  <field name="line-ending" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Required <CRLF> line terminator; SMTP recognizes no other line terminator. -->
-</message>
-  <message name="HELO">
-  <!-- Direction: request. Wire form: "HELO" SP Domain CRLF. -->
-  <field name="verb" type="constant" length="B" value="HELO"/>
-  <!-- Command verb; fixed ASCII "HELO". The verb is case-insensitive per RFC 5321 section 2.4; uppercase is the canonical encoding. -->
-  <field name="SP" type="constant" length="B" value=" "/>
-  <!-- Required separator: one ASCII space between the verb and domain. -->
-  <field name="domain" type="variable" length="undefined" value="Domain"/>
-  <!-- Client identity domain, using the RFC 5321 Domain production; US-ASCII, variable length, terminated by CRLF. The complete command line must not exceed 512 octets including CRLF (RFC 5321 section 4.5.3.1.4). -->
-  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Line terminator: ASCII CR (0x0D) immediately followed by LF (0x0A); no bare CR or LF is allowed. -->
+  <message name="VRFY">
+    <field name="verb" type="constant" length="B" value="VRFY"/>
+    <!-- SMTP command verb; uppercase is canonical, but the ABNF verb is case-insensitive per RFC 5321 Sections 2.4 and 4.1.1. -->
+    <field name="SP" type="constant" length="B" value=" "/>
+    <!-- Required single ASCII space separating the VRFY verb from its argument. -->
+    <field name="String" type="variable" length="undefined" value="user-name [@domain]"/>
+    <!-- VRFY argument: a user name or a user name and domain, in US-ASCII. If it contains a mailbox local-part, that local-part is case-sensitive. The argument must not contain bare CR/LF; the whole command line is limited to 512 octets including verb and CRLF. -->
+    <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
+    <!-- Required SMTP line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A). -->
 </message>
   <message name="SEND">
   <field name="command" type="constant" length="B" value="SEND"/>
-  <!-- SEND is an obsolete SMTP command (MUST NOT be used); canonical uppercase shown, but the verb is case-insensitive. -->
-  <field name="SP" type="constant" length="B" value=" "/>
-  <!-- A single ASCII space separates the command verb from the argument clause. -->
-  <field name="from-keyword" type="constant" length="B" value="FROM:"/>
-  <!-- Case-insensitive keyword introducing the reverse-path; no space follows the colon. -->
-  <field name="reverse-path" type="variable" length="undefined" value="Path / &lt;&gt;"/>
-  <!-- ABNF Reverse-path = Path / "<>"; includes the bracketed path; max 256 octets incl punctuation; local-part case-sensitive. -->
-  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- SMTP line terminator: ASCII CR (0x0D) immediately followed by LF (0x0A). -->
-</message>
-  <message name="NOOP">
-  <field name="command" type="constant" length="B" value="NOOP"/>
-  <!-- Command verb: NOOP is the standard uppercase form; SMTP command verbs are case-insensitive per RFC 5321 Section 2.4. -->
-  <field name="parameter" type="variable" length="undefined" value="[ SP String ]"/>
-  <!-- Optional parameter group: if present, the wire bytes are ASCII SP (0x20) followed by String. The whole group is absent for a bare NOOP; the complete command line is limited to 512 octets. -->
-  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Line terminator: CR (0x0D) immediately followed by LF (0x0A), required for every SMTP command line. -->
-</message>
-  <message name="VRFY">
-  <!-- SMTP VRFY request: client-to-server command line. -->
-  <field name="command" type="constant" length="B" value="VRFY"/>
-  <!-- Command verb; RFC 5321 verbs are case-insensitive, shown in canonical uppercase. -->
+  <!-- SMTP command verb; 4 ASCII octets. Case-insensitive per spec, shown in canonical uppercase. -->
   <field name="separator" type="constant" length="B" value=" "/>
-  <!-- Required single space (SP, 0x20) separating the command verb from its argument. -->
-  <field name="argument" type="variable" length="undefined" value="1*(%x01-09 / %x0B / %x0C / %x0E-7F)"/>
-  <!-- VRFY argument: a user name or a user name and domain. ASCII text excluding CR/LF; because the complete command line must be at most 512 octets and VRFY+SP+CRLF is 7 octets, this field is at most 505 octets. -->
-  <field name="terminator" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- CRLF line terminator: CR (0x0D) immediately followed by LF (0x0A); the receiver acts only after this sequence. -->
+  <!-- Required SP separator between the command verb and its argument clause. -->
+  <field name="from_keyword" type="constant" length="B" value="FROM:"/>
+  <!-- Fixed reverse-path introducer; case-insensitive; directly precedes the reverse-path with no space. -->
+  <field name="reverse_path" type="variable" length="undefined" value="Path / &lt;&gt;"/>
+  <!-- Reverse-path argument: Path or null reverse-path. Maximum 256 octets including punctuation and element separators; mailbox local-part is case-sensitive. -->
+  <field name="line_ending" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- Required CRLF line terminator; the complete command line including this CRLF is limited to 512 octets. -->
 </message>
   <message name="EXPN">
-    <field name="command" type="constant" length="B" value="EXPN"/><!-- Command verb (4 octets); case-insensitive per RFC 5321, canonical literal shown. -->
-    <field name="SP" type="constant" length="B" value=" "/><!-- Required single ASCII space separator after the command verb. -->
-    <field name="String" type="variable" length="undefined" value="String"/><!-- Mailing-list argument; ABNF String. Total command line, including CRLF, must not exceed 512 octets, so this field is at most 505 octets for EXPN. -->
-    <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/><!-- Required line terminator: ASCII CR immediately followed by LF. -->
-</message>
-  <message name="AUTH">
-  <!-- Fixed SMTP command verb; case-insensitive but canonical form is uppercase. -->
-  <field name="command-verb" type="constant" length="B" value="AUTH"/>
-  <!-- Required separator between the verb and the mechanism name. -->
+  <field name="verb" type="constant" length="B" value="EXPN"/>
+  <!-- Command verb; the ABNF form is case-insensitive, so this is the canonical wire form (Sections 2.4, 4.1.1). -->
   <field name="SP" type="constant" length="B" value=" "/>
-  <!-- SASL mechanism name (1-20 ASCII letters, digits, hyphen, underscore). -->
-  <field name="mechanism" type="variable" length="undefined" value="1*20(ALPHA / DIGIT / &quot;-&quot; / &quot;_&quot;)"/>
-  <!-- Optional separator; present only when initial-response is included. -->
-  <field name="SP-initial-response" type="constant" length="B" value=" "/>
-  <!-- Optional payload; base64-encoded initial response, omitted when no initial response is sent. -->
-  <field name="initial-response" type="variable" length="undefined" value="base64"/>
-  <!-- CRLF line terminator; entire command line including CRLF is limited to 512 octets. -->
+  <!-- Required single ASCII SP separating verb from argument because EXPN takes a string parameter. -->
+  <field name="string" type="variable" length="undefined" value="String"/>
+  <!-- Mailing-list/alias name to expand; non-empty String, ends before CRLF; complete command line max 512 octets. -->
   <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- Line terminator: ASCII CR (0x0D) immediately followed by LF (0x0A); no other terminator is valid. -->
 </message>
-  <message name="MAIL">
-  <field name="command-verb" type="constant" length="B" value="MAIL"/>
-  <!-- SMTP command verb; transmitted in US-ASCII and case-insensitive. -->
-  <field name="SP" type="constant" length="B" value=" "/>
-  <!-- Single SP separates the MAIL verb from the FROM argument. -->
-  <field name="FROM" type="constant" length="B" value="FROM:"/>
-  <!-- Literal FROM: argument introducer; keyword and colon are case-insensitive. -->
-  <field name="reverse-path" type="variable" length="undefined" value="&lt;Mailbox&gt; / &lt;&gt;"/>
-  <!-- Originator reverse-path; either an angle-bracketed mailbox or the empty reverse-path. Mailbox local-part case is preserved; domain is not case-sensitive. -->
-  <field name="auth-parameter" type="variable" length="undefined" value="[SP &quot;AUTH=&quot; (xtext / &quot;&lt;&gt;&quot;)]"/>
-  <!-- Optional RFC 4954 AUTH parameter; its leading SP is present only with this parameter. Auth-value is xtext or empty identity (<>), and the parameter may extend the command line by 500 characters. -->
-  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- SMTP commands are line-based; the CRLF ending terminates and triggers processing of the command. -->
-</message>
-  <message name="SAML">
-    <field name="command" type="constant" length="B" value="SAML"/>
-    <!-- SAML is the obsolete SMTP "Send and Mail" command verb; RFC 5321 Section 2.4 makes command verbs case-insensitive, while uppercase is the canonical literal. -->
-    <field name="command-argument-separator" type="constant" length="B" value=" "/>
-    <!-- A single ASCII SP separates the command verb from the required argument clause. -->
-    <field name="from-token" type="constant" length="B" value="FROM:"/>
-    <!-- The FROM: token introduces the reverse-path; argument keywords are case-insensitive except for mailbox local-parts. -->
-    <field name="reverse-path" type="variable" length="undefined" value="(&quot;&lt;&quot; Mailbox &quot;&gt;&quot;) / &quot;&lt;&gt;&quot;"/>
-    <!-- The sender reverse-path, including angle brackets on the wire. It is limited to 256 octets including punctuation; Mailbox is local-part@domain with a case-sensitive local-part. -->
-    <field name="line-terminator" type="constant" length="B" value="0x0D0A"/>
-    <!-- Mandatory SMTP line terminator <CRLF>: ASCII CR (0x0D) immediately followed by LF (0x0A). The complete command line is limited to 512 octets including command word and CRLF. -->
+  <message name="NOOP">
+  <field name="verb" type="constant" length="B" value="NOOP"/>
+  <!-- Fixed command verb from NOOP ABNF; ASCII "NOOP" (4 bytes, 0x4E4F4F50), case-insensitive per RFC 5321 Section 2.4. -->
+  <field name="parameter" type="variable" length="undefined" value="[ SP String ]"/>
+  <!-- Optional argument; if present, wire bytes are SP (0x20) followed by String. Servers SHOULD ignore it per RFC 5321 Section 4.1.1.9. -->
+  <field name="crlf" type="constant" length="B" value="0x0D0A"/>
+  <!-- Required line terminator: CR (0x0D) immediately followed by LF (0x0A), per RFC 5321 Sections 2.3.8 and 4.1.1. -->
 </message>
   <message name="SOML">
-  <field name="CommandVerb" type="constant" length="B" value="SOML"/>
-  <!-- Legacy "send or mail" verb; case-insensitive per RFC 5321 section 2.4, shown in ABNF uppercase. -->
+  <field name="command" type="constant" length="B" value="SOML"/>
+  <!-- SMTP command verb "SOML" (Send Or Mail), client-to-server request. Canonical uppercase; verbs are case-insensitive per RFC 5321. On the wire: 4 US-ASCII octets. -->
   <field name="SP" type="constant" length="B" value=" "/>
-  <!-- Required single space separator between command verb and FROM keyword. -->
-  <field name="FromKeyword" type="constant" length="B" value="FROM:"/>
-  <!-- Case-insensitive FROM keyword; the colon is part of the token and is not followed by SP. -->
-  <field name="ReversePath" type="variable" length="undefined" value="Path / &lt;&gt;"/>
-  <!-- Required reverse-path; Path is "<" [ A-d-l ":" ] Mailbox ">"; max 256 octets including punctuation; local-part case-sensitive. -->
-  <field name="MailParameters" type="variable" length="undefined" value="[SP Mail-parameters]"/>
-  <!-- Optional ESMTP extension parameters, only when negotiated; Mail-parameters = esmtp-param *(SP esmtp-param). -->
+  <!-- One ASCII space (0x20) separating the command verb from its argument clause; required because SOML takes an argument. -->
+  <field name="from_keyword" type="constant" length="B" value="FROM:"/>
+  <!-- "FROM:" introduces the reverse-path argument. Argument keywords are case-insensitive; shown canonical uppercase. 5 ASCII octets including the colon; the reverse-path follows immediately with no space. -->
+  <field name="reverse_path" type="variable" length="undefined" value="reverse-path"/>
+  <!-- Required reverse-path argument for the SEND/SOML/SAML command family. Wire form is an SMTP Path: "<" [ A-d-l ":" ] Mailbox ">" or "<>" for a null reverse-path. Max 256 octets including punctuation/element separators; local-part max 64 octets and is case-sensitive. -->
   <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
-  <!-- Mandatory line terminator; total command line max 512 octets including this CRLF. -->
+  <!-- SMTP line terminator: ASCII CR (0x0D) immediately followed by ASCII LF (0x0A); 2 octets. Total SOML command line, including this CRLF, must not exceed 512 octets. -->
+</message>
+  <message name="AUTH">
+  <field name="command" type="constant" length="B" value="AUTH"/>
+  <!-- SMTP command verb for SASL authentication. Command verbs are case-insensitive; canonical uppercase AUTH is shown. -->
+  <field name="SP" type="constant" length="B" value=" "/>
+  <!-- Required space after the verb because AUTH takes arguments. -->
+  <field name="sasl-mechanism" type="variable" length="undefined" value="1*20(ALPHA / DIGIT / '-' / '_')"/>
+  <!-- SASL mechanism name (1-20 ASCII letters, digits, hyphen, or underscore). -->
+  <field name="initial-response" type="variable" length="undefined" value="[SP] (base64-string / '=')"/>
+  <!-- Optional SASL initial response. The leading SP is transmitted only when this optional element is present; "=" denotes an empty response. -->
+  <field name="CRLF" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- End-of-line terminator; ASCII CR (0x0D) followed by LF (0x0A). The entire command line must not exceed 512 octets unless an extension raises the limit. -->
+</message>
+  <message name="QUIT">
+  <field name="verb" type="constant" length="B" value="QUIT"/>
+  <!-- SMTP command verb "QUIT": ASCII 0x51 0x55 0x49 0x54. QUIT takes no arguments, so the command line contains only this verb. Per RFC 5321 §2.4 the verb token is case-insensitive; this is the canonical uppercase form. -->
+  <field name="line-ending" type="constant" length="B" value="&#13;&#10;"/>
+  <!-- Mandatory SMTP line terminator: ASCII CR (0x0D) immediately followed by LF (0x0A), per RFC 5321 §2.3.8. It terminates the QUIT command line and is the last byte sequence of the request. -->
 </message>
 </ir>

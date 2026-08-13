@@ -58,7 +58,7 @@ exim:
   protocol: smtp
   host: 127.0.0.1
   port: 25
-  rfc_name: ["rfc5321","rfc3030","rfc2920","rfc3207","rfc4954"]
+  rfc_name: ["rfc5321","rfc3030","rfc2920","rfc3207","rfc4954", "rfc1985","rfc3463"]
   trans_layer: tcp
   server: parent
   parser_validation_samples:

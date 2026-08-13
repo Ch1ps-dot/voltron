@@ -1,14 +1,13 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <ir>
   <message name="response message of smtp protocol">
-  <!-- A multi-line reply is one or more repetitions of the code/separator/text/CRLF pattern; '-' separates continuation lines and SP precedes the final text. -->
   <field name="reply-code" type="variable" length="3B" value="[0-9]{3}"/>
-  <!-- Three-digit numeric completion code. -->
-  <field name="separator" type="variable" length="undefined" value="[ -]?"/>
-  <!-- Optional single-byte separator: SP before text, '-' for continuation; absent when no text follows. -->
-  <field name="text" type="variable" length="undefined" value="[ -~]*"/>
-  <!-- Optional free-form ASCII text, excluding CR/LF; must be empty when separator is absent. -->
-  <field name="crlf" type="constant" length="2B" value="&#13;&#10;"/>
-  <!-- CRLF terminates every SMTP line. -->
+  <!-- Numeric completion code: mandatory first field of every SMTP reply; the three ASCII digits indicate success or failure. -->
+  <field name="separator" type="constant" length="1B" value="0x20"/>
+  <!-- US-ASCII SP separating the reply code from text; present only when a text string follows, so code-only replies omit it. -->
+  <field name="text-string" type="variable" length="undefined" value="1*(%x09 / %x20-7E)"/>
+  <!-- Free-form reply text, usually intended for human users; may begin with an RFC 3463 enhanced status code when structured text is used. -->
+  <field name="line-terminator" type="constant" length="2B" value="0x0D0A"/>
+  <!-- CRLF line terminator required by SMTP line syntax; multiline replies repeat this line structure. -->
 </message>
 </ir>
