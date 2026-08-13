@@ -732,7 +732,7 @@ class AsyncChater:
             trace: str,
             related_code: str
     ) -> str:
-        """Repair teh python code
+        """Generate a request mutator guided by the per-type response gap.
 
         Args:
             pro_name: name of protocol
@@ -810,7 +810,8 @@ class AsyncChater:
             msg_ir: str,
             info: str,
             poss_response: str,
-            trace: str
+            trace: str,
+            missing_response: str = '[]',
     ) -> str:
         """Repair teh python code
 
@@ -822,6 +823,8 @@ class AsyncChater:
             poss_response: the possible response for the current request message, which provides the information for mutator evolution
             trace: JSON list of response types observed for the current
                 request type during fuzzing
+            missing_response: JSON list of RFC-possible response types not
+                yet observed for this request type
 
         Returns:
             generated mutator
@@ -836,6 +839,7 @@ class AsyncChater:
             info=self._compact_context(info),
             poss_response=self._compact_context(poss_response),
             trace=self._compact_context(trace),
+            missing_response=self._compact_context(missing_response),
         )
         # logger.debug(pmp)
         ans = await self.chat_llm(

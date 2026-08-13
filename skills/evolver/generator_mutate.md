@@ -18,6 +18,8 @@ RFC_POSSIBLE_RESPONSES:
 $poss_response
 RUNTIME_OBSERVED_RESPONSES:
 $trace
+MISSING_RFC_RESPONSES:
+$missing_response
 
 CONTRACT
 The saved baseline is a generator, normally with `generate()` as its entry,
@@ -57,7 +59,12 @@ def mutate() -> bytes:
   enable.
 - Each `mutate()` invocation must return exactly one complete `$msg_type` request. Do not concatenate messages, mutate into a different request type, or return a multi-message sequence.
 - You may use target-specific URLs or named resources stated in SUT_CONTEXT when helpful for accessing the intended endpoint or resource.
-- Prioritize RFC response types not yet present in runtime observations; avoid patterns that only repeat observed outcomes.
+- MISSING_RFC_RESPONSES is the exact set difference between RFC_POSSIBLE_RESPONSES
+  and RUNTIME_OBSERVED_RESPONSES. Prioritize one or more of these target
+  responses: identify the protocol condition that can lead to each selected
+  target, then implement bounded mutation families intended to exercise that
+  condition. Do not claim the target response is guaranteed; preserve useful
+  baseline behavior when the evidence is insufficient.
 - Prefer mutations that pass framing and early parsing before stressing deeper validation: boundary/out-of-range numbers, inconsistent declared lengths, empty/long/invalid tokens, malformed quoting/charset, reused/duplicated IDs, unsupported versions, or compound semantic conflicts.
 - Use deterministic mutation families plus bounded randomness, built-ins only, no networking/I/O, and never raise. Keep runtime practical while allowing large free-form payloads when useful.
 

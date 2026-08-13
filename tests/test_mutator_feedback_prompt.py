@@ -10,6 +10,18 @@ from voltron.synthesizer.generator import Generator
 from voltron.synthesizer.synthesizer import AsyncProducer
 
 
+def test_mutator_response_coverage_is_sorted_and_type_local():
+    coverage = AsyncProducer._mutator_response_coverage(
+        ["500", "200", "500"], {"200", "999"},
+    )
+
+    assert coverage == {
+        "possible": ["200", "500"],
+        "observed": ["200", "999"],
+        "missing": ["500"],
+    }
+
+
 def test_generator_mutation_serializes_observed_responses_deterministically(
     tmp_path,
 ):
@@ -24,6 +36,7 @@ def test_generator_mutation_serializes_observed_responses_deterministically(
         encoding="utf-8",
     )
     captured = {}
+    records = []
 
     class FakeChater:
         async def llm_mutator_evolve(self, **kwargs):
@@ -54,8 +67,11 @@ def test_generator_mutation_serializes_observed_responses_deterministically(
         pro_name="example",
         req_fields=["method"],
     )
-    producer.poss_response = {"PING": ["PONG", "ERROR"]}
+    producer.poss_response = {"PING": ["PONG", "ERROR", "UNSUPPORTED"]}
     producer._request_ir_info = lambda _msg_type: "<message />"
+    producer._record_generation = (
+        lambda *args, **kwargs: records.append((args, kwargs))
+    )
 
     result = asyncio.run(
         producer._generator_mutate_one(
@@ -69,8 +85,14 @@ def test_generator_mutation_serializes_observed_responses_deterministically(
     assert result[0] == "PING"
     assert json.loads(captured["trace"]) == ["ERROR", "PONG"]
     assert captured["trace"] == '["ERROR", "PONG"]'
+    assert json.loads(captured["missing_response"]) == ["UNSUPPORTED"]
     assert "return b'BEST" in captured["code"]
     assert "return b'LATEST" not in captured["code"]
+    assert records[-1][1]["response_coverage"] == {
+        "possible": ["ERROR", "PONG", "UNSUPPORTED"],
+        "observed": ["ERROR", "PONG"],
+        "missing": ["UNSUPPORTED"],
+    }
 
 
 def test_mutator_prompt_includes_runtime_response_feedback():
@@ -105,15 +127,19 @@ def test_mutator_prompt_includes_runtime_response_feedback():
             info="SUT information",
             poss_response="PONG\nERROR\nUNSUPPORTED",
             trace='["ERROR", "PONG"]',
+            missing_response='["UNSUPPORTED"]',
         )
     )
 
     assert result == "def mutate():\n    return b'MUTATED\\r\\n'\n"
     assert captured["usage"] == "mutator_evolve"
     assert "RUNTIME_OBSERVED_RESPONSES" in captured["prompt"]
+    assert "MISSING_RFC_RESPONSES" in captured["prompt"]
     assert "SAVED_BEST_GENERATOR" in captured["prompt"]
     assert '["ERROR", "PONG"]' in captured["prompt"]
-    assert "not yet present" in captured["prompt"]
+    assert '["UNSUPPORTED"]' in captured["prompt"]
+    assert "exact set difference" in captured["prompt"]
+    assert "Prioritize one or more of these target" in captured["prompt"]
     assert "URLs or named resources stated in SUT_CONTEXT" in captured["prompt"]
     assert "normally with `generate()` as its entry" in captured["prompt"]
     assert "field-preserving blueprint" in captured["prompt"]

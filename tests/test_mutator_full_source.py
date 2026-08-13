@@ -28,6 +28,7 @@ def evolve(chatter):
         pro_name='ftp', field_name='command', msg_type='USER',
         code="def generate():\n    return b'USER x\\r\\n'\n",
         msg_ir='{}', info='', poss_response='331', trace='[]',
+        missing_response='["331"]',
     ))
 
 

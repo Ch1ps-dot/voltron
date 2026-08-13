@@ -635,7 +635,6 @@ class Berserker:
             if self.mapper.mutators != {}:
                 ms = self.select_mutated_seq()
             suffix = self.select_suffix()
-            ms = ms + suffix
             req_seq = []
             
             method = (
@@ -658,6 +657,7 @@ class Berserker:
                         req_seq.append(prefix[i])
                     if (i < len_m):
                         req_seq.append(ms[i])
+                req_seq.extend(suffix)
 
             imported = self.selected_imported_seed_prefix
             protected_prefix_length = len(prefix)

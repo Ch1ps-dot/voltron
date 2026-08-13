@@ -154,6 +154,7 @@ class AsyncProducer:
         base_sha256: str | None = None,
         changed: bool | None = None,
         reason: str = '',
+        response_coverage: dict[str, list[str]] | None = None,
     ) -> None:
         record = {
             'timestamp': time.time(),
@@ -170,6 +171,7 @@ class AsyncProducer:
             'changed': changed,
             'reason': reason[:2000],
             'error': error[:2000],
+            'response_coverage': response_coverage,
         }
         try:
             manifest_lock = getattr(self, '_generation_manifest_lock', None)
@@ -199,6 +201,22 @@ class AsyncProducer:
     def _evolution_reason(code: str) -> str:
         reason = getattr(code, 'reason', '')
         return reason if isinstance(reason, str) else ''
+
+    @staticmethod
+    def _mutator_response_coverage(
+        possible: list[str] | set[str],
+        observed: list[str] | set[str],
+    ) -> dict[str, list[str]]:
+        """Normalize the per-request response gap supplied to a mutator."""
+        possible_responses = sorted({str(response) for response in possible})
+        observed_responses = sorted({str(response) for response in observed})
+        return {
+            'possible': possible_responses,
+            'observed': observed_responses,
+            'missing': sorted(
+                set(possible_responses) - set(observed_responses)
+            ),
+        }
             
     def run(
         self
@@ -1240,6 +1258,14 @@ class AsyncProducer:
         old_code = ''
         with open(old_m_path, 'r', encoding='utf-8') as f:
             old_code = f.read()
+
+        response_coverage = self._mutator_response_coverage(
+            self.poss_response.get(msg_type, []),
+            req_res.get(msg_type, set()),
+        )
+        possible_responses = response_coverage['possible']
+        observed_responses = response_coverage['observed']
+        missing_responses = response_coverage['missing']
                 
         async with sem:
             retry_limit = max(1, getattr(configs, 'generation_retry_limit', 3))
@@ -1258,10 +1284,14 @@ class AsyncProducer:
                             msg_ir=self._request_ir_info(msg_type),
                             info=doc_info,
                             poss_response='\n'.join(
-                                self.poss_response.get(msg_type, [])
+                                possible_responses
                             ),
                             trace=json.dumps(
-                                sorted(req_res.get(msg_type, set())),
+                                observed_responses,
+                                ensure_ascii=False,
+                            ),
+                            missing_response=json.dumps(
+                                missing_responses,
                                 ensure_ascii=False,
                             ),
                         )
@@ -1292,6 +1322,7 @@ class AsyncProducer:
                             ).hexdigest(),
                             changed=False,
                             reason=self._evolution_reason(mutate_code),
+                            response_coverage=response_coverage,
                         )
                         return None
 
@@ -1322,6 +1353,7 @@ class AsyncProducer:
                         'generated' if failure_count == 0 else 'repaired',
                         failure_count + 1,
                         mutate_code,
+                        response_coverage=response_coverage,
                     )
                     return msg_type, mutate_code
                 except LLMDeadlineExceeded as error:
@@ -1329,6 +1361,7 @@ class AsyncProducer:
                     self._record_generation(
                         'mutator', msg_type, 'fallback', failure_count + 1,
                         mutate_code, failure_error,
+                        response_coverage=response_coverage,
                     )
                     break
                 except CandidateSourceValidationError as error:
@@ -1342,6 +1375,7 @@ class AsyncProducer:
                     self._record_generation(
                         'mutator', msg_type, 'invalid', failure_count,
                         mutate_code, failure_error,
+                        response_coverage=response_coverage,
                     )
                     logger.exception('Producer: mutator candidate failed validation')
                 except Exception as error:
@@ -1352,6 +1386,7 @@ class AsyncProducer:
                     self._record_generation(
                         'mutator', msg_type, 'invalid', failure_count,
                         mutate_code, failure_error,
+                        response_coverage=response_coverage,
                     )
                     logger.exception('Producer: mutator generation failed')
             logger.error(
