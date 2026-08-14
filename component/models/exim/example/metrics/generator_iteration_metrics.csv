@@ -1,4 +1,0 @@
-checkpoint_id,timestamp,elapsed_s,phase,checkpoint_type,phase_iteration,operation_id,evaluated_operation_id,model_id,iteration_status,mutated_types,lifetime_response_events,lifetime_response_types,delta_response_events,delta_response_types,lifetime_transition_events,lifetime_response_transitions,delta_transition_events,delta_response_transitions,mutator_round_limit,mutator_rounds_attempted,published_mutator_types
-0,2026-08-12T19:24:22,0.076325,model_learning,model_learning_baseline,0,,initial_generator,,,[],0,0,0,0,0,0,0,0,,,[]
-1,2026-08-12T19:49:40,1518.999715,model_learning,before_generator_evolve,0,evolve-0,initial_generator,0,initial,[],11592,11,11592,11,11592,93,11592,93,,,[]
-2,2026-08-12T20:35:54,4292.222998,model_learning,before_generator_evolve,1,evolve-1,evolve-0,1,improved,[],26993,13,15401,2,26993,118,15401,25,,,[]

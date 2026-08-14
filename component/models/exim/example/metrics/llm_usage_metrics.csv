@@ -1,7 +1,0 @@
-usage,model,llm_calls,token_reported_calls,chat_time_s,prompt_tokens,completion_tokens,total_tokens,avg_prompt_tokens,avg_completion_tokens,avg_total_tokens,max_prompt_tokens,max_completion_tokens,max_total_tokens,valid_responses,invalid_responses,empty_responses,schema_failures,truncated_responses,discarded_completion_tokens
-checker_gen,voltron-default,1,1,15.620821,1151,1241,2392,1151.000,1241.000,2392.000,1151,1241,2392,1,0,0,0,0,0
-code_repair,voltron-default,1,1,4.347871,394,191,585,394.000,191.000,585.000,394,191,585,1,0,0,0,0,0
-generator_evolve,voltron-default,37,37,1027.458285,86176,96125,182301,2329.081,2597.973,4927.054,6332,28911,30728,37,0,0,0,0,0
-generator_gen,voltron-default,18,18,865.107910,9859,83631,93490,547.722,4646.167,5193.889,655,16616,17257,18,0,0,0,0,0
-observer_gen,voltron-default,1,1,8.426926,621,494,1115,621.000,494.000,1115.000,621,494,1115,1,0,0,0,0,0
-parser_gen,voltron-default,1,1,5.855251,443,255,698,443.000,255.000,698.000,443,255,698,0,1,0,1,0,255
