@@ -36,7 +36,7 @@ def add_exchange(
     cons.add_data(request, response)
 
 
-def test_new_request_response_relation_makes_conversation_interesting(tmp_path):
+def test_new_request_response_relation_is_recorded_without_retaining_seed(tmp_path):
     configs.results_path = tmp_path
     berserker = make_berserker()
     berserker.unique_resp.add('331')
@@ -48,7 +48,8 @@ def test_new_request_response_relation_makes_conversation_interesting(tmp_path):
 
     berserker.analyze_cons(cons, trans_inc=0, type_inc=0)
 
-    assert berserker.exe.saved_conversations == [cons]
+    assert berserker.exe.saved_conversations == []
+    assert berserker.req_res == {'USER': {'331'}}
 
     duplicate = Conversation()
     add_exchange(
@@ -60,4 +61,4 @@ def test_new_request_response_relation_makes_conversation_interesting(tmp_path):
     )
     berserker.analyze_cons(duplicate, trans_inc=0, type_inc=0)
 
-    assert berserker.exe.saved_conversations == [cons]
+    assert berserker.exe.saved_conversations == []

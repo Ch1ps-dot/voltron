@@ -19,16 +19,18 @@ class SeedNovelty:
 class SeedRetentionPolicy:
     """Stateful, phase-local version of Voltron's interesting-seed rule.
 
-    A conversation is useful only when it adds a response transition/type or
-    exposes a new request/response-type relation.  Sequence length and the
-    number of distinct response types are retained as metrics, not novelty
-    signals, because they can grow without revealing new protocol behaviour.
+    A conversation is useful when it adds a response transition or type, or
+    when it is a new longest sequence or contains more distinct response
+    transitions than any earlier conversation in this phase. Request/response
+    type relations remain available to scheduling and diagnostics, but do not
+    by themselves justify storing another replayable byte-level seed.
     """
 
     def __init__(self) -> None:
         self.unique_responses: set[str] = set()
         self.max_unique_response_count = 0
         self.max_sequence_length = 0
+        self.max_unique_transition_count = 0
         self.seen_request_response_pairs: set[tuple[str, str]] = set()
 
     @staticmethod
@@ -38,11 +40,13 @@ class SeedRetentionPolicy:
         sequence_length_increment: int,
         unique_response_increment: int,
         request_response_increment: int,
+        unique_transition_increment: int = 0,
     ) -> bool:
         return (
             transition_increment > 0
             or response_type_increment > 0
-            or request_response_increment > 0
+            or sequence_length_increment > 0
+            or unique_transition_increment > 0
         )
 
     def observe(
@@ -89,8 +93,14 @@ class SeedRetentionPolicy:
 
         sequence_length = len(conversation.res_seq)
         unique_response_count = len(set(conversation.res_seq))
+        unique_transition_count = len(
+            set(zip(conversation.res_seq, conversation.res_seq[1:]))
+        )
         unique_response_increment = (
             unique_response_count - self.max_unique_response_count
+        )
+        unique_transition_increment = (
+            unique_transition_count - self.max_unique_transition_count
         )
         sequence_length_increment = sequence_length - self.max_sequence_length
         self.max_sequence_length = max(
@@ -101,6 +111,10 @@ class SeedRetentionPolicy:
             unique_response_count,
             self.max_unique_response_count,
         )
+        self.max_unique_transition_count = max(
+            unique_transition_count,
+            self.max_unique_transition_count,
+        )
 
         return SeedNovelty(
             interesting=self.is_interesting(
@@ -109,6 +123,7 @@ class SeedRetentionPolicy:
                 sequence_length_increment,
                 unique_response_increment,
                 len(new_pairs),
+                unique_transition_increment,
             ),
             new_request_response_pairs=new_pairs,
             new_responses=new_responses,

@@ -750,7 +750,8 @@ class Berserker:
         type_inc: int,
         len_inc: int,
         unique_res_inc: int,
-        req_res_inc: int
+        req_res_inc: int,
+        unique_transition_inc: int = 0,
     ) -> bool:
         """Check whether the conversation exposes any new protocol behavior.
         
@@ -761,7 +762,11 @@ class Berserker:
             unique_res_inc: The increment in distinct response types, retained
                 for telemetry.
             req_res_inc: The number of newly observed request-response type
-                relations in the current conversation.
+                relations in the current conversation. This remains telemetry
+                and scheduler input; it does not independently retain a
+                replayable seed.
+            unique_transition_inc: Increase in the number of distinct
+                response transitions within one conversation.
         """
         if SeedRetentionPolicy.is_interesting(
             trans_inc,
@@ -769,6 +774,7 @@ class Berserker:
             len_inc,
             unique_res_inc,
             req_res_inc,
+            unique_transition_inc,
         ):
             with analyzer.lock:
                 analyzer.useful_cons += 1

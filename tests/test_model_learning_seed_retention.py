@@ -6,6 +6,7 @@ from voltron.executor.executor import Executor
 from voltron.learner.equ_oracle import EquOracle
 from voltron.learner.mem_oracle import MembershipOracle
 from voltron.scheduler.seed_retention import SeedRetentionPolicy
+from voltron.analyzer.analyzer import analyzer
 
 
 def make_conversation(request: bytes = b'PING\r\n') -> Conversation:
@@ -15,25 +16,69 @@ def make_conversation(request: bytes = b'PING\r\n') -> Conversation:
     return conversation
 
 
-def test_sequence_length_and_distinct_response_count_are_not_novelty():
-    """Length and per-conversation variety alone must not retain a seed."""
-    assert not SeedRetentionPolicy.is_interesting(
+def make_response_sequence(response_types: list[str]) -> Conversation:
+    conversation = Conversation()
+    for index, response_type in enumerate(response_types):
+        conversation.add_state('PING', response_type)
+        conversation.add_data(
+            f'PING {index}\r\n'.encode(),
+            f'{response_type}\r\n'.encode(),
+        )
+    return conversation
+
+
+def test_longer_response_sequence_is_seed_novelty():
+    assert SeedRetentionPolicy.is_interesting(
         transition_increment=0,
         response_type_increment=0,
         sequence_length_increment=4,
         unique_response_increment=3,
         request_response_increment=0,
     )
+    assert not SeedRetentionPolicy.is_interesting(
+        transition_increment=0,
+        response_type_increment=0,
+        sequence_length_increment=0,
+        unique_response_increment=3,
+        request_response_increment=0,
+    )
 
 
-def test_transition_type_or_request_response_relation_remains_novelty():
+def test_only_transition_or_response_type_is_seed_novelty():
     assert SeedRetentionPolicy.is_interesting(1, 0, 0, 0, 0)
     assert SeedRetentionPolicy.is_interesting(0, 1, 0, 0, 0)
-    assert SeedRetentionPolicy.is_interesting(0, 0, 0, 0, 1)
+    assert not SeedRetentionPolicy.is_interesting(0, 0, 0, 0, 1)
 
 
-def test_model_learning_retains_only_interesting_conversations_as_seeds():
+def test_more_distinct_response_transitions_is_seed_novelty():
+    assert SeedRetentionPolicy.is_interesting(
+        transition_increment=0,
+        response_type_increment=0,
+        sequence_length_increment=0,
+        unique_response_increment=0,
+        request_response_increment=0,
+        unique_transition_increment=2,
+    )
+
+
+def test_observe_tracks_record_response_transition_variety():
+    retention = SeedRetentionPolicy()
+
+    baseline = make_response_sequence(['A', 'A', 'A', 'A'])
+    assert retention.observe(baseline, 0, 0).interesting
+
+    richer_same_length = make_response_sequence(['B', 'C', 'D', 'E'])
+    novelty = retention.observe(richer_same_length, 0, 0)
+
+    assert novelty.interesting
+    assert retention.max_sequence_length == 4
+    assert retention.max_unique_transition_count == 3
+
+
+def test_model_learning_retains_only_interesting_conversations_as_seeds(monkeypatch):
     conversation = make_conversation()
+    response_type_count = [0]
+    monkeypatch.setattr(analyzer, 'res_types_num', lambda: response_type_count[0])
 
     class Mapper:
         def select_generators(self, *_args, **_kwargs):
@@ -44,8 +89,12 @@ def test_model_learning_retains_only_interesting_conversations_as_seeds():
     class ExecutorStub:
         def __init__(self):
             self.saved = []
+            self.discovered_response_type = False
 
         def interact(self, _messages):
+            if not self.discovered_response_type:
+                response_type_count[0] += 1
+                self.discovered_response_type = True
             return True, conversation
 
         def save_cons(self, saved_conversation):
@@ -61,8 +110,10 @@ def test_model_learning_retains_only_interesting_conversations_as_seeds():
     assert executor.saved == [conversation]
 
 
-def test_equivalence_queries_also_retain_valid_model_learning_seeds():
+def test_equivalence_queries_also_retain_valid_model_learning_seeds(monkeypatch):
     conversation = make_conversation()
+    response_type_count = [0]
+    monkeypatch.setattr(analyzer, 'res_types_num', lambda: response_type_count[0])
 
     class Mapper:
         def select_generators(self, _word):
@@ -73,6 +124,7 @@ def test_equivalence_queries_also_retain_valid_model_learning_seeds():
             self.saved = []
 
         def interact(self, _messages):
+            response_type_count[0] += 1
             return True, conversation
 
         def save_cons(self, saved_conversation):
@@ -86,8 +138,10 @@ def test_equivalence_queries_also_retain_valid_model_learning_seeds():
     assert executor.saved == [conversation]
 
 
-def test_membership_and_equivalence_share_model_learning_novelty_state():
+def test_membership_and_equivalence_share_model_learning_novelty_state(monkeypatch):
     conversation = make_conversation()
+    response_type_count = [0]
+    monkeypatch.setattr(analyzer, 'res_types_num', lambda: response_type_count[0])
 
     class Mapper:
         request_types = {'PING'}
@@ -98,8 +152,12 @@ def test_membership_and_equivalence_share_model_learning_novelty_state():
     class ExecutorStub:
         def __init__(self):
             self.saved = []
+            self.discovered_response_type = False
 
         def interact(self, _messages):
+            if not self.discovered_response_type:
+                response_type_count[0] += 1
+                self.discovered_response_type = True
             return True, conversation
 
         def save_cons(self, saved_conversation):
