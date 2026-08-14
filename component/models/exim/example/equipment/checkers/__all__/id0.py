@@ -1,105 +1,79 @@
 def packet_checker(response: bytes) -> bool:
-    # Must be bytes
     if not isinstance(response, bytes):
         return False
-    
-    # Must not be empty
-    if not response:
+    if len(response) < 5:
         return False
-    
-    # Split into lines by CRLF
-    lines = response.split(b'\r\n')
-    # The last element after splitting will be empty if ending with CRLF, or incomplete if not
-    # SMTP requires CRLF termination for each line, including the last
-    if not response.endswith(b'\r\n'):
-        return False
-    # Remove trailing empty element from split
-    if lines and lines[-1] == b'':
-        lines = lines[:-1]
-    else:
-        # Did not end with CRLF properly
-        return False
-    
-    if not lines:
-        return False
-    
-    # Process each line as a reply line
-    reply_code_str = None
-    for line_idx, line in enumerate(lines):
-        # Each line must be at least 3 bytes (digits) and can have separator and optional text
-        if len(line) < 3:
+
+    # parse first line: reply-code (3 bytes) + separator (1 byte) + text-string (variable) + CRLF (2 bytes)
+    # we need to handle multiline: each line ends with CRLF, last line ends with CRLF and no extra data
+
+    # check for multiline: if first line after CRLF has more data, it's multiline
+    # we enforce that the entire response consists of one or more lines of the same format
+    # each line: 3 digits + optional space + text (may contain enhanced code) + CRLF
+
+    pos = 0
+    min_line_len = 5  # 3 digits + space + CRLF (or 3 digits + CRLF if no space? but spec says separator present only when text follows, so code-only would be 3 digits + CRLF = 5 bytes)
+    # Actually spec: code-only: 3 digits + CRLF = 5 bytes
+    # With text: 3 digits + space + text + CRLF => at least 6 bytes
+    # But we need to handle both.
+
+    while pos < len(response):
+        if len(response) - pos < 5:
             return False
-        
-        # First three bytes must be digits
-        first_three = line[:3]
-        try:
-            code_str = first_three.decode('ascii')
-        except UnicodeDecodeError:
-            return False
-        if not code_str.isdigit() or len(code_str) != 3:
-            return False
-        
-        # Validate that the code is in the allowed list (primary field)
-        allowed_codes = {b'220', b'221', b'250', b'252', b'354', b'503', b'530', b'550', b'554'}
-        if first_three not in allowed_codes:
-            return False
-        
-        # For the first line, record the reply code
-        if reply_code_str is None:
-            reply_code_str = code_str
-        
-        # Check the separator and optional text
-        rest = line[3:]
-        if rest:
-            # First byte of rest must be separator (space or hyphen)
-            sep = rest[0:1]
-            if sep not in (b' ', b'-'):
+        # check first 3 bytes are digits
+        for i in range(3):
+            if not (48 <= response[pos + i] <= 57):
                 return False
-            # If it's a hyphen, it's a continuation line (not final)
-            if sep == b'-' and line_idx == len(lines) - 1:
-                # Last line cannot have continuation separator
+        reply_code = response[pos:pos+3].decode('ascii', errors='replace')
+        # check if code is in primary field values
+        # primary field values: ["220", "250", "458", "530"]
+        # but we also need to check enhanced status code if present? The rule is empty, so use primary field.
+        # However, we need to identify target from complete type-rule field combination.
+        # Since TYPE_RULE_JSON is empty, we use primary field only.
+        # So we must check that reply_code is one of the allowed values.
+        if reply_code not in ["220", "250", "458", "530"]:
+            return False
+
+        # after the 3 digits, check separator
+        # if next byte is space (0x20), then text follows
+        # if next byte is CR (0x0D), then no text, just CRLF
+        # anything else is invalid
+        if response[pos + 3] == 0x20:
+            # space present, text follows
+            pos += 4
+            # find CRLF
+            crlf_idx = response.find(b'\r\n', pos)
+            if crlf_idx == -1:
                 return False
-            # If it's a space, it's the final line (or a line with text)
-            if sep == b' ' and line_idx != len(lines) - 1:
-                # Non-final line cannot have space separator (must be hyphen)
+            # text is between pos and crlf_idx
+            # check enhanced status code? The rule is empty, so we don't need to enforce enhanced code presence.
+            # But we should check that the enhanced code, if present, matches allowed values? The field table says
+            # enhanced status code is "dotted status code following the SMTP reply code in enhanced replies/DSNs"
+            # and its value is ["5.7.0", "X.2.0", "X.2.1", "X.2.2", "X.3.5"].
+            # Since the rule is empty, we can't use it; but the primary field is the reply code.
+            # However, the task says: "Identify the target from the complete type-rule field combination; use the primary field only when the rule is unusable."
+            # So we only use primary field (reply code). Enhanced status code is not enforced.
+            # But we should still check that the text is printable ASCII or tab, no control chars?
+            # Spec says text-string: 1*(%x09 / %x20-7E) — printable ASCII plus tab, no CRLF inside.
+            for b in response[pos:crlf_idx]:
+                if not (b == 0x09 or (0x20 <= b <= 0x7E)):
+                    return False
+            pos = crlf_idx + 2
+        elif response[pos + 3] == 0x0D:
+            # no space, check if next byte is LF
+            if pos + 4 >= len(response) or response[pos + 4] != 0x0A:
                 return False
-            # The rest (after separator) must be printable ASCII (no control chars except CR/LF but those are already handled)
-            text_part = rest[1:] if len(rest) > 1 else b''
-            if text_part:
-                # Must be printable ASCII (space through ~)
-                for byte in text_part:
-                    if byte < 0x20 or byte > 0x7e:
-                        return False
+            pos += 5
         else:
-            # No separator and no text: allowed only if this is the only line? Actually, RFC says code may be alone.
-            # But if there is no separator, the line is just the code and CRLF.
-            # This is allowed for any line, but if there are multiple lines, the separator must be present for continuation?
-            # Actually, multi-line responses use the same code with hyphen, so if there is no text, it's still a valid line.
-            # However, we must ensure that if there is no text, there is no separator, which is fine.
-            pass
-        
-        # For enhanced status code: if the reply code is not exactly what we need for 5.7.0? Actually, the spec says
-        # enhanced status code appears after the reply code. The rule is: if enhanced status code is present, it must be
-        # 5.7.0. But we don't know if it's present. Since the primary field rule is empty, we only use primary field.
-        # The task says: use primary field only when rule is unusable. Rule is empty, so use primary.
-        # So we only check the reply code. The enhanced status code is not enforced because it's optional.
-        # But we must ensure that if it appears, it conforms? Actually, the IR field table says the separator is optional,
-        # and text is optional. The enhanced status code is part of the text. Since we don't have a rule, we don't enforce it.
-        # However, we should ensure that the text (if present) does not contain any unexpected bytes.
-        # We already check that text is printable ASCII.
-        # Additionally, we could check for enhanced status code pattern if present, but not required.
-        # According to the contract: "Identify the target from the complete type-rule field combination; use the primary field only when the rule is unusable."
-        # So we just check the reply code.
-        
-    # If we reach here, all lines are valid. The entire response must be consumed (no trailing data).
-    # We already checked that it ends with CRLF and split properly, so no trailing data.
-    # However, we must ensure that the response is exactly the concatenation of lines with CRLF.
-    # Our split already ensures that, but we need to verify that the reconstructed bytes match the original.
-    # This is a sanity check: if there were extra bytes, split would not account for them.
-    # Actually, our split already accounts for everything because we split on CRLF and the trailing empty string.
-    # But to be safe, we can reconstruct and compare.
-    reconstructed = b'\r\n'.join(lines) + b'\r\n'
-    if reconstructed != response:
+            return False
+
+    # after processing all lines, we must have consumed exactly the whole response
+    # (pos should equal len(response))
+    if pos != len(response):
         return False
-    
+
+    # at least one line must be fully processed
+    if pos == 0:
+        return False
+
     return True

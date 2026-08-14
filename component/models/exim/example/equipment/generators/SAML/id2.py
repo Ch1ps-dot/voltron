@@ -7,7 +7,7 @@ def generate() -> bytes:
     space = b" "
     from_keyword = b"FROM:"
     # Vary the reverse-path to reach unobserved legal transitions.
-    # Use a null reverse-path (i.e., "<>") to enable different SUT behaviors.
-    reverse_path = b"<>"
+    # Use a null reverse-path (i.e., "<>") or a valid mailbox to enable different SUT behaviors.
+    reverse_path = random.choice([b"<>", b"<user@example.com>", b"<postmaster@test.org>", b"<@relay1.com,@relay2.net:user@dest.org>"])
     crlf = b"\r\n"
     return command + space + from_keyword + reverse_path + crlf

@@ -1,3 +1,6 @@
 def generate() -> bytes:
-    # QUIT command: constant verb "QUIT" followed by CRLF
-    return b"QUIT\r\n"
+    # SMTP QUIT request: verb "QUIT" followed by line-ending "\r\n"
+    # Constants per IR field table: verb is ASCII "QUIT", line-ending is CRLF
+    verb = b"QUIT"
+    line_ending = b"\r\n"
+    return verb + line_ending

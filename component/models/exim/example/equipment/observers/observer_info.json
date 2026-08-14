@@ -4,9 +4,9 @@
       "msg_type": "__all__",
       "name": "id0",
       "path": "/home/ubuntu/voltron-runtime/component/equipment/exim/observers/__all__/id0.py",
-      "state_field": "reply_code",
+      "state_field": "SMTP reply code+Enhanced status code",
       "contract_version": "response-components-v1",
-      "ir_sha256": "73e3c72faea21ab5ac7d6a37bdaa27a946ee5e9e4a855eeb681fb4f683b16361",
+      "ir_sha256": "a37f845c09d35a1917774cc276cc765099487182a231b0c8fc73aa944721035c",
       "evolved_from": "init",
       "sample_observations": []
     }

@@ -1,22 +1,31 @@
+import struct
+
 def generate() -> bytes:
-    # SEND command: constant verb "SEND", space, FROM: keyword, reverse-path, CRLF
-    # All fields are mandatory; reverse-path is variable length (max 256 octets)
-    # Use a valid reverse-path: <user@example.com> (22 bytes, including angle brackets)
-    # The path must be enclosed in angle brackets; empty path <> is also valid per RFC so we vary
-    # Vary the reverse-path to explore different responses (e.g., 500, 554, POLLERR)
-    import random
+    # Build the SMTP SEND request according to RFC 5321
+    # Fields in IR order: command, separator, from_keyword, reverse_path, line_ending
+    
+    # command: constant "SEND" (4 bytes, ASCII)
     command = b"SEND"
-    space = b" "
+    
+    # separator: constant " " (1 byte)
+    separator = b" "
+    
+    # from_keyword: constant "FROM:" (5 bytes, ASCII)
     from_keyword = b"FROM:"
-    # Choose from a variety of reverse-paths to reach different legal protocol states
-    paths = [
-        b"<user@example.com>",  # 22 bytes, typical
-        b"<>",                  # empty path
-        b"<a@b>",               # short path
-        b"<user@[127.0.0.1]>",  # address literal
-        b"<User@example.com>",  # mixed case local-part
-        b"<" + b"a" * 64 + b"@" + b"b" * 63 + b"." + b"c" * 63 + b"." + b"d" * 61 + b">"  # max length path
-    ]
-    reverse_path = random.choice(paths)
-    crlf = b"\r\n"
-    return command + space + from_keyword + reverse_path + crlf
+    
+    # reverse_path: variable field, choose a valid valid path or null reverse-path
+    # For state exploration, use a common valid mailbox: <postmaster@example.com>
+    # Include angle brackets and ensure total line length <= 512 octets
+    # Path max 256 octets, our chosen path is well within limits
+    reverse_path = b"<>"  # use null reverse-path to exercise unobserved legal transition (Helo antecedents)
+    
+    # line_ending: constant "\r\n" (2 bytes)
+    line_ending = b"\r\n"
+    
+    # Assemble the full request
+    request = command + separator + from_keyword + reverse_path + line_ending
+    
+    # Validate total length <= 512 octets (RFC 5321 limit)
+    assert len(request) <= 512, "Request exceeds SMTP line length limit"
+    
+    return request

@@ -1,14 +1,17 @@
-_EHLO_DOMAINS = (
-    b"example.com",
-    b"example.org",
-    b"example.net",
-    b"[127.0.0.1]",
-    b"[IPv6:2001:db8::1]",
-)
-_ehlo_cursor = 0
+import struct
 
 def generate() -> bytes:
-    global _ehlo_cursor
-    domain = _EHLO_DOMAINS[_ehlo_cursor % len(_EHLO_DOMAINS)]
-    _ehlo_cursor += 1
-    return b"EHLO " + domain + b"\r\n"
+    # verb: constant "EHLO" (canonical uppercase)
+    verb = b"EHLO"
+    # SP: single ASCII space separator
+    sp = b" "
+    # client-domain: variable; choose a valid domain name for state exploration
+    # Common valid values: "example.com", "localhost", "client.example"
+    # Use a boundary/typical value: a short domain like "ex.com"
+    client_domain = b"ex.com"
+    # CRLF: end-of-line marker
+    crlf = b"\r\n"
+    
+    # Concatenate in IR order: verb, SP, client-domain, CRLF
+    message = verb + sp + client_domain + crlf
+    return message

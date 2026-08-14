@@ -1,2 +1,2 @@
-def generate() -> bytes:
+def generate():
     return b"STARTTLS\r\n"

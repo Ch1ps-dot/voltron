@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "derived_from": "exim--partial_after_retry_exhausted--2026-08-13_17-08-55_kA5zlt.learning_bundle.tar.gz",
+  "derived_from_sha256": "d113a662c3f54532fc46bb0d86fe7c80dd56775dfccf3ed7cc586aed1ceff725",
+  "repair": {
+    "path": "equipment/exim/generators/SOML/id0.py",
+    "change": "encode selected at-domain before bytes concatenation",
+    "reason": "validator observed nondeterministic bytes/str TypeError"
+  },
+  "model_status": "partial_after_retry_exhausted"
+}

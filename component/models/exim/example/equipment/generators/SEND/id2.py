@@ -17,7 +17,7 @@ def generate() -> bytes:
     # For state exploration, use a common valid mailbox: <postmaster@example.com>
     # Include angle brackets and ensure total line length <= 512 octets
     # Path max 256 octets, our chosen path is well within limits
-    reverse_path = b"<postmaster@example.com>"
+    reverse_path = b"<postmaster@example.com>"  # use a valid path to reach unobserved legal transitions (e.g., 250 response after HELO)
     
     # line_ending: constant "\r\n" (2 bytes)
     line_ending = b"\r\n"

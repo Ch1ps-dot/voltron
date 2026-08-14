@@ -1,49 +1,59 @@
 import hashlib
+import re
 
 def packet_observer(response: bytes) -> str:
-    """
-    Normalize SMTP response for semantic hashing.
-    - Preserves reply code, status class, enhanced status code, separator, and CRLF.
-    - Replaces free-form text (the 'text' field) with a stable marker preserving length.
-    """
+    if not isinstance(response, bytes):
+        response = b""
     try:
-        if not isinstance(response, bytes):
-            return hashlib.sha256(b"").hexdigest()
-        result = bytearray()
-        lines = response.split(b"\r\n")
-        # remove trailing empty line if present
-        if lines and lines[-1] == b"":
-            lines = lines[:-1]
-        for line in lines:
-            if not line:
-                continue
-            # extract reply code (first 3 bytes)
-            reply_code = line[:3]
-            result.extend(reply_code)
-            # separator: either b' ' or b'-' or nothing
-            sep = b""
-            text_start = 3
-            if len(line) > 3:
-                sep_char = line[3:4]
-                if sep_char in (b" ", b"-"):
-                    sep = sep_char
-                    text_start = 4
-                # else: no separator, no text (should not happen per spec but safe)
-            result.extend(sep)
-            # text from position text_start to end
-            text = line[text_start:]
-            if text:
-                # replace text with marker of same length, preserving presence
-                marker = b"X" * len(text)
-                result.extend(marker)
-            # add CRLF per line
-            result.extend(b"\r\n")
-        # remove trailing CRLF (since we added after each line, but final line may have it)
-        # the original response may have trailing CRLF; we emulate that
-        # Actually we need to keep the exact number of CRLFs as in original? The spec says
-        # each line is terminated by CRLF. The original response ends with a CRLF (maybe).
-        # We'll mimic by adding CRLF after each line, but the last line also gets one.
-        # That's fine because the original also ends with CRLF.
-        return hashlib.sha256(bytes(result)).hexdigest()
+        text = response.decode("ascii", errors="replace")
     except Exception:
-        return hashlib.sha256(b"").hexdigest()
+        text = response.decode("ascii", errors="replace")
+    
+    # Split into lines (SMTP lines are CRLF terminated)
+    lines = text.split("\r\n")
+    normalized_lines = []
+    
+    for line in lines:
+        if not line:
+            normalized_lines.append("")
+            continue
+        
+        # Extract the SMTP reply code (first three digits)
+        reply_code_match = re.match(r"(\d{3})", line)
+        if not reply_code_match:
+            normalized_lines.append(line)
+            continue
+        
+        reply_code = reply_code_match.group(1)
+        rest = line[3:]  # rest after the reply code
+        
+        # Check if there is a space separator (indicating text follows)
+        if rest.startswith(" "):
+            separator = " "
+            text_part = rest[1:]  # after the space
+        else:
+            separator = ""
+            text_part = rest
+        
+        # Check if the text part starts with an enhanced status code
+        # Format: x.y.z where x, y, z are digits
+        enhanced_match = re.match(r"(\d+\.\d+\.\d+)", text_part)
+        if enhanced_match:
+            enhanced_code = enhanced_match.group(1)
+            remaining_text = text_part[len(enhanced_code):]
+            # Normalize the enhanced status code: replace each digit component with a marker
+            # We preserve the dotted structure but replace exact digits with placeholders
+            enhanced_parts = enhanced_code.split(".")
+            normalized_enhanced = ".".join("X" if part.isdigit() else part for part in enhanced_parts)
+            # Replace the enhanced code with normalized version
+            normalized_line = reply_code + separator + normalized_enhanced + remaining_text
+        else:
+            # No enhanced code; keep the line as is but normalize any dynamic fields beyond the reply code
+            # The protocol only identifies reply code and enhanced status code as fields with controlled values
+            # For normal text, we preserve it as-is (non-dynamic content)
+            normalized_line = reply_code + separator + text_part
+        
+        normalized_lines.append(normalized_line)
+    
+    normalized_text = "\r\n".join(normalized_lines)
+    return hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()

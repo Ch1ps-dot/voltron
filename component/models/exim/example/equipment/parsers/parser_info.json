@@ -1,1 +1,1 @@
-[{"evolved_from": "init", "name": "id0", "state_field": "reply_code", "parsed_res": []}]
+[{"evolved_from": "init", "name": "id0", "state_field": "SMTP reply code+Enhanced status code", "parsed_res": []}]

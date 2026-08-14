@@ -1,15 +1,13 @@
-_candidates = [
-    b"SAML FROM:<user@example.com>\r\n",
-    b"SAML FROM:<>\r\n",
-    b"SAML FROM:<a@b>\r\n",
-    b"SAML FROM:<user@[127.0.0.1]>\r\n",
-    b"SAML FROM:<User@example.com>\r\n",
-    b"SAML FROM:<" + b"a" * 64 + b"@" + b"b" * 63 + b"." + b"c" * 63 + b"." + b"d" * 61 + b">\r\n",
-]
-_index = 0
-
 def generate() -> bytes:
-    global _index
-    request = _candidates[_index]
-    _index = (_index + 1) % len(_candidates)
-    return request
+    # Build the SAML request according to RFC 5321.
+    # Fields in IR order: command, space, from_keyword, reverse_path, crlf.
+    command = b"SAML"
+    space = b" "
+    from_keyword = b"FROM:"
+    # Choose a valid reverse-path with angle brackets and optional source route.
+    # Use a simple local-part@domain format (max 256 octets).
+    reverse_path = b"<sender@example.org>"
+    # Ensure length constraint: variable length but must be <= 256.
+    # Our chosen value is 22 bytes, well within limits.
+    crlf = b"\r\n"
+    return command + space + from_keyword + reverse_path + crlf
