@@ -1,1 +1,246 @@
-{"message_direction": "response", "primary_fields": ["SMTP reply code", "Enhanced status code"], "types": [{"type_name": "Service ready", "field_values": {"SMTP reply code": "220"}, "explanation": "RFC 3207 specifies that a 220 reply to STARTTLS indicates the server is ready for TLS negotiation."}, {"type_name": "Requested mail action okay, completed", "field_values": {"SMTP reply code": "250"}, "explanation": "RFC 3030 BDAT and RFC 1985 ETRN examples use 250 to indicate successful command processing."}, {"type_name": "Unable to process ETRN command at this time", "field_values": {"SMTP reply code": "458"}, "explanation": "RFC 1985 identifies the 458 response as the ETRN error response when queue processing cannot be started."}, {"type_name": "Must issue STARTTLS command first", "field_values": {"SMTP reply code": "530"}, "explanation": "RFC 3207 requires 530 in response to commands other than NOOP, EHLO, STARTTLS, or QUIT before TLS is established."}, {"type_name": "Other or undefined security status", "field_values": {"Enhanced status code": "5.7.0"}, "explanation": "RFC 3463 defines 5.7.0 as other or undefined security status; RFC 3207 specifies it as the enhanced status for the 530 STARTTLS-required reply."}, {"type_name": "Other or undefined mailbox status", "field_values": {"Enhanced status code": "X.2.0"}, "explanation": "RFC 3463 defines X.2.0 as other or undefined mailbox status."}, {"type_name": "Mailbox disabled, not accepting messages", "field_values": {"Enhanced status code": "X.2.1"}, "explanation": "RFC 3463 defines X.2.1 as mailbox disabled, not accepting messages."}, {"type_name": "Mailbox full", "field_values": {"Enhanced status code": "X.2.2"}, "explanation": "RFC 3463 defines X.2.2 as mailbox full."}, {"type_name": "System incorrectly configured", "field_values": {"Enhanced status code": "X.3.5"}, "explanation": "RFC 3463 defines X.3.5 as system incorrectly configured."}]}
+{
+  "message_direction": "response",
+  "primary_fields": [
+    "SMTP reply code"
+  ],
+  "types": [
+    {
+      "type_name": "211",
+      "field_values": {
+        "SMTP reply code": "211"
+      },
+      "explanation": "System status or system help reply (RFC 5321)."
+    },
+    {
+      "type_name": "214",
+      "field_values": {
+        "SMTP reply code": "214"
+      },
+      "explanation": "Help message reply (RFC 5321)."
+    },
+    {
+      "type_name": "220",
+      "field_values": {
+        "SMTP reply code": "220"
+      },
+      "explanation": "Service ready (RFC 5321)."
+    },
+    {
+      "type_name": "221",
+      "field_values": {
+        "SMTP reply code": "221"
+      },
+      "explanation": "Service closing transmission channel (RFC 5321)."
+    },
+    {
+      "type_name": "235",
+      "field_values": {
+        "SMTP reply code": "235"
+      },
+      "explanation": "Authentication successful (RFC 4954)."
+    },
+    {
+      "type_name": "250",
+      "field_values": {
+        "SMTP reply code": "250"
+      },
+      "explanation": "Requested mail action completed (RFC 5321)."
+    },
+    {
+      "type_name": "251",
+      "field_values": {
+        "SMTP reply code": "251"
+      },
+      "explanation": "User not local; will forward (RFC 5321)."
+    },
+    {
+      "type_name": "252",
+      "field_values": {
+        "SMTP reply code": "252"
+      },
+      "explanation": "Cannot verify user, but will accept message (RFC 5321)."
+    },
+    {
+      "type_name": "334",
+      "field_values": {
+        "SMTP reply code": "334"
+      },
+      "explanation": "Authentication challenge (RFC 4954)."
+    },
+    {
+      "type_name": "354",
+      "field_values": {
+        "SMTP reply code": "354"
+      },
+      "explanation": "Start mail input (RFC 5321)."
+    },
+    {
+      "type_name": "421",
+      "field_values": {
+        "SMTP reply code": "421"
+      },
+      "explanation": "Service not available (RFC 5321)."
+    },
+    {
+      "type_name": "432",
+      "field_values": {
+        "SMTP reply code": "432"
+      },
+      "explanation": "Temporary authentication failure (RFC 4954)."
+    },
+    {
+      "type_name": "450",
+      "field_values": {
+        "SMTP reply code": "450"
+      },
+      "explanation": "Mailbox unavailable (RFC 5321)."
+    },
+    {
+      "type_name": "451",
+      "field_values": {
+        "SMTP reply code": "451"
+      },
+      "explanation": "Requested action aborted (RFC 5321)."
+    },
+    {
+      "type_name": "452",
+      "field_values": {
+        "SMTP reply code": "452"
+      },
+      "explanation": "Insufficient system storage (RFC 5321)."
+    },
+    {
+      "type_name": "454",
+      "field_values": {
+        "SMTP reply code": "454"
+      },
+      "explanation": "Temporary authentication or TLS failure (RFC 4954/RFC 3207)."
+    },
+    {
+      "type_name": "455",
+      "field_values": {
+        "SMTP reply code": "455"
+      },
+      "explanation": "Server unable to accommodate parameters (RFC 5321)."
+    },
+    {
+      "type_name": "458",
+      "field_values": {
+        "SMTP reply code": "458"
+      },
+      "explanation": "Unable to process ETRN command (RFC 1985)."
+    },
+    {
+      "type_name": "459",
+      "field_values": {
+        "SMTP reply code": "459"
+      },
+      "explanation": "ETRN parameter not recognized (RFC 1985)."
+    },
+    {
+      "type_name": "500",
+      "field_values": {
+        "SMTP reply code": "500"
+      },
+      "explanation": "Syntax error, command unrecognized (RFC 5321)."
+    },
+    {
+      "type_name": "501",
+      "field_values": {
+        "SMTP reply code": "501"
+      },
+      "explanation": "Syntax error in parameters (RFC 5321)."
+    },
+    {
+      "type_name": "502",
+      "field_values": {
+        "SMTP reply code": "502"
+      },
+      "explanation": "Command not implemented (RFC 5321)."
+    },
+    {
+      "type_name": "503",
+      "field_values": {
+        "SMTP reply code": "503"
+      },
+      "explanation": "Bad sequence of commands (RFC 5321)."
+    },
+    {
+      "type_name": "504",
+      "field_values": {
+        "SMTP reply code": "504"
+      },
+      "explanation": "Command parameter not implemented (RFC 5321)."
+    },
+    {
+      "type_name": "530",
+      "field_values": {
+        "SMTP reply code": "530"
+      },
+      "explanation": "Must issue STARTTLS command first (RFC 3207)."
+    },
+    {
+      "type_name": "534",
+      "field_values": {
+        "SMTP reply code": "534"
+      },
+      "explanation": "Authentication mechanism too weak (RFC 4954)."
+    },
+    {
+      "type_name": "535",
+      "field_values": {
+        "SMTP reply code": "535"
+      },
+      "explanation": "Authentication credentials invalid (RFC 4954)."
+    },
+    {
+      "type_name": "538",
+      "field_values": {
+        "SMTP reply code": "538"
+      },
+      "explanation": "Encryption required for authentication (RFC 4954; deprecated)."
+    },
+    {
+      "type_name": "550",
+      "field_values": {
+        "SMTP reply code": "550"
+      },
+      "explanation": "Mailbox unavailable (RFC 5321)."
+    },
+    {
+      "type_name": "551",
+      "field_values": {
+        "SMTP reply code": "551"
+      },
+      "explanation": "User not local (RFC 5321)."
+    },
+    {
+      "type_name": "552",
+      "field_values": {
+        "SMTP reply code": "552"
+      },
+      "explanation": "Exceeded storage allocation (RFC 5321)."
+    },
+    {
+      "type_name": "553",
+      "field_values": {
+        "SMTP reply code": "553"
+      },
+      "explanation": "Mailbox name not allowed (RFC 5321)."
+    },
+    {
+      "type_name": "554",
+      "field_values": {
+        "SMTP reply code": "554"
+      },
+      "explanation": "Transaction failed (RFC 5321)."
+    },
+    {
+      "type_name": "555",
+      "field_values": {
+        "SMTP reply code": "555"
+      },
+      "explanation": "MAIL FROM or RCPT TO parameters not recognized (RFC 5321)."
+    }
+  ]
+}

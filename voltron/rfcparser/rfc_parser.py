@@ -26,6 +26,85 @@ class AsyncRFCParser:
     ANNOTATION_MAX_ATTEMPTS = 3
     ANNOTATION_TIMEOUT_S = 30.0
     IR_REPAIR_MAX_ATTEMPTS = 3
+    # SMTP reply types are a closed, standards-defined catalog.  Keeping this
+    # list deterministic prevents a cached LLM extraction from silently
+    # shrinking the runtime response alphabet to a handful of examples.
+    SMTP_REPLY_CODE_CATALOG: tuple[tuple[str, str], ...] = (
+        ('211', 'System status or system help reply (RFC 5321).'),
+        ('214', 'Help message reply (RFC 5321).'),
+        ('220', 'Service ready (RFC 5321).'),
+        ('221', 'Service closing transmission channel (RFC 5321).'),
+        ('235', 'Authentication successful (RFC 4954).'),
+        ('250', 'Requested mail action completed (RFC 5321).'),
+        ('251', 'User not local; will forward (RFC 5321).'),
+        ('252', 'Cannot verify user, but will accept message (RFC 5321).'),
+        ('334', 'Authentication challenge (RFC 4954).'),
+        ('354', 'Start mail input (RFC 5321).'),
+        ('421', 'Service not available (RFC 5321).'),
+        ('432', 'Temporary authentication failure (RFC 4954).'),
+        ('450', 'Mailbox unavailable (RFC 5321).'),
+        ('451', 'Requested action aborted (RFC 5321).'),
+        ('452', 'Insufficient system storage (RFC 5321).'),
+        ('454', 'Temporary authentication or TLS failure (RFC 4954/RFC 3207).'),
+        ('455', 'Server unable to accommodate parameters (RFC 5321).'),
+        ('458', 'Unable to process ETRN command (RFC 1985).'),
+        ('459', 'ETRN parameter not recognized (RFC 1985).'),
+        ('500', 'Syntax error, command unrecognized (RFC 5321).'),
+        ('501', 'Syntax error in parameters (RFC 5321).'),
+        ('502', 'Command not implemented (RFC 5321).'),
+        ('503', 'Bad sequence of commands (RFC 5321).'),
+        ('504', 'Command parameter not implemented (RFC 5321).'),
+        ('530', 'Must issue STARTTLS command first (RFC 3207).'),
+        ('534', 'Authentication mechanism too weak (RFC 4954).'),
+        ('535', 'Authentication credentials invalid (RFC 4954).'),
+        ('538', 'Encryption required for authentication (RFC 4954; deprecated).'),
+        ('550', 'Mailbox unavailable (RFC 5321).'),
+        ('551', 'User not local (RFC 5321).'),
+        ('552', 'Exceeded storage allocation (RFC 5321).'),
+        ('553', 'Mailbox name not allowed (RFC 5321).'),
+        ('554', 'Transaction failed (RFC 5321).'),
+        ('555', 'MAIL FROM or RCPT TO parameters not recognized (RFC 5321).'),
+    )
+
+    def _apply_smtp_response_catalog(
+            self,
+            fields: list[dict],
+            rules: dict,
+    ) -> tuple[list[dict], dict]:
+        """Normalize SMTP reply types without altering extended-status fields."""
+        if str(getattr(self, 'pro_name', '')).lower() != 'smtp':
+            return fields, rules
+
+        reply_field = next(
+            (
+                field for field in fields
+                if str(field.get('field_name', '')).casefold() == 'smtp reply code'
+            ),
+            None,
+        )
+        if reply_field is None:
+            return fields, rules
+
+        field_name = str(reply_field['field_name'])
+        codes = [code for code, _ in self.SMTP_REPLY_CODE_CATALOG]
+        normalized_fields = [
+            {**field, 'value': codes}
+            if field is reply_field else field
+            for field in fields
+        ]
+        normalized_rules = {
+            'message_direction': 'response',
+            'primary_fields': [field_name],
+            'types': [
+                {
+                    'type_name': code,
+                    'field_values': {field_name: code},
+                    'explanation': explanation,
+                }
+                for code, explanation in self.SMTP_REPLY_CODE_CATALOG
+            ],
+        }
+        return normalized_fields, normalized_rules
 
     def __init__(
             self, 
@@ -264,6 +343,22 @@ class AsyncRFCParser:
         )
         self.req_type_rules = await req_type_rules_task
         self.res_type_rules = await res_type_rules_task
+
+        normalized_res_json, normalized_res_type_rules = (
+            self._apply_smtp_response_catalog(res_json, self.res_type_rules)
+        )
+        if normalized_res_json != res_json:
+            with open(res_path, 'w', encoding='utf-8') as f:
+                json.dump(normalized_res_json, f, indent=2)
+                f.write('\n')
+            self.res_json = normalized_res_json
+            res_json = normalized_res_json
+        if normalized_res_type_rules != self.res_type_rules:
+            with open(res_type_rules_path, 'w', encoding='utf-8') as f:
+                json.dump(normalized_res_type_rules, f, indent=2)
+                f.write('\n')
+            self.res_type_rules = normalized_res_type_rules
+        self.res_fields = [str(v['field_name']) for v in res_json]
 
         self.req_types = self._types_from_rules(self.req_type_rules)
         self.res_types = self._types_from_rules(self.res_type_rules)
