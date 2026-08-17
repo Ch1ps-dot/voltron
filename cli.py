@@ -60,6 +60,15 @@ import click
     help="Enable state/dependency-guided scheduling and feedback-based energy.",
 )
 @click.option(
+    "--offline-mutator-only",
+    is_flag=True,
+    help=(
+        "Ablation mode: use fixed generator/parser plus corpus prefixes and "
+        "offline byte mutation only; disables state learning, scheduling, and "
+        "LLM mutator evolution."
+    ),
+)
+@click.option(
     "--compliance-analysis/--no-compliance-analysis",
     default=False,
     show_default=True,
@@ -128,6 +137,7 @@ def main(
     spec_knowledge: bool,
     state_learning: bool,
     guided_scheduling: bool,
+    offline_mutator_only: bool,
     compliance_analysis: bool,
     observer: bool,
     load_aflnet_seeds: bool,
@@ -205,6 +215,7 @@ def main(
         spec_knowledge=spec_knowledge,
         state_learning=state_learning,
         guided_scheduling=guided_scheduling,
+        offline_mutator_only=offline_mutator_only,
         compliance_analysis=compliance_analysis,
         observer_enabled=observer,
         aflnet_seed_loading=load_aflnet_seeds,

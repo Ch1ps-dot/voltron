@@ -20,6 +20,10 @@ Important feature switches are:
 - `--state-learning` / `--no-state-learning`: enable or skip active learning.
 - `--guided-scheduling` / `--no-guided-scheduling`: enable or ablate
   state/dependency-guided scheduling.
+- `--offline-mutator-only`: fixed-component ablation.  It disables state
+  learning, model/dependency scheduling, and LLM mutator evolution, while
+  retaining AFLNet and Voltron interesting-seed prefixes plus offline byte
+  mutation.
 - `--observer` / `--no-observer`: enable or disable semantic observers.
 - `--compliance-analysis`: enable in-run checker review; it is disabled by
   default.

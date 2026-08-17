@@ -278,7 +278,10 @@ class AsyncProducer:
                 self._load_observers()
 
         # load existed parser info or generate init mutator
-        if (self.mutator_info_path.is_file()):
+        if (
+            not getattr(configs, 'offline_mutator_only', False)
+            and self.mutator_info_path.is_file()
+        ):
             try:
                 with open(self.mutator_info_path, 'r', encoding='utf-8') as f:
                     mutator_info = json.load(f)
@@ -291,7 +294,10 @@ class AsyncProducer:
         if getattr(configs, 'spec_knowledge', True):
             self.load_best_equipment()
 
-        if not configs.spec_knowledge:
+        if (
+            not configs.spec_knowledge
+            or getattr(configs, 'offline_mutator_only', False)
+        ):
             self.generators = {
                 msg_type: generators[:1]
                 for msg_type, generators in self.generators.items()

@@ -47,6 +47,7 @@ class Berserker:
         exe: Executor,
         machine: MealyMachine | None,
         use_guidance: bool = True,
+        use_corpus_prefixes: bool = False,
         partial_guidance: PartialStateGraph | None = None,
         interesting_seed_sequences: list[list[tuple[str, bytes]]] | None = None,
         replay_imported_seed_sequences: bool = True,
@@ -59,6 +60,7 @@ class Berserker:
         self.useful_msg: list[tuple[str, bytes]] = []
         self.useful_seq: list[list[tuple[str, bytes]]] = []
         self.partial_guidance = partial_guidance if use_guidance else None
+        self.use_corpus_prefixes = bool(use_corpus_prefixes)
         self.partial_seed_sequences: list[list[tuple[str, bytes]]] = (
             self.partial_guidance.seed_sequences()
             if self.partial_guidance is not None
@@ -86,6 +88,7 @@ class Berserker:
         )
         self.selected_partial_prefix = False
         self.selected_imported_seed_prefix = False
+        self.selected_interesting_prefix = False
         self.partial_prefix_attempts = 0
         self.max_seq_len = 0
         self.seen_req_res_pairs = self.seed_retention.seen_request_response_pairs
@@ -350,6 +353,26 @@ class Berserker:
         self.selected_base_state_mode = ''
         self.selected_partial_prefix = False
         self.selected_imported_seed_prefix = False
+        self.selected_interesting_prefix = False
+        if self.use_corpus_prefixes:
+            # Corpus prefixes are concrete prior traffic, not model-derived
+            # state access sequences.  They remain available even when all
+            # model/dependency guidance is disabled for the ablation.
+            corpus = list(self.imported_seed_sequences)
+            corpus.extend(
+                sequence for sequence in self.useful_seq
+                if not any(sequence is imported for imported in self.imported_seed_sequences)
+            )
+            if corpus and self.rand.random() < 0.5:
+                selected = self.rand.choice(corpus)
+                if any(
+                    selected is imported
+                    for imported in self.imported_seed_sequences
+                ):
+                    self.selected_imported_seed_prefix = True
+                else:
+                    self.selected_interesting_prefix = True
+                return list(selected)
         if self.partial_seed_sequences or self.imported_seed_sequences:
             # Prefer concrete MQ prefixes often enough to preserve useful
             # learning evidence, while leaving the rest of the scheduler's
@@ -643,6 +666,7 @@ class Berserker:
                     self.selected_base_state is not None
                     or self.selected_partial_prefix
                     or self.selected_imported_seed_prefix
+                    or self.selected_interesting_prefix
                 )
                 else self.rand.choice(self.methods)
             )
@@ -661,7 +685,11 @@ class Berserker:
 
             imported = self.selected_imported_seed_prefix
             protected_prefix_length = len(prefix)
-            if imported and self.offline_mutator.mutate_imported_seeds:
+            if (
+                imported
+                and self.offline_mutator.mutate_imported_seeds
+                and not self.use_corpus_prefixes
+            ):
                 # Imported AFLNet traffic is a concrete fuzz seed, not an
                 # access sequence that must remain intact to reach a model
                 # state.  Its dedicated option therefore overrides the

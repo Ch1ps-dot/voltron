@@ -89,6 +89,35 @@ def test_imported_seed_is_a_concrete_interesting_prefix():
     assert berserker.selected_partial_prefix is False
 
 
+def test_offline_only_mode_uses_interesting_seed_prefix_without_guidance():
+    class Mapper:
+        request_types = {'GENERATED'}
+        req_dep = {}
+
+    interesting = [('TYPE', b'captured request')]
+    berserker = Berserker(
+        Mapper(), object(), None,
+        use_guidance=False,
+        use_corpus_prefixes=True,
+    )
+    berserker.useful_seq.append(interesting)
+
+    class RandomStub:
+        @staticmethod
+        def random():
+            return 0.0
+
+        @staticmethod
+        def choice(values):
+            return values[0]
+
+    berserker.rand = RandomStub()
+
+    assert berserker.select_base_state() == interesting
+    assert berserker.selected_interesting_prefix is True
+    assert berserker.selected_base_state is None
+
+
 def test_imported_seed_exact_replay_preserves_full_sequence():
     class Mapper:
         request_types = {'GENERATED'}

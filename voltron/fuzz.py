@@ -113,6 +113,7 @@ class Fuzzer:
             spec_knowledge: bool = True,
             state_learning: bool = True,
             guided_scheduling: bool = True,
+            offline_mutator_only: bool = False,
             compliance_analysis: bool = False,
             observer_enabled: bool = True,
             aflnet_seed_loading: bool = True,
@@ -124,8 +125,9 @@ class Fuzzer:
         self.mode = mode
         self.output = output
         self.spec_knowledge = spec_knowledge
-        self.state_learning = state_learning
-        self.guided_scheduling = guided_scheduling
+        self.offline_mutator_only = bool(offline_mutator_only)
+        self.state_learning = state_learning and not self.offline_mutator_only
+        self.guided_scheduling = guided_scheduling and not self.offline_mutator_only
         self.compliance_analysis = compliance_analysis
         self.observer_enabled = observer_enabled
         self.aflnet_seed_loading = aflnet_seed_loading
@@ -381,6 +383,9 @@ class Fuzzer:
         configs.spec_knowledge = self.spec_knowledge
         configs.state_learning = self.state_learning
         configs.guided_scheduling = self.guided_scheduling
+        configs.offline_mutator_only = getattr(
+            self, 'offline_mutator_only', False,
+        )
         configs.compliance_analysis = self.compliance_analysis
         configs.observer_enabled = self.observer_enabled
         configs.aflnet_seed_loading_enabled = getattr(
@@ -1670,6 +1675,7 @@ class Fuzzer:
             self.exe,
             hypothesis,
             use_guidance=self.guided_scheduling,
+            use_corpus_prefixes=getattr(self, 'offline_mutator_only', False),
             partial_guidance=(
                 partial_guidance if self.guided_scheduling else None
             ),
@@ -1730,9 +1736,13 @@ class Fuzzer:
                     )
                     if self._should_stop_for_deadline():
                         break
-                    if self.spec_knowledge and (
+                    if (
+                        self.spec_knowledge
+                        and not getattr(self, 'offline_mutator_only', False)
+                        and (
                         mutator_round_limit == 0
                         or mutator_rounds_attempted < mutator_round_limit
+                        )
                     ):
                         # Reserve budget before the LLM call.  A no-change or
                         # invalid result still consumed a mutation attempt and
