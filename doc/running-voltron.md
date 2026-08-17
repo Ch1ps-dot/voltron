@@ -63,6 +63,7 @@ paths include:
 | `generator_iteration_metrics.csv` | Response checkpoints around generator changes. |
 | `request_response_pairs/` | Unique captured request/response pairs. |
 | `replayable_testcases/` | Saved conversations usable by `replayer.py`. |
+| `diagnostics/events/replayable_seed_manifest.jsonl` | One byte-free provenance record for every saved replayable conversation, including phase, iteration, source, retention reason, and component versions. |
 
 `run_status.json` describes the terminal result; a live process, archive, or
 partial artifact alone does not establish successful completion.

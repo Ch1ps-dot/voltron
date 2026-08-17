@@ -624,7 +624,11 @@ class Berserker:
             with analyzer.lock:
                 analyzer.useful_cons += 1
             logger.debug('Berserker: interesting conversation')
-            self.exe.save_cons(cons)
+            self.exe.save_cons(
+                cons,
+                source='berserker',
+                retention_reasons=novelty.retention_reasons,
+            )
         # seq = []
         # if len(cons.res_seq) > self.max_seq_len:
         #     for i in range(len(cons.res_seq)):

@@ -58,7 +58,11 @@ class MembershipOracle:
                     response_type_increment,
                 )
                 if novelty.interesting:
-                    self.executor.save_cons(cons)
+                    self.executor.save_cons(
+                        cons,
+                        source='membership_oracle',
+                        retention_reasons=novelty.retention_reasons,
+                    )
                 if self.trace_recorder is not None:
                     pair_grew = self.trace_recorder.observe(cons)
                     if self.threshold_tracker is not None:

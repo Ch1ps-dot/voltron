@@ -96,7 +96,7 @@ def test_real_observation_table_drains_before_threshold_partial_exit(
                 result.add_data(request, b'OK\r\n')
             return True, result
 
-        def save_cons(self, _conversation):
+        def save_cons(self, _conversation, **_kwargs):
             return True
 
     mapper = Mapper()
@@ -183,7 +183,7 @@ def test_berserker_partial_guidance_reaches_normal_executor_path(monkeypatch):
                 ]
             )
 
-        def save_cons(self, _conversation):
+        def save_cons(self, _conversation, **_kwargs):
             return True
 
     monkeypatch.setattr(analyzer, 'set_progress', lambda *_args, **_kwargs: None)

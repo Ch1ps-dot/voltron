@@ -2423,7 +2423,14 @@ class Executor:
                     and stderr == ''
                 ):
                     stdout, stderr = self._read_process_output(proc)
-                self.save_cons(cons, stdout, stderr, True)
+                self.save_cons(
+                    cons,
+                    stdout,
+                    stderr,
+                    True,
+                    source='crash',
+                    retention_reasons=('crash',),
+                )
                 self.generate_crash_report(
                     cons=cons,
                     proc=proc,
@@ -3880,10 +3887,12 @@ class Executor:
         cons: Conversation,
         stdout: str = '',
         stderr: str = '',
-        crash: bool = False
+        crash: bool = False,
+        *,
+        source: str = '',
+        retention_reasons: list[str] | tuple[str, ...] = (),
     ) -> bool:
-        """Use pickle to store section tree instance
-        """
+        """Store a replayable conversation and its phase/iteration provenance."""
         seed_digest = self._seed_digest(cons, crash)
         seed_lock = getattr(self, '_saved_seed_lock', None)
         if seed_lock is None:
@@ -3943,6 +3952,15 @@ class Executor:
             file_count = '0' + file_count        
         with open(target_folder / f"cons_{file_count}{pending}.pkl", "wb") as f:
             pickle.dump(cons, f)
+
+        self._record_replayable_seed_metadata(
+            filename=f'cons_{file_count}{pending}.pkl',
+            cons=cons,
+            seed_digest=seed_digest,
+            crash=crash,
+            source=source,
+            retention_reasons=retention_reasons,
+        )
             
         
         logger.debug(f'run: save cons_{file_count}')    
@@ -3953,6 +3971,59 @@ class Executor:
             f.write(f'stdout: {stdout}' + '\n')
             f.write(f'stderr: {stderr}' + '\n')
         return True
+
+    def _record_replayable_seed_metadata(
+        self,
+        *,
+        filename: str,
+        cons: Conversation,
+        seed_digest: str,
+        crash: bool,
+        source: str,
+        retention_reasons: list[str] | tuple[str, ...],
+    ) -> None:
+        """Append byte-free provenance for one successfully saved replay seed."""
+        with analyzer.lock:
+            phase = analyzer.active_phase or analyzer._phase_from_stage() or 'unknown'
+            snapshot_phase = getattr(analyzer, '_state_snapshot_phase', '')
+            phase_iteration = (
+                getattr(analyzer, '_state_snapshot_phase_iteration', None)
+                if snapshot_phase == phase else None
+            )
+            components = list(getattr(analyzer, '_state_snapshot_components', ()))
+
+        metadata = {
+            'schema_version': 1,
+            'sequence_file': f'replayable_testcases/{filename}',
+            'saved_at': time.time(),
+            'seed_sha256': seed_digest,
+            'crash': bool(crash),
+            'phase': phase,
+            'phase_iteration': phase_iteration,
+            'source': source or ('crash' if crash else 'unknown'),
+            'retention_reasons': list(retention_reasons),
+            'request_types': list(cons.req_seq),
+            'response_types': list(cons.res_seq),
+            'request_count': len(cons.req_seq),
+            'response_count': len(cons.res_seq),
+            'unique_response_types': len(set(cons.res_seq)),
+            'unique_response_transitions': len(
+                set(zip(cons.res_seq, cons.res_seq[1:]))
+            ),
+            'component_versions': components,
+        }
+        manifest = diagnostics_path(
+            configs.results_path,
+            'events',
+            'replayable_seed_manifest.jsonl',
+        )
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest_lock = getattr(self, '_replayable_seed_manifest_lock', None)
+        if manifest_lock is None:
+            manifest_lock = threading.Lock()
+            self._replayable_seed_manifest_lock = manifest_lock
+        with manifest_lock, manifest.open('a', encoding='utf-8') as stream:
+            stream.write(json.dumps(metadata, ensure_ascii=False) + '\n')
 
     @staticmethod
     def _seed_digest(cons: Conversation, crash: bool) -> str:

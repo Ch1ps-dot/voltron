@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from voltron.configs import configs
@@ -97,7 +98,7 @@ def test_model_learning_retains_only_interesting_conversations_as_seeds(monkeypa
                 self.discovered_response_type = True
             return True, conversation
 
-        def save_cons(self, saved_conversation):
+        def save_cons(self, saved_conversation, **_kwargs):
             self.saved.append(saved_conversation)
             return True
 
@@ -127,7 +128,7 @@ def test_equivalence_queries_also_retain_valid_model_learning_seeds(monkeypatch)
             response_type_count[0] += 1
             return True, conversation
 
-        def save_cons(self, saved_conversation):
+        def save_cons(self, saved_conversation, **_kwargs):
             self.saved.append(saved_conversation)
             return True
 
@@ -160,7 +161,7 @@ def test_membership_and_equivalence_share_model_learning_novelty_state(monkeypat
                 self.discovered_response_type = True
             return True, conversation
 
-        def save_cons(self, saved_conversation):
+        def save_cons(self, saved_conversation, **_kwargs):
             self.saved.append(saved_conversation)
             return True
 
@@ -179,14 +180,42 @@ def test_replayable_seed_deduplication_spans_model_learning_and_fuzzing(
     monkeypatch,
 ):
     monkeypatch.setattr(configs, 'results_path', tmp_path, raising=False)
+    monkeypatch.setattr(analyzer, 'active_phase', 'model_learning', raising=False)
+    monkeypatch.setattr(
+        analyzer, '_state_snapshot_phase', 'model_learning', raising=False,
+    )
+    monkeypatch.setattr(
+        analyzer, '_state_snapshot_phase_iteration', 7, raising=False,
+    )
+    monkeypatch.setattr(
+        analyzer, '_state_snapshot_components', (), raising=False,
+    )
     executor = Executor.__new__(Executor)
     learning_seed = make_conversation()
     duplicate_fuzzing_seed = make_conversation()
     distinct_fuzzing_seed = make_conversation(b'PING second\r\n')
 
-    assert executor.save_cons(learning_seed) is True
+    assert executor.save_cons(
+        learning_seed,
+        source='membership_oracle',
+        retention_reasons=('new_response_type',),
+    ) is True
     assert executor.save_cons(duplicate_fuzzing_seed) is False
     assert executor.save_cons(distinct_fuzzing_seed) is True
 
     replayable = sorted((tmp_path / 'replayable_testcases').glob('cons_*.pkl'))
     assert len(replayable) == 2
+    manifest = (
+        tmp_path / 'diagnostics' / 'events' / 'replayable_seed_manifest.jsonl'
+    )
+    records = [json.loads(line) for line in manifest.read_text().splitlines()]
+    assert [record['sequence_file'] for record in records] == [
+        'replayable_testcases/cons_000000.pkl',
+        'replayable_testcases/cons_000001.pkl',
+    ]
+    assert all(record['phase'] == 'model_learning' for record in records)
+    assert all(record['phase_iteration'] == 7 for record in records)
+    assert all(record['seed_sha256'] for record in records)
+    assert all('request_types' in record for record in records)
+    assert records[0]['source'] == 'membership_oracle'
+    assert records[0]['retention_reasons'] == ['new_response_type']

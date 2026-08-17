@@ -41,7 +41,11 @@ class EquOracle:
                 response_type_increment,
             )
             if novelty.interesting:
-                self.executor.save_cons(cons)
+                self.executor.save_cons(
+                    cons,
+                    source='equivalence_oracle',
+                    retention_reasons=novelty.retention_reasons,
+                )
             return cons.content
 
     def compare_mealy(

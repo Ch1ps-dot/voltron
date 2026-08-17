@@ -14,6 +14,24 @@ class SeedNovelty:
     new_request_response_pairs: list[tuple[str, str, bytes, bytes]]
     new_responses: list[tuple[int, str]]
     request_response_relations: list[tuple[str, str]]
+    transition_increment: int
+    response_type_increment: int
+    sequence_length_increment: int
+    unique_transition_increment: int
+
+    @property
+    def retention_reasons(self) -> list[str]:
+        """Return stable, human-readable reasons for retaining a seed."""
+        reasons: list[str] = []
+        if self.transition_increment > 0:
+            reasons.append('new_response_transition')
+        if self.response_type_increment > 0:
+            reasons.append('new_response_type')
+        if self.sequence_length_increment > 0:
+            reasons.append('longer_response_sequence')
+        if self.unique_transition_increment > 0:
+            reasons.append('more_distinct_response_transitions')
+        return reasons
 
 
 class SeedRetentionPolicy:
@@ -128,4 +146,8 @@ class SeedRetentionPolicy:
             new_request_response_pairs=new_pairs,
             new_responses=new_responses,
             request_response_relations=relations,
+            transition_increment=transition_increment,
+            response_type_increment=response_type_increment,
+            sequence_length_increment=sequence_length_increment,
+            unique_transition_increment=unique_transition_increment,
         )
