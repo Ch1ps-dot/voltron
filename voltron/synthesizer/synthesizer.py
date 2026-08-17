@@ -230,7 +230,10 @@ class AsyncProducer:
         # A no-spec run is a fresh LLM-only ablation.  Never load historical
         # equipment, including an earlier LLM-only run, because it makes the
         # requested comparison depend on cache state.
-        if not getattr(configs, 'spec_knowledge', True):
+        if (
+            not getattr(configs, 'spec_knowledge', True)
+            and not getattr(configs, 'reuse_no_spec_bundle', False)
+        ):
             self.generator_gen()
             self.parser_gen()
         # load existed generator info or generate init generators
@@ -248,7 +251,11 @@ class AsyncProducer:
             self.generator_gen()
         
         # load existed parser info or generate init parser
-        if getattr(configs, 'spec_knowledge', True) and self.parser_info_path.is_file():
+        if (
+            (getattr(configs, 'spec_knowledge', True)
+             or getattr(configs, 'reuse_no_spec_bundle', False))
+            and self.parser_info_path.is_file()
+        ):
             try:
                 with open(self.parser_info_path, 'r', encoding='utf-8') as f:
                     parser_info = json.load(f)

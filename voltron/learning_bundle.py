@@ -71,7 +71,8 @@ def _copy_tree_if_exists(source: Path, destination: Path) -> None:
 
 
 def export_learning_bundle(*, base_path: Path, results_path: Path, target: str,
-                           protocol: str, output_path: Path) -> Path:
+                           protocol: str, output_path: Path,
+                           knowledge_mode: str = 'spec') -> Path:
     """Export reusable model/equipment plus learning-only metrics to a tarball."""
     base_path = base_path.resolve()
     output_path = output_path.resolve()
@@ -96,6 +97,7 @@ def export_learning_bundle(*, base_path: Path, results_path: Path, target: str,
             "format": BUNDLE_FORMAT,
             "target": target,
             "protocol": protocol,
+            "knowledge_mode": knowledge_mode,
             "created_at": time.time(),
             "python": f"{sys.version_info.major}.{sys.version_info.minor}",
             "files": files,

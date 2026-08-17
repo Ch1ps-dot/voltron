@@ -10,6 +10,7 @@ from voltron.config_loader import load_runtime_config
 from voltron.learning_bundle import import_learning_bundle as stage_learning_bundle, LearningBundleError
 from pathlib import Path
 import json
+import os
 import click
 
 @click.command(help='fuzzer')
@@ -147,6 +148,14 @@ def main(
     batch_id: str | None,
     model_batch: str | None,
 ):
+    reuse_no_spec_bundle = os.environ.get(
+        'VOLTRON_REUSE_NO_SPEC_BUNDLE', '0'
+    ) == '1'
+    if reuse_no_spec_bundle and (spec_knowledge or model_batch is None):
+        raise click.UsageError(
+            'VOLTRON_REUSE_NO_SPEC_BUNDLE=1 requires '
+            '--no-spec-knowledge and --model-batch.'
+        )
     if rfc_parser and generate_ir:
         raise click.UsageError(
             "--rfc-parser and --generate-ir cannot be used together."
@@ -221,6 +230,7 @@ def main(
         aflnet_seed_loading=load_aflnet_seeds,
         learning_only=learn_and_export,
         model_batch=model_batch,
+        reuse_no_spec_bundle=reuse_no_spec_bundle,
     )
     exit_code = fuzzer.fuzz(
         algo=algorithm,

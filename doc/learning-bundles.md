@@ -18,6 +18,10 @@ every bundled file. A complete bundle contains `evolved_hypothesis.pkl`; a
 partial bundle contains validated `partial_guidance.pkl` and is not a
 converged model.
 
+No-spec exports carry `knowledge_mode: "no_spec"` and the LLM-only bootstrap
+catalog. Reusing one must be reported as **No-spec (cached LLM-only bundle)**,
+not as strict No-spec.
+
 ## Verify and activate an import
 
 ```bash

@@ -29,6 +29,7 @@ class Config:
         self.state_learning: bool = True
         self.guided_scheduling: bool = True
         self.offline_mutator_only: bool = False
+        self.reuse_no_spec_bundle: bool = False
         self.compliance_analysis: bool = False
         self.observer_enabled: bool = True
         self.ir_evolution_enabled: bool = True

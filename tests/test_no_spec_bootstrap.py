@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from voltron.configs import configs
+from voltron.rfcparser.rfc_parser import AsyncRFCParser
 from voltron.synthesizer.synthesizer import AsyncProducer, Generator, Parser
 
 
@@ -49,3 +50,27 @@ def test_no_spec_run_generates_fresh_components_without_loading_cache(
     assert calls == ["generator", "parser"]
     assert set(producer.generators) == {"NEW"}
     assert producer.mutators == {}
+
+
+def test_no_spec_bootstrap_catalog_round_trips_without_an_llm(tmp_path: Path):
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.req_fields = ['command']
+    parser.res_fields = ['status']
+    parser.req_type_rules = {
+        'types': [{'type_name': 'PING', 'field_values': {'command': 'PING'}}],
+    }
+    parser.res_type_rules = {
+        'types': [{'type_name': 'OK', 'field_values': {'status': '200'}}],
+    }
+    parser.req_json = [{'field_name': 'command'}]
+    parser.res_json = [{'field_name': 'status'}]
+
+    metadata = tmp_path / 'no_spec_bootstrap.json'
+    parser.save_no_spec_bootstrap(metadata)
+
+    restored = AsyncRFCParser.__new__(AsyncRFCParser)
+    restored.load_no_spec_bootstrap(metadata)
+
+    assert restored.req_types == {'PING'}
+    assert restored.res_types == {'OK'}
+    assert restored.req_ir.findall('message')[0].get('name') == 'PING'

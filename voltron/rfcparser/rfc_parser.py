@@ -252,22 +252,90 @@ class AsyncRFCParser:
         self.req_ir = etree.ElementTree(root)
         self.res_ir = None
 
+    def save_no_spec_bootstrap(self, path: Path) -> None:
+        """Persist the LLM-only catalog needed for a byte-identical reuse."""
+        payload = {
+            'format': 1,
+            'req_fields': self.req_fields,
+            'res_fields': self.res_fields,
+            'req_type_rules': self.req_type_rules,
+            'res_type_rules': self.res_type_rules,
+            'req_json': self.req_json,
+            'res_json': self.res_json,
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+
+    def load_no_spec_bootstrap(self, path: Path) -> None:
+        """Restore a trusted no-spec catalog without an LLM bootstrap call."""
+        if not path.is_file():
+            raise FileNotFoundError(f'no-spec bundle lacks bootstrap metadata: {path}')
+        payload = json.loads(path.read_text(encoding='utf-8'))
+        if payload.get('format') != 1:
+            raise RuntimeError('unsupported no-spec bootstrap metadata')
+        self.req_fields = list(payload['req_fields'])
+        self.res_fields = list(payload['res_fields'])
+        self.req_type_rules = dict(payload['req_type_rules'])
+        self.res_type_rules = dict(payload['res_type_rules'])
+        self.req_json = list(payload['req_json'])
+        self.res_json = list(payload['res_json'])
+        self.req_types = self._types_from_rules(self.req_type_rules)
+        self.res_types = self._types_from_rules(self.res_type_rules)
+        self.req_dep_map = {}
+        self.poss_res = {}
+        root = etree.Element('ir')
+        field_name = self.req_fields[0]
+        for rule in self.req_type_rules['types']:
+            message = etree.SubElement(
+                root, 'message', name=rule['type_name'], direction='request',
+            )
+            etree.SubElement(
+                message, 'field', name=field_name, type='constant',
+                length='undefined', value=rule['field_values'][field_name],
+            )
+        self.req_ir = etree.ElementTree(root)
+        self.res_ir = None
+
     def ensure_rfc_documents(
         self,
     ) -> None:
-        """Download configured RFC documents when the helper is available."""
-        dl_script = configs.base_path / 'skills' / 'utils' / 'rfc_download.sh'
-        if dl_script.is_file():
-            rfc_args: list[str] = []
-            rfc_list = self.rfc_name if isinstance(self.rfc_name, list) else [self.rfc_name]
-            for rfc in rfc_list:
-                raw = str(rfc).strip()
-                if not raw:
-                    continue
-                raw_lower = raw.lower()
-                rfc_args.append(raw_lower if raw_lower.startswith('rfc') else f'rfc{raw_lower}')
+        """Download numeric RFCs and validate local protocol documents.
 
-            if len(rfc_args) > 0:
+        A target can combine IETF RFCs with a project-provided specification
+        such as ``daap.txt``.  The download helper only understands numeric
+        RFC identifiers, so custom document names must never be rewritten as
+        a fictitious ``rfc<name>`` identifier.
+        """
+        dl_script = configs.base_path / 'skills' / 'utils' / 'rfc_download.sh'
+        rfc_args: list[str] = []
+        rfc_list = (
+            self.rfc_name
+            if isinstance(self.rfc_name, list)
+            else [self.rfc_name]
+        )
+        for index, rfc in enumerate(rfc_list):
+            raw = str(rfc).strip()
+            if not raw:
+                continue
+            numeric = re.fullmatch(r'(?:rfc)?([0-9]+)', raw, re.IGNORECASE)
+            if numeric is not None:
+                rfc_args.append(f'rfc{numeric.group(1)}')
+                continue
+
+            document_path = (
+                self.doc_paths[index]
+                if index < len(self.doc_paths)
+                else configs.base_path / 'config' / 'rfcs' / f'{raw}.txt'
+            )
+            if not document_path.is_file():
+                raise FileNotFoundError(
+                    'RFCParser: local protocol document is missing for '
+                    f'{raw!r}: {document_path}. Add this project-provided '
+                    'document instead of using the numeric RFC downloader.'
+                )
+
+        if rfc_args:
+            if dl_script.is_file():
                 try:
                     subprocess.run(
                         ['bash', str(dl_script), *rfc_args],

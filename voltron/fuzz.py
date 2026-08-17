@@ -119,6 +119,7 @@ class Fuzzer:
             aflnet_seed_loading: bool = True,
             learning_only: bool = False,
             model_batch: str | None = None,
+            reuse_no_spec_bundle: bool = False,
         ) -> None:
         self.target_name = target_name
         self.cmdline = cmdline
@@ -133,6 +134,7 @@ class Fuzzer:
         self.aflnet_seed_loading = aflnet_seed_loading
         self.learning_only = bool(learning_only)
         self.model_batch = model_batch
+        self.reuse_no_spec_bundle = bool(reuse_no_spec_bundle)
         self._cleanup_lock = threading.RLock()
         self._cleanup_done = False
         self._previous_sigint_handler = None
@@ -386,6 +388,9 @@ class Fuzzer:
         configs.offline_mutator_only = getattr(
             self, 'offline_mutator_only', False,
         )
+        configs.reuse_no_spec_bundle = getattr(
+            self, 'reuse_no_spec_bundle', False,
+        )
         configs.compliance_analysis = self.compliance_analysis
         configs.observer_enabled = self.observer_enabled
         configs.aflnet_seed_loading_enabled = getattr(
@@ -522,7 +527,22 @@ class Fuzzer:
             self.rfcparser = AsyncRFCParser(
                 chater=self.chater
             )
-            self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
+            if self.reuse_no_spec_bundle:
+                manifest = configs.models_path / 'manifest.json'
+                if not manifest.is_file():
+                    raise RuntimeError('no-spec bundle lacks manifest.json')
+                metadata = json.loads(manifest.read_text(encoding='utf-8'))
+                if metadata.get('knowledge_mode') != 'no_spec':
+                    raise RuntimeError('selected bundle is not a no-spec bundle')
+                self.rfcparser.load_no_spec_bootstrap(
+                    configs.models_path / 'no_spec_bootstrap.json'
+                )
+            else:
+                self.rfcparser.run(use_spec_knowledge=self.spec_knowledge)
+                if not self.spec_knowledge:
+                    self.rfcparser.save_no_spec_bootstrap(
+                        configs.models_path / 'no_spec_bootstrap.json'
+                    )
             print('RFCParser: setup')
 
             # handler init
@@ -701,6 +721,9 @@ class Fuzzer:
             'exit_code': exit_code,
             'target': getattr(self, 'target_name', ''),
             'algorithm': getattr(analyzer, 'strategy', ''),
+            'no_spec_bundle_reused': bool(
+                getattr(self, 'reuse_no_spec_bundle', False)
+            ),
             'phases': {
                 name: metric.get('status')
                 for name, metric in phase_metrics.items()
@@ -984,6 +1007,9 @@ class Fuzzer:
                         target=self.target_name,
                         protocol=configs.pro_name,
                         output_path=configs.results_path / 'learning_bundle.tar.gz',
+                        knowledge_mode=(
+                            'no_spec' if not self.spec_knowledge else 'spec'
+                        ),
                     )
                     logger.info('Fuzzer: exported learning bundle to %s', bundle)
                     self._request_stop('learning_export_complete')
