@@ -1088,6 +1088,20 @@ class AsyncChater:
         )
         return pmp, self.json_extract(ans, schema='response_type_rules')
 
+    async def llm_no_spec_type_bootstrap(
+            self,
+            pro_name: str,
+            transport: str,
+    ) -> dict:
+        """Produce a minimal type catalog without specification context."""
+        tmp = self.pmp._tem_no_spec_bootstrap
+        prompt = tmp.substitute(pro_name=pro_name, transport=transport)
+        answer = await self.chat_llm(prompt=prompt, usage='no_spec_bootstrap')
+        payload = json.loads(self.json_extract(answer))
+        if not isinstance(payload, dict):
+            raise ValueError('no-spec bootstrap must return a JSON object')
+        return payload
+
     async def llm_section_type_annotation(
             self,
             rfc_num: str,

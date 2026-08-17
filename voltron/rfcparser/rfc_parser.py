@@ -151,8 +151,8 @@ class AsyncRFCParser:
         use_spec_knowledge: bool = True,
     ):
         if not use_spec_knowledge:
-            self.load_seed_metadata()
-            logger.debug('RFCParser: specification knowledge disabled')
+            self.bootstrap_without_specification()
+            logger.debug('RFCParser: LLM-only type bootstrap completed')
             return
 
         section_trees = self.parse_section_trees()
@@ -166,6 +166,91 @@ class AsyncRFCParser:
 
         # ir generation
         self.ir_generation()
+
+    def bootstrap_without_specification(self) -> None:
+        """Build minimal type metadata from model priors, never cached equipment.
+
+        This is intentionally a separate path from RFC parsing.  In
+        particular, it must not read previous generators, parsers, IR, or
+        SectionTrees, otherwise the no-specification ablation leaks knowledge
+        from a full run.
+        """
+        payload = asyncio.run(self.chater.llm_no_spec_type_bootstrap(
+            pro_name=self.pro_name,
+            transport=str(getattr(configs, 'trans_layer', 'tcp')),
+        ))
+        request = payload.get('request') if isinstance(payload, dict) else None
+        response = payload.get('response') if isinstance(payload, dict) else None
+        if not isinstance(request, dict) or not isinstance(response, dict):
+            raise RuntimeError('no_spec_bootstrap_failure: missing request/response catalog')
+
+        def normalize(direction: str, catalog: dict) -> tuple[str, list[dict]]:
+            field_name = str(catalog.get('field_name') or f'{direction} type').strip()
+            raw_types = catalog.get('types')
+            if not field_name or not isinstance(raw_types, list):
+                raise RuntimeError(
+                    f'no_spec_bootstrap_failure: invalid {direction} catalog'
+                )
+            types: list[dict] = []
+            for item in raw_types:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get('type_name') or '').strip()
+                value = str(item.get('wire_value') or '').strip()
+                if name and value:
+                    types.append({
+                        'type_name': name,
+                        'field_values': {field_name: value},
+                        'explanation': str(item.get('explanation') or ''),
+                    })
+            if not types:
+                raise RuntimeError(
+                    f'no_spec_bootstrap_failure: empty {direction} catalog'
+                )
+            return field_name, types
+
+        req_field, req_rules = normalize('request', request)
+        res_field, res_rules = normalize('response', response)
+        self.req_fields = [req_field]
+        self.res_fields = [res_field]
+        self.req_type_rules = {
+            'message_direction': 'request',
+            'primary_fields': [req_field],
+            'types': req_rules,
+        }
+        self.res_type_rules = {
+            'message_direction': 'response',
+            'primary_fields': [res_field],
+            'types': res_rules,
+        }
+        self.req_json = [{
+            'field_name': req_field,
+            'position': 'protocol-defined request discriminator',
+            'explanation': 'LLM-only bootstrap; no RFC or IR context used.',
+            'value': [rule['field_values'][req_field] for rule in req_rules],
+        }]
+        self.res_json = [{
+            'field_name': res_field,
+            'position': str(response.get('wire_hint') or 'response discriminator'),
+            'explanation': 'LLM-only bootstrap; no RFC or IR context used.',
+            'value': [rule['field_values'][res_field] for rule in res_rules],
+        }]
+        self.req_types = self._types_from_rules(self.req_type_rules)
+        self.res_types = self._types_from_rules(self.res_type_rules)
+        self.req_dep_map = {}
+        self.poss_res = {}
+
+        root = etree.Element('ir')
+        for rule in req_rules:
+            message = etree.SubElement(
+                root, 'message', name=rule['type_name'], direction='request',
+            )
+            etree.SubElement(
+                message, 'field', name=req_field, type='constant',
+                length='undefined', value=rule['field_values'][req_field],
+            )
+        self.req_ir = etree.ElementTree(root)
+        self.res_ir = None
 
     def ensure_rfc_documents(
         self,
@@ -226,48 +311,6 @@ class AsyncRFCParser:
             results.append((name, source))
         return results
 
-    def load_seed_metadata(
-        self
-    ) -> None:
-        """Load only the symbol metadata needed to replay cached seed equipment."""
-        equipment_path = (
-            configs.base_path / 'component' / 'equipment' / configs.target_name
-        )
-        generator_info_path = (
-            equipment_path / 'generators' / 'generator_info.json'
-        )
-        parser_info_path = equipment_path / 'parsers' / 'parser_info.json'
-
-        if not generator_info_path.is_file() or not parser_info_path.is_file():
-            raise RuntimeError(
-                'Specification knowledge is disabled, but cached seed '
-                f'equipment is missing under {equipment_path}'
-            )
-
-        with open(generator_info_path, 'r', encoding='utf-8') as f:
-            generator_info = json.load(f)
-        with open(parser_info_path, 'r', encoding='utf-8') as f:
-            parser_info = json.load(f)
-
-        self.req_types = {
-            str(msg_type)
-            for msg_type, generators in generator_info.items()
-            if generators
-        }
-        if not self.req_types or not parser_info:
-            raise RuntimeError(
-                'Specification knowledge is disabled, but cached seed '
-                f'equipment is empty under {equipment_path}'
-            )
-        self.req_fields = ['MessageType']
-        self.res_json = []
-        self.req_type_rules = {}
-        self.res_type_rules = {}
-        self.res_types = set()
-        self.res_fields = []
-        self.req_dep_map = {}
-        self.poss_res = {}
-        
     def spe_parse(
         self,
         idx: int

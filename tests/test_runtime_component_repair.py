@@ -128,7 +128,7 @@ def test_malformed_smtp_response_skips_parser_repair(monkeypatch):
     executor._parser_code = "def packet_parser(_response): return b''\n"
     executor._parser_version = "id0"
     executor._last_known_good_parser = None
-    monkeypatch.setattr(configs, "pro_name", "smtp")
+    monkeypatch.setattr(configs, "pro_name", "smtp", raising=False)
 
     frames = executor._parse_response_frames(
         b"not an smtp reply\r\n", "EHLO", False,
@@ -159,7 +159,7 @@ def test_unknown_smtp_code_still_repairs_parser(monkeypatch):
     executor._last_known_good_parser = None
     executor.parser_degraded = False
     executor.parser_fallback_count = 0
-    monkeypatch.setattr(configs, "pro_name", "smtp")
+    monkeypatch.setattr(configs, "pro_name", "smtp", raising=False)
 
     assert executor._parse_tcp_response(b"477 New extension reply\r\n", "-", False) == "PARSE_FAILURE"
     assert len(repairs) == 1
@@ -183,7 +183,7 @@ def test_parser_contract_error_still_repairs_for_malformed_input(monkeypatch):
     executor._last_known_good_parser = None
     executor.parser_degraded = False
     executor.parser_fallback_count = 0
-    monkeypatch.setattr(configs, "pro_name", "smtp")
+    monkeypatch.setattr(configs, "pro_name", "smtp", raising=False)
 
     assert executor._parse_tcp_response(b"not an smtp reply\r\n", "-", False) == "PARSE_FAILURE"
     assert len(repairs) == 1

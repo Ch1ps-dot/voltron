@@ -2,6 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
+from voltron.configs import configs
 from voltron.rfcparser.rfc_parser import AsyncRFCParser
 
 
@@ -179,3 +180,39 @@ def test_smtp_response_catalog_replaces_incomplete_cached_rules(tmp_path):
     assert parser.res_json[1]["value"] == ["5.7.0"]
     assert parser.res_type_rules["primary_fields"] == ["SMTP reply code"]
     assert [item["type_name"] for item in parser.res_type_rules["types"]] == codes
+
+
+def test_no_spec_bootstrap_uses_llm_catalog_without_cached_equipment(monkeypatch):
+    class BootstrapChater:
+        async def llm_no_spec_type_bootstrap(self, **_kwargs):
+            return {
+                "request": {
+                    "field_name": "command",
+                    "types": [
+                        {"type_name": "PING", "wire_value": "PING"},
+                        {"type_name": "QUIT", "wire_value": "QUIT"},
+                    ],
+                },
+                "response": {
+                    "field_name": "status",
+                    "wire_hint": "first token",
+                    "types": [
+                        {"type_name": "OK", "wire_value": "200"},
+                    ],
+                },
+            }
+
+    parser = AsyncRFCParser.__new__(AsyncRFCParser)
+    parser.chater = BootstrapChater()
+    parser.pro_name = "demo"
+    monkeypatch.setattr(configs, "trans_layer", "tcp", raising=False)
+
+    parser.bootstrap_without_specification()
+
+    assert parser.req_types == {"PING", "QUIT"}
+    assert parser.res_types == {"OK"}
+    assert parser.req_dep_map == {}
+    assert parser.poss_res == {}
+    assert [message.get("name") for message in parser.req_ir.findall("message")] == [
+        "PING", "QUIT",
+    ]

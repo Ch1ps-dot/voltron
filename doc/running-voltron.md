@@ -14,7 +14,9 @@ custom result directory.
 
 Important feature switches are:
 
-- `--spec-knowledge` / `--no-spec-knowledge`: use or ablate RFC/IR knowledge.
+- `--spec-knowledge` / `--no-spec-knowledge`: use RFC/IR knowledge, or run
+  the LLM-only type-bootstrap ablation.  The latter does not read RFC/IR or
+  cached equipment.
 - `--state-learning` / `--no-state-learning`: enable or skip active learning.
 - `--guided-scheduling` / `--no-guided-scheduling`: enable or ablate
   state/dependency-guided scheduling.
@@ -24,8 +26,10 @@ Important feature switches are:
 - `--load-aflnet-seeds` / `--no-load-aflnet-seeds`: control loading converted
   AFLNet seeds after model learning.
 
-For a fixed-seed `--no-spec-knowledge` baseline, first run the full workflow
-so cached generators and a parser exist under `component/equipment/<target>/`.
+`--no-spec-knowledge` builds a fresh, minimal request/response catalog from
+the protocol name and transport only, then synthesizes its own generator and
+parser under `component/equipment/<target>/llm-type-only/`.  It deliberately
+does not fall back to an earlier full-run cache.
 
 ## Specification-only modes
 

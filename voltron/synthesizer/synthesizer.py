@@ -76,7 +76,11 @@ class AsyncProducer:
         self.synthesizer_path = (
             self.equipment_path
             if getattr(configs, 'model_batch', None) is not None
-            else self.equipment_path / configs.target_name
+            else (
+                self.equipment_path / configs.target_name / 'llm-type-only'
+                if not getattr(configs, 'spec_knowledge', True)
+                else self.equipment_path / configs.target_name
+            )
         )
         self.generator_path = self.synthesizer_path / 'generators'
         self.mutator_path = self.synthesizer_path / 'mutators'
@@ -223,8 +227,14 @@ class AsyncProducer:
     ):
         """Load or generate initial generators, parser, checker, and mutators.
         """
+        # A no-spec run is a fresh LLM-only ablation.  Never load historical
+        # equipment, including an earlier LLM-only run, because it makes the
+        # requested comparison depend on cache state.
+        if not getattr(configs, 'spec_knowledge', True):
+            self.generator_gen()
+            self.parser_gen()
         # load existed generator info or generate init generators
-        if(self.generator_info_path.is_file()):
+        elif(self.generator_info_path.is_file()):
             try:
                 with open(self.generator_info_path, 'r', encoding='utf-8') as f:
                     generator_info = json.load(f)
@@ -235,15 +245,10 @@ class AsyncProducer:
                 logger.debug(f'Producer: generator load error {e}')
                 exit(1)
         else:
-            if not configs.spec_knowledge:
-                raise RuntimeError(
-                    'Specification knowledge is disabled, but no cached '
-                    f'generators exist at {self.generator_info_path}'
-                )
             self.generator_gen()
         
         # load existed parser info or generate init parser
-        if (self.parser_info_path.is_file()):
+        if getattr(configs, 'spec_knowledge', True) and self.parser_info_path.is_file():
             try:
                 with open(self.parser_info_path, 'r', encoding='utf-8') as f:
                     parser_info = json.load(f)
@@ -264,12 +269,7 @@ class AsyncProducer:
                     self.parser_gen()
             except Exception as e:
                 logger.debug(f'Producer: parser load error {e}')
-        else:
-            if not configs.spec_knowledge:
-                raise RuntimeError(
-                    'Specification knowledge is disabled, but no cached '
-                    f'parser exists at {self.parser_info_path}'
-                )
+        elif getattr(configs, 'spec_knowledge', True):
             self.parser_gen()
 
         if configs.fuzz_mode != 'replay':
@@ -288,7 +288,8 @@ class AsyncProducer:
             except Exception as e:
                 logger.debug(f'Mutator: load error {e}')
 
-        self.load_best_equipment()
+        if getattr(configs, 'spec_knowledge', True):
+            self.load_best_equipment()
 
         if not configs.spec_knowledge:
             self.generators = {

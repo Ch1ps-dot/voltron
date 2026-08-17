@@ -51,6 +51,12 @@ class Prompter:
             with self._path_res_type_rules.open('r+') as f:
                 self._tem_res_type_rules = Template(f.read())
 
+            self._path_no_spec_bootstrap = (
+                dir / "builder" / "no_spec_type_bootstrap.md"
+            )
+            with self._path_no_spec_bootstrap.open('r+') as f:
+                self._tem_no_spec_bootstrap = Template(f.read())
+
             self._path_section_type_annotation = (
                 dir / "builder" / "section_type_annotation.md"
             )

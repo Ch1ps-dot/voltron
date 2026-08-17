@@ -42,7 +42,10 @@ import click
     "--spec-knowledge/--no-spec-knowledge",
     default=True,
     show_default=True,
-    help="Enable RFC/IR knowledge. Disabled mode requires cached seed generators and parser.",
+    help=(
+        "Enable RFC/IR knowledge. Disabled mode uses a fresh LLM-only "
+        "type bootstrap and never reads cached equipment."
+    ),
 )
 @click.option(
     "--state-learning/--no-state-learning",
