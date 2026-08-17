@@ -18,6 +18,7 @@ from voltron.analyzer.analyzer import analyzer
 from voltron.executor.conversation import Conversation
 from voltron.executor.pair_recorder import RequestResponsePairRecorder
 from voltron.executor.response_framing import split_response_frames
+from voltron.executor.response_plausibility import classify_response_plausibility
 from voltron.executor.sut_monitor import (
     CRASHED,
     EXITED,
@@ -183,6 +184,7 @@ class Executor:
         self._last_known_good_parser: tuple[Callable, str, str] | None = None
         self.parser_degraded = False
         self.parser_fallback_count = 0
+        self._parser_ignored_inputs: set[tuple[str, str]] = set()
         self.load_parser(self.mapper.cur_parser)
         self.checker_funcs: dict[str, Callable[[bytes], bool]] = {}
         self.checker_sources: dict[str, str] = {}
@@ -1473,6 +1475,10 @@ class Executor:
                         if key != 'data'
                     } for frame in response_frames]
                     if resp_code == PARSER_FAILURE_RESPONSE.decode():
+                        ignored_invalid = bool(response_frames) and all(
+                            frame.get('parse_status') == 'ignored_invalid'
+                            for frame in response_frames
+                        )
                         # Retain the raw receive batch and frame metadata for
                         # offline repair, but never turn a parser failure into
                         # a learned response type or transition.
@@ -1482,7 +1488,6 @@ class Executor:
                                 resp_data or bytes(),
                                 response_frames=frame_metadata,
                             )
-                        cons.add_state(msg_type, resp_code)
                         with self.analyzer.lock:
                             self.analyzer.recv_batches = getattr(
                                 self.analyzer, 'recv_batches', 0,
@@ -1492,12 +1497,19 @@ class Executor:
                             ) + len(response_frames)
                             if len(response_frames) > 1:
                                 self.analyzer.multi_frame_requests = getattr(
-                                    self.analyzer,
-                                    'multi_frame_requests', 0,
-                                ) + 1
-                            self.analyzer.parse_failures = getattr(
-                                self.analyzer, 'parse_failures', 0,
+                                self.analyzer,
+                                'multi_frame_requests', 0,
                             ) + 1
+                            if ignored_invalid:
+                                self.analyzer.ignored_invalid_responses = getattr(
+                                    self.analyzer,
+                                    'ignored_invalid_responses', 0,
+                                ) + 1
+                            else:
+                                cons.add_state(msg_type, resp_code)
+                                self.analyzer.parse_failures = getattr(
+                                    self.analyzer, 'parse_failures', 0,
+                                ) + 1
                         last_request_recorded = True
                         continue
 
@@ -2005,6 +2017,9 @@ class Executor:
                     frame.data, msg_type, show_fuzz_ui,
                 )
             )
+            parser_failure_status = getattr(
+                self, '_last_parser_failure_status', 'parse_failure'
+            )
             overlapping_datagrams = [
                 datagram for datagram in (datagrams or [])
                 if datagram['offset_end'] > frame.offset_start
@@ -2021,7 +2036,7 @@ class Executor:
                     'framing_incomplete'
                     if framing_incomplete
                     else (
-                        'parse_failure'
+                        parser_failure_status
                         if response_type == PARSER_FAILURE_RESPONSE.decode()
                         else 'parsed'
                     )
@@ -2047,6 +2062,7 @@ class Executor:
         response: bytes,
         show_fuzz_ui: bool,
     ) -> bytes:
+        self._last_parser_failure_status = 'parse_failure'
         try:
             parsed = self.parser_func(response)
             if not isinstance(parsed, bytes):
@@ -2065,12 +2081,41 @@ class Executor:
             )
             return parsed
         except Exception as exception:
+            unclassified_response = (
+                isinstance(exception, ValueError)
+                and str(exception)
+                == 'packet_parser returned empty bytes for the runtime response'
+            )
             error = (
                 f'{type(exception).__name__}: {exception}\n'
                 f'{traceback.format_exc()}'
             )
             failed_code = getattr(self, '_parser_code', '')
             failed_version = getattr(self, '_parser_version', 'unknown')
+
+        plausibility = classify_response_plausibility(
+            getattr(configs, 'pro_name', ''), response,
+        )
+        if (
+            unclassified_response
+            and plausibility.status == 'invalid'
+            and response
+        ):
+            self._last_parser_failure_status = 'ignored_invalid'
+            self._record_ignored_parser_input(
+                response=response,
+                version=failed_version,
+                error=error,
+                reason=plausibility.reason,
+            )
+            logger.debug(
+                'Executor: ignored implausible parser input '
+                '[version=%s input_sha256=%s reason=%s]',
+                failed_version,
+                hashlib.sha256(response).hexdigest(),
+                plausibility.reason,
+            )
+            return PARSER_FAILURE_RESPONSE
 
         if show_fuzz_ui:
             self._set_ui_operation('Repairing parser from runtime failure')

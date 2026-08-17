@@ -2,6 +2,7 @@ import socket
 
 from voltron.executor.executor import Executor
 from voltron.executor.response_framing import split_response_frames
+from voltron.executor.response_plausibility import classify_response_plausibility
 from voltron.configs import configs
 
 
@@ -33,6 +34,26 @@ def test_incomplete_frame_is_retained_without_byte_loss():
     assert frames[0].data == data
     assert frames[0].framing_status == 'framing_incomplete'
     assert frames[0].framing_error == 'declared_content_length_exceeds_receive_batch'
+
+
+def test_plausibility_accepts_unknown_smtp_code_without_ir_lookup():
+    result = classify_response_plausibility('smtp', b'477 New extension reply\r\n')
+
+    assert result.status == 'valid'
+    assert result.reason == 'status_line'
+
+
+def test_plausibility_rejects_malformed_smtp_reply():
+    result = classify_response_plausibility('smtp', b'not an smtp reply\r\n')
+
+    assert result.status == 'invalid'
+    assert result.reason == 'invalid_status_line'
+
+
+def test_plausibility_keeps_unknown_binary_protocol_conservative():
+    result = classify_response_plausibility('custom-binary', b'\xff\x00\x01')
+
+    assert result.status == 'unknown'
 
 
 def test_sip_staged_responses_are_distinct_frames():

@@ -107,6 +107,88 @@ def test_parser_runtime_failure_degrades_to_parse_failure_after_repair_exhaustio
     assert executor.parser_fallback_count == 1
 
 
+def test_malformed_smtp_response_skips_parser_repair(monkeypatch):
+    repairs = []
+    records = []
+
+    class FakeMapper:
+        cur_parser = SimpleNamespace(name="id0")
+
+        def repair_runtime_component(self, **kwargs):
+            repairs.append(kwargs)
+            return None
+
+        def _append_runtime_record(self, name, record):
+            records.append((name, record))
+
+    executor = Executor.__new__(Executor)
+    executor.mapper = FakeMapper()
+    executor._recv_batch_id = 0
+    executor.parser_func = lambda _response: b""
+    executor._parser_code = "def packet_parser(_response): return b''\n"
+    executor._parser_version = "id0"
+    executor._last_known_good_parser = None
+    monkeypatch.setattr(configs, "pro_name", "smtp")
+
+    frames = executor._parse_response_frames(
+        b"not an smtp reply\r\n", "EHLO", False,
+    )
+
+    assert repairs == []
+    assert frames[0]["response_type"] == "PARSE_FAILURE"
+    assert frames[0]["parse_status"] == "ignored_invalid"
+    assert records[0][0] == "component_parser_ignored_inputs.jsonl"
+    assert records[0][1]["reason"] == "invalid_status_line"
+
+
+def test_unknown_smtp_code_still_repairs_parser(monkeypatch):
+    repairs = []
+
+    class FakeMapper:
+        cur_parser = SimpleNamespace(name="id0")
+
+        def repair_runtime_component(self, **kwargs):
+            repairs.append(kwargs)
+            return None
+
+    executor = Executor.__new__(Executor)
+    executor.mapper = FakeMapper()
+    executor.parser_func = lambda _response: b""
+    executor._parser_code = "def packet_parser(_response): return b''\n"
+    executor._parser_version = "id0"
+    executor._last_known_good_parser = None
+    executor.parser_degraded = False
+    executor.parser_fallback_count = 0
+    monkeypatch.setattr(configs, "pro_name", "smtp")
+
+    assert executor._parse_tcp_response(b"477 New extension reply\r\n", "-", False) == "PARSE_FAILURE"
+    assert len(repairs) == 1
+
+
+def test_parser_contract_error_still_repairs_for_malformed_input(monkeypatch):
+    repairs = []
+
+    class FakeMapper:
+        cur_parser = SimpleNamespace(name="id0")
+
+        def repair_runtime_component(self, **kwargs):
+            repairs.append(kwargs)
+            return None
+
+    executor = Executor.__new__(Executor)
+    executor.mapper = FakeMapper()
+    executor.parser_func = lambda _response: "not-bytes"
+    executor._parser_code = "def packet_parser(_response): return 'not-bytes'\n"
+    executor._parser_version = "id0"
+    executor._last_known_good_parser = None
+    executor.parser_degraded = False
+    executor.parser_fallback_count = 0
+    monkeypatch.setattr(configs, "pro_name", "smtp")
+
+    assert executor._parse_tcp_response(b"not an smtp reply\r\n", "-", False) == "PARSE_FAILURE"
+    assert len(repairs) == 1
+
+
 def test_parser_validation_rejects_empty_explicit_runtime_sample():
     result = validate_generated_code(
         "def packet_parser(_response):\n    return b''\n",
