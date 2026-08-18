@@ -124,9 +124,9 @@ llm_compliance:
 # llm_fuzz async_sem remains an independent upper bound on concurrent calls.
 fuzzing:
   mutator_round_ratio: 0.25
-  # After 12 LLM mutation attempts, keep fuzzing with the latest validated
+  # After 6 LLM mutation attempts, keep fuzzing with the latest validated
   # mutators.  Set to 0 only for an explicitly unlimited experiment.
-  mutator_round_limit: 12
+  mutator_round_limit: 6
   # Audit every imported AFLNet replay stream once as its original ordered
   # sequence.  This run has no generated suffix and no offline mutation;
   # normal fuzzing still retains the sequence as interesting seed material.
