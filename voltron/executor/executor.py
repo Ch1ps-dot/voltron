@@ -2216,6 +2216,38 @@ class Executor:
             f'parser runtime repair exhausted: {error}'
         )
 
+    def _record_ignored_parser_input(
+            self,
+            *,
+            response: bytes,
+            version: str,
+            error: str,
+            reason: str,
+    ) -> None:
+        """Record malformed parser input without retaining raw bytes."""
+        key = (version, hashlib.sha256(response).hexdigest())
+        ignored = getattr(self, '_parser_ignored_inputs', set())
+        if key in ignored:
+            return
+        ignored.add(key)
+        self._parser_ignored_inputs = ignored
+        append_record = getattr(self.mapper, '_append_runtime_record', None)
+        if callable(append_record):
+            append_record(
+                'component_parser_ignored_inputs.jsonl',
+                {
+                    'timestamp': time.time(),
+                    'kind': 'ignored_invalid_response',
+                    'component': 'parser',
+                    'component_version': version,
+                    'protocol': getattr(configs, 'pro_name', ''),
+                    'input_sha256': key[1],
+                    'input_length': len(response),
+                    'reason': reason,
+                    'error_type': error.split(':', 1)[0],
+                },
+            )
+
     def _receive_initial_response(
         self,
         sock: socket.socket,
