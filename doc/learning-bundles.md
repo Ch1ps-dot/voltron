@@ -22,6 +22,18 @@ No-spec exports carry `knowledge_mode: "no_spec"` and the LLM-only bootstrap
 catalog. Reusing one must be reported as **No-spec (cached LLM-only bundle)**,
 not as strict No-spec.
 
+Every newly exported bundle uses the same component layout, including No-spec
+exports:
+
+```text
+equipment/<target>/generators/
+equipment/<target>/parsers/
+models/<target>/no_spec_bootstrap.json  # No-spec only
+```
+
+`llm-type-only/` is an internal runtime-cache directory and is never part of
+the bundle layout.
+
 ## Verify and activate an import
 
 ```bash

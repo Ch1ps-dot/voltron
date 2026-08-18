@@ -70,17 +70,84 @@ def _copy_tree_if_exists(source: Path, destination: Path) -> None:
             shutil.copy2(source, destination)
 
 
+def _validate_no_spec_bootstrap(path: Path) -> None:
+    """Check the catalog required to reuse a no-spec bundle without an LLM."""
+    if not path.is_file():
+        raise LearningBundleError("no-spec bundle lacks bootstrap metadata")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LearningBundleError("invalid no-spec bootstrap metadata") from exc
+    if payload.get("format") != 1:
+        raise LearningBundleError("unsupported no-spec bootstrap metadata")
+    for name, expected_type in (
+        ("req_fields", list),
+        ("res_fields", list),
+        ("req_type_rules", dict),
+        ("res_type_rules", dict),
+        ("req_json", list),
+        ("res_json", list),
+    ):
+        if not isinstance(payload.get(name), expected_type):
+            raise LearningBundleError(
+                f"invalid no-spec bootstrap metadata: {name}"
+            )
+    if not isinstance(payload["req_type_rules"].get("types"), list) or not isinstance(
+        payload["res_type_rules"].get("types"), list
+    ):
+        raise LearningBundleError("invalid no-spec bootstrap type rules")
+    for direction, fields_key, rules_key in (
+        ("request", "req_fields", "req_type_rules"),
+        ("response", "res_fields", "res_type_rules"),
+    ):
+        fields = payload[fields_key]
+        rules = payload[rules_key]["types"]
+        if not fields or not all(isinstance(field, str) and field for field in fields):
+            raise LearningBundleError(
+                f"invalid no-spec bootstrap {direction} fields"
+            )
+        if not rules:
+            raise LearningBundleError(
+                f"invalid no-spec bootstrap {direction} type rules"
+            )
+        for rule in rules:
+            values = rule.get("field_values") if isinstance(rule, dict) else None
+            if (
+                not isinstance(rule, dict)
+                or not isinstance(rule.get("type_name"), str)
+                or not rule["type_name"]
+                or not isinstance(values, dict)
+                or not all(
+                    isinstance(values.get(field), str) and values[field]
+                    for field in fields
+                )
+            ):
+                raise LearningBundleError(
+                    f"invalid no-spec bootstrap {direction} type rule"
+                )
+
+
 def export_learning_bundle(*, base_path: Path, results_path: Path, target: str,
                            protocol: str, output_path: Path,
                            knowledge_mode: str = 'spec') -> Path:
     """Export reusable model/equipment plus learning-only metrics to a tarball."""
+    if knowledge_mode not in {'spec', 'no_spec'}:
+        raise LearningBundleError(f"unsupported knowledge mode: {knowledge_mode}")
     base_path = base_path.resolve()
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="voltron-learning-export-") as temporary:
         root = Path(temporary)
-        _copy_tree_if_exists(base_path / "component" / "models" / target, root / "models" / target)
-        _copy_tree_if_exists(base_path / "component" / "equipment" / target, root / "equipment" / target)
+        model_source = base_path / "component" / "models" / target
+        equipment_source = base_path / "component" / "equipment" / target
+        # No-spec generation keeps its runtime cache below llm-type-only, but
+        # that is not a bundle layout.  Every newly exported bundle uses the
+        # same canonical equipment/<target>/{generators,parsers} contract.
+        if knowledge_mode == 'no_spec':
+            equipment_source = equipment_source / "llm-type-only"
+            _validate_no_spec_bootstrap(model_source / "no_spec_bootstrap.json")
+        _copy_tree_if_exists(model_source, root / "models" / target)
+        _copy_tree_if_exists(equipment_source, root / "equipment" / target)
         for name in (
             "phase_metrics.csv", "model_learning_iterations.csv",
             "generator_iteration_metrics.csv", "llm_usage_metrics.csv",
@@ -148,11 +215,22 @@ def validate_learning_bundle(root: Path, *, target: str, protocol: str) -> dict:
         raise LearningBundleError("unsupported learning bundle format")
     if manifest.get("target") != target or manifest.get("protocol") != protocol:
         raise LearningBundleError("bundle target or protocol mismatch")
+    # Format-1 bundles created before the no-spec reuse feature are ordinary
+    # spec bundles.  Preserve their import compatibility while requiring an
+    # explicit catalog from every future no-spec export.
+    knowledge_mode = manifest.get("knowledge_mode", "spec")
+    if knowledge_mode not in {"spec", "no_spec"}:
+        raise LearningBundleError("unsupported bundle knowledge mode")
     for relative, expected in manifest.get("files", {}).items():
         path = root / relative
         if not path.is_file() or _sha256(path) != expected:
             raise LearningBundleError(f"checksum mismatch: {relative}")
     report = _validate_components(root, target)
+    if knowledge_mode == "no_spec":
+        _validate_no_spec_bootstrap(
+            root / "models" / target / "no_spec_bootstrap.json"
+        )
+    report["knowledge_mode"] = knowledge_mode
     model = root / "models" / target / "evolved_hypothesis.pkl"
     partial = root / "models" / target / "partial_guidance.pkl"
     if model.is_file():

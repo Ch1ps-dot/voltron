@@ -70,6 +70,70 @@ def test_export_then_stage_import_validates_components_and_model(tmp_path):
     assert report["generator_versions"] == 1
 
 
+def test_no_spec_export_normalizes_equipment_and_requires_bootstrap(tmp_path):
+    equipment, _results = _assets(tmp_path)
+    llm_only = equipment / "llm-type-only"
+    llm_only.mkdir()
+    for name in ("generators", "parsers"):
+        (equipment / name).rename(llm_only / name)
+    bootstrap = tmp_path / "component" / "models" / "demo" / "no_spec_bootstrap.json"
+    bootstrap.write_text(json.dumps({
+        "format": 1,
+        "req_fields": ["command"],
+        "res_fields": ["status"],
+        "req_type_rules": {
+            "types": [{"type_name": "PING", "field_values": {"command": "PING"}}],
+        },
+        "res_type_rules": {
+            "types": [{"type_name": "OK", "field_values": {"status": "200"}}],
+        },
+        "req_json": [],
+        "res_json": [],
+    }), encoding="utf-8")
+
+    bundle = export_learning_bundle(
+        base_path=tmp_path,
+        results_path=tmp_path / "results",
+        target="demo",
+        protocol="demo-proto",
+        output_path=tmp_path / "no-spec.tar.gz",
+        knowledge_mode="no_spec",
+    )
+    staging, report = import_learning_bundle(
+        bundle=bundle,
+        staging_root=tmp_path / "staging",
+        target="demo",
+        protocol="demo-proto",
+    )
+
+    assert report["knowledge_mode"] == "no_spec"
+    assert (staging / "equipment" / "demo" / "generators" / "PING" / "id0.py").is_file()
+    assert not (staging / "equipment" / "demo" / "llm-type-only").exists()
+    manifest = json.loads((staging / "manifest.json").read_text())
+    assert manifest["knowledge_mode"] == "no_spec"
+
+
+def test_no_spec_export_rejects_missing_bootstrap(tmp_path):
+    equipment, _results = _assets(tmp_path)
+    llm_only = equipment / "llm-type-only"
+    llm_only.mkdir()
+    for name in ("generators", "parsers"):
+        (equipment / name).rename(llm_only / name)
+    try:
+        export_learning_bundle(
+            base_path=tmp_path,
+            results_path=tmp_path / "results",
+            target="demo",
+            protocol="demo-proto",
+            output_path=tmp_path / "no-spec.tar.gz",
+            knowledge_mode="no_spec",
+        )
+    except LearningBundleError as exc:
+        assert "bootstrap" in str(exc)
+    else:
+        raise AssertionError("no-spec export accepted without bootstrap")
+
+
 def test_import_rejects_target_mismatch_without_activation(tmp_path):
     _assets(tmp_path)
     bundle = export_learning_bundle(
