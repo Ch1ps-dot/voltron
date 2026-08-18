@@ -167,9 +167,9 @@ response_components:
   lazy_generation: true
   prewarm_types: []
 
-# Preserve useful partial learning evidence by default, and reuse an imported
-# partial snapshot only after its target/protocol/parser/generator fingerprint
-# matches the selected component batch.
+# Partial-guidance thresholding is opt-in.  Imported partial snapshots remain
+# reusable after their target/protocol/parser/generator fingerprint matches the
+# selected component batch.
 model_learning:
-  partial_guidance_enabled: true
+  partial_guidance_enabled: false
   reuse_imported_partial_guidance: true

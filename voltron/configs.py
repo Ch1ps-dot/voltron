@@ -53,9 +53,9 @@ class Config:
         # are prepared before fuzzing starts.
         self.response_component_lazy_generation: bool = True
         self.response_component_prewarm_types: list[str] = []
-        # Preserve replayable partial traces if model learning stalls or its
-        # deadline interrupts an observation table.
-        self.partial_guidance_enabled: bool = True
+        # Opt in to preserving partial traces when model learning stalls or
+        # its deadline interrupts an observation table.
+        self.partial_guidance_enabled: bool = False
         # Reuse a validated ``partial_guidance.pkl`` as Berserker seed/frontier
         # guidance without spending another model-learning budget.  Fingerprint
         # validation keeps a partial graph tied to its exact equipment.

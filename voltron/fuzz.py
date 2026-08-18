@@ -473,7 +473,7 @@ class Fuzzer:
         learning_config = configs_yaml.get('model_learning', {})
         partial_guidance_enabled = learning_config.get(
             'partial_guidance_enabled',
-            True,
+            False,
         )
         if not isinstance(partial_guidance_enabled, bool):
             raise TypeError(
@@ -1136,7 +1136,7 @@ class Fuzzer:
         threshold_tracker = (
             ModelLearningThreshold(request_types)
             if (
-                getattr(configs, 'partial_guidance_enabled', True)
+                getattr(configs, 'partial_guidance_enabled', False)
                 and request_types
             )
             else None
