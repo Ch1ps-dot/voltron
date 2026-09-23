@@ -45,6 +45,16 @@ uv run cli.py -s lightftp --generate-ir
 uv run cli.py -s lightftp --learn-and-export -t 30
 ```
 
+Start the local Web dashboard to launch runs and inspect live telemetry:
+
+```bash
+uv run web.py
+```
+
+Then open `http://127.0.0.1:8088`. See the
+[Web dashboard guide](doc/web-dashboard.md) for architecture and deployment
+notes.
+
 ## Documentation
 
 - [Project overview and architecture](doc/overview.md)
@@ -52,6 +62,7 @@ uv run cli.py -s lightftp --learn-and-export -t 30
 - [Running Voltron, artifacts, and runtime metrics](doc/running-voltron.md)
 - [Learning-bundle export, import, and model-batch selection](doc/learning-bundles.md)
 - [Compliance analysis and coverage replay](doc/analysis-and-replay.md)
+- [Web dashboard](doc/web-dashboard.md)
 
 ## Repository layout
 

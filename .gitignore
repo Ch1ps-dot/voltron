@@ -57,3 +57,6 @@ htmlcov/
 
 # 日志文件
 *.log
+
+# Web dashboard run artifacts
+web-runs/

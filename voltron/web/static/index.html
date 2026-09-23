@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070a0d">
+  <title>Voltron · Fuzz Operations</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Voltron 首页">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span><b>VOLTRON</b><small>FUZZ OPERATIONS</small></span>
+      </a>
+
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-item active" data-view="overview"><span>⌁</span>作战总览</button>
+        <button class="nav-item" data-view="runs"><span>◫</span>运行记录</button>
+        <button class="nav-item" data-view="console"><span>›_</span>实时终端</button>
+      </nav>
+
+      <div class="sidebar-status">
+        <span class="eyebrow">CONTROL PLANE</span>
+        <div><i class="status-dot"></i><strong>服务在线</strong></div>
+        <small>数据每 3 秒自动刷新</small>
+      </div>
+      <div class="sidebar-foot">Protocol-aware fuzzing<br>command & telemetry</div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <span class="eyebrow" id="page-kicker">MISSION CONTROL</span>
+          <h1 id="page-title">作战总览</h1>
+        </div>
+        <div class="top-actions">
+          <span class="clock" id="clock">--:--:--</span>
+          <button class="icon-button" id="refresh-button" title="立即刷新" aria-label="立即刷新">↻</button>
+          <button class="primary-button" id="open-launcher"><span>＋</span> 新建任务</button>
+        </div>
+      </header>
+
+      <section class="view active" id="overview-view">
+        <div class="mission-strip">
+          <div class="mission-copy">
+            <span class="live-pill" id="live-pill"><i></i> STANDBY</span>
+            <h2 id="hero-title">等待测试任务</h2>
+            <p id="hero-subtitle">选择目标并启动一次协议感知模糊测试。</p>
+            <button class="danger-button" id="stop-run" hidden>停止当前任务</button>
+          </div>
+          <div class="mission-progress">
+            <div class="progress-meta"><span>任务进度</span><strong id="progress-label">0%</strong></div>
+            <div class="progress-track"><i id="progress-bar"></i></div>
+            <small id="stage-label">尚未启动</small>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card accent-cyan">
+            <div class="metric-head"><span>EXECUTION PATHS</span><i>↗</i></div>
+            <strong id="metric-paths">0</strong>
+            <small><span id="metric-rate">0.00</span> paths / sec</small>
+            <div class="mini-bars" id="path-bars" aria-hidden="true"></div>
+          </article>
+          <article class="metric-card accent-violet">
+            <div class="metric-head"><span>STATE SPACE</span><i>◇</i></div>
+            <strong id="metric-states">0</strong>
+            <small><span id="metric-transitions">0</span> transitions observed</small>
+            <div class="mini-bars violet" id="state-bars" aria-hidden="true"></div>
+          </article>
+          <article class="metric-card accent-amber">
+            <div class="metric-head"><span>ANOMALIES</span><i>△</i></div>
+            <strong id="metric-anomalies">0</strong>
+            <small><span id="metric-crashes">0</span> crashes · <span id="metric-noncompliant">0</span> non-compliant</small>
+            <div class="mini-bars amber" id="anomaly-bars" aria-hidden="true"></div>
+          </article>
+          <article class="metric-card accent-green">
+            <div class="metric-head"><span>LLM TOKENS</span><i>✦</i></div>
+            <strong id="metric-tokens">0</strong>
+            <small><span id="metric-llm-calls">0</span> assisted operations</small>
+            <div class="mini-bars green" id="token-bars" aria-hidden="true"></div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel chart-panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">DISCOVERY VELOCITY</span><h3>状态空间增长</h3></div>
+              <div class="legend"><span><i class="cyan"></i>响应类型</span><span><i class="violet"></i>状态转换</span></div>
+            </div>
+            <div class="chart-wrap">
+              <svg id="discovery-chart" viewBox="0 0 760 250" preserveAspectRatio="none" role="img" aria-label="状态空间增长图"></svg>
+              <div class="empty-chart" id="chart-empty">任务运行后将在此绘制发现曲线</div>
+            </div>
+          </article>
+
+          <article class="panel target-panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">TARGET PROFILE</span><h3>测试目标</h3></div>
+              <span class="target-badge" id="target-protocol">—</span>
+            </div>
+            <div class="target-name" id="target-name">No target selected</div>
+            <div class="target-address" id="target-address">—</div>
+            <dl class="target-facts">
+              <div><dt>当前阶段</dt><dd id="fact-stage">—</dd></div>
+              <div><dt>已运行</dt><dd id="fact-runtime">00:00:00</dd></div>
+              <div><dt>发送 / 接收</dt><dd id="fact-io">0 / 0</dd></div>
+              <div><dt>响应帧</dt><dd id="fact-frames">0</dd></div>
+            </dl>
+          </article>
+
+          <article class="panel phase-panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">PIPELINE</span><h3>阶段进度</h3></div>
+              <span class="muted" id="phase-count">0 / 3</span>
+            </div>
+            <div class="phase-list" id="phase-list"></div>
+          </article>
+
+          <article class="panel activity-panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">RECENT ACTIVITY</span><h3>任务动态</h3></div>
+              <button class="text-button" data-view-link="console">查看终端 →</button>
+            </div>
+            <div class="activity-list" id="activity-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="runs-view">
+        <div class="section-intro"><div><span class="eyebrow">ARCHIVE</span><h2>运行记录</h2></div><p>Web 控制台发起的任务与最终状态。</p></div>
+        <div class="runs-table-wrap panel">
+          <table class="runs-table">
+            <thead><tr><th>任务</th><th>目标</th><th>状态</th><th>时长</th><th>启动时间</th><th></th></tr></thead>
+            <tbody id="runs-table-body"></tbody>
+          </table>
+          <div class="table-empty" id="runs-empty">尚无运行记录</div>
+        </div>
+      </section>
+
+      <section class="view" id="console-view">
+        <div class="section-intro console-intro">
+          <div><span class="eyebrow">LIVE STREAM</span><h2>实时终端</h2></div>
+          <div class="console-tabs" role="tablist">
+            <button class="active" data-log="console">PROCESS</button>
+            <button data-log="fuzzer">FUZZER</button>
+            <button data-log="llm">LLM</button>
+          </div>
+        </div>
+        <article class="terminal panel">
+          <div class="terminal-bar"><span><i></i><i></i><i></i></span><b id="terminal-title">voltron / no active run</b><button id="copy-log">COPY</button></div>
+          <pre id="terminal-output"><code>Waiting for a run…</code></pre>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="launcher" aria-hidden="true">
+    <section class="launcher-card" role="dialog" aria-modal="true" aria-labelledby="launcher-title">
+      <div class="launcher-head">
+        <div><span class="eyebrow">NEW OPERATION</span><h2 id="launcher-title">启动模糊测试</h2></div>
+        <button class="close-button" id="close-launcher" aria-label="关闭">×</button>
+      </div>
+      <form id="launch-form">
+        <label class="field"><span>测试目标</span><select id="target-select" name="target_name" required></select></label>
+        <label class="field"><span>运行时长</span><div class="input-suffix"><input id="duration-input" name="duration_minutes" type="number" min="1" max="1440" value="30" required><i>分钟</i></div></label>
+        <fieldset>
+          <legend>测试能力</legend>
+          <label class="switch-row"><span><b>协议知识</b><small>使用 RFC 与已生成 IR</small></span><input type="checkbox" name="spec_knowledge" checked><i></i></label>
+          <label class="switch-row"><span><b>状态学习</b><small>运行主动 Mealy 机学习</small></span><input type="checkbox" name="state_learning" checked><i></i></label>
+          <label class="switch-row"><span><b>引导调度</b><small>按状态与反馈分配能量</small></span><input type="checkbox" name="guided_scheduling" checked><i></i></label>
+          <label class="switch-row"><span><b>语义观察器</b><small>启用响应语义分析</small></span><input type="checkbox" name="observer" checked><i></i></label>
+          <label class="switch-row"><span><b>合规分析</b><small>复核潜在协议不合规</small></span><input type="checkbox" name="compliance_analysis"><i></i></label>
+        </fieldset>
+        <p class="form-error" id="form-error"></p>
+        <div class="form-actions"><button type="button" class="secondary-button" id="cancel-launch">取消</button><button type="submit" class="primary-button" id="launch-submit">启动任务 <span>→</span></button></div>
+      </form>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
